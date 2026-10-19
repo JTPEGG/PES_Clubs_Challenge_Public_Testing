@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+  <title>PES Manager Career</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="site-topline"></div>
+
+  <header class="site-header">
+    <div class="site-brand">
+      <span class="site-brand-box">SPORT</span>
+      <div>
+        <strong>PES Manager Career</strong>
+        <span>Live Challenge Centre</span>
+      </div>
+    </div>
+
+    <nav class="nav-links">
+      <a href="{{ url_for('dashboard') }}">Dashboard</a>
+      <a href="{{ url_for('post_match') }}">Post Match</a>
+      <a href="{{ url_for('history') }}">History</a>
+      <a href="{{ url_for('career') }}">Career</a>
+      <a href="{{ url_for('jobs') }}">Jobs</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

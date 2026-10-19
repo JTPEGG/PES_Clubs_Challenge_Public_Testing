@@ -1,0 +1,36 @@
+name: Player decision regression tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - 'world_*.py'
+      - 'test_*.py'
+      - 'app.py'
+      - 'requirements.txt'
+      - '.github/workflows/player-decisions.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  player-decisions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile decision modules
+        run: python -m py_compile world_player_decisions.py world_player_decisions_ui.py world_selling_club.py world_transfer_negotiations.py world_transfer_negotiations_ui.py world_transfer_affordability.py world_transfer_board.py world_career_management.py world_career_play.py world_board_objectives.py world_career_objectives.py world_career_board_policy.py world_careers.py world_career_selling.py world_career_selling_ui.py world_career_strength.py world_career_incoming.py world_career_resources.py world_career_transfer_protocol.py world_ai_bidding.py world_preseason_window.py world_live_market.py world_live_buying.py world_offer_deadlines.py world_career_ui.py world_squad_desk.py world_season_setup.py world_player_morale.py
+      - name: Validate dynamic Manager Dashboard script
+        run: |
+          python -c "from world_career_ui import DASHBOARD_JS; open('/tmp/pes_manager_dashboard.js','w').write(DASHBOARD_JS)"
+          node --check /tmp/pes_manager_dashboard.js
+      - name: Run transfer decision regression tests
+        run: python -m unittest -v test_player_decisions_v2_regression test_selling_club_regression test_transfer_negotiations test_transfer_affordability test_transfer_board test_board_context test_career_management test_board_objectives test_career_board_policy test_career_selling test_career_selling_http test_career_incoming test_career_resources test_ai_bidding test_preseason_window test_live_market_http test_full_career_playtest test_transfer_logic_qa test_offer_deadlines
