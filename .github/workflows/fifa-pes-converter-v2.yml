@@ -1,0 +1,43 @@
+name: FIFA20-only PES2020 conversion v2 complete QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_fifa_pes_converter_v2.py'
+      - 'test_fifa_pes_converter_v2.py'
+      - 'test_fifa_pes_export_v2.py'
+      - 'scripts/export_fifa_pes_v2.py'
+      - '.github/workflows/fifa-pes-converter-v2.yml'
+  pull_request:
+    paths:
+      - 'world_fifa_pes_converter_v2.py'
+      - 'test_fifa_pes_converter_v2.py'
+      - 'test_fifa_pes_export_v2.py'
+      - 'scripts/export_fifa_pes_v2.py'
+      - '.github/workflows/fifa-pes-converter-v2.yml'
+permissions:
+  contents: read
+jobs:
+  strict-conversion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests for complete conversions, GK fallback and excluded FC25
+        run: python -m unittest -v test_fifa_pes_converter_v2 test_fifa_pes_export_v2
+      - name: Fetch and checksum the 23 original annual FIFA CSVs
+        run: python -u scripts/build_fifa_fc_archive.py --output qa-v2-input/fifa_original_23.zip --workers 5
+      - name: Full 22-edition PES rating conversion (FC25 deliberately omitted)
+        run: python -u -m scripts.export_fifa_pes_v2 --source qa-v2-input/fifa_original_23.zip --output qa-v2-output/FIFA05_to_FC27_Complete_PES2020_Converted_NO_FC25.zip
+      - name: Upload version 2 year-specific completed rating CSVs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FIFA-PES2020-Converter-v2-NO-FC25
+          path: qa-v2-output/FIFA05_to_FC27_Complete_PES2020_Converted_NO_FC25.zip
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
