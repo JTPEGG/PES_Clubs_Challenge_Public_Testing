@@ -83,7 +83,12 @@ class FifaToPes20Tests(unittest.TestCase):
                     calibration={"speed":35})
 
     def test_csv_stream_and_null_encoding(self):
-        inp=StringIO("player_id,position,goalkeeping_reflexes,passing\n1,GK,81,\\n2,CB,,88\n")
+        inp=StringIO(chr(10).join([
+            "player_id,position,goalkeeping_reflexes,passing",
+            "1,GK,81,",
+            "2,CB,,88",
+            ""
+        ]))
         dst=StringIO()
         result=convert_csv_stream(inp,2027,dst)
         self.assertEqual(result["processed"],2)
