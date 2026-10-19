@@ -1,0 +1,68 @@
+name: FIFA to PES2020 converter QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_fifa_pes_converter.py'
+      - 'test_fifa_pes_converter.py'
+      - 'qa_pes_conversion_pilot.py'
+      - 'qa_playersdb_source.py'
+      - 'qa_playersdb_download.py'
+      - 'qa_playersdb_jsonl.py'
+      - 'scripts/export_fifa_pes_csvs.py'
+      - 'test_fifa_pes_csv_export.py'
+      - '.github/workflows/fifa-to-pes-converter.yml'
+  pull_request:
+    paths:
+      - 'world_fifa_pes_converter.py'
+      - 'test_fifa_pes_converter.py'
+      - 'qa_pes_conversion_pilot.py'
+      - '.github/workflows/fifa-to-pes-converter.yml'
+jobs:
+  validate-and-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate converter against old and modern editions
+        run: python -m unittest -v test_fifa_pes_converter test_fifa_pes_csv_export
+      - name: Benchmark real FIFA editions against PES2020
+        run: python -u qa_pes_conversion_pilot.py
+      - name: Inspect linked PlayersDB crosswalk download source
+        run: python -u qa_playersdb_source.py
+      - name: Check PlayersDB actual cross-identifier CSV source
+        run: python -u qa_playersdb_download.py
+      - name: Inspect PlayersDB JSONL source detail availability
+        run: python -u qa_playersdb_jsonl.py
+      - name: Upload historical and current converter comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fifa-pes2020-conversion-pilot
+          path: qa-conversion-pilot/
+          if-no-files-found: warn
+      - name: Fetch original 23-edition source archive for end-to-end import
+        run: python -u scripts/build_fifa_fc_archive.py --output qa-input/original_23_editions.zip --workers 6
+      - name: Export PES2020 conversion preview for all 23 editions
+        run: python -u -m scripts.export_fifa_pes_csvs --source qa-input/original_23_editions.zip --output qa-conversion-pilot/PES2020_Conversion_23_Edition_Preview.zip --limit-per-edition 15
+      - name: Upload 23-edition PES-style CSV preview
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fifa-to-pes2020-23-edition-preview
+          path: qa-conversion-pilot/PES2020_Conversion_23_Edition_Preview.zip
+          if-no-files-found: warn
+      - name: Inspect source PES2020 historical export schema
+        run: |
+          python - <<'PY'
+          from urllib.request import urlopen
+          src="https://raw.githubusercontent.com/mlblbc/pes---Data-visualization-project/5882c0023a7f16eda4599adc87c7ba160aa9411e/pes_2020.csv"
+          with urlopen(src,timeout=30) as f:
+              header=f.readline().decode("utf-8-sig",errors="replace")
+          print("PES2020 CSV COLUMNS:",header[:6500])
+          PY
