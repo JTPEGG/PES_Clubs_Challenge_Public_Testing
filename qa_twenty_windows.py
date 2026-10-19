@@ -104,6 +104,19 @@ def score_window(conn,career,initial,final,index,market_outcome):
            JOIN world_career_offers o ON o.offer_id=e.offer_id
            WHERE o.career_id=? AND e.event_type='ai_prospect_signed'""",
         (career,)).fetchall()}
+    # Complete deal ledger: source-backed PES ratings and player identities,
+    # registered club ownership and actual committed transfer fees.
+    player_names=dict(conn.execute("SELECT player_id,full_name FROM world_players"))
+    transfer_ledger=[
+        {"Window":index,
+         "Player":player_names[pid],
+         "Position":lane_of(position) or position,
+         "OVR":int(overall),
+         "From":names[seller],"To":names[buyer],
+         "Fee_GBP":int(fee),
+         "Type":"Future prospect" if oid in prospects else "First team / depth",
+         "Offer_ID":int(oid)}
+        for oid,pid,seller,buyer,position,overall,fee in moves]
     # Every signed move is classified by actual specialist position. We
     # measure both vacancies and losses of first-team quality, including
     # midfielders and forwards, not only keepers and centre-backs.
@@ -236,6 +249,7 @@ def score_window(conn,career,initial,final,index,market_outcome):
         position_counts=dict(position_counts),seller_cases=dict(seller_cases),
         positional_alerts=positional_alerts,
         club_positions=club_positions,
+        transfers=transfer_ledger,
         final_state=market_outcome["state"])
 
 
@@ -349,4 +363,13 @@ if __name__=="__main__":
     args=parser.parse_args()
     report=run(args.windows)
     Path(args.output).write_text(json.dumps(report,indent=2),encoding="utf-8")
+    import csv
+    csv_path=Path(args.output).with_name("qa-two-window-transfer-ledger.csv")
+    fields=("Window","Player","Position","OVR","From","To","Fee_GBP","Type","Offer_ID")
+    rows=[transfer for win in report["windows"] for transfer in win["transfers"]]
+    with csv_path.open("w",newline="",encoding="utf-8-sig") as handle:
+        writer=csv.DictWriter(handle,fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+    print("EXPORTED",len(rows),"transfer records to",csv_path,flush=True)
     print(json.dumps({k:v for k,v in report.items() if k!="windows"},indent=2))
