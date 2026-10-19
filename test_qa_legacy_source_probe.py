@@ -37,20 +37,19 @@ class LegacyDataSourceProbeTests(unittest.TestCase):
         self.assertEqual(result["records_with_all_detected_pes_abilities"],1)
 
     def test_historical_crosswalk_is_only_a_candidate(self):
-        fifa=("sofifa_id,short_name,nationality,age,club,dob\\n"
-              "239085,E. Haaland,Norway,19,RB Salzburg,2000-07-21\\n")
-        pes=("name,nationality,age,team_name\\n"
-             "E. Haaland,Norway,19,RB Salzburg\\n")
-        report=fifa20_pes20_crosswalk_candidates(
-            fifa.replace("\\\\n","\\n"),pes.replace("\\\\n","\\n"))
+        header_fifa=["sofifa_id,short_name,nationality,age,club,dob",
+                     "239085,E. Haaland,Norway,19,RB Salzburg,2000-07-21"]
+        header_pes=["name,nationality,age,team_name",
+                    "E. Haaland,Norway,19,RB Salzburg"]
+        fifa=chr(10).join(header_fifa)+chr(10)
+        pes=chr(10).join(header_pes)+chr(10)
+        report=fifa20_pes20_crosswalk_candidates(fifa,pes)
         self.assertEqual(report["qualifying_candidate_pairs"],1)
         self.assertEqual(report["modern_pilot_exact_fifa20_ids"],1)
         self.assertEqual(report["modern_pilot_with_pes20_candidate"],1)
         self.assertIn("CANDIDATES_NOT_VERIFIED",report["label"])
         ambiguous=fifa20_pes20_crosswalk_candidates(
-            fifa.replace("\\\\n","\\n"),
-            pes.replace("\\\\n","\\n") +
-            "E. Haaland,Norway,19,RB Salzburg\\n".replace("\\\\n","\\n"))
+            fifa,pes+header_pes[1]+chr(10))
         self.assertEqual(ambiguous["qualifying_candidate_pairs"],0)
         self.assertEqual(ambiguous["ambiguous_shared_keys_rejected"],1)
 
