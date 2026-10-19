@@ -1,6 +1,6 @@
 # FIFA → PES 2020 converter: Version 2
 
-**Status:** code complete for review; the first full-archive QA run is **queued** on GitHub, not yet verified. **No deployment, merger or update to existing PES careers.**
+**Status (19 Oct 2026):** Version 2 remains **IN PROGRESS**. The first GitHub V2 run executed 12 initial tests: 11 passed, 1 failed on an inconsistent calibration-status test assertion. The assertion was corrected and additional tests added; the newest CI/full export have not yet been confirmed successful. **No deployment, merge or update to existing PES careers.**
 
 ## Decisions confirmed
 
@@ -20,6 +20,16 @@
 | [test_fifa_pes_converter_v2.py](../../test_fifa_pes_converter_v2.py) | 10 targeted assertions: strict 25+4, GK Diving/Reflexes reconstruction, identity matching, FC25 disallow, FIFA20 calibration exclusivity, fallback and role checks |
 | [test_fifa_pes_export_v2.py](../../test_fifa_pes_export_v2.py) | 2 export integration tests proving no FC25 year export and all required ability fields numeric |
 | [Version 2 full-edition QA workflow](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/workflows/fifa-pes-converter-v2.yml) | Runs unit tests, downloads source ZIP, trains FIFA20/PES20 offsets and exports all non-FC25 editions; the user can download output artifact when successful |
+
+## Recent V2 hardening (separate branch, no live data changes)
+
+- Source-labelled LWB/RWB and additional sided historic positions map conservatively to PES 2020 native roles. No PES non-native wing-back role can pass validated export.
+- Each *source-listed* primary/alternative position now has a complete numerical V2 suitability index recalculated after all 25 abilities are reconstructed. These low-confidence indices must not be treated as verified Konami positional familiarity/overall.
+- Cross-year player imputation requires stable ID **and** DOB **and** matching identity name, and automatically blocks joins between incompatible source provider namespaces. Matching numeric IDs from different providers is not proof of identity.
+- Full CSV output now includes per-attribute source-edition metadata, offset provenance, complete positional suitability JSON and per-edition GK/DEF/MID/ATT method counts.
+- Automatic approval of provisional FIFA20/PES20 offset proposals was removed. The QA workflow generates *unapproved* candidate offsets, plus position-family held-out errors, and exports without applying them. Manual review is required to adopt a calibration.
+- New synthetic test covers every FIFA 05–FC 27 edition with exactly 22 outputs, 2025 manifest-only gap, 25 validated integer core ratings and positional-fit metadata. A separate live-source QA audit evaluates up to 100 real FIFA05 goalkeepers and records method/column evidence.
+- The 127 paired-player identities used previously for research are provisional exact-field matches, not verified EA↔Konami IDs. The same 20% test split was used to choose potential shifts, so exploratory after-shift improvements are **not independent confirmation**.
 
 ## Detailed imputation priority
 
@@ -52,4 +62,4 @@ The PES 2020 source has **15,035 real-game reference player profiles**. Prior FI
 4. Inspect distribution by GK/outfield, OVR band, historical era and high share of low-confidence reconstructed fields. Particular concern: goalkeeper imputation and clipping of weak outfield GK ratings.
 5. Only after data-QA passes should we design the PES option-file encoder and decide how PC/PS4 can consume it.
 
-**Current state:** QA workflow queued. Until it reports success, we have a developed v2 pipeline, not a verified full output ZIP. All changes are confined to the public isolated testing repository and draft PR.
+**Current state:** The revised tests, live FIFA05 goalkeeper audit, FIFA20 position-family benchmarking and 22-edition full export require a successful GitHub Actions run before numerical completeness/method/accuracy results can be claimed. All changes are confined to the public isolated testing repository and draft PR.
