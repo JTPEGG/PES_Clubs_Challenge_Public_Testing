@@ -454,16 +454,24 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     _sign_ai_deal(conn,career_id=career_id,offer_id=oid,buyer=buyer,
                         seller=seller,fee=final_fee,wage=final_wage,
                         game_date=game_date)
-                    if sale["requires_recruitment"]:
-                        conn.execute("""INSERT INTO world_career_offer_events
-                            (offer_id,event_type,detail) VALUES(?,?,?)""",
-                            (oid,"ai_seller_recruitment_required",
-                             f"Sell first; assess replacement afterwards in "
-                             f"{sale['lane']}; priority "
-                             f"{sale['replacement_priority']}; "
-                             f"previous depth {sale['before_depth']}, "
-                             f"after departure {sale['after_depth']}."))
-                        conn.commit()
+                    # Every approved sale gets a distinct sporting rationale.
+                    # Do not manufacture a replacement when the role is already
+                    # covered, and do not require a signing before an exit.
+                    sale_event=("ai_seller_recruitment_required"
+                                if sale["requires_recruitment"] else
+                                "ai_seller_surplus_sale"
+                                if sale["surplus_sale"] else
+                                "ai_seller_covered_sale")
+                    conn.execute("""INSERT INTO world_career_offer_events
+                        (offer_id,event_type,detail) VALUES(?,?,?)""",
+                        (oid,sale_event,
+                         f"Specialist position {sale['lane']}; "
+                         f"priority {sale['replacement_priority']}; "
+                         f"depth {sale['before_depth']} to "
+                         f"{sale['after_depth']}; "
+                         f"starter OVR drop {sale['starter_rating_drop']}. "
+                         f"Replacement is never a pre-sale requirement."))
+                    conn.commit()
                     if fit.get("category")=="prospect":
                         conn.execute("""INSERT INTO world_career_offer_events
                             (offer_id,event_type,detail) VALUES(?,? ,?)""",
