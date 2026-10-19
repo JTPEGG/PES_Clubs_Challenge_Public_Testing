@@ -386,6 +386,7 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
 
 def _consider_bid(conn,*,career_id,window_id,slot,t):
     """Exactly one plausible proposal opportunity per due market moment."""
+    from world_recruitment_strategy import prospect_fee_cap
     row=conn.execute("""SELECT c.dataset_id,c.manager_club_id,c.pes_lock_date
         FROM world_career_saves c WHERE c.career_id=?""",(career_id,)).fetchone()
     dataset,manager,pes_lock=row
