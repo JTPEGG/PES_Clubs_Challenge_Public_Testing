@@ -1,0 +1,37 @@
+name: FIFA to PES2020 converter QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_fifa_pes_converter.py'
+      - 'test_fifa_pes_converter.py'
+      - 'qa_pes_conversion_pilot.py'
+      - '.github/workflows/fifa-to-pes-converter.yml'
+  pull_request:
+    paths:
+      - 'world_fifa_pes_converter.py'
+      - 'test_fifa_pes_converter.py'
+      - 'qa_pes_conversion_pilot.py'
+      - '.github/workflows/fifa-to-pes-converter.yml'
+jobs:
+  validate-and-benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate converter against old and modern editions
+        run: python -m unittest -v test_fifa_pes_converter
+      - name: Inspect source PES2020 historical export schema
+        run: |
+          python - <<'PY'
+          from urllib.request import urlopen
+          src="https://raw.githubusercontent.com/mlblbc/pes---Data-visualization-project/5882c0023a7f16eda4599adc87c7ba160aa9411e/pes_2020.csv"
+          with urlopen(src,timeout=30) as f:
+              header=f.readline().decode("utf-8-sig",errors="replace")
+          print("PES2020 CSV COLUMNS:",header[:6500])
+          PY
