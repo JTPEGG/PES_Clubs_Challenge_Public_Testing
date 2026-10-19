@@ -218,9 +218,25 @@ def run(windows):
                   f"{stats['prospect_signings']} prospects, "
                   f"{len(stats['defensive_coverage_flags'])} coverage flags",
                   flush=True)
+        elite_totals={}
+        for name in ELITE:
+            entries=[result["elite"][name] for result in results]
+            elite_totals[name]={
+                "arrivals":sum(x["arrivals"] for x in entries),
+                "departures":sum(x["departures"] for x in entries),
+                "prospect_arrivals":sum(x["incoming_prospects"] for x in entries),
+                "window_with_incoming":sum(x["arrivals"]>0 for x in entries),
+                "mean_start_top11":round(
+                    sum(x["original_top11_mean"] for x in entries)/windows,2),
+                "mean_end_top11":round(
+                    sum(x["final_top11_mean"] for x in entries)/windows,2),
+                "total_cb_losses":sum(max(0,
+                    x["original_cb_depth"]-x["final_cb_depth"]) for x in entries),
+            }
         return dict(version="market-qa-v1",source_dataset=DATASET,
             fixture="isolated seeded 92-club development world",
             simulated_windows=windows,
+            elite_totals=elite_totals,
             **{"total_completed":sum(x["completed_transfers"] for x in results),
                "mean_completed":round(sum(x["completed_transfers"] for x in results)/windows,2),
                "goalkeeper_share":round(
