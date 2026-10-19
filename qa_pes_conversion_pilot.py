@@ -25,8 +25,7 @@ SRC={
  2027:"https://raw.githubusercontent.com/LakshmiKanth11/EA_FC_ANALYSIS/c0b2542d9fcae72d2c538a472a30ee57c4e7c75e/EA_FC_PLAYERS_DATASET_AND_%20DASHBOARD/data/players.csv",
 }
 PES_SRC="https://raw.githubusercontent.com/mlblbc/pes---Data-visualization-project/5882c0023a7f16eda4599adc87c7ba160aa9411e/pes_2020.csv"
-PES_TARGETS={k:("place_kicking" if k=="set_piece_taking" else k)
-             for k in TARGETS}
+PES_TARGETS={k:k for k in TARGETS}
 
 
 def fetch_csv(url,limit=20_000_000):
