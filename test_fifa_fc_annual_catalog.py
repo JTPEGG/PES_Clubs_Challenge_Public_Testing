@@ -33,7 +33,7 @@ class FifaFcSourceCatalogTests(unittest.TestCase):
             self.assertIn("unverified" if row["edition"]>=2003 else "unextractable",
                           row["status"])
         self.assertEqual(CATALOG["records"][4]["edition"],2004)
-        self.assertIn("XLSX",CATALOG["records"][4]["file_path"])
+        self.assertIn(".xlsx",CATALOG["records"][4]["file_path"].lower())
 
     def test_fifa05_to_20_are_all_single_year_csvs(self):
         root="lbenz730/fifa_model"
