@@ -23,6 +23,9 @@ on:
       - '.github/workflows/fifa-pes-converter-v2.yml'
 permissions:
   contents: read
+concurrency:
+  group: fifa-pes-v2-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   strict-conversion:
     runs-on: ubuntu-latest
