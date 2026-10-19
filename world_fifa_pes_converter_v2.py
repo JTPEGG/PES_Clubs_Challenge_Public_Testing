@@ -87,7 +87,7 @@ def _date(row,edition):
     text=(row.get("dob") or row.get("birthdate") or "").strip()
     if not text or text.lower() in ("na","nan"):
         return None
-    if re.match(r"^\\d{4}-\\d{2}-\\d{2}(?:[T ]|$)",text):
+    if re.match(r"^\d{4}-\d{2}-\d{2}(?:[T ]|$)",text):
         text=text[:10]
     for fmt in ("%Y-%m-%d","%d-%m-%Y","%m/%d/%Y","%d/%m/%Y",
                 "%Y/%m/%d","%d %b %Y"):
@@ -202,7 +202,7 @@ def _same_player_name(left,right):
         raw=next((str(prepared[k]).strip() for k in
                   ("name","long_name","short_name","Name","FullName",
                    "common_name") if prepared.get(k)), "")
-        return re.sub(r"[^\\w]", "", raw.casefold())
+        return re.sub(r"[^\w]", "", raw.casefold())
     a,b=name(left),name(right)
     return bool(a and b and a==b)
 
