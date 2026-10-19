@@ -51,6 +51,19 @@ CREATE TABLE IF NOT EXISTS wh_player_positions (
 CREATE UNIQUE INDEX IF NOT EXISTS wh_one_primary_position
  ON wh_player_positions(dataset_id,player_id) WHERE position_kind='primary';
 
+-- A player with zero listed alternatives might truly play one position,
+-- or might simply have no scouting evidence. Record review completeness.
+CREATE TABLE IF NOT EXISTS wh_player_position_reviews (
+ dataset_id TEXT NOT NULL REFERENCES world_datasets(dataset_id),
+ player_id INTEGER NOT NULL REFERENCES world_players(player_id),
+ review_status TEXT NOT NULL CHECK(review_status IN
+  ('unreviewed','partial','verified_complete')),
+ reviewed_on TEXT,
+ source_id TEXT NOT NULL REFERENCES wh_sources(source_id),
+ review_note TEXT,
+ PRIMARY KEY(dataset_id,player_id)
+);
+
 -- Attribute key examples: sprint_speed, acceleration, passing, stamina,
 -- finishing, heading; existing six FC categories map to separate keys.
 CREATE TABLE IF NOT EXISTS wh_player_attributes (
