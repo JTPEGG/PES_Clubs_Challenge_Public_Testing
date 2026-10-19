@@ -151,10 +151,14 @@ def prepared_row(row):
                 found.append(name)
     copy=dict(row)
     # FC27 often leaves common_name blank; use the sourced first+last fields.
-    if not any(copy.get(k) for k in
-               ("name","long_name","short_name","Name","FullName","common_name")):
+    real_names=("name","long_name","short_name","Name","FullName","common_name")
+    def meaningful(value):
+        return str(value or "").strip().casefold() not in (
+            "","nan","na","n/a","none","null","-")
+    if not any(meaningful(copy.get(k)) for k in real_names):
         full=" ".join(str(copy.get(k) or "").strip()
-                      for k in ("first_name","last_name")).strip()
+                      for k in ("first_name","last_name")
+                      if meaningful(copy.get(k))).strip()
         if full:
             copy["name"]=full
     if found:
