@@ -90,10 +90,12 @@ def recruitment_fit(squads, *, buyer, position, overall):
     starter_n=STARTERS[slot]
     baseline=peers[min(starter_n-1,len(peers)-1)][1] if peers else None
     team_baseline=all_ratings[min(10,len(all_ratings)-1)]
-    thin=len(peers)<MIN_COVER[slot]
+    thin=len(peers)<max(MIN_COVER[slot],STARTERS[slot])
     # First-team upgrades require meaningful improvement to the actual
     # starter; an 83-rated attacker is not a first-team upgrade to a 90+ XI.
     improvement=(overall-baseline) if baseline is not None else 0
+    # Missing a usable starter is an urgent need, not a demand to
+    # obtain the replacement BEFORE selling the previous player.
     credible_depth=thin and overall>=team_baseline-8
     credible_upgrade=(baseline is not None and improvement>=3 and
                       overall>=team_baseline-3)
@@ -107,6 +109,50 @@ def recruitment_fit(squads, *, buyer, position, overall):
             "upgrade":improvement,"depth_shortage":thin,
             "reason":("Required positional cover" if credible_depth else
                       "Meaningful first-team positional upgrade")}
+
+
+
+def sale_profile(squads, *, seller, player_id, position, overall):
+    """Describe sporting consequences; never veto a transfer by itself.
+
+    Surplus is not a vacancy. A genuine replacement search can BEGIN after
+    selling, and external seller/board/player decisions determine consent.
+    This must assess actual specialist positions, not pooled DEF/MID/FWD.
+    """
+    slot=lane_of(position)
+    if not slot:
+        return {"valid":False,"reason":"Unknown specialist position"}
+    peers=squads.get(seller,{}).get(slot,[])
+    selected=[p for p in peers if p[0]==player_id]
+    if len(selected)!=1:
+        return {"valid":False,"reason":"Player not on projected seller squad"}
+    remaining=[p for p in peers if p[0]!=player_id]
+    starter_n=STARTERS[slot]
+    required=max(starter_n,MIN_COVER[slot])
+    rank=next(i for i,p in enumerate(peers) if p[0]==player_id)
+    before=peers[min(starter_n-1,len(peers)-1)][1]
+    after=(remaining[min(starter_n-1,len(remaining)-1)][1]
+           if remaining else None)
+    starter_drop=max(0,before-after) if after is not None else before
+    is_first_choice=rank<starter_n
+    cover_breach=len(remaining)<required
+    material_drop=is_first_choice and starter_drop>4
+    needs_recruitment=cover_breach or material_drop
+    return {
+        "valid":True,"lane":slot,"rank":rank,"first_choice":is_first_choice,
+        "before_depth":len(peers),"after_depth":len(remaining),
+        "before_starter_floor":before,"after_starter_floor":after,
+        "starter_rating_drop":starter_drop,"below_target_cover":cover_breach,
+        "replacement_priority":("urgent" if cover_breach else
+                                "improve_starter" if material_drop else "none"),
+        "requires_recruitment":needs_recruitment,
+        "surplus_sale":not needs_recruitment and not is_first_choice,
+        "reason":("Club can sell from existing positional surplus" if
+                  not needs_recruitment and not is_first_choice else
+                  "Sale is viable without a pre-agreed replacement but needs follow-up"
+                  if needs_recruitment else
+                  "Projected specialist starting standard remains acceptable"),
+    }
 
 
 def departure_guard(squads, *, seller, player_id, position, overall):

@@ -31,7 +31,7 @@ from world_live_market import (
     initialise_live_market,start_live_market,process_live_market,MARKET_MOMENTS,
 )
 from world_preseason_window import window_snapshot
-from world_squad_planner import lane_of,MIN_COVER
+from world_squad_planner import lane_of,MIN_COVER,STARTERS
 
 DATASET="england-2026-27-fc27"
 ELITE=("Arsenal","Chelsea","Manchester City")
@@ -104,6 +104,73 @@ def score_window(conn,career,initial,final,index,market_outcome):
            JOIN world_career_offers o ON o.offer_id=e.offer_id
            WHERE o.career_id=? AND e.event_type='ai_prospect_signed'""",
         (career,)).fetchall()}
+    # Every signed move is classified by actual specialist position. We
+    # measure both vacancies and losses of first-team quality, including
+    # midfielders and forwards, not only keepers and centre-backs.
+    position_counts=defaultdict(lambda: {"transfers":0,"prospects":0})
+    seller_cases=Counter()
+    for oid,pid,seller,buyer,position,overall,fee in moves:
+        lane=lane_of(position) or "UNKNOWN"
+        position_counts[lane]["transfers"]+=1
+        position_counts[lane]["prospects"]+=int(oid in prospects)
+        facts=conn.execute("""SELECT market_value,contract_years,
+            transfer_listed,player_wants_exit,financial_state
+            FROM world_career_seller_assumptions
+            WHERE career_id=? AND player_id=?""",(career,pid)).fetchone()
+        if facts:
+            value,term,listed,pushing,finances=facts
+            basis=("exceptional_fee" if value and fee>=2*value else
+                   "player_exit_pressure" if pushing or listed else
+                   "short_contract" if term is not None and term<=1 else
+                   "financial_pressure" if finances in
+                     ("cash_needed","distressed") else
+                   "ordinary")
+        else:
+            basis="unrecorded_seller_facts"
+        seller_cases[basis]+=1
+
+    club_positions={}
+    positional_alerts=[]
+    for club in sorted(set(initial)|set(final)):
+        before=initial.get(club,{})
+        after=final.get(club,{})
+        positions={}
+        for lane in MIN_COVER:
+            older=before.get(lane,[])
+            newer=after.get(lane,[])
+            incoming=sum(m[3]==club and lane_of(m[4])==lane for m in moves)
+            outgoing=sum(m[2]==club and lane_of(m[4])==lane for m in moves)
+            if not (older or newer or incoming or outgoing):
+                continue
+            n=STARTERS[lane]
+            before_floor=(older[min(n-1,len(older)-1)][1]
+                          if older else None)
+            after_floor=(newer[min(n-1,len(newer)-1)][1]
+                         if newer else None)
+            before_top=(round(sum(p[1] for p in older[:n])/
+                         min(n,len(older)),2) if older else None)
+            after_top=(round(sum(p[1] for p in newer[:n])/
+                        min(n,len(newer)),2) if newer else None)
+            lost_cover=(len(newer)<len(older) and
+                        len(newer)<max(MIN_COVER[lane],STARTERS[lane]))
+            weaker=(before_top is not None and
+                    (after_top is None or before_top-after_top>=3))
+            positions[lane]=dict(bought=incoming,sold=outgoing,
+                before_depth=len(older),after_depth=len(newer),
+                before_starter_floor=before_floor,
+                after_starter_floor=after_floor,
+                before_starter_quality=before_top,
+                after_starter_quality=after_top,
+                lost_specialist_cover=lost_cover,
+                starter_quality_decline=weaker)
+            if lost_cover or weaker:
+                positional_alerts.append({
+                    "club":names[club],"position":lane,
+                    "lost_cover":lost_cover,"weaker_starters":weaker,
+                    "bought":incoming,"sold":outgoing,
+                    "before_depth":len(older),"after_depth":len(newer),
+                    "before_quality":before_top,"after_quality":after_top})
+        club_positions[names[club]]=positions
     keepers=sum(lane_of(m[4])=="GK" for m in moves)
     out=Counter(m[2] for m in moves)
     into=Counter(m[3] for m in moves)
@@ -166,6 +233,9 @@ def score_window(conn,career,initial,final,index,market_outcome):
         ai_attempts=attempts,goalkeeper_transfers=keepers,
         prospect_signings=sum(m[0] in prospects for m in moves),
         elite=by_elite,defensive_coverage_flags=quality_risks,
+        position_counts=dict(position_counts),seller_cases=dict(seller_cases),
+        positional_alerts=positional_alerts,
+        club_positions=club_positions,
         final_state=market_outcome["state"])
 
 
@@ -218,6 +288,20 @@ def run(windows):
                   f"{stats['prospect_signings']} prospects, "
                   f"{len(stats['defensive_coverage_flags'])} coverage flags",
                   flush=True)
+        all_position_counts=defaultdict(lambda: {"transfers":0,"prospects":0,
+            "cover_alerts":0,"quality_alerts":0})
+        all_seller_cases=Counter()
+        for result in results:
+            for lane,values in result["position_counts"].items():
+                all_position_counts[lane]["transfers"]+=values["transfers"]
+                all_position_counts[lane]["prospects"]+=values["prospects"]
+            all_seller_cases.update(result["seller_cases"])
+            for alert in result["positional_alerts"]:
+                lane=alert["position"]
+                all_position_counts[lane]["cover_alerts"]+=int(
+                    alert["lost_cover"])
+                all_position_counts[lane]["quality_alerts"]+=int(
+                    alert["weaker_starters"])
         elite_totals={}
         for name in ELITE:
             entries=[result["elite"][name] for result in results]
@@ -237,6 +321,14 @@ def run(windows):
             fixture="isolated seeded 92-club development world",
             simulated_windows=windows,
             elite_totals=elite_totals,
+            all_positions=dict(all_position_counts),
+            seller_sale_reasons=dict(all_seller_cases),
+            position_coverage_alerts=sum(
+                len([a for a in x["positional_alerts"] if a["lost_cover"]])
+                for x in results),
+            position_quality_alerts=sum(
+                len([a for a in x["positional_alerts"] if a["weaker_starters"]])
+                for x in results),
             **{"total_completed":sum(x["completed_transfers"] for x in results),
                "mean_completed":round(sum(x["completed_transfers"] for x in results)/windows,2),
                "goalkeeper_share":round(

@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 
 from world_squad_planner import (
-    lane_of, projected_squads, recruitment_fit, departure_guard,
+    lane_of, projected_squads, recruitment_fit, departure_guard, sale_profile,
 )
 
 
@@ -39,7 +39,7 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(lane_of("RB"),"RB")
         self.assertEqual(lane_of("RW"),"RW")
         self.assertEqual(lane_of("LW"),"LW")
-        self.assertEqual(lane_of("RWF"),"W")
+        self.assertEqual(lane_of("RWF"),"RW")
 
     def test_elite_club_does_not_buy_ordinary_backup_as_upgrade(self):
         # Three strong starters and a solid XI; the third-best forward
@@ -100,6 +100,37 @@ class PlannerTests(unittest.TestCase):
         plan=self.squads()
         self.assertFalse(departure_guard(plan,seller=2,player_id=pids[1],
                         position="CB",overall=88)["allowed"])
+
+    def test_surplus_sale_needs_no_replacement(self):
+        backups=[self.player(2,"CB",v) for v in (87,82,78,76,73)]
+        case=sale_profile(self.squads(),seller=2,
+            player_id=backups[-1],position="CB",overall=73)
+        self.assertTrue(case["valid"])
+        self.assertTrue(case["surplus_sale"])
+        self.assertFalse(case["requires_recruitment"])
+
+    def test_sell_first_key_starter_is_scored_as_follow_up_not_a_veto(self):
+        sole=self.player(2,"RB",91)
+        case=sale_profile(self.squads(),seller=2,
+            player_id=sole,position="RB",overall=91)
+        self.assertTrue(case["valid"])
+        self.assertEqual(case["replacement_priority"],"urgent")
+        self.assertTrue(case["requires_recruitment"])
+        # Normal seller/agent/board approval is deliberately assessed later.
+        self.assertFalse(departure_guard(self.squads(),seller=2,
+                         player_id=sole,position="RB",overall=91)["allowed"])
+
+    def test_sold_starter_creates_buyer_need_without_advance_replacement(self):
+        starter=self.player(2,"LW",84)
+        for pos,v in (("GK",83),("CB",83),("CM",82),("ST",81)):
+            for _ in range(3):self.player(2,pos,v)
+        self.db.execute("""INSERT INTO world_career_offers
+            VALUES('test',?,?,?,'agreed_future',5)""",(starter,2,3))
+        plan=self.squads()
+        self.assertNotIn("LW",plan[2])
+        new=recruitment_fit(plan,buyer=2,position="LW",overall=85)
+        self.assertTrue(new["eligible"])
+        self.assertTrue(new["depth_shortage"])
 
     def test_signed_arrival_revises_both_clubs_immediately(self):
         p=self.player(2,"CB",88)
