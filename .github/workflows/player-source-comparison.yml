@@ -1,0 +1,40 @@
+name: Player source comparison — global and FC26
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'qa_player_source_comparison.py'
+      - 'test_qa_player_source_comparison.py'
+      - 'docs/warehouse/PLAYER_SOURCE_COMPARISON.md'
+      - '.github/workflows/player-source-comparison.yml'
+  pull_request:
+    paths:
+      - 'qa_player_source_comparison.py'
+      - 'test_qa_player_source_comparison.py'
+      - 'docs/warehouse/PLAYER_SOURCE_COMPARISON.md'
+      - '.github/workflows/player-source-comparison.yml'
+concurrency:
+  group: player-source-global-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test deterministic identity matching and source categorisation
+        run: python -m unittest -v test_qa_player_source_comparison test_qa_player_source_pilot
+      - name: Scan all OpenFootball countries and FC26 source in memory
+        run: python -u qa_player_source_comparison.py --output qa-player-source-global
+      - name: Upload QA-only field availability and source diagnostics
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: player-source-global-comparison
+          path: qa-player-source-global/
+          if-no-files-found: warn
