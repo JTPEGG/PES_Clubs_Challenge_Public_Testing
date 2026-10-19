@@ -16,6 +16,7 @@ import io
 import json
 from pathlib import Path
 import re
+import sqlite3
 from urllib.request import Request, urlopen
 import zipfile
 
@@ -214,6 +215,91 @@ def get_bytes(url,limit=100_000_000):
     return body
 
 
+
+def stage_fc26_in_memory(sample,fc26,attribute_columns):
+    """Validate a source snapshot against the real warehouse DDL in memory.
+
+    Never import previous-edition player facts as a current FC27 career.
+    Only ephemeral source snapshots are constructed, with NO source records
+    written to GitHub or to an existing career.
+    """
+    db=sqlite3.connect(":memory:")
+    db.execute("PRAGMA foreign_keys=ON")
+    db.executescript("""
+        CREATE TABLE world_datasets(dataset_id TEXT PRIMARY KEY);
+        CREATE TABLE world_players(player_id INTEGER PRIMARY KEY);
+        CREATE TABLE world_clubs(club_id INTEGER PRIMARY KEY);
+        CREATE TABLE world_competitions(competition_id TEXT PRIMARY KEY);
+        INSERT INTO world_datasets VALUES('ea-fc26-pilot-only');
+    """)
+    db.executescript((Path(__file__).resolve().parent/
+                      "warehouse"/"schema_v1.sql").read_text(encoding="utf-8"))
+    db.execute("""INSERT INTO wh_sources(source_id,name,rights_basis,source_version)
+                  VALUES('fc26-eval','FC26 dated QA source','unresolved','fc26-csv-pinned')""")
+    counters=Counter()
+    for item in sample:
+        pid=int(item[0]);birth=reference_birthdate(item[15])
+        record=fc26.get(str(pid))
+        if not record or parse_date(record.get("dob"))!=birth:
+            continue
+        db.execute("INSERT INTO world_players(player_id) VALUES(?)",(pid,))
+        counters["matched_player_profiles"]+=1
+        positions=list(dict.fromkeys(
+            x.strip().upper() for x in
+            (record.get("player_positions") or "").split(",")
+            if x.strip()
+        ))
+        for i,pos in enumerate(positions):
+            if not re.fullmatch(r"[A-Z]{2,5}",pos):
+                counters["unrecognized_position_codes"]+=1
+                continue
+            # Only a true reported position is inserted. Per-role suitability
+            # stays NULL because this source does not give a PES-style OVR.
+            db.execute("""INSERT INTO wh_player_positions(
+                dataset_id,player_id,position_code,position_kind,
+                suitability_ovr,origin,source_id)
+                VALUES('ea-fc26-pilot-only',?,?,?,?,?,?)""",
+                (pid,pos,"primary" if i==0 else "alternative",
+                 None,"source","fc26-eval"))
+            counters["position_rows"]+=1
+            if i>0:counters["alternative_position_rows"]+=1
+        if positions:
+            db.execute("""INSERT INTO wh_player_position_reviews(
+                dataset_id,player_id,review_status,source_id)
+                VALUES('ea-fc26-pilot-only',?,'partial','fc26-eval')""",
+                (pid,))
+        for key in attribute_columns:
+            # skill_moves is a separate 1–5 scale and must not be passed
+            # off as an ordinary 1–99 ability attribute.
+            if key=="skill_moves":continue
+            raw=record.get(key)
+            if not nonempty(raw):continue
+            try:
+                value=float(raw)
+            except (ValueError,TypeError):
+                continue
+            if not value.is_integer() or not 1<=value<=99:continue
+            db.execute("""INSERT INTO wh_player_attributes(
+                dataset_id,player_id,attribute_key,value,origin,source_id)
+                VALUES('ea-fc26-pilot-only',?,?,?,?,?)""",
+                (pid,key,int(value),"source","fc26-eval"))
+            counters["individual_attribute_rows"]+=1
+    counters["position_suitability_values"]=db.execute(
+        "SELECT COUNT(*) FROM wh_player_positions WHERE suitability_ovr IS NOT NULL"
+    ).fetchone()[0]
+    counters["fictional_personality_rows"]=db.execute(
+        "SELECT COUNT(*) FROM wh_player_traits"
+    ).fetchone()[0]
+    counters["reference_contract_rows"]=0 # Existing world_dataset_player_contracts owns this data.
+    counters["foreign_key_problems"]=len(db.execute("PRAGMA foreign_key_check").fetchall())
+    counters["unique_player_ids"]=db.execute(
+        "SELECT COUNT(DISTINCT player_id) FROM wh_player_positions"
+    ).fetchone()[0]
+    db.close()
+    return dict(counters)
+
+
+
 def run(output):
     sample=sample_players()
     zip_data=get_bytes(CC0_ARCHIVE)
@@ -221,6 +307,8 @@ def run(output):
     csv_data=get_bytes(FC26_CSV_URL).decode("utf-8-sig",errors="replace")
     fc26,fc_info=fc26_players_from_csv(csv_data)
     summary,rows=compare_players(sample,global_index,fc26,fc_info)
+    summary["in_memory_warehouse_stage"]=stage_fc26_in_memory(
+        sample,fc26,fc_info["selected_attributes"])
     summary["cc0_archive_info"]=cc0_info
     summary["fc26_csv_info"]={
         "records_read":fc_info["records_read"],
@@ -242,6 +330,7 @@ def run(output):
         "sample":summary["sample_size"],
         "country_files":cc0_info["country_files"],
         "fc26_fields":fc_info["columns"],
+        "warehouse_stage":summary["in_memory_warehouse_stage"],
         "individual_attribute_fields":len(fc_info["selected_attributes"]),
         "coverage":summary["coverage"],
         "per_club":summary["per_club"],
