@@ -26,7 +26,7 @@ jobs:
         run: python -u scripts/build_fifa_fc_archive.py --output qa-v2-input/fifa_original_23.zip --workers 5
       - name: Fetch pinned six-year SoFIFA restoration candidates and preserve source bytes
         run: |
-          python -u scripts/build_fifa_fc_restored_2015_2020.py \
+          python -u -m scripts.build_fifa_fc_restored_2015_2020 \
             --original-source qa-v2-input/fifa_original_23.zip \
             --output qa-v2-restoration/FIFA15_to_FIFA20_SoFIFA_candidate_sources.zip
       - name: Test small PES2020 conversion subset against all six restored source schemas
