@@ -104,6 +104,53 @@ def _id(row):
     return None
 
 
+
+# Legacy FIFA 05 used sided roles such as RCM, RAM and RS, not consistently
+# available as independent PES2020 position names. Standardize before v1.
+LEGACY_POS_MAP={
+ "RS":"CF","LS":"CF",
+ "RCM":"CMF","LCM":"CMF",
+ "RAM":"AMF","LAM":"AMF","RCAM":"AMF","LCAM":"AMF",
+ "RDM":"DMF","LDM":"DMF","RCDM":"DMF","LCDM":"DMF",
+ "SW":"CB","SB":"RB","WB":"LB","SM":"LMF","WF":"LWF"
+}
+_NATIVE_NAMES={
+ "GK":"GK","CB":"CB","LB":"LB","RB":"RB","DMF":"DMF",
+ "CMF":"CMF","LMF":"LMF","RMF":"RMF","AMF":"AMF",
+ "LWF":"LWF","RWF":"RWF","SS":"SS","CF":"CF",
+}
+_PREFERRED_KEYS=("player_positions","preferred_positions","positions","Positions",
+                 "position","BestPosition","Position")
+
+
+def prepared_row(row):
+    """Adapt legacy FIFA side labels without inventing additional roles.
+
+    The source position string is preserved separately in the original record.
+    If only generic unqualified side information exists, choose a labelled
+    conservative PES import role rather than a fake exact familiarity.
+    """
+    chunks=[]
+    for field in _PREFERRED_KEYS:
+        if row.get(field):
+            chunks=[str(row[field])]
+            break
+    if not chunks:return dict(row)
+    for f in ("alternate_positions","alternatePositions"):
+        if row.get(f):chunks.append(str(row[f]))
+    found=[]
+    for chunk in chunks:
+        for tok in re.split(r"[,;/| ]+",chunk.upper()):
+            if not tok:continue
+            name=LEGACY_POS_MAP.get(tok) or _NATIVE_NAMES.get(tok) or POS_MAP.get(tok)
+            if name in PES_POSITIONS and name not in found:
+                found.append(name)
+    copy=dict(row)
+    if found:
+        copy["player_positions"]=", ".join(found)
+    return copy
+
+
 def identity_key(row,edition):
     """No name-only matches. A consistent ID and DOB are REQUIRED."""
     i=_id(row)
@@ -182,7 +229,7 @@ class EditionContext:
             self.adjacent[other_year]=m
 
     def _register_peer(self,row):
-        base=v1_convert(row,self.edition)
+        base=v1_convert(prepared_row(row),self.edition)
         p=base["primary_position"]
         family=_family(p)
         rating=_overall(row)
@@ -204,7 +251,7 @@ class EditionContext:
             # Reject duplicate/unresolved registrations, never guess a row.
             if len(group)!=1:continue
             other=group[0]
-            v=v1_convert(other,other_year)["abilities"][attribute]
+            v=v1_convert(prepared_row(other),other_year)["abilities"][attribute]
             if v["method"] not in ("direct_equivalent","weighted_estimate"):
                 continue
             if v["value"] is None:continue
@@ -295,7 +342,7 @@ def convert_v2(row,edition,*,context=None,approved_calibration=None):
             approved_calibration.get("source_edition")!=2020 or
             approved_calibration.get("status")!="approved"):
             raise ConversionError("Unapproved / cross-edition calibration")
-    previous=v1_convert(row,edition)
+    previous=v1_convert(prepared_row(row),edition)
     positions=[previous["primary_position"]]+previous["alternative_positions"]
     result={
         "model_version":MODEL_VERSION,"source_edition":edition,
