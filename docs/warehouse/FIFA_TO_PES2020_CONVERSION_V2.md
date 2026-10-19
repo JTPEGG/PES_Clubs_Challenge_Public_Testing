@@ -2,6 +2,14 @@
 
 **Status (19 Oct 2026):** The V2 numeric conversion and 22-edition export **PASSED CI** ([19/19 tests and successful full conversion](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39286441255)). **Rating quality and full source/player coverage are NOT approved**; full-game source coverage has never been independently verified. No deployment, merge or update to existing PES careers.
 
+## Stage 1: historically fuller FIFA 15–20 sources (isolated candidates)
+
+- A pinned public SoFIFA-derived dataset provides six edition-specific files, [players_15.csv through players_20.csv](https://github.com/kushal-gopal/EA-Sports-Fifa/tree/66fc78145ff32ea2dea839459e247833856e0f47). The existing FIFAIndex source for each of these six editions is capped at 10,500 players; more source rows do **not** automatically establish original launch-roster completeness or identity overlap.
+- [Standalone restoration builder](../../scripts/build_fifa_fc_restored_2015_2020.py) downloads exact original bytes, checks annual SoFIFA IDs for uniqueness, required identity and rating/role fields, credible GK counts and improved row coverage, computes SHA-256 per year, and records the original archive's count and checksum. It fails rather than silently manufacturing rows.
+- [Isolated restoration workflow](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/workflows/fifa-pes-v2-restore-historical.yml) compares all six candidates against the original unchanged 23-source archive and runs a *250-player-per-year smoke conversion* to check compatibility. The resulting source supplement stays separate and marked **CANDIDATE / NOT APPROVED**.
+- Source provider shifts, snapshot dates and mixed-provider numeric ID equivalence have not been independently certified. Do **not** blend the restored 2015–20 files with historical FIFAIndex editions or enable adjacent-year imputation across that boundary without explicit provider-aware source identity. Do **not** replace the primary export automatically.
+- FIFA 20 stays the sole calibration edition; FC 25 is excluded from **all** restored sources and remains a separate gap. The next acceptance gates are confirmed year-by-year restoration counts, cross-provider player-identity review, position-stratified conversion sample, and independent calibration tests.
+
 ## Real-run results and remaining quality blockers
 
 - **281,394 source player records** converted across 22 source editions, each with 25 bounded PES estimates and 4 auxiliary values. FC25 (2025) was not converted. The downloadable CSV artifact is attached to the successful workflow run; it is **not a console-native option file**.
