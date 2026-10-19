@@ -1,0 +1,29 @@
+name: Warehouse schema validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'warehouse/**'
+      - 'docs/warehouse/**'
+      - 'test_warehouse_schema_v1.py'
+      - '.github/workflows/warehouse-schema.yml'
+  pull_request:
+    paths:
+      - 'warehouse/**'
+      - 'docs/warehouse/**'
+      - 'test_warehouse_schema_v1.py'
+      - '.github/workflows/warehouse-schema.yml'
+concurrency:
+  group: warehouse-schema-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate SQLite warehouse schema and dictionary
+        run: python -m unittest -v test_warehouse_schema_v1
