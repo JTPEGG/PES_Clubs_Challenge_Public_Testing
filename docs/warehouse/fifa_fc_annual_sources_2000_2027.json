@@ -1,0 +1,260 @@
+{
+  "version": "FIFA_FC_ANNUAL_SOURCES_V1",
+  "created": "2026-10-19",
+  "status_note": "Catalog confirms hosted edition files for 2005–2027. For 2004, a community Excel extract is described but unverified. FIFA 2000–2003 remain without verified structured player files (a community archive describes raw, partly unextractable DBI formats).",
+  "game_year_vs_calendar": "FIFA 2005 corresponds to 2004/05 football season, not calendar 2005 squad or FIFA game released in 2005.",
+  "records": [
+    {
+      "edition": 2000,
+      "label": "FIFA 2000",
+      "status": "community_raw_dbi_claim_unextractable",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive; DBI binary (contents not inspected)",
+      "notes": "Community maintainer says historical archives from FIFA 98 onward, but reports 1997–2002 DBI remains unextractable. Not a structured player dataset."
+    },
+    {
+      "edition": 2001,
+      "label": "FIFA 2001",
+      "status": "community_raw_dbi_claim_unextractable",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive; DBI binary (contents not inspected)",
+      "notes": "Community maintainer says historical archives from FIFA 98 onward, but reports 1997–2002 DBI remains unextractable. Not a structured player dataset."
+    },
+    {
+      "edition": 2002,
+      "label": "FIFA 2002",
+      "status": "community_raw_dbi_claim_unextractable",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive; DBI binary (contents not inspected)",
+      "notes": "Community maintainer says historical archives from FIFA 98 onward, but reports 1997–2002 DBI remains unextractable. Not a structured player dataset."
+    },
+    {
+      "edition": 2003,
+      "label": "FIFA 2003",
+      "status": "community_raw_file_claim_unverified",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive only (not inspected)",
+      "notes": "Forum describes almost every FIFA database since 1998; no confirmed standalone FIFA 2003 player CSV/XLSX found."
+    },
+    {
+      "edition": 2004,
+      "label": "FIFA 2004",
+      "status": "community_excel_claim_unverified",
+      "source": "SoccerGaming extracted FIFA04 Excel archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "FIFA 2004 extracted tables (.xlsx), inside uninspected MediaFire archive",
+      "notes": "Maintainer explicitly states FIFA 2004 database tables were extracted to XLSX. MediaFire bundle reported but not downloaded/verified."
+    },
+    {
+      "edition": 2005,
+      "label": "FIFA 05",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2005.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2005.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2006,
+      "label": "FIFA 06",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2006.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2006.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2007,
+      "label": "FIFA 07",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2007.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2007.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2008,
+      "label": "FIFA 08",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2008.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2008.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2009,
+      "label": "FIFA 09",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2009.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2009.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2010,
+      "label": "FIFA 10",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2010.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2010.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2011,
+      "label": "FIFA 11",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2011.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2011.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2012,
+      "label": "FIFA 12",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2012.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2012.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2013,
+      "label": "FIFA 13",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2013.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2013.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2014,
+      "label": "FIFA 14",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2014.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2014.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2015,
+      "label": "FIFA 15",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2015.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2015.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2016,
+      "label": "FIFA 16",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2016.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2016.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2017,
+      "label": "FIFA 17",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2017.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2017.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2018,
+      "label": "FIFA 18",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2018.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2018.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2019,
+      "label": "FIFA 19",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2019.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2019.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2020,
+      "label": "FIFA 20",
+      "status": "github_csv_present",
+      "source": "lbenz730/fifa_model",
+      "file_path": "stats/player_stats_2020.csv",
+      "url": "https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/stats/player_stats_2020.csv",
+      "notes": "Separate edition CSV with FIFA Index player ratings, attributes, DOB, identity and preferred positions; source snapshot may differ from opening day."
+    },
+    {
+      "edition": 2021,
+      "label": "FIFA 21",
+      "status": "github_csv_present",
+      "source": "lokesh28-krish/Analysis-of-Fifa-21-Players-Dataset",
+      "file_path": "players_21.csv",
+      "url": "https://github.com/lokesh28-krish/Analysis-of-Fifa-21-Players-Dataset/blob/9d55181662e2dd3caf2dabc9365a2c8e564407b9/players_21.csv",
+      "notes": "Separate 2021 career player CSV."
+    },
+    {
+      "edition": 2022,
+      "label": "FIFA 22",
+      "status": "github_csv_present",
+      "source": "ryonce/FIFA-Dataset",
+      "file_path": "players_22.csv",
+      "url": "https://github.com/ryonce/FIFA-Dataset/blob/e4f27b6b565b702ac661069f8365d42ec6b93d38/players_22.csv",
+      "notes": "Separate 2022 player CSV."
+    },
+    {
+      "edition": 2023,
+      "label": "FIFA 23",
+      "status": "hosted_multiyear_csv",
+      "source": "jsulz/FIFA23",
+      "file_path": "male_players (legacy).csv",
+      "url": "https://huggingface.co/datasets/jsulz/FIFA23/blob/main/male_players%20%28legacy%29.csv",
+      "notes": "Hugging Face multiyear legacy FIFA15–23 archive; filter fifa_version==23; not separate-year player file."
+    },
+    {
+      "edition": 2024,
+      "label": "EA FC 24",
+      "status": "github_csv_present",
+      "source": "stephensoccer/EA-Sports-FC-24-Players-Data",
+      "file_path": "FC 24 Players Data.csv",
+      "url": "https://github.com/stephensoccer/EA-Sports-FC-24-Players-Data/blob/fa16d9bd06b5afd9c56fc8a1f282ece855a9edde/FC%2024%20Players%20Data.csv",
+      "notes": "Career Mode player dataset; snapshot updated 21 Nov 2024."
+    },
+    {
+      "edition": 2025,
+      "label": "EA FC 25",
+      "status": "github_csv_present",
+      "source": "LucasKonrath/ea-fc25-career-poc",
+      "file_path": "dataset/player-data-full-2025-june.csv",
+      "url": "https://github.com/LucasKonrath/ea-fc25-career-poc/blob/a8348430f0d094ac5ca5765146eabc39550b2e7e/dataset/player-data-full-2025-june.csv",
+      "notes": "Public full FC25 player data at June 2025 snapshot; do not assume launch squads."
+    },
+    {
+      "edition": 2026,
+      "label": "EA FC 26",
+      "status": "github_csv_present",
+      "source": "ismailoksuz/EAFC26-DataHub",
+      "file_path": "data/players.csv",
+      "url": "https://github.com/ismailoksuz/EAFC26-DataHub/blob/8724af5803a787c9c262eee2ac8f942651b0e4b9/data/players.csv",
+      "notes": "110 columns, 18,405 players tested previously. FC26 snapshot."
+    },
+    {
+      "edition": 2027,
+      "label": "EA FC 27",
+      "status": "github_csv_present",
+      "source": "LakshmiKanth11/EA_FC_ANALYSIS",
+      "file_path": "EA_FC_PLAYERS_DATASET_AND_ DASHBOARD/data/players.csv",
+      "url": "https://github.com/LakshmiKanth11/EA_FC_ANALYSIS/blob/c0b2542d9fcae72d2c538a472a30ee57c4e7c75e/EA_FC_PLAYERS_DATASET_AND_%20DASHBOARD/data/players.csv",
+      "notes": "19,789 players, 60 fields, snapshot 12 Sep 2026; includes detailed attributes/alternative positions."
+    }
+  ]
+}
