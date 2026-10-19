@@ -1,53 +1,53 @@
 {
   "version": "FIFA_FC_ANNUAL_SOURCES_V1",
   "created": "2026-10-19",
-  "status_note": "Catalog confirms hosting / file paths for 2005-2027; not proof data are error-free, fully cleared for reuse, or one-to-one season opening squads. 2000-2004 remain unresolved.",
+  "status_note": "Catalog confirms hosted edition files for 2005–2027. For 2004, a community Excel extract is described but unverified. FIFA 2000–2003 remain without verified structured player files (a community archive describes raw, partly unextractable DBI formats).",
   "game_year_vs_calendar": "FIFA 2005 corresponds to 2004/05 football season, not calendar 2005 squad or FIFA game released in 2005.",
   "records": [
     {
       "edition": 2000,
       "label": "FIFA 2000",
-      "status": "no_complete_dataset_verified",
-      "source": "",
-      "url": "",
-      "file_path": "",
-      "notes": "No verified full downloadable player ratings data; historical game-file extraction may be possible."
+      "status": "community_raw_dbi_claim_unextractable",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive; DBI binary (contents not inspected)",
+      "notes": "Community maintainer says historical archives from FIFA 98 onward, but reports 1997–2002 DBI remains unextractable. Not a structured player dataset."
     },
     {
       "edition": 2001,
       "label": "FIFA 2001",
-      "status": "no_complete_dataset_verified",
-      "source": "",
-      "url": "",
-      "file_path": "",
-      "notes": "No verified full downloadable player ratings data; historical game-file extraction may be possible."
+      "status": "community_raw_dbi_claim_unextractable",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive; DBI binary (contents not inspected)",
+      "notes": "Community maintainer says historical archives from FIFA 98 onward, but reports 1997–2002 DBI remains unextractable. Not a structured player dataset."
     },
     {
       "edition": 2002,
       "label": "FIFA 2002",
-      "status": "no_complete_dataset_verified",
-      "source": "",
-      "url": "",
-      "file_path": "",
-      "notes": "No verified full downloadable player ratings data; historical game-file extraction may be possible."
+      "status": "community_raw_dbi_claim_unextractable",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive; DBI binary (contents not inspected)",
+      "notes": "Community maintainer says historical archives from FIFA 98 onward, but reports 1997–2002 DBI remains unextractable. Not a structured player dataset."
     },
     {
       "edition": 2003,
       "label": "FIFA 2003",
-      "status": "no_complete_dataset_verified",
-      "source": "",
-      "url": "",
-      "file_path": "",
-      "notes": "No verified full downloadable player ratings data; historical game-file extraction may be possible."
+      "status": "community_raw_file_claim_unverified",
+      "source": "SoccerGaming forum archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "community archive only (not inspected)",
+      "notes": "Forum describes almost every FIFA database since 1998; no confirmed standalone FIFA 2003 player CSV/XLSX found."
     },
     {
       "edition": 2004,
       "label": "FIFA 2004",
-      "status": "no_complete_dataset_verified",
-      "source": "",
-      "url": "",
-      "file_path": "",
-      "notes": "No verified full downloadable player ratings data; historical game-file extraction may be possible."
+      "status": "community_excel_claim_unverified",
+      "source": "SoccerGaming extracted FIFA04 Excel archive",
+      "url": "https://soccergaming.com/forums/threads/fifa-dbs-since-fifa-98-download.6469756/",
+      "file_path": "FIFA 2004 extracted tables (.xlsx), inside uninspected MediaFire archive",
+      "notes": "Maintainer explicitly states FIFA 2004 database tables were extracted to XLSX. MediaFire bundle reported but not downloaded/verified."
     },
     {
       "edition": 2005,
