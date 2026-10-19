@@ -25,5 +25,7 @@ jobs:
         if: always()
         with:
           name: ai-two-window-audit
-          path: qa-two-windows.json
+          path: |
+            qa-two-windows.json
+            qa-two-window-transfer-ledger.csv
           if-no-files-found: warn
