@@ -3,7 +3,7 @@ import unittest
 from qa_fifa20_pes20_calibration_v2 import (
     choose_calibration, position_accuracy_report
 )
-from world_fifa_pes_converter_v2 import convert_v2
+from world_fifa_pes_converter_v2 import convert_v2, ConversionError
 
 
 class PositionAccuracyTests(unittest.TestCase):
@@ -15,6 +15,12 @@ class PositionAccuracyTests(unittest.TestCase):
         self.assertEqual(report["training_fifa_edition"],2020)
         self.assertEqual(report["status"],"unapproved_experimental_candidate")
         self.assertEqual(report["offsets"]["speed"],4)
+        baseline={"name":"Example","preferred_positions":"CF","rating":"80",
+                  "sprint_speed":"85"}
+        original=convert_v2(baseline,2020)
+        self.assertNotIn("calibration_shift",original["abilities"]["speed"])
+        with self.assertRaises(ConversionError):
+            convert_v2(baseline,2020,approved_calibration=report)
 
     def test_position_stratification_uses_completed_profiles(self):
         pairs=[]
