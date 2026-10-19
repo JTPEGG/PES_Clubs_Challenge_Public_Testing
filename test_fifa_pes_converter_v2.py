@@ -24,7 +24,7 @@ class CompleteConverterV2Tests(unittest.TestCase):
                       approved_calibration=real)
         self.assertEqual(ok["abilities"]["speed"]["value"],82)
         self.assertEqual(ok["abilities"]["speed"]["calibration_status"],
-                         "experimental_FIFA20_PES2020")
+                         "approved_FIFA20_PES2020")
 
     def test_25_core_and_four_aux_are_always_complete(self):
         p=convert_v2({"name":"Fictional GK","player_id":"12",
@@ -125,6 +125,42 @@ class CompleteConverterV2Tests(unittest.TestCase):
         wrong={"player_id":"123","dob":"2000-03-05"}
         self.assertEqual(identity_key(a,2005),identity_key(b,2020))
         self.assertNotEqual(identity_key(a,2005),identity_key(wrong,2020))
+
+
+    def test_historical_native_position_mappings_and_separate_fit(self):
+        x=convert_v2({"name":"Wing Back","preferred_positions":"RWB, LWB, RCM",
+                      "rating":"74","sprint_speed":"88","stamina":"79"},2005)
+        self.assertEqual(x["primary_position"],"RB")
+        self.assertEqual(x["alternative_positions"],["LB","CMF"])
+        fits=x["position_fit_indices"]
+        self.assertEqual(set(fits),{"RB","LB","CMF"})
+        self.assertTrue(all(40<=f["value"]<=99 for f in fits.values()))
+        self.assertTrue(all(f["is_native_pes_overall"] is False for f in fits.values()))
+
+    def test_historical_date_with_timestamp(self):
+        self.assertEqual(identity_key(
+            {"player_id":"200","dob":"1984-02-01 00:00:00"},2005),
+            ("200","1984-02-01"))
+
+    def test_adjacent_different_name_or_provider_cannot_supply_ability(self):
+        old={"player_id":"8","name":"Original Keeper",
+             "birthdate":"1980-02-01","preferred_positions":"GK","rating":"80"}
+        reused=dict(old,name="Another Keeper",gk_diving="95")
+        c=EditionContext(2005,[old],{2006:[reused]})
+        p=convert_v2(old,2005,context=c)
+        self.assertNotEqual(p["abilities"]["gk_reach"]["method"],
+                            "adjacent_edition_same_id_dob")
+        newer=dict(old,gk_diving="95")
+        c2=EditionContext(2020,[old],{2021:[newer]})
+        p2=convert_v2(old,2020,context=c2)
+        self.assertNotEqual(p2["abilities"]["gk_reach"]["method"],
+                            "adjacent_edition_same_id_dob")
+
+    def test_boolean_is_not_accepted_as_numeric_pes_attribute(self):
+        x=convert_v2({"name":"Test","preferred_positions":"GK"},2005)
+        x["abilities"]["gk_reach"]["value"]=True
+        with self.assertRaises(ConversionError):
+            validate_exportable(x)
 
 
 if __name__=="__main__":
