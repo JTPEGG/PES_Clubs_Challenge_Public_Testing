@@ -76,29 +76,12 @@ def evaluate_selling_club(*,market_value=None,offer_fee=None,
     if missing:
         return outcome("review", "Unverified scenario inputs: "+", ".join(missing)+
                        ". No willingness to sell or fee is inferred.")
-    # An exceptional bid can change the board's financial calculation even
-    # when a manager wants to keep the player. This is seller permission only:
-    # the player can still refuse and the buyer's board can still veto.
-    # These are fictional scenario inputs, never inferred real club positions.
-    financial_windfall=(offer_fee is not None and market_value>0 and
-                        offer_fee>=2*market_value)
-    risk_of_free_exit=(contract_years<=1)
-    financial_pressure=financial_state in ("cash_needed","distressed")
-    if (seller_stance=="retain" and not transfer_listed and
-            not player_wants_exit and not risk_of_free_exit and
-            not financial_pressure and not financial_windfall):
-        return outcome("reject","Club intends to retain this player: no exit pressure, contract or exceptional financial reason to sell.")
+    if seller_stance=="retain" and not transfer_listed and not player_wants_exit:
+        return outcome("reject","Club intends to retain this player and has no recorded exit pressure. An arbitrary premium does not force a sale.")
     if (squad_role=="key_player" and contract_years>=3
-            and not transfer_listed and not player_wants_exit and
-            financial_state=="stable" and replacement=="difficult" and
-            not financial_windfall):
-        return outcome("reject","Essential player protected without exceptional board-level financial justification.")
-    if financial_windfall:
-        return outcome("accept",
-            "Exceptional offer at least twice the recorded market value; "
-            "seller permits sale before a replacement is found. "
-            "Player and agent consent and the buying board remain separate.",
-            2*market_value)
+            and not transfer_listed and not player_wants_exit
+            and financial_state=="stable" and replacement=="difficult"):
+        return outcome("reject","Essential player, lengthy contract, no exit request, stable finances and no practical replacement: not for sale.")
     # Market value is only the *user's* hypothetical input, not inferred from
     # rating, wages, historical prestige, or modern club transfer rumours.
     premium = ROLE_MULTIPLIER[squad_role]

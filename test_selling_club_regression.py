@@ -18,20 +18,10 @@ class SellingClubTests(unittest.TestCase):
         self.assertIsNone(r["asking_price"])
         self.assertIsNone(r["market_value"])
 
-    def test_financial_windfall_can_justify_selling_key_player(self):
+    def test_key_player_protected_despite_large_bid(self):
         r=self.choice(offer_fee=150_000_000)
-        self.assertEqual(r["decision"],"accept")
-        self.assertIn("Player and agent consent",r["reason"])
-
-    def test_normal_bid_does_not_automatically_unsettle_key_player(self):
-        r=self.choice(offer_fee=30_000_000)
         self.assertEqual(r["decision"],"reject")
-
-    def test_approaching_contract_end_can_change_retain_stance(self):
-        r=self.choice(squad_role="regular_starter",seller_stance="retain",
-                      contract_years=1,offer_fee=20_000_000,
-                      replacement="difficult")
-        self.assertNotEqual(r["decision"],"reject")
+        self.assertIsNone(r["asking_price"])
 
     def test_retain_stance_blocks_unwanted_exit(self):
         self.assertEqual(self.choice(seller_stance="retain",

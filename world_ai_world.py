@@ -359,7 +359,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 approaches+=1
                 try:
                     _model_player_and_seller(conn,career_id=career_id,
-                                              player_id=pid,target=target)
+                                              player_id=pid,target=target,
+                                              autonomous_club=True)
                     from world_career_selling import get_seller_assumptions
                     seller_facts=get_seller_assumptions(conn,career_id,pid)
                     price=determine_offer(career_id=career_id,player_id=pid,

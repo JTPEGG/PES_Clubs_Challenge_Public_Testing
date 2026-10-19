@@ -45,7 +45,8 @@ def _buyer_target(conn,*,career_id,player_id):
                 seller=seller,name=name,overall=overall,value=value)
 
 
-def _model_player_and_seller(conn,*,career_id,player_id,target):
+def _model_player_and_seller(conn,*,career_id,player_id,target,
+                             autonomous_club=False):
     """Fill missing facts from a documented fictional policy, never user forms.
 
     Recorded historical circumstances always win. We cannot retroactively
@@ -67,6 +68,12 @@ def _model_player_and_seller(conn,*,career_id,player_id,target):
           else "rotation" if rank<18 else "fringe")
     term=1+_stable(career_id,player_id,VERSION)%4
     listed=role=="fringe" and term<=2
+    # In AI-only club dealings, a small, explicitly FICTIONAL subset of
+    # expiring starters may push for an exit. The human manager is never
+    # assigned a wish or request by this model.
+    exit_pressure=(listed or (autonomous_club and term<=1
+        and role in ("key_player","regular_starter") and
+        _stable(career_id,player_id,VERSION,"exit-pressure")%13==0))
     estimated=min(350000,max(1000,round(
         1000*2**((target["overall"]-55)/8)/500)*500))
     existing=get_seller_assumptions(conn,career_id,player_id)
@@ -74,16 +81,27 @@ def _model_player_and_seller(conn,*,career_id,player_id,target):
         record_seller_assumptions(
             conn,career_id=career_id,player_id=player_id,
             market_value=target["value"],contract_years=term,
-            squad_role=role,transfer_listed=listed,player_wants_exit=listed,
+            squad_role=role,transfer_listed=listed,
+            player_wants_exit=bool(exit_pressure),
             financial_state="stable",
             replacement="difficult" if rank<11 else "available",
             seller_stance=("retain" if rank<3 else
                            "neutral" if rank<18 else "sell"),
-            board_enabled=False,
+            # Only AI-vs-AI uses an automatically modelled board override.
+            # Normal user-specified seller policies remain unchanged.
+            board_enabled=bool(autonomous_club),
+            exceptional_offer_pct=(165 if role=="key_player" else 150
+                                   if role=="regular_starter" else 140)
+                                   if autonomous_club else None,
+            financial_objective=("balanced" if autonomous_club else "unknown"),
+            ambition=("consolidation" if autonomous_club else "unknown"),
+            ownership_priority=("balanced" if autonomous_club else "unknown"),
+            assumed_manager_trust=("medium" if autonomous_club else "unknown"),
             source_note=(
-                "fictional-autonomous-seller-v1: PES player rating, "
-                "selling-club ranked squad depth, deterministic contract proxy; "
-                "not a verified real salary, player intention or contract."))
+                "fictional-autonomous-seller-v2: squad-ranked role, "
+                "deterministic contract and rare exit pressure; "
+                "board exceptional sale only for autonomous AI clubs. "
+                "Not a verified wage, player intention or contract."))
     known=conn.execute("""SELECT 1 FROM world_career_player_circumstances
         WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
     if known is None:
