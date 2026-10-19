@@ -1,0 +1,36 @@
+name: PES V2 historical source and FIFA20 calibration quality audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'qa_fifa_pes_v2_quality_audit.py'
+      - 'test_fifa_pes_v2_quality_audit.py'
+      - '.github/workflows/fifa-pes-v2-quality-audit.yml'
+permissions:
+  contents: read
+concurrency:
+  group: fifa-pes-v2-quality-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  quality-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test source completeness warnings and unique FIFA20 identity candidates
+        run: python -m unittest -v test_fifa_pes_v2_quality_audit
+      - name: Download source archive with exact row counts and source URLs
+        run: python -u scripts/build_fifa_fc_archive.py --output qa-v2-input/fifa_original_23.zip --workers 5
+      - name: Compare source coverage and two independent FIFA20 source snapshots against native PES20
+        run: python -u qa_fifa_pes_v2_quality_audit.py --source qa-v2-input/fifa_original_23.zip --output qa-v2-quality/fifa20-and-source-coverage.json
+      - name: Upload QA conclusions without exporting or changing live data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FIFA-PES-V2-source-coverage-and-FIFA20-calibration-quality
+          path: qa-v2-quality/
+          retention-days: 30
+          if-no-files-found: warn
