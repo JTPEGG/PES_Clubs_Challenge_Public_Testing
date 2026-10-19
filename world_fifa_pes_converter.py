@@ -21,7 +21,7 @@ ALIASES={
  "att_pos":("att_position","attacking_positioning","mentality_positioning","Positioning"),
  "react":("reactions","movement_reactions","Reactions"),
  "ball":("ball_control","skill_ball_control","BallControl"),
- "dribble":("dribbling","skill_dribbling","Dribbling"),
+ "dribble":("skill_dribbling","dribbling","Dribbling"),
  "agility":("agility","movement_agility","Agility"),
  "short":("short_pass","attacking_short_passing","ShortPassing"),
  "vision":("vision","mentality_vision","Vision"),
