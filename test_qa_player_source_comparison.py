@@ -5,7 +5,7 @@ import zipfile
 
 from qa_player_source_comparison import (
     full_openfootball_index, fc26_players_from_csv, compare_players,
-    FIELDS, parse_date,
+    FIELDS, parse_date, stage_fc26_in_memory,
 )
 from qa_player_source_pilot import sample_players
 
@@ -80,6 +80,34 @@ class SourceComparisonTests(unittest.TestCase):
             self.assertEqual(row["pes_native_abilities_available"],0)
         self.assertEqual(summary["source_status"]["football_manager_26"],
                          "available save parser, no underlying save file")
+
+    def test_staging_into_proposed_warehouse_is_additive_and_valid(self):
+        item={
+            "dob":"2000-07-21","player_positions":"ST, RW, LW",
+            "movement_sprint_speed":"91","attacking_finishing":"88",
+            "skill_moves":"4",
+        }
+        stage=stage_fc26_in_memory(
+            self.players,{"239085":item},
+            ("movement_sprint_speed","attacking_finishing","skill_moves"))
+        self.assertEqual(stage["matched_player_profiles"],1)
+        self.assertEqual(stage["unique_player_ids"],1)
+        self.assertEqual(stage["position_rows"],3)
+        self.assertEqual(stage["alternative_position_rows"],2)
+        self.assertEqual(stage["individual_attribute_rows"],2)
+        self.assertEqual(stage["position_suitability_values"],0)
+        self.assertEqual(stage["fictional_personality_rows"],0)
+        self.assertEqual(stage["foreign_key_problems"],0)
+
+    def test_staging_rejects_same_id_with_wrong_birth(self):
+        stage=stage_fc26_in_memory(
+            self.players,
+            {"239085":{"dob":"1999-07-21",
+                       "player_positions":"ST",
+                       "attacking_finishing":"90"}},
+            ("attacking_finishing",))
+        self.assertEqual(stage.get("matched_player_profiles",0),0)
+        self.assertEqual(stage["foreign_key_problems"],0)
 
     def test_output_field_completeness(self):
         index,meta=full_openfootball_index(self.make_global())
