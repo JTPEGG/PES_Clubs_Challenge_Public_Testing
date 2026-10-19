@@ -1,0 +1,35 @@
+name: Archive FIFA 2005 through FC 27 hard copies
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/build_fifa_fc_archive.py'
+      - 'test_fifa_fc_hardcopy_archive.py'
+      - '.github/workflows/fifa-fc-hardcopy-archive.yml'
+concurrency:
+  group: annual-hardcopy-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test archive source mapping
+        run: python -m unittest -v test_fifa_fc_hardcopy_archive test_fifa_fc_annual_catalog
+      - name: Download and archive exact source CSV files
+        run: python -u scripts/build_fifa_fc_archive.py --output dist/PES_FIFA_FC_2000_to_2027_Archive.zip --manifest-dir dist/reports --workers 5
+      - name: Upload hard-copy archive as ZIP for user retrieval
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-FIFA-FC-2000-to-2027-hardcopy
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
