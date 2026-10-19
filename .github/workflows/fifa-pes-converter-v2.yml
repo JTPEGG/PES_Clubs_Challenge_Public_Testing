@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'world_fifa_pes_converter_v2.py'
+      - 'qa_fifa20_pes20_calibration_v2.py'
       - 'test_fifa_pes_converter_v2.py'
       - 'test_fifa_pes_export_v2.py'
       - 'scripts/export_fifa_pes_v2.py'
@@ -28,10 +29,12 @@ jobs:
           python-version: '3.12'
       - name: Unit tests for complete conversions, GK fallback and excluded FC25
         run: python -m unittest -v test_fifa_pes_converter_v2 test_fifa_pes_export_v2
+      - name: Train held-out FIFA20 versus native PES2020 calibration only
+        run: python -u qa_fifa20_pes20_calibration_v2.py
       - name: Fetch and checksum the 23 original annual FIFA CSVs
         run: python -u scripts/build_fifa_fc_archive.py --output qa-v2-input/fifa_original_23.zip --workers 5
       - name: Full 22-edition PES rating conversion (FC25 deliberately omitted)
-        run: python -u -m scripts.export_fifa_pes_v2 --source qa-v2-input/fifa_original_23.zip --output qa-v2-output/FIFA05_to_FC27_Complete_PES2020_Converted_NO_FC25.zip
+        run: python -u -m scripts.export_fifa_pes_v2 --source qa-v2-input/fifa_original_23.zip --output qa-v2-output/FIFA05_to_FC27_Complete_PES2020_Converted_NO_FC25.zip --calibration qa-v2-calibration/fifa20-pes20-experimental-calibration.json
       - name: Upload version 2 year-specific completed rating CSVs
         if: success()
         uses: actions/upload-artifact@v4
@@ -41,3 +44,11 @@ jobs:
           retention-days: 30
           compression-level: 0
           if-no-files-found: error
+      - name: Upload FIFA20-only calibration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FIFA20-PES2020-V2-calibration-evidence
+          path: qa-v2-calibration/
+          retention-days: 30
+          if-no-files-found: warn
