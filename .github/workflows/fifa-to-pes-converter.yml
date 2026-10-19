@@ -9,6 +9,8 @@ on:
       - 'qa_playersdb_source.py'
       - 'qa_playersdb_download.py'
       - 'qa_playersdb_jsonl.py'
+      - 'scripts/export_fifa_pes_csvs.py'
+      - 'test_fifa_pes_csv_export.py'
       - '.github/workflows/fifa-to-pes-converter.yml'
   pull_request:
     paths:
@@ -28,7 +30,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Validate converter against old and modern editions
-        run: python -m unittest -v test_fifa_pes_converter
+        run: python -m unittest -v test_fifa_pes_converter test_fifa_pes_csv_export
       - name: Benchmark real FIFA editions against PES2020
         run: python -u qa_pes_conversion_pilot.py
       - name: Inspect linked PlayersDB crosswalk download source
@@ -44,6 +46,10 @@ jobs:
           name: fifa-pes2020-conversion-pilot
           path: qa-conversion-pilot/
           if-no-files-found: warn
+      - name: Fetch original 23-edition source archive for end-to-end import
+        run: python -u scripts/build_fifa_fc_archive.py --output qa-input/original_23_editions.zip --workers 6
+      - name: Export PES2020 conversion preview for all 23 editions
+        run: python -u scripts/export_fifa_pes_csvs.py --source qa-input/original_23_editions.zip --output qa-conversion-pilot/PES2020_Conversion_23_Edition_Preview.zip --limit-per-edition 15
       - name: Inspect source PES2020 historical export schema
         run: |
           python - <<'PY'
