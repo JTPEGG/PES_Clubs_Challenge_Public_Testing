@@ -62,13 +62,15 @@ def to_csv_row(p):
     return val
 
 
-def export(source_zip,destination,*,years=None,limit_per_edition=None):
+def export(source_zip,destination,*,years=None,limit_per_edition=None,calibration=None):
     destination=Path(destination)
     destination.parent.mkdir(parents=True,exist_ok=True)
     outcome={"model_version":MODEL_VERSION,
              "conversion_reference":"PES2020",
              "only_allowed_calibration_pair":"FIFA2020 -> PES2020",
-             "calibration_offsets_applied":False,
+             "calibration_offsets_applied":bool(calibration and calibration.get("offsets")),
+             "calibration_fifa_edition":2020 if calibration else None,
+             "calibration_reference":"PES2020" if calibration else None,
              "excluded_source_edition":2025,
              "excluded_reason":"FC25 detailed data unusable; wait for proper replacement",
              "source_archive_untouched":True,
@@ -102,7 +104,8 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None):
                 writer.writeheader()
                 for i,row in enumerate(current):
                     try:
-                        p=convert_v2(row,year,context=context)
+                        p=convert_v2(row,year,context=context,
+                                     approved_calibration=calibration)
                         validate_exportable(p)
                     except Exception as e:
                         raise RuntimeError(f"{year} row {i}: {e}") from e
@@ -160,9 +163,11 @@ if __name__=="__main__":
     p.add_argument("--output",required=True)
     p.add_argument("--edition",action="append",type=int)
     p.add_argument("--limit-per-edition",type=int)
+    p.add_argument("--calibration",help="Held-out FIFA20/PES20 calibration JSON")
     x=p.parse_args()
+    calibration=json.loads(Path(x.calibration).read_text(encoding="utf-8")) if x.calibration else None
     result=export(x.source,x.output,years=set(x.edition) if x.edition else None,
-                  limit_per_edition=x.limit_per_edition)
+                  limit_per_edition=x.limit_per_edition,calibration=calibration)
     print(json.dumps({"model":result["model_version"],
                       "editions":{k:v["status"] for k,v in result["per_edition"].items()}},
                      indent=2),flush=True)
