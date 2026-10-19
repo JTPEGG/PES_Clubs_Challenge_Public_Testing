@@ -7,32 +7,32 @@ The projected roster is rebuilt after each agreement, not cached at window start
 from collections import defaultdict
 import sqlite3
 
-# User-verified secondary eligibility in this provisional 2026/27 dataset.
+# User-verified alternative-position eligibility in this provisional 2026/27 dataset.
 # These are NOT present in the FC27 primary-position source. Do not infer
-# secondary positions from the broad DEF/MID/FWD group.
-EXPLICIT_SECONDARIES = {
+# alternative positions from the broad DEF/MID/FWD group.
+EXPLICIT_ALTERNATIVE_POSITIONS = {
     "england-2026-27-fc27": {
         "231936": {"CB": "User-confirmed Ben White centre-back cover, 19 Oct 2026"},
     },
 }
 
 class ProjectedSquads(defaultdict):
-    """Original primary-position roster plus nonduplicating secondary cover."""
+    """Original primary-position roster plus multi-position cover."""
     def __init__(self):
         super().__init__(lambda: defaultdict(list))
-        self.secondary = {}
+        self.alternative_positions = {}
 
 def effective_cover(squads, club, lane, exclude_player=None):
     """Credible options at one position, counting each person once.
 
-    An eligible second-position player counts as rotation cover only when
+    An eligible alternative-position player counts as rotation cover only when
     enough other starters remain in their *primary* position. This avoids
     describing the same footballer as two simultaneous starters.
     """
     roster=squads.get(club,{})
     options={p[0]: p for p in roster.get(lane,())
              if p[0]!=exclude_player}
-    evidence=getattr(squads,"secondary",{})
+    evidence=getattr(squads,"alternative_positions",{})
     for origin,primary_players in roster.items():
         if origin==lane:
             continue
@@ -50,8 +50,54 @@ def effective_cover(squads, club, lane, exclude_player=None):
     return sorted(options.values(),key=lambda p:(-p[1],p[0]))
 
 
+
+def assign_available_players(squads, club, required, *, exclude_player=None):
+    """Maximum simultaneous lineup assignment; no player fills two slots.
+
+    required maps position -> number of simultaneous players. The assignment
+    uses eligible positions, not invented position-specific OVR adjustments.
+    """
+    slots=[]
+    for position,count in required.items():
+        lane=lane_of(position)
+        if lane is None or type(count) is not int or not 0<=count<=11:
+            raise ValueError("Invalid requested lineup position or count")
+        slots.extend([lane]*count)
+    roster=squads.get(club,{})
+    players={}
+    evidence=getattr(squads,"alternative_positions",{})
+    for origin,group in roster.items():
+        for pid,ovr,pos in group:
+            if pid==exclude_player:
+                continue
+            players[pid]=(ovr,{origin,*evidence.get(pid,{})},origin)
+    candidates={}
+    for index,lane in enumerate(slots):
+        candidates[index]=sorted(
+            (pid for pid,(ovr,playable,origin) in players.items()
+             if lane in playable),
+            key=lambda pid:(players[pid][2]!=lane,-players[pid][0],pid))
+    matching={}
+    def allocate(slot,visited):
+        for pid in candidates[slot]:
+            if pid in visited:continue
+            visited.add(pid)
+            if pid not in matching or allocate(matching[pid],visited):
+                matching[pid]=slot
+                return True
+        return False
+    for slot in sorted(range(len(slots)),key=lambda i:len(candidates[i])):
+        allocate(slot,set())
+    assignments=[{"position":slots[index],"player_id":pid}
+                 for pid,index in sorted(matching.items(),
+                   key=lambda pair:pair[1])]
+    return {"required":len(slots),"filled":len(assignments),
+            "assignments":assignments,
+            "unfilled":len(slots)-len(assignments)}
+
+
 def squad_standard(roster):
-    """Rated standard of the best XI, without double-counting secondary roles."""
+    """Rated standard of the best XI, without double-counting the same player."""
     rated=sorted((p[1] for players in roster.values()
                   for p in players),reverse=True)
     return sum(rated[:11])/min(len(rated),11) if rated else 0
@@ -118,18 +164,33 @@ def projected_squads(conn, *, career_id, dataset):
             squads[owners[pid]][lane].append((pid,int(overall),pos))
     # Resolve the explicit user-supplied eligibility through stable EA IDs,
     # never name similarity. Imported historic datasets have no implied cover.
-    ids=EXPLICIT_SECONDARIES.get(dataset,{})
+    ids=EXPLICIT_ALTERNATIVE_POSITIONS.get(dataset,{})
     if ids:
         try:
             rows=conn.execute("""SELECT player_id,external_id
                 FROM world_player_source_refs
                 WHERE source_name='EAFC27'""").fetchall()
-            squads.secondary={
+            squads.alternative_positions={
                 int(pid):ids[str(ea_id)] for pid,ea_id in rows
                 if str(ea_id) in ids}
         except sqlite3.OperationalError:
             # Minimal synthetic planner fixtures may omit source-ref tables.
-            squads.secondary={}
+            squads.alternative_positions={}
+    # Many documented alternative positions are permitted per player.
+    # This table supports user-approved imports without code changes.
+    # An absent record means unknown, not automatically versatile.
+    try:
+        extra=conn.execute("""SELECT player_id,position,source_note
+            FROM world_player_alternative_positions
+            WHERE dataset_id=?""",(dataset,)).fetchall()
+    except sqlite3.OperationalError:
+        extra=()
+    primary={pid:lane_of(pos) for pid,_owner,_ovr,pos in registrations}
+    valid_players=set(primary)
+    for pid,position,source_note in extra:
+        lane=lane_of(position)
+        if pid in valid_players and lane and lane!=primary[pid] and source_note:
+            squads.alternative_positions.setdefault(pid,{})[lane]=source_note
     for roster in squads.values():
         for players in roster.values():
             players.sort(key=lambda x:(-x[1],x[0]))
@@ -179,7 +240,7 @@ def recruitment_fit(squads, *, buyer, position, overall):
 
 
 def sale_profile(squads, *, seller, player_id, position, overall):
-    """Sporting cost of selling, considering genuine secondary positions.
+    """Sporting cost of selling, considering genuine alternative positions.
 
     No advance signing is REQUIRED. Elite rotation quality is protected via a
     higher hurdle for *routine* sales, with separate seller, board, contract
@@ -203,7 +264,7 @@ def sale_profile(squads, *, seller, player_id, position, overall):
     strongest_eight=(sum(rated[:8])/len(rated[:8]) - 1
                      if rated else 0)
     quality=max(squad_standard(roster),strongest_eight)
-    eligible=getattr(squads,"secondary",{}).get(player_id,{})
+    eligible=getattr(squads,"alternative_positions",{}).get(player_id,{})
     affected={slot,*eligible}
     reports=[]
     for lane in sorted(affected):

@@ -4,7 +4,7 @@ import unittest
 
 from world_squad_planner import (
     lane_of, projected_squads, recruitment_fit, departure_guard,
-    sale_profile, effective_cover,
+    sale_profile, effective_cover, assign_available_players,
 )
 
 
@@ -133,7 +133,7 @@ class PlannerTests(unittest.TestCase):
         self.assertTrue(new["eligible"])
         self.assertTrue(new["depth_shortage"])
 
-    def _test_secondary_source(self, player_id):
+    def _test_alternative_position_source(self, player_id):
         self.db.execute("""CREATE TABLE IF NOT EXISTS
             world_player_source_refs(
                 player_id INTEGER, source_name TEXT,external_id TEXT)""")
@@ -144,12 +144,12 @@ class PlannerTests(unittest.TestCase):
         return projected_squads(self.db,career_id="test",
             dataset="england-2026-27-fc27")
 
-    def test_ben_white_verified_secondary_cb_without_double_counting(self):
+    def test_ben_white_verified_alternative_cb_without_double_counting(self):
         for rating in (89,88,84,78):
             self.player(2,"CB",rating)
         white=self.player(2,"RB",81)
         self.player(2,"RB",84)  # Timber can still start at right-back
-        squad=self._test_secondary_source(white)
+        squad=self._test_alternative_position_source(white)
         self.assertEqual(len(squad[2]["CB"]),4)
         self.assertEqual(len(effective_cover(squad,2,"CB")),5)
         self.assertEqual(len(effective_cover(squad,2,"RB")),2)
@@ -158,6 +158,39 @@ class PlannerTests(unittest.TestCase):
         timber=next(x[0] for x in squad[2]["RB"] if x[0]!=white)
         self.assertEqual(len(effective_cover(squad,2,"CB",
                                            exclude_player=timber)),4)
+
+    def test_many_alternative_positions_are_stored_as_separate_rows(self):
+        flexible=self.player(2,"RB",82)
+        starter_rb=self.player(2,"RB",79)
+        self.db.execute("""CREATE TABLE world_player_alternative_positions(
+            dataset_id TEXT,player_id INTEGER,position TEXT,source_note TEXT,
+            PRIMARY KEY(dataset_id,player_id,position))""")
+        for alt in ("CB","CDM","LB"):
+            self.db.execute("""INSERT INTO world_player_alternative_positions
+                VALUES('2026',?,?,?)""",(flexible,alt,"test-evidenced"))
+        squads=self.squads()
+        self.assertEqual(set(squads.alternative_positions[flexible]),
+                         {"CB","DM","LB"})
+        for lane in ("CB","DM","LB"):
+            self.assertEqual([p[0] for p in effective_cover(squads,2,lane)],
+                             [flexible])
+        # Multi-position does not mean three additional footballers.
+        assignment=assign_available_players(squads,2,
+            {"RB":1,"CB":1,"DM":1,"LB":1})
+        self.assertEqual(assignment["filled"],2)
+        self.assertEqual(assignment["unfilled"],2)
+        self.assertEqual(len({x["player_id"] for x in
+                              assignment["assignments"]}),2)
+        self.assertIn(starter_rb,{x["player_id"] for x in
+                                  assignment["assignments"]})
+
+    def test_alternative_position_eligibility_is_not_inferred(self):
+        p=self.player(2,"RB",84)
+        self.player(2,"RB",78)
+        self.assertEqual(effective_cover(self.squads(),2,"CB"),[])
+        assigned=assign_available_players(self.squads(),2,
+            {"RB":1,"CB":1})
+        self.assertEqual(assigned["unfilled"],1)
 
     def test_elite_arsenal_rather_sells_mosquera_than_konsa(self):
         self.player(2,"CB",89)  # Gabriel
@@ -169,7 +202,7 @@ class PlannerTests(unittest.TestCase):
         for pos,rating in (
             ("LB",84),("LB",82),("GK",88),("CM",86),("ST",86)):
             self.player(2,pos,rating)
-        squad=self._test_secondary_source(white)
+        squad=self._test_alternative_position_source(white)
         konsa_case=sale_profile(squad,seller=2,player_id=konsa,
                                 position="CB",overall=84)
         mosquera_case=sale_profile(squad,seller=2,player_id=mosquera,
