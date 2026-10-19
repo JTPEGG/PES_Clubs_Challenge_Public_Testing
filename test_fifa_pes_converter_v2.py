@@ -7,22 +7,24 @@ from world_fifa_pes_converter_v2 import (
 )
 
 class CompleteConverterV2Tests(unittest.TestCase):
-    def test_fifa20_only_not_fifa19_and_never_fc25(self):
+    def test_fifa20_only_calibration_trained_on_2020_not_fifa19(self):
         with self.assertRaises(UnrestoredEdition):
             convert_v2({"player_id":"1","name":"Example","preferred_positions":"ST"},2025)
+        # FIFA19 may still be converted as a historical SOURCE, but cannot
+        # be substituted as a PES20 calibration TRAINING year.
+        fake={"training_fifa_edition":2019,"reference_game":"PES 2020",
+              "status":"approved_heldout_experimental","offsets":{"speed":2}}
         with self.assertRaises(ConversionError):
             convert_v2({"player_id":"1","name":"Example","preferred_positions":"ST"},2019,
-                       approved_calibration={"source_edition":2020,
-                                             "reference_game":"PES 2020",
-                                             "status":"approved","offsets":{"speed":2}})
+                       approved_calibration=fake)
+        real={"training_fifa_edition":2020,"reference_game":"PES 2020",
+              "status":"approved_heldout_experimental","offsets":{"speed":2}}
         ok=convert_v2({"player_id":"1","name":"Example","preferred_positions":"ST",
-                       "sprint_speed":"80"},2020,
-                      approved_calibration={"source_edition":2020,
-                                            "reference_game":"PES 2020",
-                                            "status":"approved","offsets":{"speed":2}})
+                       "sprint_speed":"80"},2019,
+                      approved_calibration=real)
         self.assertEqual(ok["abilities"]["speed"]["value"],82)
         self.assertEqual(ok["abilities"]["speed"]["calibration_status"],
-                         "approved_FIFA20_PES2020")
+                         "experimental_FIFA20_PES2020")
 
     def test_25_core_and_four_aux_are_always_complete(self):
         p=convert_v2({"name":"Fictional GK","player_id":"12",
