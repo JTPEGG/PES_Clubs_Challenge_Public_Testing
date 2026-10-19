@@ -3,7 +3,8 @@ import sqlite3
 import unittest
 
 from world_squad_planner import (
-    lane_of, projected_squads, recruitment_fit, departure_guard, sale_profile,
+    lane_of, projected_squads, recruitment_fit, departure_guard,
+    sale_profile, effective_cover,
 )
 
 
@@ -131,6 +132,78 @@ class PlannerTests(unittest.TestCase):
         new=recruitment_fit(plan,buyer=2,position="LW",overall=85)
         self.assertTrue(new["eligible"])
         self.assertTrue(new["depth_shortage"])
+
+    def _test_secondary_source(self, player_id):
+        self.db.execute("""CREATE TABLE IF NOT EXISTS
+            world_player_source_refs(
+                player_id INTEGER, source_name TEXT,external_id TEXT)""")
+        self.db.execute("""INSERT INTO world_player_source_refs
+            VALUES(?,'EAFC27','231936')""",(player_id,))
+        self.db.execute("""UPDATE world_dataset_ratings
+            SET dataset_id='england-2026-27-fc27'""")
+        return projected_squads(self.db,career_id="test",
+            dataset="england-2026-27-fc27")
+
+    def test_ben_white_verified_secondary_cb_without_double_counting(self):
+        for rating in (89,88,84,78):
+            self.player(2,"CB",rating)
+        white=self.player(2,"RB",81)
+        self.player(2,"RB",84)  # Timber can still start at right-back
+        squad=self._test_secondary_source(white)
+        self.assertEqual(len(squad[2]["CB"]),4)
+        self.assertEqual(len(effective_cover(squad,2,"CB")),5)
+        self.assertEqual(len(effective_cover(squad,2,"RB")),2)
+        self.assertEqual(len({x[0] for x in effective_cover(squad,2,"CB")}),5)
+        # Selling Timber leaves no other natural RB starter.
+        timber=next(x[0] for x in squad[2]["RB"] if x[0]!=white)
+        self.assertEqual(len(effective_cover(squad,2,"CB",
+                                           exclude_player=timber)),4)
+
+    def test_elite_arsenal_rather_sells_mosquera_than_konsa(self):
+        self.player(2,"CB",89)  # Gabriel
+        self.player(2,"CB",88)  # Saliba
+        konsa=self.player(2,"CB",84)
+        mosquera=self.player(2,"CB",78)
+        white=self.player(2,"RB",81)
+        self.player(2,"RB",84)
+        for pos,rating in (
+            ("LB",84),("LB",82),("GK",88),("CM",86),("ST",86)):
+            self.player(2,pos,rating)
+        squad=self._test_secondary_source(white)
+        konsa_case=sale_profile(squad,seller=2,player_id=konsa,
+                                position="CB",overall=84)
+        mosquera_case=sale_profile(squad,seller=2,player_id=mosquera,
+                                  position="CB",overall=78)
+        self.assertTrue(konsa_case["protected_rotation"])
+        self.assertGreater(konsa_case["backup_quality_drop"],0)
+        self.assertFalse(mosquera_case["protected_rotation"])
+        self.assertTrue(mosquera_case["surplus_sale"])
+        self.assertGreater(konsa_case["sporting_risk"],
+                           mosquera_case["sporting_risk"])
+
+    def test_two_quality_cb_sales_increase_rotation_risk_sequentially(self):
+        self.player(2,"CB",87)
+        self.player(2,"CB",85)
+        gvardiol=self.player(2,"CB",85)
+        khusanov=self.player(2,"CB",82)
+        for rating in (76,73,69):
+            self.player(2,"CB",rating)
+        for pos,rating in (("GK",89),("LB",84),("RB",83),
+                           ("CM",85),("RW",86)):
+            self.player(2,pos,rating)
+        before=self.squads()
+        first=sale_profile(before,seller=2,player_id=gvardiol,
+                           position="CB",overall=85)
+        self.db.execute("""INSERT INTO world_career_offers
+            VALUES('test',?,?,?,'agreed_future',9)""",
+            (gvardiol,2,3))
+        after=self.squads()
+        second=sale_profile(after,seller=2,player_id=khusanov,
+                            position="CB",overall=82)
+        self.assertTrue(first["protected_rotation"])
+        self.assertTrue(second["protected_rotation"])
+        self.assertLess(len(effective_cover(after,2,"CB")),
+                        len(effective_cover(before,2,"CB")))
 
     def test_signed_arrival_revises_both_clubs_immediately(self):
         p=self.player(2,"CB",88)

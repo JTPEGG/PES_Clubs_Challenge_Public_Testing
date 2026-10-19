@@ -31,7 +31,9 @@ from world_live_market import (
     initialise_live_market,start_live_market,process_live_market,MARKET_MOMENTS,
 )
 from world_preseason_window import window_snapshot
-from world_squad_planner import lane_of,MIN_COVER,STARTERS
+from world_squad_planner import (
+    lane_of,MIN_COVER,STARTERS,projected_squads,effective_cover,
+)
 
 DATASET="england-2026-27-fc27"
 ELITE=("Arsenal","Chelsea","Manchester City")
@@ -71,22 +73,10 @@ def make_template(path):
 
 
 def snapshot(conn,career):
-    """Specialist depth and rated players by active career ownership."""
-    rows=conn.execute("""SELECT r.club_id,r.player_id,x.overall,p.primary_position
-        FROM world_career_registrations r
-        JOIN world_career_saves s ON s.career_id=r.career_id
-        JOIN world_dataset_ratings x ON x.dataset_id=s.dataset_id
-            AND x.player_id=r.player_id
-        JOIN world_players p ON p.player_id=r.player_id
-        WHERE r.career_id=? AND x.overall BETWEEN 1 AND 99""",
-        (career,)).fetchall()
-    result=defaultdict(lambda:defaultdict(list))
-    for club,pid,ovr,pos in rows:
-        lane=lane_of(pos)
-        if lane:result[club][lane].append((pid,ovr))
-    for roster in result.values():
-        for group in roster.values():group.sort(key=lambda p:-p[1])
-    return result
+    """Projected rated registrations, retaining documented secondary positions."""
+    row=conn.execute("SELECT dataset_id FROM world_career_saves WHERE career_id=?",
+                     (career,)).fetchone()
+    return projected_squads(conn,career_id=career,dataset=row[0])
 
 
 def score_window(conn,career,initial,final,index,market_outcome):
@@ -143,8 +133,8 @@ def score_window(conn,career,initial,final,index,market_outcome):
         after=final.get(club,{})
         positions={}
         for lane in MIN_COVER:
-            older=before.get(lane,[])
-            newer=after.get(lane,[])
+            older=effective_cover(initial,club,lane)
+            newer=effective_cover(final,club,lane)
             incoming=sum(m[3]==club and lane_of(m[4])==lane for m in moves)
             outgoing=sum(m[2]==club and lane_of(m[4])==lane for m in moves)
             if not (older or newer or incoming or outgoing):
@@ -162,6 +152,12 @@ def score_window(conn,career,initial,final,index,market_outcome):
                         len(newer)<max(MIN_COVER[lane],STARTERS[lane]))
             weaker=(before_top is not None and
                     (after_top is None or before_top-after_top>=3))
+            old_rotation=[p[1] for p in older[n:n+2]]
+            new_rotation=[p[1] for p in newer[n:n+2]]
+            rotation_drop=sum(max(0,v-
+                (new_rotation[i] if i<len(new_rotation) else 0))
+                for i,v in enumerate(old_rotation))
+            rotation_weaker=rotation_drop>=4
             positions[lane]=dict(bought=incoming,sold=outgoing,
                 before_depth=len(older),after_depth=len(newer),
                 before_starter_floor=before_floor,
@@ -169,11 +165,17 @@ def score_window(conn,career,initial,final,index,market_outcome):
                 before_starter_quality=before_top,
                 after_starter_quality=after_top,
                 lost_specialist_cover=lost_cover,
-                starter_quality_decline=weaker)
-            if lost_cover or weaker:
+                starter_quality_decline=weaker,
+                rotation_quality_decline=rotation_weaker,
+                rotation_strength_drop=rotation_drop,
+                previous_rotation_strength=old_rotation,
+                current_rotation_strength=new_rotation)
+            if lost_cover or weaker or rotation_weaker:
                 positional_alerts.append({
                     "club":names[club],"position":lane,
                     "lost_cover":lost_cover,"weaker_starters":weaker,
+                    "weaker_rotation":rotation_weaker,
+                    "rotation_strength_drop":rotation_drop,
                     "bought":incoming,"sold":outgoing,
                     "before_depth":len(older),"after_depth":len(newer),
                     "before_quality":before_top,"after_quality":after_top})
@@ -229,8 +231,10 @@ def score_window(conn,career,initial,final,index,market_outcome):
             "incoming_prospects":sum(m[0] in prospects for m in arrivals),
             "original_top11_mean":best_eleven(old_ratings),
             "final_top11_mean":best_eleven(new_ratings),
-            "original_cb_depth":len(initial.get(cid,{}).get("CB",[])),
-            "final_cb_depth":len(final.get(cid,{}).get("CB",[]))}
+            "original_cb_depth":len(effective_cover(initial,cid,"CB")),
+            "final_cb_depth":len(effective_cover(final,cid,"CB")),
+            "cb_rotation_drop":club_positions[name].get("CB",{}).get(
+                "rotation_strength_drop",0)}
     attempts=conn.execute("""SELECT COUNT(*) FROM world_career_ai_world_moments
         WHERE window_id=(SELECT window_id FROM world_career_preseason_windows
           WHERE career_id=? AND season_index=1)""",(career,)).fetchone()[0]
@@ -297,7 +301,7 @@ def run(windows):
                   f"{len(stats['defensive_coverage_flags'])} coverage flags",
                   flush=True)
         all_position_counts=defaultdict(lambda: {"transfers":0,"prospects":0,
-            "cover_alerts":0,"quality_alerts":0})
+            "cover_alerts":0,"quality_alerts":0,"rotation_alerts":0})
         all_seller_cases=Counter()
         all_sale_types=Counter()
         for result in results:
@@ -312,6 +316,8 @@ def run(windows):
                     alert["lost_cover"])
                 all_position_counts[lane]["quality_alerts"]+=int(
                     alert["weaker_starters"])
+                all_position_counts[lane]["rotation_alerts"]+=int(
+                    alert["weaker_rotation"])
         elite_totals={}
         for name in ELITE:
             entries=[result["elite"][name] for result in results]
@@ -324,6 +330,8 @@ def run(windows):
                     sum(x["original_top11_mean"] for x in entries)/windows,2),
                 "mean_end_top11":round(
                     sum(x["final_top11_mean"] for x in entries)/windows,2),
+                "cb_rotation_ovr_drop":sum(x["cb_rotation_drop"]
+                                          for x in entries),
                 "total_cb_losses":sum(max(0,
                     x["original_cb_depth"]-x["final_cb_depth"]) for x in entries),
             }
@@ -339,6 +347,9 @@ def run(windows):
                 for x in results),
             position_quality_alerts=sum(
                 len([a for a in x["positional_alerts"] if a["weaker_starters"]])
+                for x in results),
+            position_rotation_alerts=sum(
+                len([a for a in x["positional_alerts"] if a["weaker_rotation"]])
                 for x in results),
             **{"total_completed":sum(x["completed_transfers"] for x in results),
                "mean_completed":round(sum(x["completed_transfers"] for x in results)/windows,2),

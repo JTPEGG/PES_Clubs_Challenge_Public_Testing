@@ -21,7 +21,7 @@ from world_squad_planner import (projected_squads, recruitment_fit,
 from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
 
-AI_WORLD_VERSION = "ai-world-v5-sell-first-and-reinvest"
+AI_WORLD_VERSION = "ai-world-v6-versatile-cover-rotation-quality"
 # Global ceiling is a safety bound, not a target. A real market may be quiet.
 # Multiple independent clubs may agree moves during one market interval.
 MAX_AI_DEALS = 90  # upper safety bound, not a minimum or forced sales
@@ -318,9 +318,14 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 seller_depth=projected.get(seller,{}).get(lane,[])
                 seller_rank=next((i for i,item in enumerate(seller_depth)
                                   if item[0]==pid),len(seller_depth))
+                # Routine selling priorities favour genuine surplus;
+                # strong clubs resist cashing in on key rotation quality.
                 seller_fit=(22 if sale["surplus_sale"] else
                             -28 if sale["requires_recruitment"] else
                             8 if seller_rank>=3 else -15)
+                seller_fit-=min(60,sale["sporting_risk"]*3)
+                if sale["protected_rotation"]:
+                    seller_fit-=30
                 options.append((seller,pid,overall,need,
                                 need+seller_fit,fit,sale))
             options.sort(key=lambda v:(-v[4],
@@ -369,6 +374,30 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         seller_assumptions=seller_facts)
                     if price["fee"] is None:
                         continue
+                    # Realistic seller hierarchy: a strong club protects
+                    # its high-grade rotation options. It may STILL sell
+                    # BEFORE replacing someone for a serious player exit,
+                    # a last-year contract, financial pressure, or a board-
+                    # justifiable exceptional offer. These are modelled
+                    # circumstances, not claims about a real footballer.
+                    protected_exception=None
+                    if sale["protected_rotation"]:
+                        if bool(seller_facts.get("player_wants_exit")):
+                            protected_exception="player_exit"
+                        elif seller_facts.get("contract_years")==1 and (
+                                price["fee"]>=value*1.1):
+                            protected_exception="expiring_contract"
+                        elif seller_facts.get("financial_state") in (
+                                "cash_needed","distressed"):
+                            protected_exception="financial_pressure"
+                        elif (seller_facts.get("board_enabled") and
+                              seller_facts.get("exceptional_offer_pct")
+                              is not None and
+                              price["fee"]*100>=value*
+                              seller_facts["exceptional_offer_pct"]):
+                            protected_exception="exceptional_board_offer"
+                        if protected_exception is None:
+                            continue
                     if fit.get("category")=="prospect" and price["fee"]>prospect_fee_cap(
                             initial_transfer_budget=ledger[0],
                             available_budget=money):
@@ -454,6 +483,13 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     _sign_ai_deal(conn,career_id=career_id,offer_id=oid,buyer=buyer,
                         seller=seller,fee=final_fee,wage=final_wage,
                         game_date=game_date)
+                    if sale["protected_rotation"]:
+                        conn.execute("""INSERT INTO world_career_offer_events
+                            (offer_id,event_type,detail) VALUES(?,?,?)""",
+                            (oid,"ai_protected_rotation_exception",
+                             f"Rotation-critical sale: {protected_exception}; "
+                             f"position impact: {sale['affected_positions']}"))
+                        conn.commit()
                     # Every approved sale gets a distinct sporting rationale.
                     # Do not manufacture a replacement when the role is already
                     # covered, and do not require a signing before an exit.
@@ -469,7 +505,9 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                          f"priority {sale['replacement_priority']}; "
                          f"depth {sale['before_depth']} to "
                          f"{sale['after_depth']}; "
-                         f"starter OVR drop {sale['starter_rating_drop']}. "
+                         f"starter OVR drop {sale['starter_rating_drop']}; "
+                         f"backup-quality drop {sale['backup_quality_drop']}; "
+                         f"secondary-position impact {sale['affected_positions']}. "
                          f"Replacement is never a pre-sale requirement."))
                     conn.commit()
                     if fit.get("category")=="prospect":
