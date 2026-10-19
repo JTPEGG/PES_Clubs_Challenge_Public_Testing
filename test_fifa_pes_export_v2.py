@@ -1,5 +1,6 @@
 """Edition-aware CSV full completeness tests, FC25 explicit gap and source preservation."""
 import csv
+import json
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -45,6 +46,47 @@ class ExportV2Tests(unittest.TestCase):
         for x in ("weak_foot_usage","weak_foot_accuracy","form","injury_resistance"):
             self.assertIn(x,COLUMNS)
             self.assertIn(x+"_method",COLUMNS)
+        self.assertIn("position_fit_indices",COLUMNS)
+        for x in TARGETS:
+            self.assertIn(x+"_source_edition",COLUMNS)
+            self.assertIn(x+"_calibration_shift",COLUMNS)
+
+    def test_synthetic_all_22_supported_editions_stay_complete(self):
+        with TemporaryDirectory() as d:
+            original=Path(d)/"all_fifa.zip"
+            output=Path(d)/"all_pes.zip"
+            with ZipFile(original,"w") as z:
+                for year in range(2005,2028):
+                    z.writestr(f"fifa_fc_2000_2027/data/{year}_season.csv",
+                        "player_id,name,dob,preferred_positions,rating,gk_reflexes,sprint_speed\\n"
+                        "123,Test Keeper,1988-02-07,GK,72,80,30\\n"
+                        "124,Test Wing Back,1987-06-04,RWB,73,11,82\\n")
+            result=export(original,output)
+            self.assertEqual(len(result["per_edition"]),23)
+            self.assertEqual(result["per_edition"]["2025"]["status"],
+                             "SOURCE_GAP_NOT_REPAIRED")
+            supported={str(y) for y in range(2005,2028) if y!=2025}
+            self.assertEqual({k for k,v in result["per_edition"].items()
+                              if v["status"]=="FULLY_NUMERIC_ESTIMATED_OUTPUT"},
+                             supported)
+            with ZipFile(output) as z:
+                data=[p for p in z.namelist() if p.endswith("_Complete.csv")]
+                self.assertEqual(len(data),22)
+                for file in data:
+                    parsed=list(csv.DictReader(StringIO(z.read(file).decode())))
+                    self.assertEqual(len(parsed),2)
+                    for r in parsed:
+                        self.assertTrue(all(r[attr].isdigit() for attr in TARGETS))
+                        self.assertEqual(len(json.loads(r["position_fit_indices"])),
+                                         1)
+                manifest=json.loads(z.read("PES2020_v2/MANIFEST.json"))
+                for year in supported:
+                    entry=manifest["per_edition"][year]
+                    self.assertEqual(entry["ratings_written"],50)
+                    self.assertEqual(entry["numeric_core_completeness_pct"],100.0)
+                    self.assertEqual(set(entry["per_position_family"]),
+                                     {"GK","DEF"})
+
 
 
 if __name__=="__main__":
