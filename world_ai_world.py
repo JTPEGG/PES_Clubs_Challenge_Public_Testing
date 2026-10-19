@@ -388,7 +388,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         asking=terms_row["demanded_fee"]
                         # AI accepts a reasoned asking price only within its
                         # independent ceiling and the remaining budget.
-                        if (asking is None or asking>value*1.25
+                        # Don't impose an unrelated 1.25x limit AFTER
+                        # the AI has already calculated its own higher,
+                        # financially bounded valuation ceiling. This
+                        # artificially blocked regular starters at elite clubs.
+                        if (asking is None or
+                                asking>price["maximum_sensible_fee"]
                                 or asking>money or asking<=final_fee or
                                 (fit.get("category")=="prospect" and
                                  asking>prospect_fee_cap(
