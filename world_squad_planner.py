@@ -195,7 +195,14 @@ def sale_profile(squads, *, seller, player_id, position, overall):
     if len(selected)!=1:
         return {"valid":False,"reason":"Player not in projected seller squad"}
     rank=next(i for i,p in enumerate(peers) if p[0]==player_id)
-    quality=squad_standard(roster)
+    # A club with an elite first-choice core stays subject to elite
+    # expectations after selling a reserve. Using only the current top-XI
+    # average could lower the bar immediately after a damaging sale.
+    rated=sorted((p[1] for players in roster.values()
+                  for p in players),reverse=True)
+    strongest_eight=(sum(rated[:8])/len(rated[:8]) - 1
+                     if rated else 0)
+    quality=max(squad_standard(roster),strongest_eight)
     eligible=getattr(squads,"secondary",{}).get(player_id,{})
     affected={slot,*eligible}
     reports=[]
