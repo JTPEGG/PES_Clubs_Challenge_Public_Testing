@@ -5,6 +5,9 @@ on:
     paths:
       - 'qa_fifa_pes_v2_quality_audit.py'
       - 'test_fifa_pes_v2_quality_audit.py'
+      - 'scripts/source_coverage_v2.py'
+      - 'scripts/export_fifa_pes_v2.py'
+      - 'test_fifa_pes_export_v2.py'
       - '.github/workflows/fifa-pes-v2-quality-audit.yml'
 permissions:
   contents: read
@@ -21,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test source completeness warnings and unique FIFA20 identity candidates
-        run: python -m unittest -v test_fifa_pes_v2_quality_audit
+        run: python -m unittest -v test_fifa_pes_v2_quality_audit test_fifa_pes_export_v2
       - name: Download source archive with exact row counts and source URLs
         run: python -u scripts/build_fifa_fc_archive.py --output qa-v2-input/fifa_original_23.zip --workers 5
       - name: Compare source coverage and two independent FIFA20 source snapshots against native PES20
