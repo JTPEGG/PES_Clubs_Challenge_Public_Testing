@@ -13,7 +13,7 @@ from zipfile import ZipFile
 from scripts.export_fifa_pes_v2 import source_members, read_ed
 from world_fifa_pes_converter import positions
 from world_fifa_pes_converter_v2 import (
-    EditionContext, POSITION_FAMILY, convert_v2, prepared_row,
+    POSITION_FAMILY, convert_v2, prepared_row,
     validate_exportable, TARGETS,
 )
 
@@ -58,7 +58,7 @@ def run(source, output, per_family=20):
                 family = POSITION_FAMILY.get(source_positions[0])
                 if family in FAMILIES:
                     indexed[family].append(row)
-            context = EditionContext(year, rows)  # no cross-provider neighbours
+            context = None  # fast independent per-row schema QA; never use cross-provider neighbours
             per_role = {}
             for family in FAMILIES:
                 choices = select_spread(indexed[family], per_family)
@@ -87,6 +87,7 @@ def run(source, output, per_family=20):
                 "per_family": per_family,
                 "source_provider": "SoFIFA-derived pinned FIFA15–FIFA20 candidate",
                 "cross_provider_adjacent_imputation_enabled": False,
+                "context_free_attribute_fallback": True,
             }
             print(f"{year}: {len(rows):,} source rows; "
                   + ", ".join(f"{f}:{per_role[f]['sampled_players']}"
