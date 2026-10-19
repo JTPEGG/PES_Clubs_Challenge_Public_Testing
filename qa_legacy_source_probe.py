@@ -4,9 +4,9 @@ Reads the datasets in CI memory, exports ONLY field coverage, file counts and
 identity-key availability. No player ratings or full source CSV are republished.
 """
 import argparse
-from collections import Counter
+from collections import Counter,defaultdict
 from datetime import date,datetime
-from qa_player_source_pilot import sample_players,reference_birthdate
+from qa_player_source_pilot import sample_players,reference_birthdate,normalized_name
 import csv
 import io
 import json
@@ -144,6 +144,63 @@ def schema_probe(text,source):
     }
 
 
+
+def fifa20_pes20_crosswalk_candidates(fifa_text,pes_text):
+    """Discover candidate historical identity joins, NOT certified mappings.
+
+    Same-game-season short name, nationality and age are all required. A
+    collision in EITHER source invalidates candidate auto-acceptance. FIFA
+    players get stable EA IDs; PES's downloaded CSV has no stable PES IDs.
+    """
+    fifa_rows=list(csv.DictReader(io.StringIO(fifa_text)))
+    pes_rows=list(csv.DictReader(io.StringIO(pes_text)))
+    index_fifa=defaultdict(list)
+    index_pes=defaultdict(list)
+    for r in fifa_rows:
+        key=(normalized_name(r.get("short_name") or ""),
+             normalized_name(r.get("nationality") or ""),
+             str(r.get("age") or "").strip())
+        if all(key):index_fifa[key].append(r)
+    for r in pes_rows:
+        key=(normalized_name(r.get("name") or ""),
+             normalized_name(r.get("nationality") or ""),
+             str(r.get("age") or "").strip())
+        if all(key):index_pes[key].append(r)
+    shared=set(index_fifa)&set(index_pes)
+    qualified={}
+    ambiguous=0
+    same_club=0
+    for key in shared:
+        left=index_fifa[key];right=index_pes[key]
+        if len(left)!=1 or len(right)!=1:
+            ambiguous+=1
+            continue
+        src=left[0];pes=right[0]
+        eaid=str(src.get("sofifa_id") or "").strip()
+        if not eaid.isdigit():continue
+        qualified[eaid]=key
+        if normalized_name(src.get("club") or "")==normalized_name(pes.get("team_name") or ""):
+            same_club+=1
+    sample_ids={str(p[0]):reference_birthdate(p[15]) for p in sample_players()}
+    matched_fifa=set()
+    for row in fifa_rows:
+        eid=str(row.get("sofifa_id") or "").strip()
+        if eid in sample_ids and date_value(row.get("dob"))==sample_ids[eid]:
+            matched_fifa.add(eid)
+    return {
+        "label":"historical_CANDIDATES_NOT_VERIFIED_IDENTITIES",
+        "matching_criteria":"same short player name + nationality + age in FIFA20 and PES20",
+        "requires_unique_in_both_sources":True,
+        "qualifying_candidate_pairs":len(qualified),
+        "ambiguous_shared_keys_rejected":ambiguous,
+        "same_raw_club_name_pairs":same_club,
+        "modern_pilot_exact_fifa20_ids":len(matched_fifa),
+        "modern_pilot_with_pes20_candidate":len(matched_fifa & set(qualified)),
+        "limitation":"PES source CSV lacks stable player ID and DOB. Even unique name/nationality/age can be wrong; do not automatically merge profiles or use 2019 PES stats for 2026 ratings.",
+    }
+
+
+
 def fetch(url):
     request=Request(url,headers={"User-Agent":"PES-Challenge-source-coverage/1.0"})
     with urlopen(request,timeout=60) as response:
@@ -157,11 +214,15 @@ def run(folder):
     target=Path(folder)
     target.mkdir(parents=True,exist_ok=True)
     result={}
+    source_text={}
     for key,meta in SOURCES.items():
         try:
+            body=fetch(meta["url"])
+            if key in ("pes2020_public_research_csv","fifa2020_research_csv"):
+                source_text[key]=body
             result[key]={
                 "status":"machine_readable",
-                **schema_probe(fetch(meta["url"]),meta["url"]),
+                **schema_probe(body,meta["url"]),
                 "edition":meta["edition"],
                 "source_commit":meta["url"].split("/")[5],
             }
@@ -174,6 +235,16 @@ def run(folder):
         print(key, result[key]["status"],result[key].get("rows_total"),
               "fields=",result[key].get("columns_total"),
               "identity=",result[key].get("identification_method"),flush=True)
+    if {"pes2020_public_research_csv","fifa2020_research_csv"}<=set(source_text):
+        result["cross_source_candidate_audit"]=fifa20_pes20_crosswalk_candidates(
+            source_text["fifa2020_research_csv"],
+            source_text["pes2020_public_research_csv"],
+        )
+        print("PES-FIFA possible crosswalk:",
+              result["cross_source_candidate_audit"]["qualifying_candidate_pairs"],
+              "pilot overlaps:",
+              result["cross_source_candidate_audit"]["modern_pilot_with_pes20_candidate"],
+              flush=True)
     (target/"historical-source-schemas.json").write_text(
         json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
     return result
@@ -184,5 +255,5 @@ if __name__=="__main__":
     parser.add_argument("--output",default="qa-player-source-historical")
     args=parser.parse_args()
     result=run(args.output)
-    if not all(v["status"]=="machine_readable" for v in result.values()):
+    if not all(v["status"]=="machine_readable" for k,v in result.items() if k in SOURCES):
         raise SystemExit("One or more historical datasets unavailable; see detailed report")
