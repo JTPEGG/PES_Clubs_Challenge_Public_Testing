@@ -312,7 +312,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # Rank surplus deals higher to discourage gratuitous
                 # starter churn; don't forbid an attractive late offer.
                 need=fit["score"]
-                if overall>max(club_ratings)+14:
+                if club_ratings and overall>max(club_ratings)+14:
                     continue
                 lane=lane_of(position)
                 seller_depth=projected.get(seller,{}).get(lane,[])
@@ -410,7 +410,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     conn.commit()
                     promise=("rotation" if fit.get("category")=="prospect" else
                              "key_player" if need>=90 and
-                             overall>=max(club_ratings) else "regular_starter")
+                             club_ratings and overall>=max(club_ratings) else "regular_starter")
                     interest=player_move_interest(conn,career_id=career_id,
                         offer_id=oid,role_promise=promise)
                     if not interest["can_negotiate"]:
