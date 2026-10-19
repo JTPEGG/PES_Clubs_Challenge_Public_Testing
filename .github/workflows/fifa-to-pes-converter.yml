@@ -49,7 +49,7 @@ jobs:
       - name: Fetch original 23-edition source archive for end-to-end import
         run: python -u scripts/build_fifa_fc_archive.py --output qa-input/original_23_editions.zip --workers 6
       - name: Export PES2020 conversion preview for all 23 editions
-        run: python -u scripts/export_fifa_pes_csvs.py --source qa-input/original_23_editions.zip --output qa-conversion-pilot/PES2020_Conversion_23_Edition_Preview.zip --limit-per-edition 15
+        run: python -u -m scripts.export_fifa_pes_csvs --source qa-input/original_23_editions.zip --output qa-conversion-pilot/PES2020_Conversion_23_Edition_Preview.zip --limit-per-edition 15
       - name: Inspect source PES2020 historical export schema
         run: |
           python - <<'PY'
