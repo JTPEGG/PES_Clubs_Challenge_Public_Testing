@@ -1,0 +1,28 @@
+name: FIFA and FC annual source catalogue
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'docs/warehouse/FIFA_FC_ANNUAL_2000_2027.md'
+      - 'docs/warehouse/fifa_fc_annual_sources_2000_2027.json'
+      - 'test_fifa_fc_annual_catalog.py'
+      - '.github/workflows/annual-source-catalog.yml'
+  pull_request:
+    paths:
+      - 'docs/warehouse/FIFA_FC_ANNUAL_2000_2027.md'
+      - 'docs/warehouse/fifa_fc_annual_sources_2000_2027.json'
+      - 'test_fifa_fc_annual_catalog.py'
+      - '.github/workflows/annual-source-catalog.yml'
+jobs:
+  test-catalogue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check annual edition and source map
+        run: python -m unittest -v test_fifa_fc_annual_catalog
