@@ -50,6 +50,13 @@ jobs:
         run: python -u scripts/build_fifa_fc_archive.py --output qa-input/original_23_editions.zip --workers 6
       - name: Export PES2020 conversion preview for all 23 editions
         run: python -u -m scripts.export_fifa_pes_csvs --source qa-input/original_23_editions.zip --output qa-conversion-pilot/PES2020_Conversion_23_Edition_Preview.zip --limit-per-edition 15
+      - name: Upload 23-edition PES-style CSV preview
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fifa-to-pes2020-23-edition-preview
+          path: qa-conversion-pilot/PES2020_Conversion_23_Edition_Preview.zip
+          if-no-files-found: warn
       - name: Inspect source PES2020 historical export schema
         run: |
           python - <<'PY'
