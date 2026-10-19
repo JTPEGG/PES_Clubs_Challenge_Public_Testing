@@ -5,6 +5,7 @@ on:
     paths:
       - 'qa_player_source_comparison.py'
       - 'qa_legacy_source_probe.py'
+      - 'test_qa_legacy_source_probe.py'
       - 'test_qa_player_source_comparison.py'
       - 'docs/warehouse/PLAYER_SOURCE_COMPARISON.md'
       - '.github/workflows/player-source-comparison.yml'
@@ -29,7 +30,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test deterministic identity matching and source categorisation
-        run: python -m unittest -v test_qa_player_source_comparison test_qa_player_source_pilot
+        run: python -m unittest -v test_qa_player_source_comparison test_qa_player_source_pilot test_qa_legacy_source_probe
       - name: Scan all OpenFootball countries and FC26 source in memory
         run: python -u qa_player_source_comparison.py --output qa-player-source-global
       - name: Probe historical PES and FIFA CSV fields
