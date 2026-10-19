@@ -146,6 +146,13 @@ def prepared_row(row):
             if name in PES_POSITIONS and name not in found:
                 found.append(name)
     copy=dict(row)
+    # FC27 often leaves common_name blank; use the sourced first+last fields.
+    if not any(copy.get(k) for k in
+               ("name","long_name","short_name","Name","FullName","common_name")):
+        full=" ".join(str(copy.get(k) or "").strip()
+                      for k in ("first_name","last_name")).strip()
+        if full:
+            copy["name"]=full
     if found:
         copy["player_positions"]=", ".join(found)
     return copy
