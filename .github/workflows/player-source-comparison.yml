@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'qa_player_source_comparison.py'
+      - 'qa_legacy_source_probe.py'
       - 'test_qa_player_source_comparison.py'
       - 'docs/warehouse/PLAYER_SOURCE_COMPARISON.md'
       - '.github/workflows/player-source-comparison.yml'
@@ -31,10 +32,14 @@ jobs:
         run: python -m unittest -v test_qa_player_source_comparison test_qa_player_source_pilot
       - name: Scan all OpenFootball countries and FC26 source in memory
         run: python -u qa_player_source_comparison.py --output qa-player-source-global
+      - name: Probe historical PES and FIFA CSV fields
+        run: python -u qa_legacy_source_probe.py --output qa-player-source-historical
       - name: Upload QA-only field availability and source diagnostics
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: player-source-global-comparison
-          path: qa-player-source-global/
+          path: |
+            qa-player-source-global/
+            qa-player-source-historical/
           if-no-files-found: warn
