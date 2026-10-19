@@ -66,7 +66,8 @@ def to_csv_row(p):
     return val
 
 
-def export(source_zip,destination,*,years=None,limit_per_edition=None,calibration=None):
+def export(source_zip,destination,*,years=None,limit_per_edition=None,
+           calibration=None,require_all_supported=False):
     destination=Path(destination)
     destination.parent.mkdir(parents=True,exist_ok=True)
     outcome={"model_version":MODEL_VERSION,
@@ -82,6 +83,11 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,calibratio
              "per_edition":{}}
     with ZipFile(source_zip) as original,ZipFile(destination,"w",ZIP_DEFLATED,compresslevel=6,allowZip64=True) as out:
         members=source_members(original)
+        if require_all_supported:
+            required=set(range(2005,2028))-DISALLOWED_EDITIONS
+            missing=sorted(required-set(members))
+            if missing:
+                raise ValueError("Missing mandatory non-FC25 editions: "+str(missing))
         wanted=sorted(x for x in members if years is None or x in years)
         if not wanted:raise ValueError("No matching FIFA year files")
         for year in wanted:
@@ -181,11 +187,14 @@ if __name__=="__main__":
     p.add_argument("--output",required=True)
     p.add_argument("--edition",action="append",type=int)
     p.add_argument("--limit-per-edition",type=int)
-    p.add_argument("--calibration",help="Held-out FIFA20/PES20 calibration JSON")
+    p.add_argument("--calibration",help="Explicitly approved FIFA20/PES20 calibration JSON")
+    p.add_argument("--require-all-supported",action="store_true",
+                   help="Reject an incomplete 2005–2027 archive (FC25 remains excluded)")
     x=p.parse_args()
     calibration=json.loads(Path(x.calibration).read_text(encoding="utf-8")) if x.calibration else None
     result=export(x.source,x.output,years=set(x.edition) if x.edition else None,
-                  limit_per_edition=x.limit_per_edition,calibration=calibration)
+                  limit_per_edition=x.limit_per_edition,calibration=calibration,
+                  require_all_supported=x.require_all_supported)
     print(json.dumps({"model":result["model_version"],
                       "editions":{k:v["status"] for k,v in result["per_edition"].items()}},
                      indent=2),flush=True)
