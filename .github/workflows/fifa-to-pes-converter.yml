@@ -26,6 +26,15 @@ jobs:
           python-version: '3.12'
       - name: Validate converter against old and modern editions
         run: python -m unittest -v test_fifa_pes_converter
+      - name: Benchmark real FIFA editions against PES2020
+        run: python -u qa_pes_conversion_pilot.py
+      - name: Upload historical and current converter comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fifa-pes2020-conversion-pilot
+          path: qa-conversion-pilot/
+          if-no-files-found: warn
       - name: Inspect source PES2020 historical export schema
         run: |
           python - <<'PY'
