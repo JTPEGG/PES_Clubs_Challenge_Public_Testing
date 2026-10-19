@@ -109,6 +109,13 @@ def score_window(conn,career,initial,final,index,market_outcome):
     # midfielders and forwards, not only keepers and centre-backs.
     position_counts=defaultdict(lambda: {"transfers":0,"prospects":0})
     seller_cases=Counter()
+    seller_sale_types=Counter(dict(conn.execute("""SELECT e.event_type,COUNT(*)
+        FROM world_career_offer_events e
+        JOIN world_career_offers o ON o.offer_id=e.offer_id
+        WHERE o.career_id=? AND e.event_type IN (
+            'ai_seller_recruitment_required',
+            'ai_seller_surplus_sale','ai_seller_covered_sale')
+        GROUP BY e.event_type""",(career,)).fetchall()))
     for oid,pid,seller,buyer,position,overall,fee in moves:
         lane=lane_of(position) or "UNKNOWN"
         position_counts[lane]["transfers"]+=1
@@ -234,6 +241,7 @@ def score_window(conn,career,initial,final,index,market_outcome):
         prospect_signings=sum(m[0] in prospects for m in moves),
         elite=by_elite,defensive_coverage_flags=quality_risks,
         position_counts=dict(position_counts),seller_cases=dict(seller_cases),
+        seller_sale_types=dict(seller_sale_types),
         positional_alerts=positional_alerts,
         club_positions=club_positions,
         final_state=market_outcome["state"])
@@ -291,11 +299,13 @@ def run(windows):
         all_position_counts=defaultdict(lambda: {"transfers":0,"prospects":0,
             "cover_alerts":0,"quality_alerts":0})
         all_seller_cases=Counter()
+        all_sale_types=Counter()
         for result in results:
             for lane,values in result["position_counts"].items():
                 all_position_counts[lane]["transfers"]+=values["transfers"]
                 all_position_counts[lane]["prospects"]+=values["prospects"]
             all_seller_cases.update(result["seller_cases"])
+            all_sale_types.update(result["seller_sale_types"])
             for alert in result["positional_alerts"]:
                 lane=alert["position"]
                 all_position_counts[lane]["cover_alerts"]+=int(
@@ -323,6 +333,7 @@ def run(windows):
             elite_totals=elite_totals,
             all_positions=dict(all_position_counts),
             seller_sale_reasons=dict(all_seller_cases),
+            sale_squad_cases=dict(all_sale_types),
             position_coverage_alerts=sum(
                 len([a for a in x["positional_alerts"] if a["lost_cover"]])
                 for x in results),
