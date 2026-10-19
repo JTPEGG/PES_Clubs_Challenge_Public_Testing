@@ -17,6 +17,10 @@ from qa_pes_conversion_pilot import (
     SRC, PES_SRC, fetch_csv, pairs_for_calibration
 )
 from qa_fifa20_pes20_calibration_v2 import position_accuracy_report
+from scripts.source_coverage_v2 import (
+    FIFAINDEX_PROVIDER, KNOWN_SCRAPE_PAGE_COUNT,
+    OBSERVED_FIFAINDEX_PAGE_CEILING, source_coverage_status,
+)
 
 # Pinned copy of the complete 18,278-row public FIFA 20 SoFIFA snapshot.
 # Different provider/snapshot than FIFAIndex; identity overlap is NOT assumed.
@@ -24,22 +28,6 @@ ALTERNATE_FIFA20 = (
     "https://raw.githubusercontent.com/kushal-gopal/EA-Sports-Fifa/"
     "66fc78145ff32ea2dea839459e247833856e0f47/players_20.csv"
 )
-FIFAINDEX_PROVIDER = "lbenz730/fifa_model"
-KNOWN_SCRAPE_PAGE_COUNT = 700
-OBSERVED_FIFAINDEX_PAGE_CEILING = 10500
-
-
-def source_coverage_status(edition, rows, provider):
-    """Separate source player coverage from numeric PES attribute completeness."""
-    if edition == 2025:
-        return "EXCLUDED_FC25_NOT_CONVERTED"
-    if (2005 <= edition <= 2020
-            and provider == FIFAINDEX_PROVIDER
-            and rows == OBSERVED_FIFAINDEX_PAGE_CEILING):
-        return "KNOWN_SCRAPER_PAGE_LIMIT_REACHED_COVERAGE_UNVERIFIED"
-    return "SOURCE_COVERAGE_NOT_INDEPENDENTLY_VERIFIED"
-
-
 def audit_source_manifest(manifest):
     records = manifest["downloads"]
     rows = {}
