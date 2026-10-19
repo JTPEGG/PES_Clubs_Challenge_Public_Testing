@@ -58,9 +58,9 @@ class ExportV2Tests(unittest.TestCase):
             with ZipFile(original,"w") as z:
                 for year in range(2005,2028):
                     z.writestr(f"fifa_fc_2000_2027/data/{year}_season.csv",
-                        "player_id,name,dob,preferred_positions,rating,gk_reflexes,sprint_speed\\n"
-                        "123,Test Keeper,1988-02-07,GK,72,80,30\\n"
-                        "124,Test Wing Back,1987-06-04,RWB,73,11,82\\n")
+                        "player_id,name,dob,preferred_positions,rating,gk_reflexes,sprint_speed\n"
+                        "123,Test Keeper,1988-02-07,GK,72,80,30\n"
+                        "124,Test Wing Back,1987-06-04,RWB,73,11,82\n")
             result=export(original,output)
             self.assertEqual(len(result["per_edition"]),23)
             self.assertEqual(result["per_edition"]["2025"]["status"],
