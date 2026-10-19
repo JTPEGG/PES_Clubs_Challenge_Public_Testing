@@ -87,7 +87,10 @@ def _date(row,edition):
     text=(row.get("dob") or row.get("birthdate") or "").strip()
     if not text or text.lower() in ("na","nan"):
         return None
-    for fmt in ("%Y-%m-%d","%d-%m-%Y","%m/%d/%Y","%d/%m/%Y"):
+    if re.match(r"^\\d{4}-\\d{2}-\\d{2}(?:[T ]|$)",text):
+        text=text[:10]
+    for fmt in ("%Y-%m-%d","%d-%m-%Y","%m/%d/%Y","%d/%m/%Y",
+                "%Y/%m/%d","%d %b %Y"):
         try:
             dt=datetime.strptime(text,fmt).date()
             if 1900<=dt.year<=2020:
@@ -108,7 +111,8 @@ def _id(row):
 # Legacy FIFA 05 used sided roles such as RCM, RAM and RS, not consistently
 # available as independent PES2020 position names. Standardize before v1.
 LEGACY_POS_MAP={
- "RS":"CF","LS":"CF",
+ "RS":"CF","LS":"CF","RWB":"RB","LWB":"LB",
+ "RCB":"CB","LCB":"CB","LAM":"AMF",
  "RCM":"CMF","LCM":"CMF",
  "RAM":"AMF","LAM":"AMF","RCAM":"AMF","LCAM":"AMF",
  "RDM":"DMF","LDM":"DMF","RCDM":"DMF","LCDM":"DMF",
@@ -175,6 +179,52 @@ def _overall(row):
 
 def _family(position):
     return POSITION_FAMILY.get(position,"OTHER")
+
+
+def _identity_namespace(year):
+    """Different providers may reuse the same numeric player IDs.
+    
+    Only known same-source-series annual files may form automatic adjacency.
+    A verified cross-provider ID crosswalk can be introduced separately.
+    """
+    if 2005 <= year <= 2020:return "fifa_index_historical"
+    if year in (2021,2022):return "sofifa_21_22"
+    return "edition_specific_" + str(year)
+
+
+def _same_player_name(left,right):
+    def name(r):
+        prepared=prepared_row(r)
+        raw=next((str(prepared[k]).strip() for k in
+                  ("name","long_name","short_name","Name","FullName",
+                   "common_name") if prepared.get(k)), "")
+        return re.sub(r"[^\\w]", "", raw.casefold())
+    a,b=name(left),name(right)
+    return bool(a and b and a==b)
+
+
+def _position_suitability(profile):
+    """Separate, numeric V2 role-fit indices for SOURCE-LISTED positions only.
+
+    These are NOT PES native positional OVRs or proven familiarity ratings.
+    """
+    overall=numeric(profile["source_overall"])
+    result={}
+    for role in [profile["primary_position"],*profile["alternative_positions"]]:
+        keys=GROUPS.get(role)
+        if not keys:
+            raise ConversionError("Unmapped native PES2020 positional role: "+str(role))
+        values=[profile["abilities"][stat]["value"] for stat in keys]
+        avg=sum(values)/len(values)
+        value=avg if overall is None else 0.75*avg+0.25*overall
+        result[role]={
+            "value":_clamp(value),
+            "method":"v2_completed_abilities_role_fit",
+            "confidence":"low",
+            "source_abilities":list(keys),
+            "is_native_pes_overall":False,
+        }
+    return result
 
 
 def _clamp(v):
@@ -254,10 +304,18 @@ class EditionContext:
         current=_overall(row)
         found=[]
         for other_year,mapping in self.adjacent.items():
+            if _identity_namespace(other_year)!=_identity_namespace(self.edition):
+                continue
             group=mapping.get(key,[])
             # Reject duplicate/unresolved registrations, never guess a row.
             if len(group)!=1:continue
             other=group[0]
+            if not _same_player_name(row,other):
+                continue
+            nation_a=str(row.get("nationality") or "").strip().casefold()
+            nation_b=str(other.get("nationality") or "").strip().casefold()
+            if nation_a and nation_b and nation_a!=nation_b:
+                continue
             v=v1_convert(prepared_row(other),other_year)["abilities"][attribute]
             if v["method"] not in ("direct_equivalent","weighted_estimate"):
                 continue
@@ -273,7 +331,8 @@ class EditionContext:
         return _method(value,"adjacent_edition_same_id_dob",
                        ["source_year:"+str(x[1])+":"+("+".join(x[3]["source_columns"]))
                         for x in nearest],
-                       self.edition,"medium_low")
+                       nearest[0][1] if len(nearest)==1
+                       else sorted(x[1] for x in nearest),"medium_low")
 
     def peer_value(self,row,position,attribute):
         family=_family(position)
@@ -359,7 +418,7 @@ def convert_v2(row,edition,*,context=None,approved_calibration=None):
         "alternative_positions":previous["alternative_positions"],
         "identity_dob":_date(row,edition),
         "abilities":{},"additional":{},
-        "position_fit_indices":previous["position_fit_indices"],
+        "position_fit_indices":{},
         "export_status":"pending_validation",
     }
     for attr,old in previous["abilities"].items():
@@ -388,6 +447,7 @@ def convert_v2(row,edition,*,context=None,approved_calibration=None):
                        calibration_shift=shift)
         result["abilities"][attr]=value
     result["additional"]=_extra_fields(row,result)
+    result["position_fit_indices"]=_position_suitability(result)
     validate_exportable(result)
     result["export_status"]="complete_estimated_pes2020_profile"
     return result
@@ -401,13 +461,23 @@ def validate_exportable(profile):
         raise ConversionError("Missing PES abilities")
     for key,val in profile["abilities"].items():
         n=val.get("value")
-        if not isinstance(n,int) or not 40<=n<=99 or not val.get("method"):
+        if type(n) is not int or not 40<=n<=99 or not val.get("method"):
             raise ConversionError("Invalid PES ability: "+key)
     if profile["primary_position"] not in PES_POSITIONS:
         raise ConversionError("Unknown or invalid primary PES 2020 position")
+    positions=[profile["primary_position"],*profile["alternative_positions"]]
+    if len(set(positions))!=len(positions):
+        raise ConversionError("Duplicate PES2020 positions")
     for pos in profile["alternative_positions"]:
         if pos not in PES_POSITIONS:
             raise ConversionError("Invalid PES 2020 alternative position")
+    if set(profile.get("position_fit_indices",{}))!=set(positions):
+        raise ConversionError("Missing individual positional suitability")
+    for pos,fit in profile["position_fit_indices"].items():
+        value=fit.get("value")
+        if (type(value) is not int or not PES_MIN<=value<=PES_MAX or
+            not fit.get("method") or fit.get("is_native_pes_overall") is not False):
+            raise ConversionError("Invalid estimated positional suitability: "+pos)
     expected={"weak_foot_usage":(1,4),"weak_foot_accuracy":(1,4),
               "form":(1,8),"injury_resistance":(1,3)}
     for name,(low,high) in expected.items():
