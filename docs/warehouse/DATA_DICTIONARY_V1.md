@@ -52,6 +52,19 @@ Dataset-scoped primary and unlimited alternative playing positions, with optiona
 | `source_id` | TEXT | Yes | References wh_sources; provides a traceable evidence or simulation origin. |
 | `source_note` | TEXT | Yes | Explicit source evidence note. Does not automatically certify suitability. |
 
+## `wh_player_position_reviews`
+
+Whether all alternative positions have actually been researched. **No alternatives listed** is not proof that a player only has one playable position; a verified-complete review with no alternative rows is.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `dataset_id` | TEXT | Yes | Immutable versioned source snapshot identifier. |
+| `player_id` | INTEGER | Yes | Canonical internal player identifier. |
+| `review_status` | TEXT | Yes | unreviewed, partial, or verified_complete; only verified_complete can certify zero alternatives. |
+| `reviewed_on` | TEXT | No | Date the listed playable positions were last checked. |
+| `source_id` | TEXT | Yes | Evidence source used for the completeness assessment. |
+| `review_note` | TEXT | No | Scouting caveats, applicable position editions, or contradictory sources. |
+
 ## `wh_player_attributes`
 
 Fine-grained 1–99 football attributes; independent of aggregate EA reference-category ratings.
@@ -243,4 +256,4 @@ Competition finishing-place reward schedule. Unknown prize amounts remain NULL.
 - The simultaneous-lineup allocator must count an individual player once even if several alternative positions are eligible.
 - Source-date versions and career mutation events are never conflated. Historical snapshots remain immutable.
 
-*Generated from schema field declarations, then annotated with business definitions. Proposed `wh_` fields: 123 across 15 tables.*
+*Generated from schema field declarations, then annotated with business definitions. Proposed `wh_` fields: 129 across 16 tables.*
