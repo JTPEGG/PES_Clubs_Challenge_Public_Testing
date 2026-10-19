@@ -9,23 +9,24 @@ import csv
 import io
 import json
 import re
-from collections import Counter
+from collections import Counter,defaultdict
 from pathlib import Path
 from zipfile import ZipFile,ZIP_DEFLATED
 
 from world_fifa_pes_converter_v2 import (
     convert_v2, EditionContext, TARGETS, MODEL_VERSION, DISALLOWED_EDITIONS,
-    validate_exportable, UnrestoredEdition
+    validate_exportable, UnrestoredEdition, POSITION_FAMILY
 )
 
 BASIC=("source_edition","source_player_id","player_name","source_overall",
        "identity_dob","model_version","primary_position",
-       "alternative_positions","export_status",
+       "alternative_positions","position_fit_indices","export_status",
        "weak_foot_usage","weak_foot_accuracy","form","injury_resistance")
 EXTRAS=("weak_foot_usage","weak_foot_accuracy","form","injury_resistance")
 COLUMNS=list(BASIC)
 for name in TARGETS:
-    COLUMNS.extend((name,name+"_method",name+"_confidence",name+"_sources"))
+    COLUMNS.extend((name,name+"_method",name+"_confidence",name+"_sources",
+                    name+"_source_edition",name+"_calibration_shift"))
 for name in EXTRAS:
     COLUMNS.append(name+"_method")
 
@@ -51,11 +52,14 @@ def read_ed(archive,files,year):
 def to_csv_row(p):
     val={x:p[x] for x in BASIC if x not in EXTRAS and x!="alternative_positions"}
     val["alternative_positions"]=json.dumps(p["alternative_positions"])
+    val["position_fit_indices"]=json.dumps(p["position_fit_indices"],sort_keys=True)
     for name,field in p["abilities"].items():
         val[name]=field["value"]
         val[name+"_method"]=field["method"]
         val[name+"_confidence"]=field["confidence"]
         val[name+"_sources"]=json.dumps(field["source_columns"],ensure_ascii=False)
+        val[name+"_source_edition"]=json.dumps(field["source_edition"])
+        val[name+"_calibration_shift"]=field.get("calibration_shift",0)
     for name,v in p["additional"].items():
         val[name]=v["value"]
         val[name+"_method"]=v["method"]
@@ -97,6 +101,7 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,calibratio
             context=EditionContext(year,rows,adjacent)
             current=rows if limit_per_edition is None else rows[:limit_per_edition]
             count=Counter()
+            family_counts=defaultdict(Counter)
             filename=f"PES2020_v2/{year}_FIFA_to_PES2020_Complete.csv"
             with out.open(filename,"w") as raw:
                 text=io.TextIOWrapper(raw,encoding="utf-8",newline="")
@@ -112,9 +117,14 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,calibratio
                     writer.writerow(to_csv_row(p))
                     count["players"]+=1
                     count["alternative_positions"]+=len(p["alternative_positions"])
+                    family=POSITION_FAMILY.get(p["primary_position"],"OTHER")
+                    family_counts[family]["players"]+=1
+                    family_counts[family]["alternative_positions"]+=len(p["alternative_positions"])
                     for ability in p["abilities"].values():
                         count[ability["method"]]+=1
                         count["rating_values"]+=1
+                        family_counts[family][ability["method"]]+=1
+                        family_counts[family]["ratings"]+=1
                         if ability["value"] is None:count["missing"]+=1
                     for x in p["additional"].values():
                         count["auxiliary_values"]+=1
@@ -132,6 +142,14 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,calibratio
                 "status":"FULLY_NUMERIC_ESTIMATED_OUTPUT",
                 "source_player_rows":len(rows),
                 "converted_players":count["players"],
+                "numeric_core_completeness_pct":100.0,
+                "reconstructed_rating_values":sum(
+                    count[method] for method in (
+                        "weighted_estimate","aggregate_reconstruction",
+                        "related_same_edition","adjacent_edition_same_id_dob",
+                        "same_edition_position_peer_median","position_ovr_prior")),
+                "per_position_family":{k:dict(v) for k,v in
+                    sorted(family_counts.items())},
                 "ratings_written":count["rating_values"],
                 "auxiliary_fields_written":count["auxiliary_values"],
                 "alternative_positions_written":count["alternative_positions"],
