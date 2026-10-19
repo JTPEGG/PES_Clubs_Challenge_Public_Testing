@@ -4,7 +4,7 @@ Outputs one CSV per edition in a ZIP, preserving measured vs estimated vs
 unknown values and original source columns. This is not a PES .ted/.bin file.
 
 Example:
- python scripts/export_fifa_pes_csvs.py \
+ python -m scripts.export_fifa_pes_csvs \
  --source FIFA_05_to_FC_27_CSV_Hard_Copies.zip \
  --output FIFA_to_PES2020_estimated.csv.zip
 """
