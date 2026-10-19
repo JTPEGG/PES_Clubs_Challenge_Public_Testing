@@ -337,10 +337,9 @@ def convert_v2(row,edition,*,context=None,approved_calibration=None):
     if context is not None and context.edition!=edition:
         raise ConversionError("Context must match FIFA source edition")
     if approved_calibration is not None:
-        if (edition!=CALIBRATION_FIFA_EDITION or
-            approved_calibration.get("reference_game")!=TARGET_GAME or
-            approved_calibration.get("source_edition")!=2020 or
-            approved_calibration.get("status")!="approved"):
+        if (approved_calibration.get("reference_game")!=TARGET_GAME or
+            approved_calibration.get("training_fifa_edition")!=CALIBRATION_FIFA_EDITION or
+            approved_calibration.get("status")!="approved_heldout_experimental"):
             raise ConversionError("Unapproved / cross-edition calibration")
     previous=v1_convert(prepared_row(row),edition)
     positions=[previous["primary_position"]]+previous["alternative_positions"]
