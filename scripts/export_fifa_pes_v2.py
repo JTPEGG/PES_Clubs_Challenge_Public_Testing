@@ -17,6 +17,7 @@ from world_fifa_pes_converter_v2 import (
     convert_v2, EditionContext, TARGETS, MODEL_VERSION, DISALLOWED_EDITIONS,
     validate_exportable, UnrestoredEdition, POSITION_FAMILY
 )
+from scripts.source_coverage_v2 import source_coverage_status
 
 BASIC=("source_edition","source_player_id","player_name","source_overall",
        "identity_dob","model_version","primary_position",
@@ -80,9 +81,21 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,
              "excluded_reason":"FC25 detailed data unusable; wait for proper replacement",
              "source_archive_untouched":True,
              "game_binary_created":False,
+             "source_rosters_independently_verified_complete":False,
+             "source_completeness_warning":(
+                 "All source rows are converted, but 100% numeric PES ratings "
+                 "DO NOT establish full original FIFA edition roster coverage."
+             ),
              "per_edition":{}}
     with ZipFile(source_zip) as original,ZipFile(destination,"w",ZIP_DEFLATED,compresslevel=6,allowZip64=True) as out:
         members=source_members(original)
+        source_provider_by_year={}
+        manifest_names=[n for n in original.namelist()
+                        if n.endswith("/MANIFEST.json")]
+        if len(manifest_names)==1:
+            meta=json.loads(original.read(manifest_names[0]))
+            source_provider_by_year={int(x["edition"]):x.get("catalog_source","")
+                                     for x in meta.get("downloads",[])}
         if require_all_supported:
             required=set(range(2005,2028))-DISALLOWED_EDITIONS
             missing=sorted(required-set(members))
@@ -148,6 +161,10 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,
                 "status":"FULLY_NUMERIC_ESTIMATED_OUTPUT",
                 "source_player_rows":len(rows),
                 "converted_players":count["players"],
+                "source_provider":source_provider_by_year.get(year,"unknown"),
+                "source_coverage_status":source_coverage_status(
+                    year,len(rows),source_provider_by_year.get(year,"")),
+
                 "numeric_core_completeness_pct":100.0,
                 "reconstructed_rating_values":sum(
                     count[method] for method in (
@@ -165,6 +182,9 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,
                                         "missing","missing_aux")},
             }
             print(f"{year}: {count['players']} players × 25 completed PES attributes",flush=True)
+        outcome["known_upstream_700_page_scrape_ceiling_editions"]=[
+            int(y) for y,entry in outcome["per_edition"].items()
+            if entry.get("source_coverage_status","").startswith("KNOWN_")]
         out.writestr("PES2020_v2/MANIFEST.json",
             json.dumps(outcome,indent=2,ensure_ascii=False))
         out.writestr("PES2020_v2/README.txt",
@@ -174,6 +194,10 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,
             "All export records contain 25 numeric abilities plus Weak Foot\n"
             "Usage, Weak Foot Accuracy, Form and Injury Resistance.\n"
             "Source years, original player IDs, method and confidence retained.\n"
+            "Important: complete numeric ratings do NOT prove complete in-game\n"
+            "player roster coverage. Some FIFAIndex source editions reached\n"
+            "the original scraper's fixed 700-page collection limit. Check\n"
+            "MANIFEST.json source_coverage_status for each edition.\n"
             "FIFA20 is the ONLY permitted PES20 calibration source.\n"
             "Conversion is NOT a native Konami formula, nor an importable\n"
             "Xbox / PS4 / PC option file. PES identities, physical fields,\n"
