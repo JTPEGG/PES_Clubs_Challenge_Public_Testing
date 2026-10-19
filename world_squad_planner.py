@@ -290,17 +290,26 @@ def sale_profile(squads, *, seller, player_id, position, overall):
             "recruitment_needed":short or starter_drop>=4 or
                                 first_backup_drop>=4,
         })
+    demands={lane:max(STARTERS[lane],MIN_COVER[lane])
+             for lane in affected}
+    whole_before=assign_available_players(squads,seller,demands)
+    whole_after=assign_available_players(squads,seller,demands,
+                                         exclude_player=player_id)
+    # Per-position lists overlap for multi-role players. This assignment
+    # instead counts simultaneous cover: the same person cannot fulfil
+    # centre-back AND defensive-midfield during one match.
+    simultaneous_loss=max(0,whole_before["filled"]-whole_after["filled"])
     seriousness=max((r["starter_rating_drop"]*2+
                      r["backup_quality_drop"]+
                      (15 if r["depth_shortage"] else 0)
-                     for r in reports),default=0)
+                     for r in reports),default=0)+6*simultaneous_loss
     # Strong clubs ought to retain *competition-quality* reserves instead of
     # preserving only their top two starters and replacing depth with 70s.
     # This only makes a routine sale harder; does not bar genuine exceptions.
-    protected_rotation=quality>=82 and any(
+    protected_rotation=quality>=82 and (simultaneous_loss>0 or any(
         r["backup_quality_drop"]>=4 or r["starter_rating_drop"]>=4
-        for r in reports)
-    needs=any(r["recruitment_needed"] for r in reports)
+        for r in reports))
+    needs=simultaneous_loss>0 or any(r["recruitment_needed"] for r in reports)
     main=next(r for r in reports if r["lane"]==slot)
     return {
         "valid":True,"lane":slot,"rank":rank,
@@ -317,6 +326,7 @@ def sale_profile(squads, *, seller, player_id, position, overall):
         "surplus_sale":not needs and rank>=STARTERS[slot],
         "protected_rotation":protected_rotation,
         "sporting_risk":seriousness,
+        "simultaneous_cover_loss":simultaneous_loss,
         "affected_positions":reports,
         "source_standard_top11":round(quality,2),
         "reason":("Routine sale would materially weaken elite rotation"

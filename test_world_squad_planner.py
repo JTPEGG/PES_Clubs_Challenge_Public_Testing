@@ -183,6 +183,10 @@ class PlannerTests(unittest.TestCase):
                               assignment["assignments"]}),2)
         self.assertIn(starter_rb,{x["player_id"] for x in
                                   assignment["assignments"]})
+        sale=sale_profile(squads,seller=2,player_id=flexible,
+                          position="RB",overall=82)
+        self.assertEqual(sale["simultaneous_cover_loss"],1)
+        self.assertTrue(sale["requires_recruitment"])
 
     def test_alternative_position_eligibility_is_not_inferred(self):
         p=self.player(2,"RB",84)
