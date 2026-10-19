@@ -21,7 +21,7 @@
 
 **Attributes covered (25):**
 
-offensive_awareness, ball_control, dribbling, tight_possession, low_pass, lofted_pass, finishing, heading, set_piece_taking, curl, speed, acceleration, kicking_power, jump, physical_contact, balance, stamina, defensive_awareness, ball_winning, aggression, gk_awareness, gk_catching, gk_clearing, gk_reflexes, gk_reach.
+offensive_awareness, ball_control, dribbling, tight_possession, low_pass, lofted_pass, finishing, heading, place_kicking, curl, speed, acceleration, kicking_power, jump, physical_contact, balance, stamina, defensive_awareness, ball_winning, aggression, gk_awareness, gk_catching, gk_clearing, gk_reflexes, gk_reach.
 
 All estimates are constrained to **40–99** to reflect this PES2020-style source format. This is a heuristic bound, not evidence of Konami's official conversion formula. For players with extremely weak goalkeeper stats this bound can affect many values. Source values remain untouched in original FIFA CSVs.
 
