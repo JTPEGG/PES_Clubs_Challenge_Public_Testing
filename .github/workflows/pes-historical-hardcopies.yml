@@ -1,0 +1,40 @@
+name: Archive historical PES database hard copies
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/build_pes_historical_archive.py'
+      - 'test_pes_historical_archive.py'
+      - '.github/workflows/pes-historical-hardcopies.yml'
+  pull_request:
+    paths:
+      - 'scripts/build_pes_historical_archive.py'
+      - 'test_pes_historical_archive.py'
+      - '.github/workflows/pes-historical-hardcopies.yml'
+concurrency:
+  group: pes-historical-hardcopies-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate native PES attributes and cross-edition file separation
+        run: python -m unittest -v test_pes_historical_archive
+      - name: Download and verify hard-copy PES CSV datasets
+        run: python -u -m scripts.build_pes_historical_archive --output dist/PES_Historical_Database_Hard_Copies.zip --manifest dist/PES_Historical_Archive_Manifest.csv
+      - name: Publish original CSV copies and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-Historical-Database-Hard-Copies
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
