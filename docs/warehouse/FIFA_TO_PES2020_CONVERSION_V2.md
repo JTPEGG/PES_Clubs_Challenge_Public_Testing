@@ -1,6 +1,17 @@
 # FIFA → PES 2020 converter: Version 2
 
-**Status (19 Oct 2026):** Version 2 remains **IN PROGRESS**. The first GitHub V2 run executed 12 initial tests: 11 passed, 1 failed on an inconsistent calibration-status test assertion. The assertion was corrected and additional tests added; the newest CI/full export have not yet been confirmed successful. **No deployment, merge or update to existing PES careers.**
+**Status (19 Oct 2026):** The V2 numeric conversion and 22-edition export **PASSED CI** ([19/19 tests and successful full conversion](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39286441255)). **Rating quality and full source/player coverage are NOT approved**; full-game source coverage has never been independently verified. No deployment, merge or update to existing PES careers.
+
+## Real-run results and remaining quality blockers
+
+- **281,394 source player records** converted across 22 source editions, each with 25 bounded PES estimates and 4 auxiliary values. FC25 (2025) was not converted. The downloadable CSV artifact is attached to the successful workflow run; it is **not a console-native option file**.
+- **FIFA20 native PES20 accuracy:** 127 provisional name+age+nationality+club candidate links, with only **22** in the deterministic holdout. For position-relevant attributes the raw, uncalibrated mean absolute errors were: GK **13.400** (1 goalkeeper), DEF **6.381** (7 defenders), MID **6.048** (9 midfielders), ATT **5.833** (5 attackers). These numbers are a small, potentially biased provisional matched sample—not proof of game-wide accuracy.
+- **Calibration not applied:** proposed FIFA20-only offsets are *unapproved*. The same holdout was previously used to select candidates, so after-shift gains are not independent. In particular, one matched holdout goalkeeper is insufficient for GK calibration.
+- **Historical source ceiling confirmed:** 13 FIFAIndex source files in FIFA07–FIFA20 have **exactly 10,500** records; the [published source scraper](https://github.com/lbenz730/fifa_model/blob/2901373e446cc21671916ac0f25ca30716b626aa/fifa_scraper.R) asks for only **700 listing pages per edition** (approximately 15 players per page). This explains the repeated ceiling and prevents calling the files complete game rosters.
+- **Independent source comparison:** a separately published SoFIFA-based [FIFA20 CSV](https://github.com/kushal-gopal/EA-Sports-Fifa/blob/66fc78145ff32ea2dea839459e247833856e0f47/players_20.csv) has **18,278 player records**, compared with **10,500** in the present FIFAIndex FIFA20 input. Different snapshots/providers mean the 7,778 row difference is **not automatically a list of missing player identities**.
+- **New independent QA:** [source completeness and alternate FIFA20 benchmark workflow](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/workflows/fifa-pes-v2-quality-audit.yml) generates a separate evidence artifact, with per-edition warnings and conservative four-field player matching. It never approves or applies calibration, switches source input, touches careers, or deploys anything.
+
+**Interpretation:** V2 is technically exportable as estimated 25-stat player CSVs. It is **not yet signed off** for historical full-player coverage, verified FIFA20↔PES20 identity matching, position-specific realism or PES import-file production.
 
 ## Decisions confirmed
 
