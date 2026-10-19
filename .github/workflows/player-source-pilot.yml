@@ -1,0 +1,39 @@
+name: Player source feasibility pilot
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'qa_player_source_pilot.py'
+      - 'test_qa_player_source_pilot.py'
+      - 'docs/warehouse/PLAYER_SOURCE_PILOT.md'
+      - '.github/workflows/player-source-pilot.yml'
+  pull_request:
+    paths:
+      - 'qa_player_source_pilot.py'
+      - 'test_qa_player_source_pilot.py'
+      - 'docs/warehouse/PLAYER_SOURCE_PILOT.md'
+      - '.github/workflows/player-source-pilot.yml'
+concurrency:
+  group: player-data-source-pilot-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  coverage-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate deterministic player sample and matching logic
+        run: python -m unittest -v test_qa_player_source_pilot
+      - name: Fetch licensed CC0 identity source and generate field coverage
+        run: python -u qa_player_source_pilot.py --output-dir qa-player-source-pilot
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: player-source-feasibility-100
+          path: qa-player-source-pilot/
+          if-no-files-found: warn
