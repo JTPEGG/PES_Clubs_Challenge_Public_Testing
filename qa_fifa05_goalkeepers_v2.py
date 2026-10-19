@@ -56,6 +56,8 @@ def run(output=ROOT/"fifa05-real-goalkeeper-audit.json", sample_cap=100):
                 "gk_reflexes":profile["abilities"]["gk_reflexes"],
                 "gk_reach":profile["abilities"]["gk_reach"],
             })
+    if median(values["gk_reach"])<=40 or median(values["gk_reflexes"])<=40:
+        raise AssertionError("FIFA05 goalkeeper estimates collapsed to PES floor")
     report={
         "data_source":SRC[2005],
         "game_source":"FIFA 05 (2004/05 season)",
