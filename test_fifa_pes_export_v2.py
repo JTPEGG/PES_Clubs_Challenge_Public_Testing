@@ -80,10 +80,16 @@ class ExportV2Tests(unittest.TestCase):
                         self.assertEqual(len(json.loads(r["position_fit_indices"])),
                                          1)
                 manifest=json.loads(z.read("PES2020_v2/MANIFEST.json"))
+                self.assertFalse(manifest["source_rosters_independently_verified_complete"])
+                self.assertEqual(
+                    manifest["known_upstream_700_page_scrape_ceiling_editions"],[])
                 for year in supported:
                     entry=manifest["per_edition"][year]
                     self.assertEqual(entry["ratings_written"],50)
                     self.assertEqual(entry["numeric_core_completeness_pct"],100.0)
+                    self.assertEqual(entry["source_coverage_status"],
+                                     "SOURCE_COVERAGE_NOT_INDEPENDENTLY_VERIFIED")
+                    self.assertEqual(entry["source_provider"],"unknown")
                     self.assertEqual(set(entry["per_position_family"]),
                                      {"GK","DEF"})
 
