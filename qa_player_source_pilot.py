@@ -26,6 +26,11 @@ OPENFOOTBALL_LICENSE = (
     "https://github.com/openfootball/players/blob/"
     + OPENFOOTBALL_SHA + "/LICENSE.md"
 )
+FC26_REPO_SHA = "8724af5803a787c9c262eee2ac8f942651b0e4b9"
+FC26_CSV_URL = (
+    "https://raw.githubusercontent.com/ismailoksuz/EAFC26-DataHub/"
+    + FC26_REPO_SHA + "/data/players.csv"
+)
 DATASET = "england-2026-27-fc27"
 CLUB_SAMPLE = (
     ("Manchester City", 17),
@@ -126,7 +131,34 @@ def load_cc0_england():
     return body.decode("utf-8-sig"), hashlib.sha256(body).hexdigest()
 
 
-def create_report(cc0_text=None, *, source_error=None, source_sha256=None):
+def probe_fc26_schema():
+    """Read ONLY the first CSV header line; no player records are copied.
+
+    The publisher labelled the upstream Kaggle file CC BY 4.0, but repository
+    licence and underlying EA data reuse rights remain unverified. This is a
+    *technical availability* probe, NOT clearance for warehousing the CSV.
+    """
+    req=Request(FC26_CSV_URL,headers={"User-Agent":"PES-Challenge-source-QA/1.0"})
+    with urlopen(req,timeout=20) as resp:
+        line=resp.readline(32768)
+    cols=next(csv.reader([line.decode("utf-8-sig",errors="replace")]))
+    if not 20<=len(cols)<=400:
+        raise ValueError("Unexpected FC26 CSV header format")
+    sample=cols[:8]
+    keys=("overall","potential","position","contract","wage",
+          "pace","sprint","vision","strength","foot","work_rate")
+    indicators={key:[col for col in cols if key in col.casefold()][:6]
+                for key in keys}
+    return {"state":"schema_header_accessible","source":FC26_CSV_URL,
+            "fields_total":len(cols),"first_fields":sample,
+            "relevant_columns":indicators,
+            "rights":"unverified_for_redistribution",
+            "season":"FC26 (different season from target FC27)",
+            "note":"Header only; no player rows collected; not a licence assessment"}
+
+
+def create_report(cc0_text=None, *, source_error=None, source_sha256=None,
+                  fc26_schema=None, fc26_error=None):
     sample=sample_players()
     external=parse_openfootball_players(cc0_text) if cc0_text is not None else {}
     explicit=EXPLICIT_ALTERNATIVE_POSITIONS.get(DATASET,{})
@@ -184,6 +216,12 @@ def create_report(cc0_text=None, *, source_error=None, source_sha256=None):
                 "scope":"English-born/nationality file only; older snapshot; not current club/contract evidence",
             },
         },
+        "fc26_detailed_schema_probe":fc26_schema or {
+            "state":"not_run" if not fc26_error else "unavailable",
+            "error":fc26_error,
+            "source":FC26_CSV_URL,
+            "rights":"unverified_for_redistribution",
+        },
         "matched_cc0_english_ids":sum(r["cc0_england_identity_match"] for r in rows),
         "external_match_method":"Exact unicode-normalised player name AND exact birthdate; rejects ambiguity",
         "completeness":{
@@ -218,7 +256,15 @@ def main():
             contents,sha=load_cc0_england()
         except Exception as exc:
             error=f"{type(exc).__name__}: {str(exc)[:160]}"
-    report,rows=create_report(contents,source_error=error,source_sha256=sha)
+    fc26_schema=None;fc26_error=None
+    if not args.offline:
+        try:
+            fc26_schema=probe_fc26_schema()
+        except Exception as exc:
+            fc26_error=f"{type(exc).__name__}: {str(exc)[:160]}"
+    report,rows=create_report(
+        contents,source_error=error,source_sha256=sha,
+        fc26_schema=fc26_schema,fc26_error=fc26_error)
     target=Path(args.output_dir);target.mkdir(parents=True,exist_ok=True)
     (target/"pilot-summary.json").write_text(
         json.dumps(report,ensure_ascii=False,indent=2),encoding="utf-8")
@@ -229,6 +275,8 @@ def main():
         "sample_size":report["sample_size"],
         "cc0_status":report["source_availability"]["openfootball_england"]["status"],
         "cc0_exact_matches":report["matched_cc0_english_ids"],
+        "fc26_columns_found":fc26_schema["fields_total"] if fc26_schema else None,
+        "fc26_source_error":fc26_error,
         "field_counts":{k:v["available"] for k,v in report["completeness"].items()},
         "source_error":error
     },indent=2))
