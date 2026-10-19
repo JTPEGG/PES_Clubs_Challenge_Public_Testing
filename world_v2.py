@@ -86,6 +86,13 @@ CREATE TABLE IF NOT EXISTS world_player_source_refs(
  identity_status TEXT NOT NULL DEFAULT 'provisional',
  PRIMARY KEY(source_name,external_id), UNIQUE(player_id,source_name)
 );
+CREATE TABLE IF NOT EXISTS world_player_alternative_positions(
+ dataset_id TEXT NOT NULL,
+ player_id INTEGER NOT NULL REFERENCES world_players(player_id),
+ position TEXT NOT NULL,
+ source_note TEXT NOT NULL,
+ PRIMARY KEY(dataset_id,player_id,position)
+);
 CREATE TABLE IF NOT EXISTS world_rosters(
  season_id TEXT NOT NULL REFERENCES world_seasons(season_id),
  club_id INTEGER NOT NULL REFERENCES world_clubs(club_id),

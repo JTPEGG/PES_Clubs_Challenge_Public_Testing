@@ -5,6 +5,103 @@ future transfers. They never infer PES results or change gameplay attributes.
 The projected roster is rebuilt after each agreement, not cached at window start.
 """
 from collections import defaultdict
+import sqlite3
+
+# User-verified alternative-position eligibility in this provisional 2026/27 dataset.
+# These are NOT present in the FC27 primary-position source. Do not infer
+# alternative positions from the broad DEF/MID/FWD group.
+EXPLICIT_ALTERNATIVE_POSITIONS = {
+    "england-2026-27-fc27": {
+        "231936": {"CB": "User-confirmed Ben White centre-back cover, 19 Oct 2026"},
+    },
+}
+
+class ProjectedSquads(defaultdict):
+    """Original primary-position roster plus multi-position cover."""
+    def __init__(self):
+        super().__init__(lambda: defaultdict(list))
+        self.alternative_positions = {}
+
+def effective_cover(squads, club, lane, exclude_player=None):
+    """Credible options at one position, counting each person once.
+
+    An eligible alternative-position player counts as rotation cover only when
+    enough other starters remain in their *primary* position. This avoids
+    describing the same footballer as two simultaneous starters.
+    """
+    roster=squads.get(club,{})
+    options={p[0]: p for p in roster.get(lane,())
+             if p[0]!=exclude_player}
+    evidence=getattr(squads,"alternative_positions",{})
+    for origin,primary_players in roster.items():
+        if origin==lane:
+            continue
+        for pid,ovr,pos in primary_players:
+            if pid==exclude_player or pid in options:
+                continue
+            if lane not in evidence.get(pid,{}):
+                continue
+            other_starters=sum(
+                1 for p in primary_players
+                if p[0] not in (pid,exclude_player))
+            if other_starters<STARTERS.get(origin,1):
+                continue
+            options[pid]=(pid,ovr,pos)
+    return sorted(options.values(),key=lambda p:(-p[1],p[0]))
+
+
+
+def assign_available_players(squads, club, required, *, exclude_player=None):
+    """Maximum simultaneous lineup assignment; no player fills two slots.
+
+    required maps position -> number of simultaneous players. The assignment
+    uses eligible positions, not invented position-specific OVR adjustments.
+    """
+    slots=[]
+    for position,count in required.items():
+        lane=lane_of(position)
+        if lane is None or type(count) is not int or not 0<=count<=11:
+            raise ValueError("Invalid requested lineup position or count")
+        slots.extend([lane]*count)
+    roster=squads.get(club,{})
+    players={}
+    evidence=getattr(squads,"alternative_positions",{})
+    for origin,group in roster.items():
+        for pid,ovr,pos in group:
+            if pid==exclude_player:
+                continue
+            players[pid]=(ovr,{origin,*evidence.get(pid,{})},origin)
+    candidates={}
+    for index,lane in enumerate(slots):
+        candidates[index]=sorted(
+            (pid for pid,(ovr,playable,origin) in players.items()
+             if lane in playable),
+            key=lambda pid:(players[pid][2]!=lane,-players[pid][0],pid))
+    matching={}
+    def allocate(slot,visited):
+        for pid in candidates[slot]:
+            if pid in visited:continue
+            visited.add(pid)
+            if pid not in matching or allocate(matching[pid],visited):
+                matching[pid]=slot
+                return True
+        return False
+    for slot in sorted(range(len(slots)),key=lambda i:len(candidates[i])):
+        allocate(slot,set())
+    assignments=[{"position":slots[index],"player_id":pid}
+                 for pid,index in sorted(matching.items(),
+                   key=lambda pair:pair[1])]
+    return {"required":len(slots),"filled":len(assignments),
+            "assignments":assignments,
+            "unfilled":len(slots)-len(assignments)}
+
+
+def squad_standard(roster):
+    """Rated standard of the best XI, without double-counting the same player."""
+    rated=sorted((p[1] for players in roster.values()
+                  for p in players),reverse=True)
+    return sum(rated[:11])/min(len(rated),11) if rated else 0
+
 
 PLANNER_VERSION = "projected-squad-planner-v1"
 
@@ -60,11 +157,40 @@ def projected_squads(conn, *, career_id, dataset):
         if owners.get(pid)!=seller:
             raise ValueError("Projected transfer seller does not match registration")
         owners[pid]=buyer
-    squads=defaultdict(lambda:defaultdict(list))
+    squads=ProjectedSquads()
     for pid,_original,overall,pos in registrations:
         lane=lane_of(pos)
         if lane:
             squads[owners[pid]][lane].append((pid,int(overall),pos))
+    # Resolve the explicit user-supplied eligibility through stable EA IDs,
+    # never name similarity. Imported historic datasets have no implied cover.
+    ids=EXPLICIT_ALTERNATIVE_POSITIONS.get(dataset,{})
+    if ids:
+        try:
+            rows=conn.execute("""SELECT player_id,external_id
+                FROM world_player_source_refs
+                WHERE source_name='EAFC27'""").fetchall()
+            squads.alternative_positions={
+                int(pid):ids[str(ea_id)] for pid,ea_id in rows
+                if str(ea_id) in ids}
+        except sqlite3.OperationalError:
+            # Minimal synthetic planner fixtures may omit source-ref tables.
+            squads.alternative_positions={}
+    # Many documented alternative positions are permitted per player.
+    # This table supports user-approved imports without code changes.
+    # An absent record means unknown, not automatically versatile.
+    try:
+        extra=conn.execute("""SELECT player_id,position,source_note
+            FROM world_player_alternative_positions
+            WHERE dataset_id=?""",(dataset,)).fetchall()
+    except sqlite3.OperationalError:
+        extra=()
+    primary={pid:lane_of(pos) for pid,_owner,_ovr,pos in registrations}
+    valid_players=set(primary)
+    for pid,position,source_note in extra:
+        lane=lane_of(position)
+        if pid in valid_players and lane and lane!=primary[pid] and source_note:
+            squads.alternative_positions.setdefault(pid,{})[lane]=source_note
     for roster in squads.values():
         for players in roster.values():
             players.sort(key=lambda x:(-x[1],x[0]))
@@ -82,7 +208,7 @@ def recruitment_fit(squads, *, buyer, position, overall):
     if not slot or not 1<=overall<=99:
         return {"eligible":False,"score":0,"reason":"Unknown position or rating"}
     roster=squads.get(buyer,{})
-    peers=roster.get(slot,[])
+    peers=effective_cover(squads,buyer,slot)
     all_ratings=sorted((entry[1] for group in roster.values()
                         for entry in group),reverse=True)
     if not all_ratings:
@@ -90,10 +216,12 @@ def recruitment_fit(squads, *, buyer, position, overall):
     starter_n=STARTERS[slot]
     baseline=peers[min(starter_n-1,len(peers)-1)][1] if peers else None
     team_baseline=all_ratings[min(10,len(all_ratings)-1)]
-    thin=len(peers)<MIN_COVER[slot]
+    thin=len(peers)<max(MIN_COVER[slot],STARTERS[slot])
     # First-team upgrades require meaningful improvement to the actual
     # starter; an 83-rated attacker is not a first-team upgrade to a 90+ XI.
     improvement=(overall-baseline) if baseline is not None else 0
+    # Missing a usable starter is an urgent need, not a demand to
+    # obtain the replacement BEFORE selling the previous player.
     credible_depth=thin and overall>=team_baseline-8
     credible_upgrade=(baseline is not None and improvement>=3 and
                       overall>=team_baseline-3)
@@ -107,6 +235,104 @@ def recruitment_fit(squads, *, buyer, position, overall):
             "upgrade":improvement,"depth_shortage":thin,
             "reason":("Required positional cover" if credible_depth else
                       "Meaningful first-team positional upgrade")}
+
+
+
+
+def sale_profile(squads, *, seller, player_id, position, overall):
+    """Sporting cost of selling, considering genuine alternative positions.
+
+    No advance signing is REQUIRED. Elite rotation quality is protected via a
+    higher hurdle for *routine* sales, with separate seller, board, contract
+    and player-pressure exceptions. The next agreed sale is always rechecked
+    against the projected roster (previous sales have already been removed).
+    """
+    slot=lane_of(position)
+    if slot is None:
+        return {"valid":False,"reason":"Unknown specialist position"}
+    roster=squads.get(seller,{})
+    peers=roster.get(slot,[])
+    selected=[p for p in peers if p[0]==player_id]
+    if len(selected)!=1:
+        return {"valid":False,"reason":"Player not in projected seller squad"}
+    rank=next(i for i,p in enumerate(peers) if p[0]==player_id)
+    # A club with an elite first-choice core stays subject to elite
+    # expectations after selling a reserve. Using only the current top-XI
+    # average could lower the bar immediately after a damaging sale.
+    rated=sorted((p[1] for players in roster.values()
+                  for p in players),reverse=True)
+    strongest_eight=(sum(rated[:8])/len(rated[:8]) - 1
+                     if rated else 0)
+    quality=max(squad_standard(roster),strongest_eight)
+    eligible=getattr(squads,"alternative_positions",{}).get(player_id,{})
+    affected={slot,*eligible}
+    reports=[]
+    for lane in sorted(affected):
+        before=effective_cover(squads,seller,lane)
+        after=effective_cover(squads,seller,lane,exclude_player=player_id)
+        n=STARTERS[lane]
+        minimum=max(n,MIN_COVER[lane])
+        old_floor=before[min(n-1,len(before)-1)][1] if before else None
+        new_floor=after[min(n-1,len(after)-1)][1] if after else None
+        # First two rotation places, not just the strongest starters.
+        old_backup=[p[1] for p in before[n:n+2]]
+        new_backup=[p[1] for p in after[n:n+2]]
+        first_backup_drop=sum(
+            max(0,old_backup[i]-(new_backup[i] if i<len(new_backup) else 0))
+            for i in range(len(old_backup)))
+        starter_drop=max(0,(old_floor or 0)-(new_floor or 0))
+        short=len(after)<minimum
+        reports.append({
+            "lane":lane,"before_depth":len(before),"after_depth":len(after),
+            "starter_rating_drop":starter_drop,
+            "backup_quality_drop":first_backup_drop,
+            "depth_shortage":short,
+            "recruitment_needed":short or starter_drop>=4 or
+                                first_backup_drop>=4,
+        })
+    demands={lane:max(STARTERS[lane],MIN_COVER[lane])
+             for lane in affected}
+    whole_before=assign_available_players(squads,seller,demands)
+    whole_after=assign_available_players(squads,seller,demands,
+                                         exclude_player=player_id)
+    # Per-position lists overlap for multi-role players. This assignment
+    # instead counts simultaneous cover: the same person cannot fulfil
+    # centre-back AND defensive-midfield during one match.
+    simultaneous_loss=max(0,whole_before["filled"]-whole_after["filled"])
+    seriousness=max((r["starter_rating_drop"]*2+
+                     r["backup_quality_drop"]+
+                     (15 if r["depth_shortage"] else 0)
+                     for r in reports),default=0)+6*simultaneous_loss
+    # Strong clubs ought to retain *competition-quality* reserves instead of
+    # preserving only their top two starters and replacing depth with 70s.
+    # This only makes a routine sale harder; does not bar genuine exceptions.
+    protected_rotation=quality>=82 and (simultaneous_loss>0 or any(
+        r["backup_quality_drop"]>=4 or r["starter_rating_drop"]>=4
+        for r in reports))
+    needs=simultaneous_loss>0 or any(r["recruitment_needed"] for r in reports)
+    main=next(r for r in reports if r["lane"]==slot)
+    return {
+        "valid":True,"lane":slot,"rank":rank,
+        "first_choice":rank<STARTERS[slot],
+        "before_depth":main["before_depth"],
+        "after_depth":main["after_depth"],
+        "starter_rating_drop":main["starter_rating_drop"],
+        "backup_quality_drop":main["backup_quality_drop"],
+        "below_target_cover":main["depth_shortage"],
+        "replacement_priority":("urgent" if any(r["depth_shortage"] for r in reports)
+           else "improve_rotation" if protected_rotation
+           else "improve_starter" if needs else "none"),
+        "requires_recruitment":needs,
+        "surplus_sale":not needs and rank>=STARTERS[slot],
+        "protected_rotation":protected_rotation,
+        "sporting_risk":seriousness,
+        "simultaneous_cover_loss":simultaneous_loss,
+        "affected_positions":reports,
+        "source_standard_top11":round(quality,2),
+        "reason":("Routine sale would materially weaken elite rotation"
+            if protected_rotation else "Sale creates follow-up recruitment need"
+            if needs else "Existing squad cover permits sale"),
+    }
 
 
 def departure_guard(squads, *, seller, player_id, position, overall):
