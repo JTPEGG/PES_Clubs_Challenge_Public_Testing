@@ -33,7 +33,7 @@ Artifacts:
 | Countries/territories covered by fixture-competition group labels | 20 | **21** |
 | Fully verified playable starting editions | 0 | **0** |
 
-**201 new mappings beyond earlier named source-club coverage are not fabricated squads**. All game identities (including exact-name fixtures) remain subject to the strict career readiness gate.
+**206 additional club-season records linked to some evidence are not fabricated squads**. All game identities (including exact-name fixtures) remain subject to the strict career readiness gate.
 
 The 16 new dated competition-sources include 2026/27 English League One, League Two, National League, National League North/South, Scottish Championship/League One/League Two, German 3. Liga, Spanish Segunda, Italian Serie B, French Ligue 2, Turkish Süper Lig, and calendar-2026 Major League Soccer, Argentina Primera División and Japan J1 League.
 
