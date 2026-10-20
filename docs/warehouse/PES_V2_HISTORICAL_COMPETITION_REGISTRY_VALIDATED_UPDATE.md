@@ -4,9 +4,9 @@
 
 ## What was built and validated
 
-**Latest expanded consolidated CI passed:** [historical competition registry run 39450980308](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39450980308).
+**Latest expanded consolidated CI passed:** [historical competition registry run 39450980308](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39453612685).
 
-[Download the **complete current competition-registry review package** (SQLite, memberships and 22-season rule CSV)](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39450980308/artifacts/12278501550).
+[Download the **complete current competition-registry review package** (SQLite, memberships and 22-season rule CSV)](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39453612685/artifacts/12278501550).
 
 The existing `world_historical_competition_registry.py` now merges the original game-club source with three pinned fixture pipelines: 2011–2027 OpenFootball, 2005–2010 England Football.TXT, and 2005–2010 multi-country CC0 Soccerverse. The 5,709 fixture-source club entries are persisted in the new `sourced_domestic_league_clubs` table. They are **source observations, not manufactured playable PES squads**.
 
@@ -16,10 +16,10 @@ The existing `world_historical_competition_registry.py` now merges the original 
 | Men's club-season records preserved | 13,104 |
 | Independent domestic league-season source records | **304** |
 | Exact game-club matches to independent league fixtures | **2,857** |
-| Additional unique conservative alias review candidates | **890** |
+| Additional unique conservative alias review candidates | **953** |
 | Provider source league groups independently corroborated | **62** |
-| Club-season records with some supported domestic-league reference | **4,021** |
-| Still unresolved or insufficiently proven | **9,083** |
+| Club-season records with some supported domestic-league reference | **4,084** |
+| Still unresolved or insufficiently proven | **9,020** |
 | Historical competition source countries | **19** |
 | All independent domestic source-team memberships (including unlicensed/nonplayable clubs) | **5,709** |
 | Dated England/Germany movement rule records | 128 |
@@ -37,7 +37,7 @@ Source evidence:
 
 ## Important distinctions
 
-**Independent game-club identity**: A unique same-season source club/fixture name match is an *audit fact* linking two source lists, not official PES roster validation. The 890 unique normalized names (e.g. Arsenal vs Arsenal FC) remain **candidates** requiring review. No fuzzy assignment, namespaced ID collision or fabricated missing teams.
+**Independent game-club identity**: A unique same-season source club/fixture name match is an *audit fact* linking two source lists, not official PES roster validation. The 953 unique normalized names (e.g. Arsenal vs Arsenal FC) remain **candidates** requiring review. No fuzzy assignment, namespaced ID collision or fabricated missing teams.
 
 **Domestic vs continental**: FC27's original FIFA source includes 40 club records in CONMEBOL cup buckets. These are continental competition memberships, NOT the clubs' home league tiers. They are **not** silently placed into a domestic division.
 
@@ -49,8 +49,10 @@ Source evidence:
 
 ## Next development, in priority order
 
-1. **Finish season-specific club-to-league matches** by expanding independently sourced full league tables and alias checks. First handle the 9,083 original club-season mappings without defensible home competition evidence; the 890 unique alias candidates can be checked quickly against source club IDs and annual rosters.
-2. **Extend and certify competition association coverage** beyond the now sourced 19 countries, including Scandinavia, Brazil and USA. The new Scottish, Dutch, Portuguese, Belgian, Turkish, Mexican, Argentine and other fixture sources establish club-year observations, **not** verified historical movement formats. Each requires season-dated promotion, play-off, licensing, and financial context. MLS, A-League and other closed/semi-closed leagues need explicit **no direct promotion/relegation** rules rather than unknown transitions. MLS, A-League and other closed/semi-closed leagues need explicit **no direct promotion/relegation** rules rather than unknown transitions.
+1. **Finish season-specific club-to-league matches** by expanding independently sourced full league tables and alias checks. First handle the 9,020 original club-season mappings without defensible home competition evidence; the 953 unique alias candidates can be checked quickly against source club IDs and annual rosters.
+**Detailed cause audit:** [2026-10-20 source-preserving gap triage](PES_V2_HISTORICAL_COMPETITION_GAP_TRIAGE_OCT2026.md), validated by [GitHub Actions run 39454280532](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39454280532). The 9,020 unresolved include 6,839 without original league identifiers, 2,140 unidentified original league groups, 40 continental buckets and one specifically disambiguated Uruguayan Liverpool without sourced home division.
+
+2. **Extend and certify competition association coverage** beyond the now sourced 19 countries, including Scandinavia, Brazil and USA. The new Scottish, Dutch, Portuguese, Belgian, Turkish, Mexican, Argentine and other fixture sources establish club-year observations, **not** verified historical movement formats. Each requires season-dated promotion, play-off, licensing, and financial context. MLS, A-League and other closed/semi-closed leagues need explicit **no direct promotion/relegation** rules rather than unknown transitions.
 3. **Complete lower-tier feeder pools** (National League North/South and other countries' regional feeders) without fabricating a player database for nonplayable clubs. Decide which clubs enter the playable world after seasonal league movement, based on genuine source pool and licensing.
 4. **Add historical cup and continental qualification graphs** (separate from domestic league movement), versioned by season.
 5. **Test season-end simulated movement**, with actual manager-season standings feeding into the next season's new league membership—not real future football tables.
