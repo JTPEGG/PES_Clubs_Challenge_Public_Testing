@@ -33,7 +33,11 @@ def run(db_path,year):
     start_sandbox(conn,career_id=career,dataset_id=ds,
         title=f"Sandbox FIFA {year} autonomous market validation",manager_club_id=cid,
         pes_lock_date=f"{year-1}-08-01",next_summer_date=f"{year}-07-01")
-    t=datetime(2026,10,20,12,0,tzinfo=timezone.utc)
+    # Live market offer checks use the real server clock internally. A
+    # historical noon test clock would already be expired and reject every
+    # attempt, falsely reporting zero organic offers. Start NOW; fast-forward
+    # only the simulated window moments and deadline.
+    t=datetime.now(timezone.utc)
     snap=start_live_market(conn,career_id=career,now=t)
     if snap["state"]!="open" or snap["duration_seconds"]!=1800:
         raise ValueError("Autonomous market did not start with 30-minute deadline")
@@ -62,6 +66,11 @@ def run(db_path,year):
        WHERE window_id=?""",(snap["window_id"],)).fetchone()[0]
     if moments!=len(MARKET_MOMENTS):
         raise ValueError("Not all scheduled autonomous transfer moments processed")
+    rejected_as_closed=conn.execute("""SELECT COUNT(*) FROM world_career_market_moments
+       WHERE window_id=? AND outcome LIKE '%deadline passed%'""",
+       (snap["window_id"],)).fetchone()[0]
+    if rejected_as_closed:
+        raise ValueError("AI eligibility incorrectly treated a running window as expired")
     inbox_offers=conn.execute("""SELECT COUNT(*) FROM world_career_offers
        WHERE career_id=?""",(career,)).fetchone()[0]
     final=process_live_market(conn,career_id=career,now=t+timedelta(seconds=1801))
