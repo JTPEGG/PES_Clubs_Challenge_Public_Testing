@@ -14,12 +14,12 @@ class LegacyCountryCompetitionTests(unittest.TestCase):
         self.assertNotIn("eng", LEAGUES)
 
     def test_fixture_name_extraction_requires_valid_matches(self):
-        sample = "Date,Team 1,FT,Team 2\\n" + (
-            "2004-08-08,Team A,1-0,Team B\\n" * 100)
+        sample = "Date,Team 1,FT,Team 2\n" + (
+            "2004-08-08,Team A,1-0,Team B\n" * 100)
         with self.assertRaisesRegex(ValueError, "incomplete"):
             source_teams_csv(sample)
         with self.assertRaisesRegex(ValueError, "columns"):
-            source_teams_csv("Name,Result\\nA,1-0\\n")
+            source_teams_csv("Name,Result\nA,1-0\n")
 
 
 if __name__ == "__main__":
