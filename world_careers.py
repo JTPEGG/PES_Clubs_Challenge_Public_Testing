@@ -198,7 +198,8 @@ def _transaction(conn, fn):
 
 def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lock_date,
                   next_summer_date, economy_version="prototype-v1", scale=1.0,
-                  player_decision_version="legacy-sporting-v2"):
+                  player_decision_version="legacy-sporting-v2",
+                  competition_qa_override=False):
     """Create a new sandbox; never change source snapshot budgets or rosters."""
     from world_player_decisions import LEGACY_VERSION,DECISION_VERSION,DECISION_V2_VERSION
     if player_decision_version not in (LEGACY_VERSION,DECISION_VERSION,DECISION_V2_VERSION):
@@ -217,6 +218,25 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
     def action():
         dataset=_one(conn,"SELECT 1 FROM world_datasets WHERE dataset_id=?",(dataset_id,))
         if dataset is None:raise ValueError("Unknown source dataset")
+        # A FIFA/PES source league label is NOT a valid multi-season national
+        # football pyramid. The verified graph must know every domestic
+        # competition, level, promotion/relegation boundary, and feeder pool.
+        # This gate is separate from and earlier than any save mutation.
+        schema={row[0] for row in conn.execute(
+             "SELECT name FROM sqlite_master WHERE type='table'")}
+        historical=(("world_dataset_pes_v2_metadata" in schema) and
+            conn.execute("SELECT 1 FROM world_dataset_pes_v2_metadata "
+                         "WHERE dataset_id=?",(dataset_id,)).fetchone() is not None)
+        if historical and not competition_qa_override:
+            readiness=(conn.execute("""SELECT status FROM
+                world_dataset_pes_v2_verified_competitions
+                WHERE dataset_id=?""",(dataset_id,)).fetchone()
+                if "world_dataset_pes_v2_verified_competitions" in schema
+                else None)
+            if readiness is None or readiness[0]!="ready":
+                raise ValueError("Historical competition hierarchy incomplete: "
+                  "verify every domestic league, tier, promotion/relegation "
+                  "destination, and nonplayable feeder pool before career launch")
         teams=conn.execute("""SELECT e.club_id,c.tier FROM world_dataset_entries e
             JOIN world_competitions c ON c.competition_id=e.competition_id
             WHERE e.dataset_id=?""",(dataset_id,)).fetchall()
