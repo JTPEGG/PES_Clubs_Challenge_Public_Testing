@@ -6,8 +6,8 @@
 
 ## Download and evidence
 
-- [Completed 317,449-player wage, contract and source-loan archive](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39415350859/artifacts/12261341213)
-- [Full source salary and loan model validation](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39415350859)
+- [Completed 317,449-player wage, contract and source-loan archive](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39416831590/artifacts/12261718266)
+- [Full source salary and loan model validation](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39416831590)
 - [Career lifecycle and existing-loan testing](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39416686011)
 - [Original 22-edition source coverage audit](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39412411641)
 
