@@ -108,7 +108,10 @@ def money_source(year,raw):
     if amount>1_000_000:
         return None,"unknown","outlier_over_one_million"
     if year in range(2012,2015):
-        return round(amount),"fifaindex_unspecified","assumed_weekly_units_unknown"
+        # These legacy monetary values show severe scale/sentinel contamination.
+        # Preserve raw wage, but NEVER train, translate or seed current pay from
+        # an unverified legacy unit (full-run medians exceeded £270k/week).
+        return None,"fifaindex_units_unverified","raw_money_units_unverified_model_instead"
     if year==2024:
         return round(amount*MODEL_EUR_GBP[year]),"FC24_unknown_assumed_EUR","assumed_eur_weekly_unverified"
     if year in MODEL_EUR_GBP and year!=2015:
@@ -192,8 +195,10 @@ def calibration_wages(annual):
 
 
 def interpolated_baseline(year,base):
-    if year in base:return base[year],"direct_year_robust_training"
-    nearest=sorted(base)
+    if year in base and year>=2016:return base[year],"direct_year_robust_training"
+    # Early FIFAIndex wages do not have confirmed weekly units and cannot
+    # anchor the entire 2005-2015 curve. Only FIFA16+ observations are trained.
+    nearest=sorted(y for y in base if y>=2016)
     if not nearest:
         raise ValueError("No credible wage calibration observations")
     lower=[y for y in nearest if y<year]
