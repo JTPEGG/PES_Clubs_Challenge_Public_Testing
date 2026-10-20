@@ -65,7 +65,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: PES-V2-2027-PINNED-DOMESTIC-AND-NONPLAYABLE-FEEDER-MEMBERSHIPS
-          run-id: 39464401437
+          run-id: 39467154912
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: current2027/
       - name: Read FA official step 1 and 2 allocation reconciliation for 2026/27
@@ -120,15 +120,15 @@ jobs:
           movement=json.loads((d/'SEASON_VERSIONED_MOVEMENT_RULES_AUDIT.json').read_text())
           assert summary['source_clubs']==13104
           assert summary['source_years']==22
-          assert summary['historical_domestic_league_seasons']==365
-          assert summary['current_edition_third_party_snapshot_memberships']==308
+          assert summary['historical_domestic_league_seasons']==367
+          assert summary['current_edition_third_party_snapshot_memberships']==328
           assert summary['current_edition_source_feeder_entries']==72
           assert summary['official_fa_2027_allocations_crosschecked']==72
           assert summary['official_mls_2026_clubs_crosschecked']==30
           assert summary['official_2026_non_pyramid_league_formats']==1
           assert summary['exact_matches']>=2800
           assert summary['normalized_alias_candidates']>=700
-          assert summary['independent_domestic_fixture_club_years']==7053
+          assert summary['independent_domestic_fixture_club_years']==7073
           assert summary['source_identity_country_guards']==2
           assert summary['curated_named_groups_with_independent_fixture_count']>=0
           assert summary['source_club_country_count']>=19
@@ -146,7 +146,7 @@ jobs:
               assert db.execute('SELECT COUNT(*) FROM sourced_domestic_league_clubs').fetchone()[0]==summary['independent_domestic_fixture_club_years']
               assert db.execute('SELECT COUNT(DISTINCT edition) FROM sourced_domestic_league_clubs').fetchone()[0]==22
               assert db.execute('SELECT COUNT(*) FROM sourced_domestic_league_clubs WHERE verification=?',
-                  ('pinned_third_party_snapshot_review',)).fetchone()[0]==308
+                  ('pinned_third_party_snapshot_review',)).fetchone()[0]==328
               assert db.execute('SELECT COUNT(*) FROM sourced_nonplayable_feeder_clubs WHERE edition=2027').fetchone()[0]==72
               assert db.execute('SELECT COUNT(*) FROM official_fa_nls_allocations').fetchone()[0]==72
               assert db.execute('SELECT COUNT(DISTINCT competition_code) FROM official_fa_nls_allocations').fetchone()[0]==3
@@ -155,7 +155,7 @@ jobs:
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules').fetchone()[0]==128
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules WHERE feeder_verified!=0').fetchone()[0]==0
               assert db.execute('SELECT COUNT(*) FROM edition_club_competitions WHERE group_type=?',('continental_cup_bucket',)).fetchone()[0]==40
-          print('SUCCESS 22 years / 365 domestic league seasons: 13,104 source clubs, NO unverified ready careers')
+          print('SUCCESS 22 years / 367 domestic league seasons: 13,104 source clubs, NO unverified ready careers')
           print(json.dumps(summary,indent=2))
           PY
       - name: Upload evidence SQLite and season-to-season movement documentation
