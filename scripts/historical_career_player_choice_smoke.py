@@ -16,11 +16,11 @@ def verify(path,year):
     save=db.execute("""SELECT economy_version FROM world_career_saves
         WHERE career_id=? AND dataset_id=?""",(career,ds)).fetchone()
     if save is None:raise ValueError("Missing original historical smoke career")
-    clubs=[(int(cid),int(tier),comp) for cid,tier,comp in db.execute("""
+    clubs=[(int(cid),tier,comp) for cid,tier,comp in db.execute("""
         SELECT e.club_id,c.tier,e.competition_id
         FROM world_dataset_entries e JOIN world_competitions c
         ON c.competition_id=e.competition_id
-        WHERE e.dataset_id=? AND c.tier IS NOT NULL
+        WHERE e.dataset_id=?
         ORDER BY e.club_id""",(ds,))]
     score={}
     for cid,tier,comp in clubs:
@@ -31,6 +31,9 @@ def verify(path,year):
             score[cid]=obj["score"]
     if len(score)<500:
         raise ValueError("Insufficient source-backed historical sporting appeal")
+    unknown_tier_count=sum(tier is None for _,tier,_ in clubs)
+    if year==2027 and unknown_tier_count==0:
+        raise ValueError("FC27 source tier gaps were silently overwritten")
     choice=None
     for buyer,tier,comp in clubs:
         if buyer not in score:continue
@@ -65,6 +68,7 @@ def verify(path,year):
     print(json.dumps(dict(edition=year,clubs_with_source_backed_game_appeal=len(score),
         total_historical_clubs=len(clubs),buyer=buyer,seller=seller,
         source_competition=league,player_id=pid,
+        clubs_with_unknown_source_tier=unknown_tier_count,
         result=result["decision"],can_open_talks=result["can_negotiate"],
         scope="game-estimated player-interest only; not player consent"),indent=2))
     db.close()
