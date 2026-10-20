@@ -1038,12 +1038,19 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
     # historical fallback it vetoes every AI player-agent conversation.
     # Apply only to historical opt-in worlds, not existing live careers.
     from world_historical_career_finances import is_historical_finance_career
+    game_historical_appeal=False
     if is_historical_finance_career(conn,career_id):
         from world_historical_career_appeal import historical_club_appeal
-        buyer_profile=(buyer_profile or historical_club_appeal(
-            conn,career_id=career_id,club_id=row[1]))
-        seller_profile=(seller_profile or historical_club_appeal(
-            conn,career_id=career_id,club_id=row[2]))
+        historical_buyer=historical_club_appeal(
+            conn,career_id=career_id,club_id=row[1])
+        historical_seller=historical_club_appeal(
+            conn,career_id=career_id,club_id=row[2])
+        buyer_profile=buyer_profile or historical_buyer
+        seller_profile=seller_profile or historical_seller
+        # Applies only when a REAL PES-V2 historical squad source exists.
+        # In FC27 the source tier is unknown; strength-only fallback must
+        # not assign the club a fictional division level.
+        game_historical_appeal=bool(historical_buyer or historical_seller)
     tiers=dict(conn.execute("SELECT competition_id,tier FROM world_competitions").fetchall())
     buyer=tiers.get(buyer_profile["competition_id"]) if buyer_profile else None
     seller=tiers.get(seller_profile["competition_id"]) if seller_profile else None
@@ -1100,11 +1107,18 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
                 "prestige_source_version":policy["prestige_version"],
                 "prestige_review_status":(
                     buyer_prestige["review_status"] if buyer_prestige else "unknown")}
-    outcome=assess_player_interest(
-        buyer_tier=buyer,seller_tier=seller,
-        buyer_score=buyer_profile["score"] if buyer_profile else None,
-        seller_score=seller_profile["score"] if seller_profile else None,
-        player_overall=overall)
+    if game_historical_appeal:
+        from world_historical_career_appeal import assess_historical_player_interest
+        outcome=assess_historical_player_interest(
+            buyer_tier=buyer,seller_tier=seller,
+            buyer_score=buyer_profile["score"] if buyer_profile else None,
+            seller_score=seller_profile["score"] if seller_profile else None)
+    else:
+        outcome=assess_player_interest(
+            buyer_tier=buyer,seller_tier=seller,
+            buyer_score=buyer_profile["score"] if buyer_profile else None,
+            seller_score=seller_profile["score"] if seller_profile else None,
+            player_overall=overall)
     descriptions={
         "uninterested":"Not interested in this move",
         "needs_assurances":"Requires career assurances",
