@@ -79,7 +79,21 @@ def collect(source_sqlite,fc26_csv,output,strict=True):
             raise ValueError("Invalid 22-edition FC26 source overlay SQLite")
         if db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready!=0").fetchone()[0]:
             raise ValueError("Unverified historical careers cannot be activated")
+        coverage=db.execute("""
+            SELECT edition,COUNT(*),
+              SUM(CASE WHEN starting_competition IS NOT NULL THEN 1 ELSE 0 END),
+              SUM(CASE WHEN starting_competition IS NULL THEN 1 ELSE 0 END),
+              SUM(CASE WHEN evidence_origin='original_fc26_binary_game_league' THEN 1 ELSE 0 END)
+            FROM full_historical_club_starting_leagues GROUP BY edition ORDER BY edition
+        """).fetchall()
+        if any(total!=evidenced+unresolved for _,total,evidenced,unresolved,fc26 in coverage):
+            raise ValueError("Edition club counts inconsistent after FC26 source integration")
         db.commit()
+    with (out/"FINAL_22_EDITION_STARTING_LEAGUE_GAPS.csv").open("w",newline="",encoding="utf-8-sig") as file:
+        writer=csv.writer(file)
+        writer.writerow(("Edition","Source_Clubs","Club_Seasons_With_Source_League",
+                         "Still_Unresolved","FC26_New_Game_Source_Matches"))
+        writer.writerows(coverage)
     report=dict(version=VERSION,original_22_edition_game_clubs=13104,
         previous_club_seasons_with_home_league_evidence=before,
         fc26_source_game_name_links=len(rows),new_fc26_original_game_home_leagues=new,
