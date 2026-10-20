@@ -60,7 +60,7 @@ jobs:
           assert report['alias_identity_review']==1382
           assert report['uncrosswalked_name_candidates']==0
           assert report['game_id_disambiguations']==2
-          assert sum(report['reasons_unresolved'].values())==7877
+          assert sum(report['reasons_unresolved'].values())==7244
           assert not report['career_ready_editions']
           with (d/'HISTORICAL_COMPETITION_CLUB_TRIAGE.csv').open(
              encoding='utf-8-sig',newline='') as f:
