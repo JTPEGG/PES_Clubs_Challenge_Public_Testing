@@ -1,0 +1,61 @@
+name: PES V2 men's historical club revenue evidence
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_revenue_evidence.py'
+      - 'test_world_historical_revenue_evidence.py'
+      - 'data/warehouse/historical_club_revenue_observations_v1.json'
+      - '.github/workflows/fifa-pes-v2-historical-revenue-evidence.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: v2-source-revenue-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test source dates and reported revenue currencies
+        run: python -m unittest -v test_world_historical_revenue_evidence
+      - name: Download verified 13104 historical club circumstance overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-SOURCED-FINANCIAL-CIRCUMSTANCES
+          run-id: 39429984572
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Build non-mutating observation archive with original EUR values
+        run: |
+          python -u -m world_historical_revenue_evidence \
+            --circumstances source/PES_V2_CLUB_FINANCIAL_CIRCUMSTANCES.sqlite \
+            --evidence data/warehouse/historical_club_revenue_observations_v1.json \
+            --output release/
+      - name: Verify revenue evidence and unknown financial data remain distinct
+        run: |
+          python - <<'PY'
+          import sqlite3
+          p='release/PES_V2_REVENUE_EVIDENCE.sqlite'
+          with sqlite3.connect(p) as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert db.execute('SELECT COUNT(*) FROM latest_club_revenue_reference').fetchone()[0]==13104
+              assert db.execute('SELECT COUNT(*) FROM sourced_sector_benchmarks').fetchone()[0]==5
+              assert db.execute('SELECT COUNT(*) FROM latest_club_revenue_reference WHERE observed_revenue_eur IS NOT NULL').fetchone()[0]>5
+              assert db.execute('SELECT COUNT(*) FROM latest_club_revenue_reference WHERE edition=2025').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM latest_club_revenue_reference WHERE edition=2026 AND source_financial_year_end=2025').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM latest_club_revenue_reference WHERE edition=2027 AND source_financial_year_end=2025').fetchone()[0]>5
+              print('ALL REVENUE EVIDENCE STATUS AND AS-OF GUARDS PASS')
+          PY
+      - name: Upload reported revenues and modelled financial situations separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-MENS-HISTORICAL-REVENUE-SOURCE-REFERENCE
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
