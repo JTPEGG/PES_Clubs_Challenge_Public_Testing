@@ -1,0 +1,80 @@
+name: PES V2 direct FIFA15-23 source game club league recovery
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/match_original_fifa_game_leagues.py'
+      - 'test_match_original_fifa_game_leagues.py'
+      - '.github/workflows/fifa-pes-v2-game-division-matches.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  extract-game-leagues:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tests: same edition only, preserve conflicts
+        run: python -m unittest -v test_match_original_fifa_game_leagues
+      - name: Download unchanged 22-year club original archive
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original/
+      - name: Download source-backed competition register for cross-check
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
+          run-id: 39501911329
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: prior/
+      - name: Download cryptographically pinned historic men's FIFA15-23 team league data
+        run: |
+          python - <<'PY'
+          import hashlib,urllib.request
+          url="https://huggingface.co/datasets/jsulz/FIFA23/resolve/80076aed77a08db5cfad31bfdfa2cebc579e9500/male_teams.csv"
+          expected="22b7d55ba67c8e07c5f496386ce0a9a0cccb00f40cea42d2be62a71563af2a71"
+          h=hashlib.sha256()
+          with urllib.request.urlopen(url,timeout=180) as source,open("teams.csv","wb") as sink:
+              for chunk in iter(lambda:source.read(1048576),b""):
+                  h.update(chunk);sink.write(chunk)
+          assert h.hexdigest()==expected,"Source file changed"
+          PY
+      - name: Derive FIFA-club domestic league and division directly from SAME edition
+        run: |
+          python -u -m scripts.match_original_fifa_game_leagues \
+             --original original/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+             --teams teams.csv \
+             --registry prior/HISTORICAL_COMPETITION_REGISTER.sqlite \
+             --output release/
+      - name: Audit separate direct-game links from already sourced fixture evidence
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          d=Path("release")
+          j=json.loads((d/"FIFA_GAME_EDITION_LEAGUE_NAME_MATCH_AUDIT.json").read_text())
+          with (d/"FIFA_GAME_EDITION_EXACT_CLUB_DOMESTIC_LEAGUES.csv").open(encoding="utf-8-sig") as h:
+              rows=list(csv.DictReader(h))
+          assert j["original_game_clubs_all_editions"]==13104
+          assert len(j["fifa_editions"])==9
+          assert len(rows)==j["unique_same_edition_name_domestic_league_matches"]
+          assert len({(r["Edition"],r["FIFA_Club_Key"]) for r in rows})==len(rows)
+          assert j["no_cross_year_inheritance"] and j["no_game_team_id_only_joins"]
+          assert j["no_career_activation"] and not j["modified_squads"]
+          assert all(int(x["Game_League_Level"])>=1 for x in rows)
+          print(json.dumps(j,indent=2))
+          print("Representative direct historical game league matches:",rows[:20])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-2015-2023-DIRECT-FIFA-GAME-CLUB-HOME-LEAGUES
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
