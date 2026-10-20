@@ -239,7 +239,7 @@ def revise_fc27_wage(row,normal_estimate,source_2026_index,roster_aliases=None):
     blended=.55*implied+.45*normal_estimate
     # A lower employer benchmark can affect a genuine new contract, but 2.5x
     # the new average must not erase nearly all of a star's existing pay.
-    prior_floor=prev*(.70 if row["age"]>=35 else .75)
+    prior_floor=prev*(.70 if row.get("age",26)>=35 else .75)
     next_wage=round(max(prior_floor,min(blended,normal_estimate*2.5))/50)*50
     return (max(100,min(750000,next_wage)),
             "game_estimate_fc27_changed_club_2026_wage_blend",
