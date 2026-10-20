@@ -1,0 +1,31 @@
+{
+  "version": "uk-club-legal-entity-mapping-v1",
+  "scope": "mens_only",
+  "caution": "Company entity identity is source-verified, but individual company accounts are NOT necessarily consolidated football group accounts. No balance sheet or cash values have been extracted or certified; report date and presentation require review before use.",
+  "entities": [
+    {
+      "club": "Manchester City",
+      "legal_entity": "MANCHESTER CITY FOOTBALL CLUB LIMITED",
+      "company_number": "00040946",
+      "country": "England and Wales",
+      "registered_website": "https://find-and-update.company-information.service.gov.uk/company/00040946",
+      "filings_url": "https://find-and-update.company-information.service.gov.uk/company/00040946/filing-history",
+      "financial_year_end_last_reported": "2025-06-30",
+      "entity_match_evidence": "registered company name and Etihad Stadium address confirmed",
+      "account_figures_loaded": false,
+      "group_consolidation_review_required": true
+    },
+    {
+      "club": "Chelsea",
+      "legal_entity": "CHELSEA FOOTBALL CLUB LIMITED",
+      "company_number": "01965149",
+      "country": "England and Wales",
+      "registered_website": "https://find-and-update.company-information.service.gov.uk/company/01965149",
+      "filings_url": "https://find-and-update.company-information.service.gov.uk/company/01965149/filing-history",
+      "financial_year_end_last_reported": "2025-06-30",
+      "entity_match_evidence": "registered company name and Stamford Bridge address confirmed",
+      "account_figures_loaded": false,
+      "group_consolidation_review_required": true
+    }
+  ]
+}
