@@ -13,6 +13,10 @@ class HistoricalSupplementTests(unittest.TestCase):
   self.assertTrue(mls[6].endswith("/2025_mls.txt"))
   self.assertTrue(ar[6].endswith("/2025_ar1.txt"))
   self.assertTrue(any(x[2]=="en.3" and x[1]=="2025-26" for x in a))
+  self.assertTrue(any(x[2]=="de.3" and x[6].endswith("/2025-26/3-liga3.txt") for x in a))
+  self.assertTrue(any(x[2]=="es.2" and x[6].endswith("/2025-26/2-liga2.txt") for x in a))
+  self.assertTrue(any(x[2]=="it.2" and x[6].endswith("/2025-26/2-serieb.txt") for x in a))
+  self.assertTrue(any(x[2]=="fr.2" and x[6].endswith("/france/2025-26_fr2.txt") for x in a))
   with self.assertRaises(ValueError):source_targets(2025,set())
  def test_existing_json_league_season_not_overwritten(self):
   x=source_targets(2022,{(2022,"en.1"),(2022,"ar.1"),(2022,"us.mls")})
