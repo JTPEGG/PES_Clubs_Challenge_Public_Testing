@@ -1,0 +1,76 @@
+name: PES V2 men's historical wage contracts and initial loan model
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_wages_loans.py'
+      - 'test_world_historical_wages_loans.py'
+      - '.github/workflows/fifa-pes-v2-wages-loans.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: pes-v2-wage-loans-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build-starting-finances:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test wage calibration, source sentinels and loan-parent resolution
+        run: python -m unittest -v test_world_historical_wages_loans
+      - name: Download unchanged complete V2 source archives
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-final-source-selection
+          run-id: 39397460464
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: originals/
+      - name: Download signed-off men's historical club and squad catalogue
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: originals/
+      - name: Train per-edition held-out models and build source-owned existing loans
+        run: |
+          python -u -m world_historical_wages_loans \
+            --catalog originals/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --source originals/selected_source_22_years.zip \
+            --output release/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite
+      - name: Verify all 317449 male career rows with no fictional verified contract values
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          p=Path('release/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite')
+          j=json.loads(Path('release/STARTING_FINANCES_AND_LOANS_AUDIT.json').read_text())
+          with sqlite3.connect(p) as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM editions').fetchone()[0]==22
+              assert db.execute('SELECT COUNT(*) FROM players').fetchone()[0]==317449
+              assert db.execute('SELECT COUNT(*) FROM starting_player_finances').fetchone()[0]==317449
+              assert db.execute('SELECT COUNT(*) FROM starting_club_finances').fetchone()[0]==13104
+              assert db.execute("SELECT COUNT(*) FROM starting_player_finances WHERE model_weekly_wage_gbp IS NULL OR game_contract_expires_on IS NULL").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM starting_source_loans WHERE parent_status='resolved' AND resolved_parent_club_key=borrower_club_key").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM starting_source_loans l JOIN players p ON l.player_key=p.player_key WHERE p.club_key!=l.borrower_club_key").fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM players WHERE edition=2025').fetchone()[0]==0
+              print('VALIDATED MENS ONLY SALARY, CONTRACT AND SOURCE LOAN MODELS')
+              print(json.dumps(j['totals'],indent=2))
+              for year in ('2005','2012','2015','2020','2026','2027'):
+                  print(year,json.dumps(j['yearly'][year],indent=1))
+          PY
+      - name: Publish immutable enriched player wage contract and loan starting database
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-MENS-22-EDITION-STARTING-WAGES-CONTRACTS-LOANS
+          path: release/
+          retention-days: 30
+          compression-level: 6
+          if-no-files-found: error
