@@ -75,6 +75,13 @@ jobs:
           run-id: 39465806639
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: fa-official/
+      - name: Read official MLS 2026 30-club conferences and knockout qualification
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-OFFICIAL-MLS-2026-2027-CAREER-EDITION-COMPETITION-RULES
+          run-id: 39466458050
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: official-mls/
       - name: Read sourced historical fifth-tier National League feeder clubs
         uses: actions/download-artifact@v4
         with:
@@ -99,6 +106,7 @@ jobs:
             --supplement-dir supplement/ \
             --current-edition-dir current2027/ \
             --fa-allocations-dir fa-official/ \
+            --official-mls-dir official-mls/ \
             --identity-review data/warehouse/historical_club_identity_disambiguation_v1.json \
             --output release/
           python -m world_historical_movement_rules --output release/
@@ -116,6 +124,8 @@ jobs:
           assert summary['current_edition_third_party_snapshot_memberships']==308
           assert summary['current_edition_source_feeder_entries']==72
           assert summary['official_fa_2027_allocations_crosschecked']==72
+          assert summary['official_mls_2026_clubs_crosschecked']==30
+          assert summary['official_2026_non_pyramid_league_formats']==1
           assert summary['exact_matches']>=2800
           assert summary['normalized_alias_candidates']>=700
           assert summary['independent_domestic_fixture_club_years']==7053
@@ -140,6 +150,8 @@ jobs:
               assert db.execute('SELECT COUNT(*) FROM sourced_nonplayable_feeder_clubs WHERE edition=2027').fetchone()[0]==72
               assert db.execute('SELECT COUNT(*) FROM official_fa_nls_allocations').fetchone()[0]==72
               assert db.execute('SELECT COUNT(DISTINCT competition_code) FROM official_fa_nls_allocations').fetchone()[0]==3
+              assert db.execute('SELECT COUNT(*) FROM official_mls_conference_clubs').fetchone()[0]==30
+              assert db.execute('SELECT COUNT(*) FROM season_non_pyramid_formats WHERE edition=2027 AND direct_promotions=0 AND direct_relegations=0 AND playoff_promotions=0').fetchone()[0]==1
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules').fetchone()[0]==128
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules WHERE feeder_verified!=0').fetchone()[0]==0
               assert db.execute('SELECT COUNT(*) FROM edition_club_competitions WHERE group_type=?',('continental_cup_bucket',)).fetchone()[0]==40
