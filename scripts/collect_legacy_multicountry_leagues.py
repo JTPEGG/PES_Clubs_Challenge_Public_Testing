@@ -32,7 +32,7 @@ LEAGUES = {
     "nl": ("Netherlands", "Eredivisie"),
     "pt": ("Portugal", "Primeira Liga"),
 }
-SCORE = re.compile(r"^\\d{1,2}-\\d{1,2}$")
+SCORE = re.compile(r"^\d{1,2}-\d{1,2}$")
 
 
 def source_teams_csv(data: str):
