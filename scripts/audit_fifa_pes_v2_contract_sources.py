@@ -130,9 +130,13 @@ def audit(source,out):
                 raise ValueError(f"{year}: row count differs from source archive manifest")
             meta["source_provider"]=entry.get("catalog_source","unknown")
             results[str(year)]=meta
-            print(f"{year}: {meta['rows']:,} rows; contract/wage fields "+
-                  ", ".join(meta["fields"])+
-                  f"; loan-parent records {meta['loan_parent_rows']:,}",flush=True)
+            print(f"{year}: {meta['rows']:,} rows; loan-parent records "
+                  f"{meta['loan_parent_rows']:,}",flush=True)
+            for field,detail in meta["fields"].items():
+                print(f"  {field}: {detail['present']:,}/{meta['rows']:,} "
+                      f"({detail['coverage_pct']:.2f}%) present; "
+                      f"parseable_wages={detail['parseable_amount']:,}; "
+                      f"examples={detail['examples'][:3]}",flush=True)
     final={"scope":"READ_ONLY_V2_SOURCE_COVERAGE_AUDIT",
            "preserved_source_zip_not_modified":True,
            "source_row_count_including_gender_unspecified":sum(r["rows"] for r in results.values()),
