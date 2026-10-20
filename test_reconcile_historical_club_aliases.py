@@ -20,7 +20,7 @@ class ControlledHistoricalAliases(unittest.TestCase):
     db.execute("CREATE TABLE clubs(edition INTEGER,club_key TEXT,name TEXT,league_key TEXT)")
     db.executemany("INSERT INTO clubs VALUES (?,?,?,?)",[
        (2022,"man-1","Man Utd",None),
-       (2022,"nottm-1","Nottm Forest",None),
+       (2022,"st-1","St Mirren",None),
        (2022,"river-1","River Plate",None),
        (2022,"no-1","Unlisted FC",None),
        (2023,"man-2","Man Utd",None),
@@ -39,7 +39,7 @@ class ControlledHistoricalAliases(unittest.TestCase):
     """)
     db.executemany("INSERT INTO edition_club_competitions VALUES(?,?,?,?)",[
       (2022,x,"unresolved","missing_original_source_league")
-      for x in ("man-1","nottm-1","river-1","no-1")]
+      for x in ("man-1","st-1","river-1","no-1")]
       +[(2023,"man-2","unresolved","missing_original_source_league"),
         (2022,"taken","fixture_exact","domestic_source_group")])
     db.executemany("INSERT INTO competition_seasons VALUES (?,?,?,?)",[
@@ -47,7 +47,7 @@ class ControlledHistoricalAliases(unittest.TestCase):
      ("2022:uy.1",2022,"Uruguay",1)])
     db.executemany("INSERT INTO sourced_domestic_league_clubs VALUES (?,?,?,?,?,?)",[
       (2022,"2022:en.1","Manchester United","https://a", "abc","independent_fixture_membership"),
-      (2022,"2022:en.1","Nottingham Forest","https://a","abc","independent_fixture_membership"),
+      (2022,"2022:en.1","Saint Mirren","https://a","abc","independent_fixture_membership"),
       (2022,"2022:ar.1","River Plate","https://b","def","independent_fixture_membership"),
       (2022,"2022:uy.1","River Plate","https://c","ghi","independent_fixture_membership"),
     ])
@@ -56,7 +56,7 @@ class ControlledHistoricalAliases(unittest.TestCase):
    with (d/"output/AUTO_CONTROLLED_CLUB_ALIASES.csv").open(encoding="utf-8-sig") as f:
     rows=list(csv.DictReader(f))
    self.assertEqual(audit["controlled_unique_same_edition_name_links"],2)
-   self.assertEqual({r["FIFA_Club_Key"] for r in rows},{"man-1","nottm-1"})
+   self.assertEqual({r["FIFA_Club_Key"] for r in rows},{"man-1","st-1"})
    self.assertEqual({r["Edition"] for r in rows},{"2022"})
    self.assertFalse(audit["career_ready"])
    self.assertEqual(audit["player_squads_created"],0)
