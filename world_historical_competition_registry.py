@@ -8,7 +8,7 @@ import argparse,csv,hashlib,json,re,sqlite3,unicodedata
 from collections import defaultdict,Counter
 from pathlib import Path
 
-VERSION="historical-competition-register-v3"
+VERSION="historical-competition-register-v4"
 YEARS=set(range(2005,2028))-{2025}
 CUPS=("conmebol libertadores","conmebol sudamericana","uefa champions","uefa europa")
 # Only genuinely country-specific labels are eligible for provisional SOURCE
@@ -127,7 +127,8 @@ CREATE TABLE sourced_domestic_league_clubs(
   edition INTEGER NOT NULL,competition_code TEXT NOT NULL
   REFERENCES competition_seasons(code),club_name TEXT NOT NULL,
   source_url TEXT NOT NULL,source_sha256 TEXT NOT NULL,
-  verification TEXT NOT NULL CHECK(verification='independent_fixture_membership'),
+  verification TEXT NOT NULL CHECK(verification IN ('independent_fixture_membership',
+      'pinned_third_party_snapshot_review')),
   PRIMARY KEY(edition,competition_code,club_name));
 CREATE TABLE sourced_nonplayable_feeder_clubs(
   edition INTEGER NOT NULL,competition_code TEXT NOT NULL,
@@ -137,7 +138,8 @@ CREATE TABLE sourced_nonplayable_feeder_clubs(
   PRIMARY KEY(edition,competition_code,club_name));
 """
 def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
-            legacy_multicountry_dir=None,supplement_dir=None,identity_review_file=None):
+            legacy_multicountry_dir=None,supplement_dir=None,
+            identity_review_file=None,current_edition_dir=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"HISTORICAL_COMPETITION_REGISTER.sqlite"
     if target.exists():raise FileExistsError("Do not overwrite a previous release")
@@ -205,6 +207,19 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
             comps[code]=(y,row["Country"],int(row["Tier"]),
                 row["Competition"],row["Source_URL"],row["Source_SHA256"])
             source_sizes[code]=int(row["Parsed_Teams"])
+    if current_edition_dir is not None:
+        for row in csvrows(Path(current_edition_dir)/
+                      "FC27_PINNED_CURRENT_COMPETITION_SEASONS.csv"):
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if y!=2027 or code in comps or y not in YEARS:
+                raise ValueError("Invalid or overlapping 2026/27 snapshot division")
+            if row["Evidence_Status"]!="pinned_independent_fixture_membership_review":
+                raise ValueError("FC27 fixture memberships lack source review")
+            if int(row["Parsed_Teams"])<10 or int(row["Fixture_Count"])<4*int(row["Parsed_Teams"]):
+                raise ValueError("FC27 source too incomplete to stage")
+            comps[code]=(y,row["Country"],int(row["Tier"]),
+                         row["Competition"],row["Source_URL"],row["Source_SHA256"])
+            source_sizes[code]=int(row["Parsed_Teams"])
     def add(year,club,code,fixture,method,url):
         if code not in comps or (year,club) not in byid:return
         candidates[(year,club)].append((code,fixture,method,url))
@@ -257,6 +272,29 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
             method=("exact" if game_name.strip().casefold()==fixture.strip().casefold()
                     else "alias_requires_review")
             add(y,key,code,fixture,method,row["Source_URL"])
+    if current_edition_dir is not None:
+        for row in csvrows(Path(current_edition_dir)/
+                            "FC27_PINNED_CURRENT_SOURCE_CLUBS.csv"):
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if (y!=2027 or code not in comps or
+                row["Evidence_Status"]!="source_observation_pending_game_identity_review"):
+                raise ValueError("Current-edition club is not a valid dated membership")
+            if (row["Source_URL"]!=comps[code][4] or
+                row["Source_SHA256"]!=comps[code][5]):
+                raise ValueError("Source fixture file evidence does not match league")
+            # Lower feeders are source clubs, not created playable FIFA squads.
+            if int(row["Tier"])>4:
+                continue
+            hits=aliases[(y,canonical(row["Fixture_Club"]))]
+            if len(hits)!=1:
+                continue
+            club_key,name=hits[0]
+            if identity_guard.get((y,club_key),comps[code][1])!=comps[code][1]:
+                continue
+            # Snapshot is not independently licensed/cross-checked. Even an
+            # identical name is only a candidate pending game-ID verification.
+            add(y,club_key,code,row["Fixture_Club"],"alias_requires_review",
+                row["Source_URL"])
     # Alias candidates never override an exact fixture match and are never
     # presented as verified game club identity.
     for rows,edition_col,code_col,name_col in (
@@ -327,15 +365,15 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
     # squad exists. Each team is a dated independent fixture participant,
     # never a manufactured playable club or future career entrant.
     source_clubs={}
-    def register_source_club(y,code,team,url,source_sha):
+    def register_source_club(y,code,team,url,source_sha,
+                             verification="independent_fixture_membership"):
         if code not in comps or comps[code][0]!=y:
             raise ValueError("External team linked to non-existent domestic season")
         if comps[code][4]!=url or comps[code][5]!=source_sha:
             raise ValueError("External team evidence disagrees with pinned league")
         key=(y,code,team)
         if key in source_clubs:raise ValueError("Duplicate external team membership")
-        source_clubs[key]=(y,code,team,url,source_sha,
-             "independent_fixture_membership")
+        source_clubs[key]=(y,code,team,url,source_sha,verification)
     for row in csvrows(recent_dir/"PINNED_OPENFOOTBALL_ALL_SOURCE_TEAMS.csv"):
         y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
         if row["Evidence_Status"]!="pinned_fixture_membership_not_game_identity":
@@ -358,6 +396,16 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
                 raise ValueError("Invalid independent supplemental source status")
             register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
                 row["Source_SHA256"])
+    snapshot_member_count=0
+    if current_edition_dir is not None:
+        for row in csvrows(Path(current_edition_dir)/
+                            "FC27_PINNED_CURRENT_SOURCE_CLUBS.csv"):
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if row["Evidence_Status"]!="source_observation_pending_game_identity_review":
+                raise ValueError("Unreviewed FC27 fixture file status")
+            register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
+                row["Source_SHA256"],"pinned_third_party_snapshot_review")
+            snapshot_member_count+=1
     # Legacy source exports split independent teams between exact candidates
     # and name-review rows; both are actual source fixture participants.
     for file in ("ENGLAND_2005_2010_PROVISIONAL_CLUB_COMPETITIONS.csv",
@@ -371,6 +419,15 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
     from world_historical_movement_rules import EDITION_YEARS,source_rules
     season_rules=[r for yr in EDITION_YEARS for r in source_rules(yr)]
     feeder_clubs=[]
+    if current_edition_dir is not None:
+        # This distinct tier-5/6 source pool does NOT certify movement routes.
+        for row in csvrows(Path(current_edition_dir)/
+                            "FC27_PINNED_CURRENT_SOURCE_CLUBS.csv"):
+            tier=int(row["Tier"])
+            if tier>=5 and row["Country"]=="England":
+                feeder_clubs.append((2027,f"2027:{row['League_Code']}",
+                    row["Fixture_Club"],tier,row["Source_URL"],
+                    row["Source_SHA256"],"snapshot_review_nonplayable_feeder"))
     if feeder_dir is not None:
         for row in csvrows(Path(feeder_dir)/"NATIONAL_LEAGUE_HISTORICAL_FEEDER_CLUBS.csv"):
             yr=int(row["Edition"]);tier=int(row["Tier"])
@@ -450,6 +507,8 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
        "external_feeders_unverified":len(boundaries),
        "season_versioned_rule_records":len(season_rules),
        "historical_nonplayable_feeder_club_years":len(feeder_clubs),
+       "current_edition_third_party_snapshot_memberships":snapshot_member_count,
+       "current_edition_source_feeder_entries":sum(x[0]==2027 for x in feeder_clubs),
        "independent_domestic_fixture_club_years":len(source_clubs),
        "source_club_country_count":len({v[1] for v in comps.values()}),
        "career_ready_editions":[],
@@ -464,9 +523,11 @@ if __name__=="__main__":
     p.add_argument("--legacy-multicountry-dir")
     p.add_argument("--supplement-dir")
     p.add_argument("--identity-review")
+    p.add_argument("--current-edition-dir")
     a=p.parse_args()
     print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,
         a.output,feeder_dir=a.feeder_dir,
         legacy_multicountry_dir=a.legacy_multicountry_dir,
         supplement_dir=a.supplement_dir,
-        identity_review_file=a.identity_review),indent=2))
+        identity_review_file=a.identity_review,
+        current_edition_dir=a.current_edition_dir),indent=2))
