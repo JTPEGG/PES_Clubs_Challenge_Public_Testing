@@ -43,6 +43,19 @@ The imported datasets are **new, review-only, immutable snapshots**. Test career
 
 [Download FIFA26 test career database](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39437011805/artifacts/12272931320) · [Download FC27 test career database](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39437011805/artifacts/12273106404).
 
+## Historical AI player-interest fix — regression verified
+
+[Successful FIFA26/FC27 historical player-interest regression](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39440612152).
+
+The existing English-only career reputation model had no sporting appeal scores for the source-scoped historical league IDs and rejected AI-to-AI offers as *unassessed*. The isolated historical fallback in `world_historical_career_appeal.py` now uses top-16 player overall ratings and known league tier when the source actually provides it.
+
+- FIFA26: **662/662 source clubs** receive a game sporting-strength estimate, all with a source-listed league tier. A representative same-league move returned `open_to_talks`.
+- FC27: **669/670 source clubs** have sufficient usable rating evidence for a bounded sporting-strength estimate. **All 670 clubs have UNKNOWN historical league tiers** in this source edition; we retain NULL source tiers and compare underlying squad strength without inventing a level. A representative same-league move returned `open_to_talks`.
+- Missing player/club strength remains `review` rather than consent; severe sporting downgrades still refuse talks. These are provisional **simulation** opinions, not assertions about actual players.
+- This is restricted to opt-in historical worlds. Legacy English-league careers retain their existing sporting model.
+
+**Not yet validated:** a complete, realistic volume of signed and registered AI transfers across the full global historical world. The earlier full FIFA26 stress run generated **350 offers but zero final registrations**, while the player interest blocker was active; correcting the blocker has passed the focused real-career decision tests, but final transfer outcomes require a post-fix full market simulation. Creating a market offer is not the same as player acceptance, signed terms or deadline registration.
+
 ## Longer AI-market validation
 
 The autonomous market pipeline `world_live_market.py` is now exercised in isolated historical saves, including source-wage use and a fully timed deadline. A separate deeper workflow `fifa-pes-v2-historical-autonomous-market.yml` is intended to evaluate all 12 simulated time moments; its actual results must be read from GitHub Actions before declaring offer volumes satisfactory.
