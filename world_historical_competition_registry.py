@@ -45,6 +45,31 @@ def canonical(s):
 def cup_group(name):
     return any(x in str(name or "").casefold() for x in CUPS)
 
+def curated_group_match(edition,label,member_count,votes,comps,sizes):
+    """Staged, same-edition named source-group proof, never an identity certificate.
+
+    Generic country-ambiguous league labels cannot be admitted through this
+    function. The entire fixture league-season must be independently sourced,
+    and multiple original clubs must already match the same source season.
+    """
+    if cup_group(label):
+        return None
+    mapping=CURATED_GROUP_LABELS.get(str(label or "").strip().casefold())
+    if not mapping:
+        return None
+    suffix,country,tier=mapping
+    code=f"{edition}:{suffix}"
+    if code not in comps or comps[code][1:3]!=(country,tier):
+        return None
+    if sizes.get(code)!=member_count or member_count<10:
+        return None
+    matching=votes.get(code,0)
+    if matching<max(3,(member_count+9)//10):
+        return None
+    if sum(votes.values())!=matching:
+        return None
+    return code
+
 def csvrows(path):
     with open(path,encoding="utf-8-sig",newline="") as f:
         return list(csv.DictReader(f))
@@ -275,19 +300,10 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
         # league group when its exact size equals the source year's fixture
         # list. Explicit unique label+country+tier ONLY; never generic
         # Premier League or continent/cup name. No single name can approve it.
-        if not matched and not cup_group(label):
-            curated=CURATED_GROUP_LABELS.get(str(label or "").strip().casefold())
-            if curated:
-                token,country,tier=curated
-                code=f"{y}:{token}"
-                votes=voted.get(code,0)
-                competing=total-votes
-                if (code in comps and comps[code][1:3]==(country,tier)
-                    and source_sizes.get(code)==len(members)
-                    and votes>=max(3,(len(members)+9)//10)
-                    and competing==0):
-                    matched=code
-                    match_regime="edition_label_and_independent_full_fixture_count"
+        if not matched:
+            matched=curated_group_match(y,label,len(members),voted,comps,source_sizes)
+            if matched:
+                match_regime="edition_label_and_independent_full_fixture_count"
         group_alias[(y,g)]=matched
         groups.append((y,g,label,len(members),matched,
             sum(n for (c,m),n in counts[(y,g)].items() if m=="exact"),
