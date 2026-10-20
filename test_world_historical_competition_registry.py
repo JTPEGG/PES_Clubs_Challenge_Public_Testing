@@ -14,6 +14,11 @@ class HistoricalFootballWorldTests(unittest.TestCase):
   self.assertEqual(canonical("West Bromwich Albion"),canonical("West Brom"))
   self.assertNotEqual(canonical("Liverpool"),canonical("Liverpool FC Uruguay"))
   self.assertNotEqual(canonical("Manchester United"),canonical("Manchester City"))
+ def test_all_external_source_memberships_have_domestic_foreign_keys(self):
+  from world_historical_competition_registry import SCHEMA
+  self.assertIn("CREATE TABLE sourced_domestic_league_clubs(",SCHEMA)
+  self.assertIn("REFERENCES competition_seasons(code)",SCHEMA)
+  self.assertIn("independent_fixture_membership",SCHEMA)
  def test_continental_cup_never_counts_as_domestic_division(self):
   self.assertTrue(cup_group("CONMEBOL Libertadores"))
   self.assertTrue(cup_group("CONMEBOL Sudamericana"))
