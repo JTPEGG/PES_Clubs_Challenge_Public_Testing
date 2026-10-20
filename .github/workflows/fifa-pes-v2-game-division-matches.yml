@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Tests: same edition only, preserve conflicts
+      - name: Test same edition only and preserve identity conflicts
         run: python -m unittest -v test_match_original_fifa_game_leagues
       - name: Download unchanged 22-year club original archive
         uses: actions/download-artifact@v4
