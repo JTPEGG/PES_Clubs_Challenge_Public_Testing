@@ -8,7 +8,7 @@ import argparse,csv,hashlib,json,re,sqlite3,unicodedata
 from collections import defaultdict,Counter
 from pathlib import Path
 
-VERSION="historical-competition-register-v1"
+VERSION="historical-competition-register-v2"
 YEARS=set(range(2005,2028))-{2025}
 CUPS=("conmebol libertadores","conmebol sudamericana","uefa champions","uefa europa")
 ALIASES={
@@ -95,7 +95,7 @@ CREATE TABLE sourced_nonplayable_feeder_clubs(
   status TEXT NOT NULL,
   PRIMARY KEY(edition,competition_code,club_name));
 """
-def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
+def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy_multicountry_dir=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"HISTORICAL_COMPETITION_REGISTER.sqlite"
     if target.exists():raise FileExistsError("Do not overwrite a previous release")
@@ -122,6 +122,18 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
         y=int(row["FIFA_Edition"])
         comps[f"{y}:en.{row['Tier']}"]=(y,"England",int(row["Tier"]),
                          row["Competition"],row["Source_URL"],row["Source_SHA256"])
+    # Additional 2004/05–2009/10 independently pinned domestic first tiers.
+    # This source remains optional for reproducibility against older audits.
+    if legacy_multicountry_dir is not None:
+        for row in csvrows(Path(legacy_multicountry_dir)/
+                           "LEGACY_MULTICOUNTRY_LEAGUE_SEASONS.csv"):
+            if row["Source_Status"]!="source_team_list_available":
+                raise ValueError("Incomplete early independent domestic division")
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if code in comps:
+                raise ValueError("Early multi-country source overlaps another season")
+            comps[code]=(y,row["Country"],int(row["Tier"]),
+                         row["Competition"],row["Source_URL"],row["SHA256"])
     def add(year,club,code,fixture,method,url):
         if code not in comps or (year,club) not in byid:return
         candidates[(year,club)].append((code,fixture,method,url))
@@ -133,6 +145,12 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
         y=int(row["FIFA_Edition"])
         add(y,row["FIFA_Club_Key"],f"{y}:en.{row['Tier']}",
             row["Source_Team"],"exact",row["Source_URL"])
+    if legacy_multicountry_dir is not None:
+        for row in csvrows(Path(legacy_multicountry_dir)/
+                           "LEGACY_MULTICOUNTRY_EXACT_CLUB_MATCHES.csv"):
+            y=int(row["Edition"])
+            add(y,row["FIFA_Club_Key"],f"{y}:{row['League_Code']}",
+                row["Fixture_Club"],"exact",row["Source_URL"])
     # Alias candidates never override an exact fixture match and are never
     # presented as verified game club identity.
     for rows,edition_col,code_col,name_col in (
@@ -209,6 +227,14 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
             raise ValueError("Unverified source club offered as league membership")
         register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
             row["Source_SHA256"])
+    if legacy_multicountry_dir is not None:
+        for row in csvrows(Path(legacy_multicountry_dir)/
+                           "LEGACY_MULTICOUNTRY_SOURCE_CLUBS.csv"):
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if row["Evidence_Status"]!="pinned_fixture_membership_not_game_identity":
+                raise ValueError("Early-source fixture identity lacks provenance")
+            register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
+                row["Source_SHA256"])
     # Legacy source exports split independent teams between exact candidates
     # and name-review rows; both are actual source fixture participants.
     for file in ("ENGLAND_2005_2010_PROVISIONAL_CLUB_COMPETITIONS.csv",
@@ -309,6 +335,8 @@ if __name__=="__main__":
     p=argparse.ArgumentParser()
     for x in ("source","recent-dir","early-dir","graph","output","feeder-dir"):
         p.add_argument("--"+x,required=True)
+    p.add_argument("--legacy-multicountry-dir")
     a=p.parse_args()
     print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,
-        a.output,feeder_dir=a.feeder_dir),indent=2))
+        a.output,feeder_dir=a.feeder_dir,
+        legacy_multicountry_dir=a.legacy_multicountry_dir),indent=2))
