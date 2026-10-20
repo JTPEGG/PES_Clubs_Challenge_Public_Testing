@@ -27,6 +27,33 @@ class HistoricalFootballWorldTests(unittest.TestCase):
   self.assertEqual(canonical("FC Hansa Rostock"),canonical("Hansa Rostock"))
   self.assertEqual(canonical("AC Siena"),canonical("Siena"))
   self.assertNotEqual(canonical("Ajax Cape Town"),canonical("Ajax"))
+ def test_scoped_named_source_group_only_links_with_full_dated_fixture_evidence(self):
+  from collections import Counter
+  from world_historical_competition_registry import curated_group_match
+  comps={
+   "2026:us.mls":(2026,"United States / Canada",1,"Major League Soccer","source","sha"),
+   "2026:ar.1":(2026,"Argentina",1,"Primera División","source","sha"),
+   "2022:en.3":(2022,"England",3,"League One","source","sha"),
+  }
+  sizes={"2026:us.mls":30,"2026:ar.1":30,"2022:en.3":24}
+  self.assertEqual(curated_group_match(2026,"Major League Soccer",30,
+       Counter({"2026:us.mls":6}),comps,sizes),"2026:us.mls")
+  self.assertEqual(curated_group_match(2026,"Liga Profesional de Fútbol",30,
+       Counter({"2026:ar.1":5}),comps,sizes),"2026:ar.1")
+  self.assertEqual(curated_group_match(2022,"English League One",24,
+       Counter({"2022:en.3":3}),comps,sizes),"2022:en.3")
+  self.assertIsNone(curated_group_match(2027,"MLS",30,
+       Counter({"2026:us.mls":30}),comps,sizes))
+  self.assertIsNone(curated_group_match(2026,"Premier League",30,
+       Counter({"2026:us.mls":30}),comps,sizes))
+  self.assertIsNone(curated_group_match(2026,"Major League Soccer",29,
+       Counter({"2026:us.mls":28}),comps,sizes))
+  self.assertIsNone(curated_group_match(2026,"Major League Soccer",30,
+       Counter({"2026:us.mls":1}),comps,sizes))
+  self.assertIsNone(curated_group_match(2026,"Major League Soccer",30,
+       Counter({"2026:us.mls":10,"2026:ar.1":1}),comps,sizes))
+  self.assertIsNone(curated_group_match(2026,"CONMEBOL Libertadores",30,
+       Counter({"2026:ar.1":30}),comps,sizes))
  def test_continental_cup_never_counts_as_domestic_division(self):
   self.assertTrue(cup_group("CONMEBOL Libertadores"))
   self.assertTrue(cup_group("CONMEBOL Sudamericana"))
