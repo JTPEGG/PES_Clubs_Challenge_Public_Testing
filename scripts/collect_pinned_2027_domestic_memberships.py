@@ -48,6 +48,11 @@ ALIASES={
  "Orlando City SC":"Orlando City",
  "Vancouver Whitecaps":"Vancouver Whitecaps FC",
  "Milton Keynes Dons":"MK Dons",
+ "Airdrie Utd":"Airdrieonians",
+ "Queen of Sth":"Queen of South",
+ "Annan Athletic":"Annan",
+ "Elgin":"Elgin City",
+ "Forfar":"Forfar Athletic",
 }
 NOT_LEAGUE_CLUBS={"MLS All-Stars","Liga MX All-Stars"}
 
