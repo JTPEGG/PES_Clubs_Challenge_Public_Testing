@@ -97,12 +97,15 @@ def seed_existing_loans_and_payroll(conn, *, career_id,dataset_id,
             payroll[parent]+=wage
     ledgers=dict(conn.execute("""SELECT club_id,weekly_wage_budget
         FROM world_career_club_ledger WHERE career_id=?""",(career_id,)).fetchall())
-    for club,cost in payroll.items():
+    # Oversubscribed historical clubs are VALID game-world circumstances.
+    # Unlike the old prototype, do not arbitrarily increase their ceiling or
+    # refuse to create the career. The resulting signed remaining capacity in
+    # wage_budget_breakdown() prevents expensive new contracts automatically.
+    over_budget={club:cost-ledgers[club] for club,cost in payroll.items()
+                 if club in ledgers and cost>ledgers[club]}
+    for club in payroll:
         if club not in ledgers:
             raise ValueError("Source-loan parent is outside career financial world")
-        if cost>ledgers[club]:
-            raise ValueError(f"Starting payroll exceeds budget for club id {club}: "
-                             f"£{cost:,} > £{ledgers[club]:,} / week")
     for club,cost in payroll.items():
         conn.execute("""UPDATE world_career_club_ledger SET committed_wages=?
             WHERE career_id=? AND club_id=?""",(cost,career_id,club))
@@ -122,6 +125,8 @@ def seed_existing_loans_and_payroll(conn, *, career_id,dataset_id,
     return {
         "initial_loans":len(loans),
         "starting_payroll_weekly":sum(payroll.values()),
+        "clubs_over_wage_budget":len(over_budget),
+        "oversubscribed_wages_weekly":sum(over_budget.values()),
         "opted_in":True,
         "model_version":info[0],
     }
