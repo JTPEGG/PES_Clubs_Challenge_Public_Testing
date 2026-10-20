@@ -12,7 +12,7 @@
       "provider_game_edition": "FC24",
       "evidence_url": "https://www.fifacm.com/24/team/111326/liverpool-futbol-club-uruguay?vid=335",
       "do_not_use_fixture_country": "England",
-      "domestic_competition_status": "requires_independent_uruguayan_home_league_source"
+      "domestic_competition_status": "requires_independent_home_league_source"
     }
   ]
 }
