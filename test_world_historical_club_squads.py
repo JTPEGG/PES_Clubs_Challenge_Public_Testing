@@ -171,9 +171,9 @@ class HistoricalSquadTests(unittest.TestCase):
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM players").fetchone()[0],2)
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM clubs").fetchone()[0],2)
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM leagues").fetchone()[0],1)
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM players WHERE gender='women'").fetchone()[0],0)
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM clubs WHERE gender='women'").fetchone()[0],0)
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM leagues WHERE gender='women'").fetchone()[0],0)
+            self.assertNotIn("gender", [x[1] for x in conn.execute("PRAGMA table_info(players)")])
+            self.assertNotIn("gender", [x[1] for x in conn.execute("PRAGMA table_info(clubs)")])
+            self.assertNotIn("gender", [x[1] for x in conn.execute("PRAGMA table_info(leagues)")])
 
     def test_homonymous_clubs_differ_by_source_league_without_id(self):
         portugal={"club":"Nacional","league":"Liga Portugal","gender":"Men's Football"}
