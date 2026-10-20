@@ -53,7 +53,11 @@ jobs:
           assert audit["editions_considered"]==22
           assert audit["historical_player_rosters_created"]==0
           assert audit["all_links_staging_only"] and not audit["careers_ready"]
-          assert len(seasons)>=30
+          assert len(seasons)>=37
+          assert any(s["League_Code"]=="de.3" for s in seasons)
+          assert any(s["League_Code"]=="es.2" for s in seasons)
+          assert any(s["League_Code"]=="it.2" for s in seasons)
+          assert any(s["League_Code"]=="fr.2" for s in seasons)
           assert sum(x["League_Code"]=="us.mls" for x in seasons)>=15
           assert sum(x["League_Code"].startswith("en.") for x in seasons)>=10
           assert sum(x["League_Code"]=="ar.1" for x in seasons)>=4
