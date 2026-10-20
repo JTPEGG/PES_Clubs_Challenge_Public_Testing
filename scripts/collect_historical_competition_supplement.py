@@ -22,7 +22,22 @@ ENGLISH_FILES={
  "en.3":(3,"League One","3-league1.txt"),
  "en.4":(4,"League Two","4-league2.txt"),
 }
-VERSION="pinned-domestic-competition-supplement-v1"
+DE_PIN="c34532ab6950aa0089ef1c736ffdb8c818c3356f"
+ES_PIN="80035a93dd4920985af52aa097a54a6fb888563b"
+IT_PIN="48954d163c312aa705efacb64f771267031fe6eb"
+EU_PIN="63df627f3c87ce71708f016522ea236cf74332c3"
+DE_BASE=f"https://raw.githubusercontent.com/openfootball/deutschland/{DE_PIN}"
+ES_BASE=f"https://raw.githubusercontent.com/openfootball/espana/{ES_PIN}"
+IT_BASE=f"https://raw.githubusercontent.com/openfootball/italy/{IT_PIN}"
+EU_BASE=f"https://raw.githubusercontent.com/openfootball/europe/{EU_PIN}"
+# Tier-two/three fixtures previously absent from the pinned JSON export,
+# but present in the independently pinned source-season text repositories.
+MORE_TIERS=(
+  ("de.3","Germany",3,"3. Liga",DE_BASE,"3-liga3.txt","germany"),
+  ("es.2","Spain",2,"Segunda División",ES_BASE,"2-liga2.txt","spain"),
+  ("it.2","Italy",2,"Serie B",IT_BASE,"2-serieb.txt","italy"),
+)
+VERSION="pinned-domestic-competition-supplement-v2"
 EDITIONS=tuple(y for y in range(2005,2028) if y!=2025)
 
 def source_targets(edition,available):
@@ -36,6 +51,14 @@ def source_targets(edition,available):
             if (edition,code) not in available:
                 rows.append((edition,season,code,"England",tier,name,
                              f"{ENGLAND_BASE}/{season}/{file}","england"))
+    if edition>=2011:
+        for code,country,tier,name,base,filename,family in MORE_TIERS:
+            if (edition,code) not in available:
+                rows.append((edition,season,code,country,tier,name,
+                             f"{base}/{season}/{filename}",family))
+        if (edition,"fr.2") not in available:
+            rows.append((edition,season,"fr.2","France",2,"Ligue 2",
+                 f"{EU_BASE}/france/{season}_fr2.txt","france"))
     source_year=edition-1
     if (edition,"us.mls") not in available:
         rows.append((edition,str(source_year),"us.mls","United States / Canada",1,
@@ -104,6 +127,8 @@ def collect(recent_catalog,output):
     result={
       "version":VERSION,"pinned_england":ENGLAND_PIN,
       "pinned_world":WORLD_PIN,"pinned_south_america":SOUTH_AMERICA_PIN,
+      "pinned_de":DE_PIN,"pinned_es":ES_PIN,"pinned_it":IT_PIN,
+      "pinned_europe":EU_PIN,
       "licence":"CC0 per pinned OpenFootball repositories",
       "editions_considered":len(EDITIONS),
       "additional_league_seasons":len(rows),
