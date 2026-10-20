@@ -91,6 +91,14 @@ def audit(source_sqlite,team_csv,output):
         original_names={canonical(e[0]) for e in candidates}
         game_name=canonical(n)
         names_consistent=(game_name in original_names)
+        if not names_consistent:
+            # Source archive IDs may be provider-local numbers rather than
+            # EA official game IDs. Numeric collision without team name
+            # corroboration must NEVER be considered an ID join.
+            review.append((idkey[0],idkey[1],
+                           "numeric_id_collision_club_name_disagrees",
+                           n,league_name,country,league_id))
+            continue
         if not country or not league_id.isdigit():
             review.append((idkey[0],idkey[1],"missing_country_or_league_id",
                            n,league_name,country,league_id))
@@ -98,8 +106,7 @@ def audit(source_sqlite,team_csv,output):
         passed.append((idkey[0],idkey[1],k,n,
             next(iter(sorted(set(e[0] for e in candidates)))),
             league_id,league_name,country,level,len(candidates),
-            "exact_edition_and_EA_team_id_same_name" if names_consistent else
-            "exact_edition_and_EA_team_id_different_display_name_review",
+            "exact_edition_and_EA_team_id_same_name",
             "game_team_league_not_independent_real_division"))
         matched_club_ids.add(idkey)
     def dump(name,heads,rows):
@@ -120,7 +127,7 @@ def audit(source_sqlite,team_csv,output):
       "unique_original_edition_team_id_keys":len(target),
       "same_edition_ea_game_ids_with_domestic_league":len(passed),
       "exact_id_plus_name":sum(x[10]=="exact_edition_and_EA_team_id_same_name" for x in passed),
-      "same_ea_id_name_discrepancy_review":sum("different_display" in x[10] for x in passed),
+      "same_ea_id_name_discrepancy_review":sum(x[2]=="numeric_id_collision_club_name_disagrees" for x in review),
       "conflicting_or_unidentified":len(review),
       "game_clubs_without_domestic_source":stats["game_ids_without_domestic_source"],
       "source_rows_examined":dict(stats),
