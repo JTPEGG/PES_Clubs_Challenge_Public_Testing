@@ -34,7 +34,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
-          run-id: 39450980308
+          run-id: 39453612685
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: input/
       - name: Produce fully enumerated source identity and country review backlog
@@ -53,10 +53,11 @@ jobs:
           assert report['source_clubs']==13104
           assert report['editions']==22
           assert report['independent_league_seasons']==304
-          assert report['unresolved']==9083
-          assert report['linked_provisional_evidence']==4021
-          assert report['alias_identity_review']==890
-          assert sum(report['reasons_unresolved'].values())==9083
+          assert report['unresolved']==9020
+          assert report['linked_provisional_evidence']==4084
+          assert report['alias_identity_review']==953
+          assert report['uncrosswalked_name_candidates']<=1
+          assert sum(report['reasons_unresolved'].values())==9020
           assert not report['career_ready_editions']
           with (d/'HISTORICAL_COMPETITION_CLUB_TRIAGE.csv').open(
              encoding='utf-8-sig',newline='') as f:
