@@ -24,14 +24,14 @@ input,select{background:#223b54;color:white;border-radius:6px;padding:9px}
 Selecting a season does not create or overwrite a save.</p>
 <div class="grid">{% for item in seasons %}
 <div class="card"><h2>{{item.label}}</h2>
-{% if item.installed %}<span class="pill">Sandbox dataset ready</span>
+{% if item.installed %}<span class="pill">Source squads imported · competition links incomplete</span>
 <p><a href="/world/historical-setup?edition={{item.edition}}">Browse clubs and finances →</a></p>
-{% elif item.edition in eligible %}<span class="pill">Database built · import pending</span>
+{% elif item.edition in eligible %}<span class="pill">Source database built · promotion/relegation mapping pending</span>
 {% else %}<span class="pill">Requires league mapping</span>{% endif %}
 </div>{% endfor %}</div>
-{% if selected %}<h2>{{selected.label}} — available clubs</h2>
+{% if selected %}<h2>{{selected.label}} — source club preview (not career-ready)</h2>
 {% if clubs %}<p class="muted">Loaded {{clubs|length}} source clubs. Starting transfer and wage budgets are game estimates.</p>
-<table><tr><th>Club</th><th>Source league</th><th>Players</th><th>Existing loans</th><th>Transfer budget</th><th>Weekly wage ceiling</th></tr>
+<table><tr><th>Club</th><th>Source competition label (unverified)</th><th>Players</th><th>Existing loans</th><th>Transfer budget</th><th>Weekly wage ceiling</th></tr>
 {% for c in clubs %}<tr><td><b>{{c.name}}</b></td><td>{{c.league}}</td>
 <td>{{c.players}}</td><td>{{c.loans}}</td>
 <td>£{{'{:,.0f}'.format(c.transfer_budget)}}</td>
@@ -40,7 +40,7 @@ Selecting a season does not create or overwrite a save.</p>
 {% else %}<div class="card"><p>Historical world not yet imported into this app database.</p>
 <p class="small">The completed source package remains in the isolated GitHub test artifacts. No production careers were changed.</p></div>{% endif %}
 {% endif %}
-<p class="small">Read-only manager-club preview. Launch controls remain disabled until production integration and permission checks pass.</p>
+<p class="small">HISTORICAL CAREER NOT READY: source competition labels alone do not validate domestic league, country, historical tier, promotion/relegation, non-playable feeder pools or continental cup qualification. No launch controls until complete competition audit.</p>
 </main></body></html>"""
 
 def _display(name):
@@ -52,7 +52,12 @@ def read_historical_setup(conn,selected_year=None):
     if {"world_dataset_pes_v2_metadata","world_datasets"}<=names:
         imported=dict(conn.execute("""SELECT edition,dataset_id FROM
             world_dataset_pes_v2_metadata"""))
-    seasons=[{"edition":y,"label":season(y),"installed":y in imported}
+    # A player/contract/squad import is NOT equivalent to a valid pyramid.
+    # A historical edition remains browse-only until a separately verified
+    # complete competition graph, domestic memberships and feeder pool exist.
+    seasons=[{"edition":y,"label":season(y),"installed":y in imported,
+              "career_ready":False,
+              "blocking_reason":"historic competition hierarchy incomplete"}
              for y in EDITION_CHOICES]
     if selected_year is None:return seasons,None,[]
     if selected_year not in EDITION_CHOICES:raise ValueError("Unsupported edition")
