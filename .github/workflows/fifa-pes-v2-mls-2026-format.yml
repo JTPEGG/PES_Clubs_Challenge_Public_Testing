@@ -1,0 +1,53 @@
+name: PES V2 FC27 official MLS 2026 competition and conference audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'data/warehouse/mls_2026_official_competition_format.json'
+      - 'scripts/audit_official_mls_2026.py'
+      - 'test_audit_official_mls_2026.py'
+      - '.github/workflows/fifa-pes-v2-mls-2026-format.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  mls-official:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test MLS calendar seasons, conferences and no pyramid promotion
+        run: python -m unittest -v test_audit_official_mls_2026
+      - name: Download independent FC27 pinned MLS fixture memberships
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-2027-PINNED-DOMESTIC-AND-NONPLAYABLE-FEEDER-MEMBERSHIPS
+          run-id: 39464401437
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: snapshot/
+      - name: Prove official 30 club identities and 2026 competition regime
+        run: |
+          python -m scripts.audit_official_mls_2026 \
+            --official data/warehouse/mls_2026_official_competition_format.json \
+            --fixtures snapshot/FC27_PINNED_CURRENT_SOURCE_CLUBS.csv \
+            --output release/
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          a=json.loads(Path("release/MLS_2026_OFFICIAL_RULES_AUDIT.json").read_text())
+          assert a["official_members"]==30
+          assert a["verified_source_fixture_crosscheck"]==30
+          assert a["promotion_relegation_slots"]==0
+          assert a["postseason_teams_per_conference"]==9
+          assert not a["career_ready"]
+          print(json.dumps(a,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-OFFICIAL-MLS-2026-2027-CAREER-EDITION-COMPETITION-RULES
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
