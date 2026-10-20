@@ -29,7 +29,7 @@ from scripts.export_fifa_pes_v2 import read_ed, source_members
 from scripts.audit_fifa_pes_v2_contract_sources import parse_amount
 from world_historical_club_squads import YEARS, first, norm
 
-VERSION="historical-wage-and-loan-v2-fc27-anchored"
+VERSION="historical-wage-and-loan-v3-fc27-quality-reviewed"
 WAGE_KEYS={
     **{year:"wage" for year in range(2005,2015)},
     **{year:"wage_eur" for year in range(2015,2023)},
@@ -123,29 +123,44 @@ def money_source(year,raw):
 
 
 FC27_NEXT_YEAR_SIMULATION_INCREASE=1.075
-# Only source-backed wages may be carried forward. Never match IDs alone.
+# Confirmed alternative labels; never use a general nationality-matching
+# similarity score, because real players can change international eligibility.
+NATIONALITY_ALIASES={
+    "holland":"netherlands","netherlands":"netherlands",
+    "turkiye":"turkey","turkey":"turkey",
+    "czechrepublic":"czechia","czechia":"czechia",
+    "capeverdeislands":"caboverde","caboverde":"caboverde",
+    "stlucia":"saintlucia","saintlucia":"saintlucia",
+    "stkittsandnevis":"saintkittsandnevis",
+    "saintkittsandnevis":"saintkittsandnevis"
+}
 CLUB_ALIASES={
-  "parissg":"parissaintgermain",
-  "psg":"parissaintgermain",
-  "napoli":"sscnapoli",
-  "lilleosc":"losclille",
-  "manutd":"manchesterunited",
-  "spurs":"tottenhamhotspur",
-  "manchestercity":"manchestercity",
+  "parissg":"parissaintgermain","psg":"parissaintgermain",
+  "napoli":"sscnapoli","lilleosc":"losclille",
+  "manutd":"manchesterunited","spurs":"tottenhamhotspur",
   "mancity":"manchestercity",
+  "atléticodemadrid":"atleticomadrid",
+  "atleticodemadrid":"atleticomadrid",
+  "internazionale":"inter","lombardiafc":"inter",
+  "milanofc":"acmilan","bergamocalcio":"atalanta",
+  "latium":"lazio",
 }
 
-def _same_club(a,b):
-    left=CLUB_ALIASES.get(norm(a),norm(a))
-    right=CLUB_ALIASES.get(norm(b),norm(b))
-    return bool(left) and left==right
+def _club_label(label):
+    key=norm(label)
+    return CLUB_ALIASES.get(key,key)
+
+def _same_club(a,b,roster_aliases=None):
+    if not a or not b:return False
+    if _club_label(a)==_club_label(b):return True
+    return (norm(b),norm(a)) in (roster_aliases or {})
 
 def _source_identity(row):
-    # A numeric FIFA ID is insufficient across different source editions.
-    # Require shared ID, birth date AND nationality before wage continuity.
+    # Bare numerical IDs are never sufficient between unrelated providers.
     sid=str(row.get("source_id") or "").strip()
     dob=str(row.get("dob") or "").strip()
-    nationality=norm(row.get("nationality"))
+    raw_nationality=norm(row.get("nationality"))
+    nationality=NATIONALITY_ALIASES.get(raw_nationality,raw_nationality)
     return (sid,dob,nationality) if sid and len(dob)==10 and nationality else None
 
 def fc27_source_wage_index(rows_2026):
@@ -156,14 +171,52 @@ def fc27_source_wage_index(rows_2026):
             index[ident].append(row)
     return {key:items[0] for key,items in index.items() if len(items)==1}
 
-def revise_fc27_wage(row,normal_estimate,source_2026_index):
-    """Predict only FC27; preserve all other 21 editions' wage policy.
+def infer_fc27_club_continuity(rows_2027,source_2026_index):
+    """Conservatively discover provider name changes from same-player rosters.
 
-    Unchanged employer: continuity of a credible prior FIFA weekly wage plus
-    a FIXED 7.5% game assumption (not an evidenced new contract).
-    Different employer: conservative blend with new club's financial model,
-    capped at 2.5x the new-club baseline, not a fictional retained contract.
-    No matched identity -> preserve the rating-based original prediction.
+    A pair must contain >=8 independent matched players and represent at least
+    65% of both original and destination clubs' matched source rosters.
+    Both directions must have a UNIQUE qualifying club, excluding bulk
+    transfers or misleading aliases caused by common words in team names.
+    This is corroborated source-label continuity, not official club ID proof.
+    """
+    pair=Counter()
+    old_roster=Counter()
+    new_roster=Counter()
+    for row in rows_2027:
+        prior=source_2026_index.get(_source_identity(row))
+        if not prior or abs(prior["rating"]-row["rating"])>10:continue
+        a,b=prior.get("club_name"),row.get("club_name")
+        if not a or not b:continue
+        a,b=norm(a),norm(b)
+        pair[(a,b)]+=1
+        old_roster[a]+=1
+        new_roster[b]+=1
+    proposed=[]
+    for (a,b),overlap in pair.items():
+        if a==b or overlap<8:continue
+        old_share=overlap/old_roster[a]
+        new_share=overlap/new_roster[b]
+        if min(old_share,new_share)<.65:continue
+        proposed.append((a,b,overlap,old_share,new_share))
+    from_old=Counter(a for a,_,_,_,_ in proposed)
+    from_new=Counter(b for _,b,_,_,_ in proposed)
+    return {
+      (a,b):{"matched_players":v,
+             "share_old_roster":round(po,3),
+             "share_new_roster":round(pn,3),
+             "confidence":"strong_bilateral_roster_overlap"}
+      for a,b,v,po,pn in proposed
+      if from_old[a]==1 and from_new[b]==1
+    }
+
+def revise_fc27_wage(row,normal_estimate,source_2026_index,roster_aliases=None):
+    """2027 correction: use matched 2026 source wage, not only average rating.
+
+    Stable club: carry forward previous source-derived wage + an explicitly
+    fictional 7.5% uplift. For REAL club changes, the assumed new-club blend
+    is bounded below by 75% of previous wage (70% if aged 35+), so star wages
+    cannot collapse simply because their buyer has a weak roster.
     """
     identity=_source_identity(row)
     prior=source_2026_index.get(identity) if identity else None
@@ -172,18 +225,26 @@ def revise_fc27_wage(row,normal_estimate,source_2026_index):
     if not row.get("club_name") or not prior.get("club_name"):
         return normal_estimate,"game_estimate_fc27_missing_club","",None,None
     prev=round(prior["observed"])
-    if _same_club(row["club_name"],prior["club_name"]):
+    old_club,new_club=prior["club_name"],row["club_name"]
+    if _same_club(new_club,old_club,roster_aliases):
         next_wage=round(prev*FC27_NEXT_YEAR_SIMULATION_INCREASE/50)*50
+        inferred=(norm(old_club),norm(new_club)) in (roster_aliases or {})
+        status=("identity_verified_roster_overlap_inferred_same_club"
+                if inferred and _club_label(old_club)!=_club_label(new_club)
+                else "verified_id_dob_nationality_and_same_club")
         return (max(100,min(750000,next_wage)),
                 "game_estimate_fc27_same_club_2026_wage_carried",
-                "verified_id_dob_nationality_and_same_club",prev,prior["key"])
+                status,prev,prior["key"])
     implied=prev*FC27_NEXT_YEAR_SIMULATION_INCREASE
-    blended=0.55*implied+0.45*normal_estimate
-    next_wage=round(min(max(blended,normal_estimate*.75),
-                        normal_estimate*2.5)/50)*50
+    blended=.55*implied+.45*normal_estimate
+    # A lower employer benchmark can affect a genuine new contract, but 2.5x
+    # the new average must not erase nearly all of a star's existing pay.
+    prior_floor=prev*(.70 if row["age"]>=35 else .75)
+    next_wage=round(max(prior_floor,min(blended,normal_estimate*2.5))/50)*50
     return (max(100,min(750000,next_wage)),
             "game_estimate_fc27_changed_club_2026_wage_blend",
-            "verified_id_dob_nationality_club_changed",prev,prior["key"])
+            "verified_id_dob_nationality_club_changed_wage_floor",prev,
+            prior["key"])
 
 
 def expiry_source(year,value):
@@ -377,6 +438,7 @@ def build(catalog,source_zip,output):
             annual[year]=_gather_source(db,archive,year,source_files[year])
         base,club_cal,holdouts=calibration_wages(annual)
         fc27_prev=fc27_source_wage_index(annual[2026])
+        fc27_club_aliases=infer_fc27_club_continuity(annual[2027],fc27_prev)
         club_names=defaultdict(lambda:defaultdict(set))
         club_ratings=defaultdict(lambda:defaultdict(list))
         for year in YEARS:
@@ -407,7 +469,7 @@ def build(catalog,source_zip,output):
                 if year==2027 and source is None:
                     (value,provenance,reference_match,
                      reference_2026_wage,reference_2026_key)=revise_fc27_wage(
-                        row,value,fc27_prev)
+                        row,value,fc27_prev,fc27_club_aliases)
                     if reference_2026_wage is not None:
                         q["fc27_reference_carries"]+=1
                         q["fc27_same_club_carries" if "same_club" in provenance
@@ -504,7 +566,10 @@ def build(catalog,source_zip,output):
             "loan_return_policy":"modelled June 30 starting season after verified PES season end",
             "loan_share_policy":"50% borrower share ONLY for modelled loan budget; not historical fact",
             "player_source_wages_provisional_game_units_not_verified_real_pay":True,
-            "fc27_wage_correction":"Conservative verified ID+DOB+nationality link to FC26 source wages; same club carry +7.5% simulation, new club blend capped at 2.5x baseline",
+            "fc27_wage_correction":"ID+DOB+canonical nationality match; bilateral roster-label continuity; same club +7.5% simulation; changed club at least 75% of preceding source wage (70% age 35+) while considering new-club benchmark",
+            "fc27_inferred_club_label_continuity":[
+               {"fc26_club_normalized":old,"fc27_club_normalized":new,**details}
+               for (old,new),details in sorted(fc27_club_aliases.items())],
             "fc27_2026_wage_carries_are_estimates_not_verified_salaries":True,
             "yearly":quality,"totals":dict(totals)
         }
