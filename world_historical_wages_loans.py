@@ -29,7 +29,7 @@ from scripts.export_fifa_pes_v2 import read_ed, source_members
 from scripts.audit_fifa_pes_v2_contract_sources import parse_amount
 from world_historical_club_squads import YEARS, first, norm
 
-VERSION="historical-wage-and-loan-v3-fc27-quality-reviewed"
+VERSION="historical-wage-and-loan-v4-fc27-quality-reviewed"
 WAGE_KEYS={
     **{year:"wage" for year in range(2005,2015)},
     **{year:"wage_eur" for year in range(2015,2023)},
@@ -239,7 +239,18 @@ def revise_fc27_wage(row,normal_estimate,source_2026_index,roster_aliases=None):
     blended=.55*implied+.45*normal_estimate
     # A lower employer benchmark can affect a genuine new contract, but 2.5x
     # the new average must not erase nearly all of a star's existing pay.
-    prior_floor=prev*(.70 if row.get("age",26)>=35 else .75)
+    # This is a 2026/27 starting save, so use AUGUST 2026 age, not
+    # the age the player will turn during 2027. E.g., Salah is 34,
+    # not 35, when the simulated starting wage is set.
+    dob_text=str(row.get("dob") or "")
+    try:
+        birth=date.fromisoformat(dob_text)
+        season_start=date(2026,8,1)
+        start_age=(season_start.year-birth.year-
+                   ((season_start.month,season_start.day)<(birth.month,birth.day)))
+    except (TypeError,ValueError):
+        start_age=row.get("age",26)
+    prior_floor=prev*(.70 if start_age>=35 else .75)
     next_wage=round(max(prior_floor,min(blended,normal_estimate*2.5))/50)*50
     return (max(100,min(750000,next_wage)),
             "game_estimate_fc27_changed_club_2026_wage_blend",
@@ -566,7 +577,7 @@ def build(catalog,source_zip,output):
             "loan_return_policy":"modelled June 30 starting season after verified PES season end",
             "loan_share_policy":"50% borrower share ONLY for modelled loan budget; not historical fact",
             "player_source_wages_provisional_game_units_not_verified_real_pay":True,
-            "fc27_wage_correction":"ID+DOB+canonical nationality match; bilateral roster-label continuity; same club +7.5% simulation; changed club at least 75% of preceding source wage (70% age 35+) while considering new-club benchmark",
+            "fc27_wage_correction":"ID+DOB+canonical nationality match; bilateral roster-label continuity; same club +7.5% simulation; changed club at least 75% of preceding source wage (70% only if age 35+ at Aug 2026 season start)",
             "fc27_inferred_club_label_continuity":[
                {"fc26_club_normalized":old,"fc27_club_normalized":new,**details}
                for (old,new),details in sorted(fc27_club_aliases.items())],
