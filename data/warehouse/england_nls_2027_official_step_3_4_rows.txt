@@ -1,0 +1,76 @@
+# Source: The Football Association, National League System Club Allocations Steps 1-4 (14 May 2026), pages 1-2.
+# URL: https://www.thefa.com/-/media/thefacom-new/files/competitions/2026-27/nls/nls-1-to-4-club-allocations-2026-27---v1-140526.ashx
+# Season: 2026-27; Men; FA Steps 3 & 4 only (tiers 7 and 8); allocations subject to appeals.
+# Each data line has four numbered FA columns. Numbered rows have been transcribed from the cited official PDF.
+# Step 3 columns: Isthmian Premier, Northern Premier Premier, Southern Premier Central, Southern Premier South.
+[STEP3]
+1 AFC Whyteleafe 1 Alfreton Town 1 Alvechurch 1 Basingstoke Town
+2 Aveley 2 Ashton United 2 Anstey Nomads 2 Bath City
+3 Brentwood Town 3 Avro 3 Banbury United 3 Berkhamsted
+4 Burgess Hill Town 4 Bamber Bridge 4 Bishop’s Stortford 4 Bracknell Town
+5 Carshalton Athletic 5 Bury 5 Bromsgrove Sporting 5 Chertsey Town
+6 Chatham Town 6 Cleethorpes Town 6 Bury Town 6 Chichester City
+7 Cheshunt 7 Curzon Ashton 7 Halesowen Town 7 Chippenham Town
+8 Cray Wanderers 8 Emley 8 Hitchin Town 8 Evesham United
+9 Dartford 9 FC United of Manchester 9 Kettering Town 9 Frome Town
+10 Dulwich Hamlet 10 Gainsborough Trinity 10 Leamington 10 Gloucester City
+11 Eastbourne Borough 11 Guiseley 11 Leighton Town 11 Gosport Borough
+12 Enfield Town 12 Hyde United 12 Leiston 12 Hanwell Town
+13 Leatherhead 13 Ilkeston Town 13 Needham Market 13 Hanworth Villa
+14 Lewes 14 Lancaster City 14 Peterborough Sports 14 Havant & Waterlooville
+15 Maldon & Tiptree 15 Leek Town 15 Racing Club Warwick 15 Malvern Town
+16 Ramsgate 16 Quorn 16 Real Bedford 16 Plymouth Parkway
+17 St Albans City 17 Redcar Athletic 17 Redditch United 17 Poole Town
+18 Stanway Rovers Community 18 Stockton Town 18 Rushall Olympic 18 Sholing
+19 Three Bridges 19 Warrington Rylands 19 Stamford 19 Taunton Town
+20 Welling United 20 Warrington Town 20 Stourbridge 20 Uxbridge
+21 Whitehawk 21 Whitby Town 21 Stratford Town 21 Wimborne Town
+22 Wingate & Finchley 22 Workington 22 Worcester City 22 Yate Town
+# Step 4, first four columns: Isthmian South Central, Isthmian North, Isthmian South East, Northern Premier East.
+[STEP4A]
+1 AFC Portchester 1 AFC Sudbury 1 AFC Croydon Athletic 1 Ashington
+2 AFC Stoneham 2 Bowers & Pitsea 2 Ashford United 2 Beverley Town
+3 Ascot United 3 Brightlingsea Regent 3 Broadbridge Heath 3 Blyth Spartans
+4 Ashford Town (Middx) 4 Buckhurst Hill 4 Cray Valley PM 4 Bradford (Park Avenue)
+5 Bedfont Sports 5 Cambridge City 5 Crowborough Athletic 5 Bridlington Town
+6 Binfield 6 Canvey Island 6 Deal Town 6 Consett
+7 Bognor Regis Town 7 Concord Rangers 7 Eastbourne Town 7 Dunston
+8 Cobham 8 Fakenham Town 8 Erith Town 8 Garforth Town
+9 Egham Town 9 Felixstowe & Walton United 9 Faversham Town 9 Grimsby Borough
+10 Harrow Borough 10 Gorleston 10 Guernsey or Peacehaven & Telscombe 10 Guisborough Town
+11 Hartley Wintney 11 Grays Athletic 11 Hastings United 11 Hallam
+12 Hayes & Yeading United 12 Hashtag United 12 Herne Bay 12 Heaton Stannington
+13 Hendon 13 Little Oakley 13 Horley Town 13 Lincoln United
+14 Jersey Bulls 14 Lowestoft Town 14 Margate 14 Liversedge
+15 Kingstonian 15 Mulbarton Wanderers 15 Merstham 15 Matlock Town
+16 Littlehampton Town * 16 Newmarket Town 16 Punjab United 16 Morpeth Town
+17 Moneyfields 17 Redbridge 17 Sevenoaks Town 17 North Ferriby
+18 Raynes Park Vale 18 Takeley 18 Sheppey United 18 Ossett United
+19 Southall 19 Tilbury 19 Sittingbourne 19 Pontefract Collieries
+20 Westfield 20 Walthamstow 20 South Park (Reigate) 20 Silsden
+21 Winchester City 21 Witham Town 21 Steyning Town 21 Stocksbridge Park Steels
+22 Windsor & Eton 22 Wroxham 22 Whitstable Town 22 West Aukland Town
+# Step 4, next four columns: Northern Premier West, Northern Premier Midlands, Southern Central, Southern South.
+[STEP4B]
+1 1874 Northwich 1 AFC Rushden & Diamonds 1 Aylesbury United 1 Barnstaple Town
+2 Atherton Collieries 2 Barwell 2 Barton Rovers 2 Bideford
+3 Bootle 3 Basford United 3 Beaconsfield Town 3 Bishops Cleeve
+4 Chasetown 4 Bedworth United 4 Biggleswade 4 Bristol Manor Farm
+5 Clitheroe 5 Belper Town 5 Biggleswade Town 5 Dorchester Town
+6 Congleton Town 6 Boldmere St Michael’s 6 Didcot Town 6 Exmouth Town
+7 Hanley Town 7 Boston Town 7 Flackwell Heath 7 Falmouth Town
+8 Kidsgrove Athletic 8 Bourne Town # 8 Hadley 8 Hartpury
+9 Lichfield City 9 Carlton Town 9 Haringey Borough 9 Hungerford Town
+10 Lower Breck 10 Coleshill Town 10 Hertford Town 10 Larkhall Athletic
+11 Mossley 11 Corby Town 11 Leverstock Green 11 Melksham Town
+12 Nantwich Town 12 Coventry United 12 London Lions 12 Paulton Rovers
+13 Newcastle Town 13 Grantham Town 13 Marlow 13 Portland United
+14 Padiham 14 Long Eaton United 14 Milton Keynes Irish 14 Shaftesbury
+15 Prescot Cables 15 Loughborough Students 15 Potters Bar Town 15 Slimbridge
+16 Runcorn Linnets 16 Mickleover 16 Royston Town 16 Sporting Club Inkberrow
+17 Shifnal Town 17 Nuneaton Town 17 Stotfold 17 Swindon Supermarine
+18 Stafford Rangers 18 Rugby Borough 18 Thame United 18 Tiverton Town
+19 Stalybridge Celtic 19 Shepshed Dynamo 19 Waltham Abbey 19 Westbury United
+20 Vauxhall Motors 20 St Ives Town 20 Ware 20 Weymouth
+21 Witton Albion 21 Sutton Coldfield Town 21 Welwyn Garden City 21 Willand Rovers ^
+22 Wythenshawe 22 Wellingborough Town 22 Winslow United 22 Worcester Raiders
