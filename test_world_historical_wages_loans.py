@@ -4,7 +4,8 @@ import unittest
 from world_historical_wages_loans import (
     VERSION,age_on,calibration_wages,coefficient,expiry_source,
     interpolated_baseline,money_source,predicted_wage,resolve_parent,
-    _season_contract_end,fc27_source_wage_index,revise_fc27_wage
+    _season_contract_end,fc27_source_wage_index,revise_fc27_wage,
+    infer_fc27_club_continuity
 )
 
 
@@ -94,7 +95,7 @@ class WageLoanModelTests(unittest.TestCase):
         target=dict(source_id="112",dob="1999-01-02",
             nationality="France",rating=87,club_name="Trabzonspor")
         wage,provenance,_,ref,_=revise_fc27_wage(target,42000,idx)
-        self.assertLessEqual(wage,105000)
+        self.assertEqual(wage,225000)
         self.assertGreater(wage,42000)
         self.assertIn("changed_club",provenance)
         self.assertEqual(ref,300000)
@@ -103,6 +104,61 @@ class WageLoanModelTests(unittest.TestCase):
         self.assertEqual(wage,42000)
         self.assertIsNone(ref)
         self.assertIn("unmatched",provenance)
+
+    def test_nationality_labels_are_synonyms_only_when_explicit(self):
+        prior=[dict(key="26-frenkie",source_id="228702",dob="1997-05-12",
+                    nationality="Netherlands",rating=87,
+                    club_name="FC Barcelona",observed=144500),
+               dict(key="26-kenan",source_id="277954",dob="2005-05-04",
+                    nationality="Türkiye",rating=79,
+                    club_name="Juventus",observed=68000)]
+        idx=fc27_source_wage_index(prior)
+        for r,expected in [
+            (dict(source_id="228702",dob="1997-05-12",
+                  nationality="Holland",rating=86,age=29,
+                  club_name="FC Barcelona"),155350),
+            (dict(source_id="277954",dob="2005-05-04",
+                  nationality="Turkey",rating=84,age=21,
+                  club_name="Juventus"),73100)
+        ]:
+            val,status,match,_,_=revise_fc27_wage(r,42000,idx)
+            self.assertAlmostEqual(val,expected,delta=50)
+            self.assertIn("same_club",status)
+        wrong=dict(source_id="228702",dob="1997-05-12",
+                   nationality="France",rating=86,age=29,
+                   club_name="FC Barcelona")
+        self.assertIn("unmatched",revise_fc27_wage(wrong,42000,idx)[1])
+
+    def test_roster_overlap_alias_never_infers_bulk_one_way_transfer(self):
+        prev=[];new=[]
+        for i in range(20):
+            prev.append(dict(key=f"old-{i}",source_id=str(i),
+                dob="1999-01-01",nationality="Italy",rating=78,
+                club_name="Inter",observed=30000))
+            new.append(dict(key=f"new-{i}",source_id=str(i),
+                dob="1999-01-01",nationality="Italy",rating=78,age=27,
+                club_name="Lombardia FC"))
+        idx=fc27_source_wage_index(prev)
+        aliases=infer_fc27_club_continuity(new,idx)
+        self.assertIn(("inter","lombardiafc"),aliases)
+        result=revise_fc27_wage(new[0],12000,idx,aliases)
+        self.assertIn("same_club",result[1])
+        # Bare one-player movement does not create a club alias.
+        one=infer_fc27_club_continuity(new[:1],idx)
+        self.assertFalse(one)
+
+    def test_changed_club_respects_source_wage_floor_not_star_pay_collapse(self):
+        idx=fc27_source_wage_index([dict(key="26-salah",source_id="209331",
+            dob="1992-06-15",nationality="Egypt",rating=91,
+            club_name="Liverpool",observed=314500)])
+        row=dict(source_id="209331",dob="1992-06-15",
+            nationality="Egypt",rating=87,age=34,
+            club_name="Trabzonspor")
+        wage,status,match,ref,_=revise_fc27_wage(row,41100,idx)
+        self.assertEqual(wage,235900)
+        self.assertEqual(ref,314500)
+        self.assertIn("changed_club",status)
+        self.assertIn("wage_floor",match)
 
     def test_fc27_rejects_duplicate_2026_source_id_dob_nationality(self):
         prior=dict(key="a",source_id="777",dob="1998-01-01",
