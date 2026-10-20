@@ -1,5 +1,7 @@
 # PES V2: historical men's club finance source research and first implementation
 
+> **Development decision (20 October 2026):** Companies House and full club-account extraction are **out of scope for the game-ready baseline**. They are not required for career launch and will not block further development. Use official league history and reported financial events, Deloitte/UEFA aggregate and club revenue benchmarks, and the already-approved historical player wages. Unknown individual cash balances, debt and owner contributions stay *unknown*, while affordable wage ceilings and transfer allowances remain explicitly marked as **game estimates**. The next priority is connecting this baseline to historical career setup and the 30-minute AI transfer window.
+
 **Date:** 20 October 2026
 **Platform:** PC / PlayStation.
 **Scope:** 22 historical starting editions (FC25 unavailable) and 13,104 men's club-season entries.
@@ -66,16 +68,16 @@ These mappings are NOT proof that an individual company filing is the correct co
 5. Premier League and EFL publish authoritative membership, status and sanctions. Financial implications must be estimated separately.
 6. Football-data.co.uk has historical league CSVs but publicly states restrictions on automated collection and AI/data-training uses; we did **not** ingest that site's data. Use permitted/licensed feeds and official league standings instead.
 
-## Implementation backlog / next milestones
+## Implementation backlog / next milestones (superseded by game-ready decision above)
 
 **Priority 1: Get more SOURCE FACTS.**
 - Extend Premier League and EFL season membership to all feasible edition-years with verified league/tier, continental qualification and promotion/relegation history; do not guess gaps in older snapshots. Ensure official *season dates* and no knowledge of future promotions at earlier career starting points.
-- Pilot audited club accounts extraction for Chelsea, Manchester City and two EFL clubs (one financially distressed, one stable). Record reporting entity, financial-year-end, published date, revenue, wages, net operating profit/loss, net debt and net cash **separately**, with original currency and units.
-- Expand annual Deloitte football revenue observations to the Money League archives 2006+, UEFA national benchmarks, and league aggregate TV distribution and parachute payments.
+- **Deferred:** audited club-account extraction for Chelsea, Manchester City and EFL clubs. This is optional longer-term research, NOT a prerequisite for playable careers.
+- Reuse existing official league events and Deloitte/UEFA historical benchmarks; expand only where an obvious financial edge case materially affects gameplay, rather than demanding full coverage before launch.
 
-**Priority 2: Calibrate economic health instead of simply rescaling payroll.**
-- Build a cash-flow framework distinguishing recurring football revenue, non-playing operating expenses, player wages, transfer instalments, debt service, owner equity/loans and existing free cash.
-- Create transparent historical spending decisions from *cash available, regulation, owner willingness and financing constraints*, not from player payroll alone.
+**Priority 2: Calibrate pragmatic game economics (no company accounts required).**
+- Use source-backed club/league circumstances plus game-calibrated financial health and board policy; do not simulate precise cash balances or debt service when the source has no evidence.
+- Separate documented events from estimated spending decisions. Relegated/financially distressed clubs can have **negative wage headroom**; wealthy or promoted clubs may have greater spending flexibility based on the game policy.
 - Allow negative wage budget headroom, negative operating margin, transfer freezes, planned player disposals, and soft/hard board constraints.
 - Include parachute-payment periods, wage relegation clauses only where known/modelled, and distinguish owner net-worth from documented investments.
 
