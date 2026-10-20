@@ -8,7 +8,8 @@
 ## Verified men's-only starting-world release
 
 - [GitHub Actions release workflow](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/workflows/fifa-pes-v2-club-squad-map.yml)
-- [Historical men-only run (all 22 editions verified)](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39409652801)
+- [Historical men-only run (all 22 editions verified)](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39409971210)
+- [Download finished men-only 22-edition career database](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39409971210/artifacts/12258752561)
 - [Source snapshots and V2 numeric player database](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39397460464) are retained as immutable provenance inputs, NOT the men-only playable career selection.
 
 The **men-only historical catalogue** has **317,449** annual player records across 22 game editions. These are source-season records, not distinct individuals. From the original 319,389 source rows, **1,940 explicitly identified women’s player records** (all from FC27) are excluded, removing their 84 edition-specific teams and 14 competition entries. The output includes **13,104** club entries and **257** source-named competition entries, with 314,684 players in source-registered squads, 531 explicitly free agents, and 2,234 with unknown club.
