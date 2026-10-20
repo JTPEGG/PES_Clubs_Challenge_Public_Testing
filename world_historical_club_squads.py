@@ -65,7 +65,6 @@ CREATE TABLE leagues(
  league_name TEXT NOT NULL,
  source_league_id TEXT,
  source_league_level TEXT,
- gender TEXT NOT NULL,
  verification_status TEXT NOT NULL DEFAULT 'source_label_only'
 );
 CREATE TABLE clubs(
@@ -78,7 +77,6 @@ CREATE TABLE clubs(
  league_conflicts INTEGER NOT NULL DEFAULT 0,
  squad_size INTEGER NOT NULL DEFAULT 0,
  source_provider TEXT NOT NULL,
- gender TEXT NOT NULL,
  identity_status TEXT NOT NULL DEFAULT 'edition_scoped_source'
 );
 CREATE TABLE players(
@@ -103,7 +101,6 @@ CREATE TABLE players(
  pes_abilities_json TEXT NOT NULL,
  pes_additional_json TEXT NOT NULL,
  source_provider TEXT NOT NULL,
- gender TEXT NOT NULL,
  UNIQUE(edition,source_row_number)
 );
 CREATE INDEX player_edition_club ON players(edition,club_key);
@@ -250,13 +247,13 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
             club_sizes[club_key]+=1
             source_club_id=first(src,CLUB_ID_COLS)
             if club_key not in clubs:
-                clubs[club_key]=(club_name,source_club_id,gender_group(src))
-            elif clubs[club_key]!=(club_name,source_club_id,gender_group(src)):
+                clubs[club_key]=(club_name,source_club_id)
+            elif clubs[club_key]!=(club_name,source_club_id):
                 conflicting_names[club_key].add(club_name)
             club_league_seen[club_key].add(league_key)
             if league_key:
                 league=(first(src,LEAGUE_COLS),first(src,LEAGUE_ID_COLS),
-                        first(src,LEAGUE_LEVEL_COLS),gender_group(src))
+                        first(src,LEAGUE_LEVEL_COLS))
                 if league_key in leagues and leagues[league_key]!=league:
                     raise ValueError(f"{year}: inconsistent league identity {league_key}")
                 leagues[league_key]=league
@@ -289,7 +286,7 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
             source_overall,pes["primary_position"],pes["alternative_positions"],
             pes["position_fit_indices"],club_key,assignment,
             first(src,LOAN_COLS) or None,json.dumps(abilities,separators=(",",":")),
-            json.dumps(additional,separators=(",",":")),provider,gender_group(src)))
+            json.dumps(additional,separators=(",",":")),provider))
     league_status={}
     for club_key,options in club_league_seen.items():
         # Unknown league on some records and known on others is not itself
@@ -310,25 +307,25 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
       year,season_label(year),provider,source_rec["sha256"],len(source_rows),
       excluded,len(players),len(clubs),assigned,free,unknown,absent,conflicts))
-    for league_key,(name,sid,level,gender) in sorted(leagues.items()):
+    for league_key,(name,sid,level) in sorted(leagues.items()):
         conn.execute("""INSERT INTO leagues
-          (league_key,edition,league_name,source_league_id,source_league_level,gender)
-          VALUES (?,?,?,?,?,?)""",(league_key,year,name,sid or None,level or None,gender))
-    for club_key,(name,sid,gender) in sorted(clubs.items()):
+          (league_key,edition,league_name,source_league_id,source_league_level)
+          VALUES (?,?,?,?,?)""",(league_key,year,name,sid or None,level or None))
+    for club_key,(name,sid) in sorted(clubs.items()):
         lk,status,conflict=league_status[club_key]
         conn.execute("""INSERT INTO clubs
           (club_key,edition,name,source_club_id,league_key,league_status,
-           league_conflicts,squad_size,source_provider,gender)
-          VALUES (?,?,?,?,?,?,?,?,?,?)""",(
+           league_conflicts,squad_size,source_provider)
+          VALUES (?,?,?,?,?,?,?,?,?)""",(
             club_key,year,name,sid or None,lk,status,conflict,
-            club_sizes[club_key],provider,gender))
+            club_sizes[club_key],provider))
     conn.executemany("""INSERT INTO players
        (player_key,edition,source_row_number,source_player_id,
         namespaced_source_player_key,player_name,date_of_birth,nationality,
         preferred_foot,height_cm,weight_kg,source_overall,primary_position,
         alternative_positions,position_fit_indices,club_key,assignment,
-        loaned_from,pes_abilities_json,pes_additional_json,source_provider,gender)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",players)
+        loaned_from,pes_abilities_json,pes_additional_json,source_provider)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",players)
     result={
         "edition":year,"season":season_label(year),"source_provider":provider,
         "source_player_rows":len(source_rows),"excluded_womens_rows":excluded,
@@ -403,10 +400,10 @@ def export_summary(conn,out_dir,report):
     with (out_dir/"PES_V2_ALL_EDITION_CLUBS.csv").open("w",encoding="utf-8",newline="") as f:
         writer=csv.writer(f)
         writer.writerow(("edition","season","club_key","club_name","source_club_id",
-                         "league_name","league_status","squad_players","source_provider","gender"))
+                         "league_name","league_status","squad_players","source_provider"))
         for r in conn.execute("""SELECT c.edition,e.season,c.club_key,c.name,
                           c.source_club_id,l.league_name,c.league_status,c.squad_size,
-                          c.source_provider,c.gender FROM clubs c
+                          c.source_provider FROM clubs c
                           JOIN editions e ON e.edition=c.edition
                           LEFT JOIN leagues l ON l.league_key=c.league_key
                           ORDER BY c.edition,c.name"""):
@@ -440,17 +437,17 @@ def select_edition(conn,edition,*,limit=100):
       WHERE edition=?""",(edition,)).fetchone()
     if not summary:raise ValueError("Edition not built")
     clubs=conn.execute("""SELECT c.club_key,c.name,c.squad_size,
-      l.league_name,c.league_status,c.gender FROM clubs c
+      l.league_name,c.league_status FROM clubs c
       LEFT JOIN leagues l ON l.league_key=c.league_key
       WHERE c.edition=? ORDER BY c.squad_size DESC,c.name LIMIT ?""",(edition,limit)).fetchall()
     return {"edition":edition,"season":summary[0],"players":summary[1],
       "club_count":summary[2],"assigned":summary[3],"free_agents":summary[4],
       "unknown_club":summary[5],
       "club_preview":[{"club_key":r[0],"name":r[1],"squad_size":r[2],
-         "league":r[3],"league_status":r[4],"gender":r[5]} for r in clubs]}
+         "league":r[3],"league_status":r[4]} for r in clubs]}
 
 def club_squad(conn,edition,club_key):
-    club=conn.execute("""SELECT c.name,l.league_name,c.squad_size,c.gender
+    club=conn.execute("""SELECT c.name,l.league_name,c.squad_size
           FROM clubs c LEFT JOIN leagues l ON l.league_key=c.league_key
           WHERE c.edition=? AND c.club_key=?""",(edition,club_key)).fetchone()
     if not club:raise ValueError("Club not found in selected edition")
@@ -462,7 +459,7 @@ def club_squad(conn,edition,club_key):
             ORDER BY source_overall DESC,player_name""",(edition,club_key))]
     if len(players)!=club[2]:raise ValueError("Squad count inconsistency")
     return {"edition":edition,"club_key":club_key,"club":club[0],
-            "league":club[1],"squad_size":club[2],"gender":club[3],"players":players}
+            "league":club[1],"squad_size":club[2],"players":players}
 
 if __name__=="__main__":
     import argparse
