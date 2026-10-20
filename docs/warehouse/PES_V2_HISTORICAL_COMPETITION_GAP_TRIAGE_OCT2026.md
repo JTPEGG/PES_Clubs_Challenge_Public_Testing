@@ -1,4 +1,4 @@
-# Historical men's FIFA/FC competition database — audited blocker triage
+> **Latest milestone:** This report is a previous-stage snapshot. The [351-season competition membership expansion and 8,083 remaining-club audit](PES_V2_HISTORICAL_COMPETITION_MEMBERSHIP_EXPANSION_OCT2026.md) supersedes these counts; the older runs are retained for reproducibility.\n\n# Historical men's FIFA/FC competition database — audited blocker triage
 
 **20 October 2026** · GitHub testing branch `feat/fifa-pes-converter-v2-complete` · PC/PlayStation, no production career changes.
 
