@@ -192,7 +192,11 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
     if feeder_dir is not None:
         for row in csvrows(Path(feeder_dir)/"NATIONAL_LEAGUE_HISTORICAL_FEEDER_CLUBS.csv"):
             yr=int(row["Edition"]);tier=int(row["Tier"])
-            if yr not in YEARS or tier!=5 or row["Competition_Code"]!="ENG:NL":
+            # FC25 is absent from the playable FIFA archive but a real
+            # 2024/25 National League feeder source still belongs in the
+            # independent external-competition history. Never create FC25
+            # players, FIFA source edition or a playable FC25 career.
+            if not 2016<=yr<=2026 or tier!=5 or row["Competition_Code"]!="ENG:NL":
                 raise ValueError("Invalid source feeder division")
             feeder_clubs.append((yr,row["Competition_Code"],row["Club"],
                 tier,row["Fixture_URL"],row["Source_SHA256"],row["Evidence_Status"]))
