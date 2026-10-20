@@ -254,6 +254,9 @@ def audit(source_database, register_database, output, *, strict=True):
         })
     group_rows.sort(key=lambda x:(-x["Unresolved_Club_Years"], x["Edition"],
                                   x["Original_League_Key"]))
+    labelled_groups=[g for g in group_rows
+                     if g["Source_League_Label"] and
+                        g["Original_League_Key"]!="(no original league key)"]
     # Repeated original source IDs are prioritisation candidates across years,
     # never a proof that two same-named football competitions are identical.
     recurring = defaultdict(list)
@@ -324,6 +327,11 @@ def audit(source_database, register_database, output, *, strict=True):
         "reasons_unresolved":dict(sorted(reason_counts.items())),
         "all_confidence_categories":dict(sorted(confidence_counts.items())),
         "top_original_source_groups":group_rows[:20],
+        "top_labelled_source_groups":labelled_groups[:30],
+        "uncrosswalked_name_sample":[
+            {k:x[k] for k in ("Edition","Source_Club_Key","Club",
+                             "Candidate_Country_Review_Only","Candidate_Source_Names")}
+            for x in uncrosswalked[:20]],
         "top_unresolved_editions":sorted(edition_rows,key=lambda x:-x["Unresolved"])[:10],
         "country_inference_policy":"ONLY direct sourced league-country matches are evidence; name-derived countries labelled review hints",
         "club_identity_policy":"unique fixture name is provisional; source-group corroboration does not prove individual club identity",
@@ -351,7 +359,15 @@ def audit(source_database, register_database, output, *, strict=True):
            "", "| Edition | Original league label | Club-years to resolve |",
            "|---|---|---:|"]
     md += [f"| {r['Edition']} | {r['Source_League_Label'] or '(no source league)'}"
-           f" | {r['Unresolved_Club_Years']} |" for r in group_rows[:30]]
+           f" | {r['Unresolved_Club_Years']} |" for r in group_rows[:20]]
+    md += [
+        "", "## Largest labelled FIFA league groups requiring dated sources", "",
+        "| Edition | Original league ID | Original league label | Unresolved club-years |",
+        "|---|---|---|---:|",
+    ]
+    md += [f"| {r['Edition']} | {r['Source_League_ID'] or '(unavailable)'}"
+           f" | {r['Source_League_Label']} | {r['Unresolved_Club_Years']} |"
+           for r in labelled_groups[:30]]
     md += [
         "", "## Source IDs recurring across editions (REVIEW only)", "",
         "| Original FIFA source league ID | Label | Editions | Outstanding club-years |",
@@ -360,6 +376,12 @@ def audit(source_database, register_database, output, *, strict=True):
     md += [f"| {r['Original_League_Source_ID'] or '(edition scoped)'} | "
            f"{r['Original_League_Label'] or '(unknown)'} | {r['Distinct_Editions']} "
            f"| {r['Total_Unresolved_Club_Years']} |" for r in recurring_rows[:30]]
+    md += ["", "## Largest unresolved editions", "",
+           "| Edition | Unresolved | Missing source league | Unidentified source group |",
+           "|---|---:|---:|---:|"]
+    md += [f"| {r['Edition']} | {r['Unresolved']} | {r['Source_League_Absent']} "
+           f"| {r['Source_Group_Unidentified']} |" for r in
+           sorted(edition_rows,key=lambda x:-x["Unresolved"])[:22]]
     md += [
         "", "## How to resolve without inventing divisions", "",
         "1. Prioritise original source-group clusters and find a dated independent domestic league membership source.",
