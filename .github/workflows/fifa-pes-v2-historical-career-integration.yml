@@ -87,6 +87,10 @@ jobs:
               loans=db.execute("SELECT COUNT(*) FROM world_career_loan_agreements WHERE career_id=? AND status='active'",(career,)).fetchone()[0]
               source_loans=db.execute('SELECT COUNT(*) FROM world_dataset_initial_loans WHERE dataset_id=?',(ds,)).fetchone()[0]
               assert loans==source_loans
+              pes=db.execute('SELECT COUNT(*) FROM world_dataset_extended_attributes WHERE dataset_id=?',(ds,)).fetchone()[0]
+              assert pes==registered*29, 'Must retain all 25 PES ability and four auxiliary attributes per player'
+              detail=db.execute('SELECT COUNT(*) FROM world_dataset_pes_v2_player_details WHERE dataset_id=?',(ds,)).fetchone()[0]
+              assert detail==registered
               assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
               assert not db.execute('PRAGMA foreign_key_check').fetchall()
               now=datetime(2026,10,20,12,0,tzinfo=timezone.utc)
