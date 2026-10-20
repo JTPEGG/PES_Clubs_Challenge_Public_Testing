@@ -113,7 +113,7 @@ def generate(source_sqlite,out_dir,*,edition_min=2011,edition_max=2027):
     club_matches=defaultdict(list)
     for o in observations:club_matches[(o[0],o[8])].append(o)
     valid=[o for o in observations if len(club_matches[(o[0],o[8])])==1]
-    conflicts=[o for o in observations if len(club_matches[(o[0],o[8])])]>1]
+    conflicts=[o for o in observations if len(club_matches[(o[0],o[8])])>1]
     def export(name,head,rows):
         with (out/name).open("w",encoding="utf-8-sig",newline="") as f:
             wr=csv.writer(f);wr.writerow(head);wr.writerows(rows)
