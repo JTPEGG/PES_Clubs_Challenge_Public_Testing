@@ -8,9 +8,25 @@ import argparse,csv,hashlib,json,re,sqlite3,unicodedata
 from collections import defaultdict,Counter
 from pathlib import Path
 
-VERSION="historical-competition-register-v2"
+VERSION="historical-competition-register-v3"
 YEARS=set(range(2005,2028))-{2025}
 CUPS=("conmebol libertadores","conmebol sudamericana","uefa champions","uefa europa")
+# Only genuinely country-specific labels are eligible for provisional SOURCE
+# GROUP identity corroboration. These are not whole-pyramid certificates and
+# don't approve an individual club's legal/game identity.
+CURATED_GROUP_LABELS={
+ "major league soccer":("us.mls","United States / Canada",1),
+ "usa major league soccer":("us.mls","United States / Canada",1),
+ "mls":("us.mls","United States / Canada",1),
+ "liga profesional de fútbol":("ar.1","Argentina",1),
+ "argentina primera división":("ar.1","Argentina",1),
+ "english league one":("en.3","England",3),
+ "efl league one":("en.3","England",3),
+ "english league two":("en.4","England",4),
+ "efl league two":("en.4","England",4),
+ "league one":("en.3","England",3),
+ "league two":("en.4","England",4),
+}
 ALIASES={
  "westbromwichalbion":"westbrom","wolverhamptonwanderers":"wolves",
  "nottinghamforest":"nottmforest","queensparkrangers":"qpr",
@@ -95,7 +111,8 @@ CREATE TABLE sourced_nonplayable_feeder_clubs(
   status TEXT NOT NULL,
   PRIMARY KEY(edition,competition_code,club_name));
 """
-def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy_multicountry_dir=None):
+def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
+            legacy_multicountry_dir=None,supplement_dir=None,identity_review_file=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"HISTORICAL_COMPETITION_REGISTER.sqlite"
     if target.exists():raise FileExistsError("Do not overwrite a previous release")
@@ -106,22 +123,37 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy
         editions=[v for (v,) in db.execute("SELECT edition FROM editions")]
     if len(originals)!=13104 or set(editions)!=YEARS:
         raise ValueError("Not the approved 22-year men's club source archive")
+    identity_guard={}
+    if identity_review_file is not None:
+        identity=json.loads(Path(identity_review_file).read_text())
+        if identity.get("version")!="historical-club-identity-disambiguation-v1":
+            raise ValueError("Unrecognised club identity evidence ledger")
+        for e in identity["entries"]:
+            k=(int(e["edition"]),e["game_club_key"])
+            if k in identity_guard:raise ValueError("Duplicate club identity guard")
+            identity_guard[k]=e["country"]
     aliases=defaultdict(list);byid={}
     for y,key,name,group,label in originals:
         aliases[(y,canonical(name))].append((key,name))
         byid[(y,key)]=(name,group,label)
-    comps={};candidates=defaultdict(list)
+    if any(k not in byid for k in identity_guard):
+        raise ValueError("Game identity override references missing club")
+    comps={};source_sizes={};candidates=defaultdict(list)
     recent_dir=Path(recent_dir);early_dir=Path(early_dir)
     for row in csvrows(recent_dir/"PINNED_OPENFOOTBALL_LEAGUES_BY_SEASON.csv"):
         if row["Source_Status"]!="source_team_list_available":continue
         y=int(row["Edition"]);id=row["Source_File"].removesuffix(".json")
-        comps[f"{y}:{id}"]=(y,row["Country"],int(row["Tier"]),
-                            row["Competition"],row["Source_URL"],row["SHA256"])
+        code=f"{y}:{id}"
+        comps[code]=(y,row["Country"],int(row["Tier"]),
+                     row["Competition"],row["Source_URL"],row["SHA256"])
+        source_sizes[code]=int(row["Source_Teams"])
     for row in csvrows(early_dir/"ENGLAND_2005_2010_FOOTBALLTXT_SOURCE_FILES.csv"):
         if row["Status"]!="parsed_source_verified_team_count":continue
         y=int(row["FIFA_Edition"])
-        comps[f"{y}:en.{row['Tier']}"]=(y,"England",int(row["Tier"]),
-                         row["Competition"],row["Source_URL"],row["Source_SHA256"])
+        code=f"{y}:en.{row['Tier']}"
+        comps[code]=(y,"England",int(row["Tier"]),
+                     row["Competition"],row["Source_URL"],row["Source_SHA256"])
+        source_sizes[code]=int(row["Parsed_Teams"])
     # Additional 2004/05–2009/10 independently pinned domestic first tiers.
     # This source remains optional for reproducibility against older audits.
     if legacy_multicountry_dir is not None:
@@ -134,6 +166,20 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy
                 raise ValueError("Early multi-country source overlaps another season")
             comps[code]=(y,row["Country"],int(row["Tier"]),
                          row["Competition"],row["Source_URL"],row["SHA256"])
+            source_sizes[code]=int(row["Source_Teams"])
+    if supplement_dir is not None:
+        for row in csvrows(Path(supplement_dir)/
+                    "PINNED_SUPPLEMENT_DOMESTIC_LEAGUE_SEASONS.csv"):
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if row["Source_Status"]!="pinned_fixture_membership_checked":
+                raise ValueError("Unverified supplemental fixture season")
+            if code in comps or y not in YEARS:
+                raise ValueError("Supplement overlaps verified source or unknown edition")
+            if int(row["Declared_Teams"])!=int(row["Parsed_Teams"]):
+                raise ValueError("Inconsistent supplementary source team count")
+            comps[code]=(y,row["Country"],int(row["Tier"]),
+                row["Competition"],row["Source_URL"],row["Source_SHA256"])
+            source_sizes[code]=int(row["Parsed_Teams"])
     def add(year,club,code,fixture,method,url):
         if code not in comps or (year,club) not in byid:return
         candidates[(year,club)].append((code,fixture,method,url))
@@ -165,6 +211,27 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy
                 continue
             add(y,hits[0][0],f"{y}:{row['League_Code']}",
                 row["Fixture_Club"],"alias_requires_review",row["Source_URL"])
+    if supplement_dir is not None:
+        for row in csvrows(Path(supplement_dir)/
+                        "PINNED_SUPPLEMENT_DOMESTIC_SOURCE_CLUBS.csv"):
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if row["Evidence_Status"]!="independent_fixture_club_not_game_identity":
+                raise ValueError("Supplement membership lacks pinned fixture proof")
+            if code not in comps or row["Source_URL"]!=comps[code][4] or (
+                row["Source_SHA256"]!=comps[code][5]):
+                raise ValueError("Supplement fixture evidence provenance mismatch")
+            fixture=row["Fixture_Club"]
+            hits=aliases[(y,canonical(fixture))]
+            if len(hits)!=1:
+                continue
+            key,game_name=hits[0]
+            if identity_guard.get((y,key),comps[code][1])!=comps[code][1]:
+                # Guard country-known homonyms, e.g. Liverpool Uruguay vs
+                # Liverpool FC England. Do not fabricate home-division data.
+                continue
+            method=("exact" if game_name.strip().casefold()==fixture.strip().casefold()
+                    else "alias_requires_review")
+            add(y,key,code,fixture,method,row["Source_URL"])
     # Alias candidates never override an exact fixture match and are never
     # presented as verified game club identity.
     for rows,edition_col,code_col,name_col in (
@@ -203,11 +270,29 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy
         winners=voted.most_common(1);total=sum(voted.values())
         matched=(winners[0][0] if winners and winners[0][1]>=6
                  and winners[0][1]/total>=.75 and not cup_group(label) else None)
+        match_regime="cross_checked_fixture_group" if matched else ""
+        # A small historically sourced sample may corroborate a named EA
+        # league group when its exact size equals the source year's fixture
+        # list. Explicit unique label+country+tier ONLY; never generic
+        # Premier League or continent/cup name. No single name can approve it.
+        if not matched and not cup_group(label):
+            curated=CURATED_GROUP_LABELS.get(str(label or "").strip().casefold())
+            if curated:
+                token,country,tier=curated
+                code=f"{y}:{token}"
+                votes=voted.get(code,0)
+                competing=total-votes
+                if (code in comps and comps[code][1:3]==(country,tier)
+                    and source_sizes.get(code)==len(members)
+                    and votes>=max(3,(len(members)+9)//10)
+                    and competing==0):
+                    matched=code
+                    match_regime="edition_label_and_independent_full_fixture_count"
         group_alias[(y,g)]=matched
         groups.append((y,g,label,len(members),matched,
             sum(n for (c,m),n in counts[(y,g)].items() if m=="exact"),
             sum(n for (c,m),n in counts[(y,g)].items() if m!="exact"),
-            "cross_checked_fixture_group" if matched else
+            match_regime if matched else
             "continental_cup_not_domestic" if cup_group(label)
             else "still_unverified"))
     rows=[];per_year=Counter()
@@ -247,6 +332,14 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy
             y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
             if row["Evidence_Status"]!="pinned_fixture_membership_not_game_identity":
                 raise ValueError("Early-source fixture identity lacks provenance")
+            register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
+                row["Source_SHA256"])
+    if supplement_dir is not None:
+        for row in csvrows(Path(supplement_dir)/
+                        "PINNED_SUPPLEMENT_DOMESTIC_SOURCE_CLUBS.csv"):
+            y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+            if row["Evidence_Status"]!="independent_fixture_club_not_game_identity":
+                raise ValueError("Invalid independent supplemental source status")
             register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
                 row["Source_SHA256"])
     # Legacy source exports split independent teams between exact candidates
@@ -332,6 +425,9 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy
        "exact_matches":sum(x[5]=="exact" for x in validated),
        "normalized_alias_candidates":sum(x[5]!="exact" for x in validated),
        "cross_checked_original_league_groups":sum(x[7]=="cross_checked_fixture_group" for x in groups),
+       "curated_named_groups_with_independent_fixture_count":sum(
+           x[7]=="edition_label_and_independent_full_fixture_count" for x in groups),
+       "source_identity_country_guards":len(identity_guard),
        "club_years_with_sourced_home_league_evidence":sum(per_year.values()),
        "club_years_unresolved":len(rows)-sum(per_year.values()),
        "disputed_club_years":len(conflicts),"dated_movement_edges_staged":len(edges),
@@ -350,7 +446,11 @@ if __name__=="__main__":
     for x in ("source","recent-dir","early-dir","graph","output","feeder-dir"):
         p.add_argument("--"+x,required=True)
     p.add_argument("--legacy-multicountry-dir")
+    p.add_argument("--supplement-dir")
+    p.add_argument("--identity-review")
     a=p.parse_args()
     print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,
         a.output,feeder_dir=a.feeder_dir,
-        legacy_multicountry_dir=a.legacy_multicountry_dir),indent=2))
+        legacy_multicountry_dir=a.legacy_multicountry_dir,
+        supplement_dir=a.supplement_dir,
+        identity_review_file=a.identity_review),indent=2))
