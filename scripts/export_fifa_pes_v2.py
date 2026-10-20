@@ -22,7 +22,10 @@ from scripts.source_coverage_v2 import source_coverage_status
 BASIC=("source_edition","source_player_id","player_name","source_overall",
        "identity_dob","model_version","primary_position",
        "alternative_positions","position_fit_indices","export_status",
-       "weak_foot_usage","weak_foot_accuracy","form","injury_resistance")
+       "weak_foot_usage","weak_foot_accuracy","form","injury_resistance",
+       "source_provider","namespaced_source_player_key",
+       "source_club","source_nationality","source_height_cm",
+       "source_weight_kg","source_preferred_foot")
 EXTRAS=("weak_foot_usage","weak_foot_accuracy","form","injury_resistance")
 COLUMNS=list(BASIC)
 for name in TARGETS:
@@ -96,6 +99,13 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,
             meta=json.loads(original.read(manifest_names[0]))
             source_provider_by_year={int(x["edition"]):x.get("catalog_source","")
                                      for x in meta.get("downloads",[])}
+        # Restored source archives label each edition's provider independently.
+        # Numerical IDs may be reused by unrelated upstream providers.
+        if not source_provider_by_year and len(manifest_names)==1:
+            for year, info in meta.get("editions",{}).items():
+                source_provider_by_year[int(year)] = (
+                    info.get("source_repository","kushal-gopal/EA-Sports-Fifa")
+                    if isinstance(info,dict) else "unknown")
         if require_all_supported:
             required=set(range(2005,2028))-DISALLOWED_EDITIONS
             missing=sorted(required-set(members))
@@ -116,6 +126,12 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,
             adjacent={}
             for near in (year-1,year+1,year-2,year+2):
                 if near in members and near not in DISALLOWED_EDITIONS:
+                    # Absolutely no cross-provider ID borrowing, even if numeric
+                    # player ID and birthdate happen to be identical.
+                    provider=source_provider_by_year.get(year)
+                    nearby_provider=source_provider_by_year.get(near)
+                    if provider and nearby_provider and provider!=nearby_provider:
+                        continue
                     adjacent[near]=read_ed(original,members,near)
             context=EditionContext(year,rows,adjacent)
             current=rows if limit_per_edition is None else rows[:limit_per_edition]
@@ -131,6 +147,19 @@ def export(source_zip,destination,*,years=None,limit_per_edition=None,
                         p=convert_v2(row,year,context=context,
                                      approved_calibration=calibration)
                         validate_exportable(p)
+                        provider=source_provider_by_year.get(year,"unidentified_source")
+                        p["source_provider"]=provider
+                        p["namespaced_source_player_key"]=f"{year}:{provider}:{p['source_player_id']}"
+                        for output_field,keys in (
+                            ("source_club",("club","club_name","Club","team_name")),
+                            ("source_nationality",("nationality","Nationality")),
+                            ("source_height_cm",("height_cm","height","Height")),
+                            ("source_weight_kg",("weight_kg","weight","Weight")),
+                            ("source_preferred_foot",("preferred_foot","PreferredFoot")),
+                        ):
+                            p[output_field]=next((str(row[k]).strip() for k in keys
+                                if str(row.get(k) or "").strip().lower()
+                                not in ("","nan","na","n/a","none","null")), "")
                     except Exception as e:
                         raise RuntimeError(f"{year} row {i}: {e}") from e
                     writer.writerow(to_csv_row(p))
