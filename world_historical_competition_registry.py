@@ -8,7 +8,7 @@ import argparse,csv,hashlib,json,re,sqlite3,unicodedata
 from collections import defaultdict,Counter
 from pathlib import Path
 
-VERSION="historical-competition-register-v4"
+VERSION="historical-competition-register-v5"
 YEARS=set(range(2005,2028))-{2025}
 CUPS=("conmebol libertadores","conmebol sudamericana","uefa champions","uefa europa")
 # Only genuinely country-specific labels are eligible for provisional SOURCE
@@ -130,6 +130,23 @@ CREATE TABLE sourced_domestic_league_clubs(
   verification TEXT NOT NULL CHECK(verification IN ('independent_fixture_membership',
       'pinned_third_party_snapshot_review')),
   PRIMARY KEY(edition,competition_code,club_name));
+CREATE TABLE official_mls_conference_clubs(
+  edition INTEGER NOT NULL,competition_code TEXT NOT NULL
+  REFERENCES competition_seasons(code),calendar_year INTEGER NOT NULL,
+  conference TEXT NOT NULL CHECK(conference IN ('Eastern','Western')),
+  official_club TEXT NOT NULL,source_url TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status='official_mls_member_matches_independent_fixture_snapshot'),
+  PRIMARY KEY(edition,competition_code,official_club));
+CREATE TABLE season_non_pyramid_formats(
+  edition INTEGER NOT NULL,competition_code TEXT NOT NULL
+  REFERENCES competition_seasons(code),calendar_year INTEGER NOT NULL,
+  regular_games INTEGER NOT NULL,conferences INTEGER NOT NULL,
+  postseason_qualifiers_per_conference INTEGER NOT NULL,
+  direct_promotions INTEGER NOT NULL CHECK(direct_promotions=0),
+  playoff_promotions INTEGER NOT NULL CHECK(playoff_promotions=0),
+  direct_relegations INTEGER NOT NULL CHECK(direct_relegations=0),
+  source_url TEXT NOT NULL,career_ready INTEGER NOT NULL CHECK(career_ready=0),
+  PRIMARY KEY(edition,competition_code));
 CREATE TABLE official_fa_nls_allocations(
   edition INTEGER NOT NULL,competition_code TEXT NOT NULL
   REFERENCES competition_seasons(code),step INTEGER NOT NULL,
@@ -147,7 +164,7 @@ CREATE TABLE sourced_nonplayable_feeder_clubs(
 def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
             legacy_multicountry_dir=None,supplement_dir=None,
             identity_review_file=None,current_edition_dir=None,
-            fa_allocations_dir=None):
+            fa_allocations_dir=None,official_mls_dir=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"HISTORICAL_COMPETITION_REGISTER.sqlite"
     if target.exists():raise FileExistsError("Do not overwrite a previous release")
@@ -426,6 +443,33 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
     # full feeder pools. A National League fixture list is not a game squad.
     from world_historical_movement_rules import EDITION_YEARS,source_rules
     season_rules=[r for yr in EDITION_YEARS for r in source_rules(yr)]
+    official_mls_clubs=[]
+    mls_format=[]
+    if official_mls_dir is not None:
+        mls_dir=Path(official_mls_dir)
+        regime=json.loads((mls_dir/"MLS_2026_OFFICIAL_RULES_AUDIT.json").read_text())
+        if (regime["edition"]!=2027 or regime["calendar_year"]!=2026 or
+            regime["verified_source_fixture_crosscheck"]!=30 or
+            regime["official_members"]!=30 or
+            regime["promotion_relegation_slots"]!=0 or regime["career_ready"]):
+            raise ValueError("MLS official dated 2026 league regime not verified")
+        for row in csvrows(mls_dir/"MLS_2026_OFFICIAL_MEMBERS.csv"):
+            if (row["Edition"]!="2027" or
+                row["Competition_Code"]!="2027:us.mls" or
+                row["Verification"]!="official_mls_member_matches_independent_fixture_snapshot"
+                or not row["Source_URL"].startswith("https://www.mlssoccer.com/")):
+                raise ValueError("Unverified official MLS conference member")
+            official_mls_clubs.append((2027,"2027:us.mls",2026,
+                row["Conference"],row["Official_Club"],row["Source_URL"],
+                row["Verification"]))
+        if (len(official_mls_clubs)!=30 or
+            {x[3] for x in official_mls_clubs}!={"Eastern","Western"} or
+            Counter(x[3] for x in official_mls_clubs)!={"Eastern":15,"Western":15}):
+            raise ValueError("Incomplete official MLS 2026 conference membership")
+        if "2027:us.mls" not in comps or comps["2027:us.mls"][2]!=1:
+            raise ValueError("MLS 2026 official membership lacks source competition")
+        mls_format.append((2027,"2027:us.mls",2026,34,2,9,0,0,0,
+                          official_mls_clubs[0][5],0))
     official_fa_clubs=[]
     if fa_allocations_dir is not None:
         for row in csvrows(Path(fa_allocations_dir)/
@@ -496,6 +540,10 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
              r["evidence_url"],r["source_status"],0) for r in season_rules))
         db.executemany("INSERT INTO sourced_domestic_league_clubs VALUES (?,?,?,?,?,?)",
             source_clubs.values())
+        db.executemany("INSERT INTO official_mls_conference_clubs VALUES (?,?,?,?,?,?,?)",
+            official_mls_clubs)
+        db.executemany("INSERT INTO season_non_pyramid_formats VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            mls_format)
         db.executemany("INSERT INTO official_fa_nls_allocations VALUES (?,?,?,?,?,?,?)",
             official_fa_clubs)
         db.executemany("INSERT INTO sourced_nonplayable_feeder_clubs VALUES (?,?,?,?,?,?,?)",
@@ -537,6 +585,8 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
        "current_edition_third_party_snapshot_memberships":snapshot_member_count,
        "current_edition_source_feeder_entries":sum(x[0]==2027 for x in feeder_clubs),
        "official_fa_2027_allocations_crosschecked":len(official_fa_clubs),
+       "official_mls_2026_clubs_crosschecked":len(official_mls_clubs),
+       "official_2026_non_pyramid_league_formats":len(mls_format),
        "independent_domestic_fixture_club_years":len(source_clubs),
        "source_club_country_count":len({v[1] for v in comps.values()}),
        "career_ready_editions":[],
@@ -553,6 +603,7 @@ if __name__=="__main__":
     p.add_argument("--identity-review")
     p.add_argument("--current-edition-dir")
     p.add_argument("--fa-allocations-dir")
+    p.add_argument("--official-mls-dir")
     a=p.parse_args()
     print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,
         a.output,feeder_dir=a.feeder_dir,
@@ -560,4 +611,5 @@ if __name__=="__main__":
         supplement_dir=a.supplement_dir,
         identity_review_file=a.identity_review,
         current_edition_dir=a.current_edition_dir,
-        fa_allocations_dir=a.fa_allocations_dir),indent=2))
+        fa_allocations_dir=a.fa_allocations_dir,
+        official_mls_dir=a.official_mls_dir),indent=2))
