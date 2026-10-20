@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/audit_historical_competition_gaps.py'
+      - 'data/warehouse/historical_club_identity_disambiguation_v1.json'
       - 'test_historical_competition_gap_audit.py'
       - '.github/workflows/fifa-pes-v2-competition-gap-analysis.yml'
 permissions:
@@ -42,7 +43,8 @@ jobs:
           python -u -m scripts.audit_historical_competition_gaps \
             --source input/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
             --registry input/HISTORICAL_COMPETITION_REGISTER.sqlite \
-            --output release/
+            --output release/ \
+            --identity-review data/warehouse/historical_club_identity_disambiguation_v1.json
       - name: Assert complete cause accounting and no invented competition identities
         run: |
           python - <<'PY'
@@ -56,7 +58,8 @@ jobs:
           assert report['unresolved']==9020
           assert report['linked_provisional_evidence']==4084
           assert report['alias_identity_review']==953
-          assert report['uncrosswalked_name_candidates']<=1
+          assert report['uncrosswalked_name_candidates']==0
+          assert report['game_id_disambiguations']==1
           assert sum(report['reasons_unresolved'].values())==9020
           assert not report['career_ready_editions']
           with (d/'HISTORICAL_COMPETITION_CLUB_TRIAGE.csv').open(
