@@ -4,7 +4,9 @@ Read-only input: the SAME source and converted full-database artifacts. Builds a
 standalone SQLite catalogue; never mutates live World/Career/Render databases.
 
 Contract:
- - preserve all edition rows, including duplicate source IDs, using row ordinal
+ - preserve all eligible source rows including duplicate IDs using row ordinal
+ - omit explicitly marked female football records from game-facing career data
+ - leave original source archives unchanged and report excluded rows
  - never join different FIFA years merely because IDs/names match
  - never guess country, league, budgets, club identities across source providers
  - free agents/unknown clubs are NOT silently assigned to a football club
@@ -46,6 +48,7 @@ CREATE TABLE editions(
  provider TEXT NOT NULL,
  source_sha256 TEXT NOT NULL,
  source_player_rows INTEGER NOT NULL,
+ excluded_womens_rows INTEGER NOT NULL,
  imported_player_rows INTEGER NOT NULL,
  club_count INTEGER NOT NULL,
  assigned_squad_rows INTEGER NOT NULL,
@@ -137,6 +140,24 @@ def gender_group(row):
         return "men"
     return "unspecified" if not raw else "source:"+raw
 
+def is_womens_source_row(row):
+    """Exclude source-labelled women's football without guessing from names.
+
+    Earlier FIFA sources lack reliable gender labels; those historical rows
+    remain included unless there is explicit female-team evidence.
+    """
+    if gender_group(row)=="women":
+        return True
+    for label in (source_club(row),first(row,LEAGUE_COLS)):
+        value=norm(label)
+        if any(k in value for k in
+               ("women","female","femeni","femenino","frauen","femminile")):
+            return True
+        if value in ("wsl","nwsl"):
+            return True
+    return False
+
+
 def source_club(row):
     return first(row,CLUB_COLS)
 
@@ -198,7 +219,7 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
     club_league_seen=defaultdict(set)
     conflicting_names=defaultdict(set)
     club_sizes=Counter()
-    assigned=free=unknown=0
+    assigned=free=unknown=excluded=0
     for ordinal,(src,pes) in enumerate(zip(source_rows,rating_rows),start=1):
         source_id=clean(pes["source_player_id"])
         if not source_id or not clean(pes["player_name"]):
@@ -214,6 +235,9 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
         expected_namespaced=f"{year}:{provider}:{source_id}"
         if pes["namespaced_source_player_key"]!=expected_namespaced:
             raise ValueError(f"{year} row {ordinal}: source ID reference mismatch")
+        if is_womens_source_row(src):
+            excluded+=1
+            continue
         # A source ID MAY be duplicated in an upstream dataset. Row ordinal
         # makes distinct registrations without inventing another original ID.
         duplicate_ids[source_id]+=1
@@ -280,12 +304,12 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
     absent=sum(club_key is None for club_key,_,_ in league_status.values())
     conflicts=sum(bool(n) for _,_,n in league_status.values())
     conn.execute("""INSERT INTO editions
-      (edition,season,provider,source_sha256,source_player_rows,imported_player_rows,
-       club_count,assigned_squad_rows,free_agent_rows,unknown_club_rows,
-       missing_league_clubs,conflicting_league_clubs)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",(
+      (edition,season,provider,source_sha256,source_player_rows,excluded_womens_rows,
+       imported_player_rows,club_count,assigned_squad_rows,free_agent_rows,
+       unknown_club_rows,missing_league_clubs,conflicting_league_clubs)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",(
       year,season_label(year),provider,source_rec["sha256"],len(source_rows),
-      len(players),len(clubs),assigned,free,unknown,absent,conflicts))
+      excluded,len(players),len(clubs),assigned,free,unknown,absent,conflicts))
     for league_key,(name,sid,level,gender) in sorted(leagues.items()):
         conn.execute("""INSERT INTO leagues
           (league_key,edition,league_name,source_league_id,source_league_level,gender)
@@ -307,6 +331,7 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",players)
     result={
         "edition":year,"season":season_label(year),"source_provider":provider,
+        "source_player_rows":len(source_rows),"excluded_womens_rows":excluded,
         "players":len(players),"clubs":len(clubs),
         "squad_player_rows":assigned,"free_agent_rows":free,"unknown_club_rows":unknown,
         "clubs_with_no_verified_league":absent,"clubs_with_conflicting_source_leagues":conflicts,
@@ -314,9 +339,11 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
         "conflicting_club_names_for_same_club_id":len(conflicting_names),
         "source_roster_complete":False,
         "source_league_is_accepted_official_membership":False,
-        "separate_mens_and_womens_clubs":True,
+        "career_dataset_mens_only":True,
     }
     if assigned+free+unknown!=len(players):raise ValueError("Lost squad assignments")
+    if len(players)+excluded!=len(source_rows):
+        raise ValueError("Men-only source row accounting mismatch")
     print(f"{year}: {len(players):,} players; {len(clubs):,} clubs; "
           f"{assigned:,} club assignments; {free:,} free; {unknown:,} unknown; "
           f"{absent} no league; {conflicts} league conflicts",flush=True)
@@ -337,8 +364,9 @@ def build(source_zip,ratings_zip,out_dir):
               "edition_count":len(YEARS),"FC25_excluded":True,
               "ratings_source_players_expected":319389,
               "source_player_ids_not_guaranteed_unique":True,
-              "gender_preserved_when_provided":True,
-              "never_merge_womens_and_mens_club_squads":True,
+              "career_scope":"MENS_ONLY",
+              "sourced_womens_rows_excluded":True,
+              "unknown_gender_source_rows_not_assumed_verified_male":True,
               "data_converted_without_changing_career_or_live_rosters":True,
               "original_game_league_membership_not_verified":True,
               "season_start_date_not_assumed":True,
@@ -348,8 +376,11 @@ def build(source_zip,ratings_zip,out_dir):
                        sr[year],pes_manifest["per_edition"][str(year)],members[year])
                 report["source_derived_club_map"][str(year)]=record
             total=conn.execute("SELECT COUNT(*) FROM players").fetchone()[0]
-            if total!=319389:raise ValueError("Source player count mismatch after import")
+            excluded=sum(v["excluded_womens_rows"] for v in report["source_derived_club_map"].values())
+            if total+excluded!=319389:raise ValueError("Source / selected player row parity failed")
             conn.commit()
+            report["source_players"]=319389
+            report["excluded_womens_rows"]=excluded
             report["players"]=total
             report["clubs"]=conn.execute("SELECT COUNT(*) FROM clubs").fetchone()[0]
             report["leagues_with_known_source_name"]=conn.execute("SELECT COUNT(*) FROM leagues").fetchone()[0]
@@ -385,7 +416,7 @@ def export_summary(conn,out_dir,report):
         "Choose a FIFA edition (2005–2027 excluding FC25); each edition has\n"
         "separate clubs, direct source squad records and 25+4 rating estimates.\n"
         "Leagues are populated ONLY where specifically given in source data.\n"
-        "Men and women teams never share a club key when source gender exists.\n"
+        "Only men's football is included in the game-facing catalogue.\n"
         "Unknown club and unattached players are kept separately, not assigned\n"
         "to invented clubs. No automatic cross-year/source club identity merge.\n"
         "Original source IDs sometimes repeat; stable player_key uses edition\n"
