@@ -6,7 +6,8 @@ import argparse,json,sqlite3
 from datetime import datetime,timedelta,timezone
 from world_careers import start_sandbox,wage_budget_breakdown
 from world_live_market import (
-    initialise_live_market,start_live_market,process_live_market,market_messages
+    initialise_live_market,start_live_market,process_live_market,market_messages,
+    MARKET_MOMENTS
 )
 from world_preseason_window import window_snapshot
 
@@ -49,9 +50,20 @@ def run(db_path,year):
     if len(source)<18 or any(contract!=a or contract!=ctx for _,contract,a,ctx in source):
         raise ValueError("Market is still inventing a second player wage")
     result=process_live_market(conn,career_id=career,now=t+timedelta(seconds=40))
-    # The model must support a zero-offer window; do not force imaginary deals.
+    # The market can legitimately generate zero offers; do not force deals.
     if result["state"]!="open":
         raise ValueError("Market processed an early moment incorrectly")
+    for offset in MARKET_MOMENTS:
+        due=t+timedelta(seconds=offset+1)
+        tick=process_live_market(conn,career_id=career,now=due)
+        if tick["state"]!="open":
+            raise ValueError("Autonomous market closed too early")
+    moments=conn.execute("""SELECT COUNT(*) FROM world_career_market_moments
+       WHERE window_id=?""",(snap["window_id"],)).fetchone()[0]
+    if moments!=len(MARKET_MOMENTS):
+        raise ValueError("Not all scheduled autonomous transfer moments processed")
+    inbox_offers=conn.execute("""SELECT COUNT(*) FROM world_career_offers
+       WHERE career_id=?""",(career,)).fetchone()[0]
     final=process_live_market(conn,career_id=career,now=t+timedelta(seconds=1801))
     if final["state"]!="closed":
         raise ValueError("Market failed to reconcile after 30 minutes")
@@ -65,7 +77,8 @@ def run(db_path,year):
         "initial_loan_count":conn.execute("""SELECT COUNT(*) FROM
            world_career_loan_agreements WHERE career_id=? AND status='active'""",
            (career,)).fetchone()[0],
-        "due_40s":result,"at_1801s":final,
+        "due_40s":result,"ai_market_moments_processed":moments,
+        "proposed_ai_offers":inbox_offers,"at_1801s":final,
         "budget":wage_budget_breakdown(conn,career,cid),
         "messages":len(market_messages(conn,career_id=career))
     }
