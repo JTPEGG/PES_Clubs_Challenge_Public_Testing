@@ -29,7 +29,7 @@ from scripts.export_fifa_pes_v2 import read_ed, source_members
 from scripts.audit_fifa_pes_v2_contract_sources import parse_amount
 from world_historical_club_squads import YEARS, first, norm
 
-VERSION="historical-wage-and-loan-v1"
+VERSION="historical-wage-and-loan-v2-fc27-anchored"
 WAGE_KEYS={
     **{year:"wage" for year in range(2005,2015)},
     **{year:"wage_eur" for year in range(2015,2023)},
@@ -66,7 +66,10 @@ CREATE TABLE IF NOT EXISTS starting_player_finances(
  expiry_provenance TEXT NOT NULL,
  estimated_squad_tier TEXT NOT NULL,
  model_version TEXT NOT NULL,
- wage_quality_warning TEXT NOT NULL DEFAULT ''
+ wage_quality_warning TEXT NOT NULL DEFAULT '',
+ reference_2026_weekly_wage_gbp INTEGER,
+ reference_2026_player_key TEXT,
+ reference_2026_match_status TEXT
 );
 CREATE TABLE IF NOT EXISTS starting_source_loans(
  player_key TEXT PRIMARY KEY REFERENCES players(player_key),
@@ -117,6 +120,70 @@ def money_source(year,raw):
     if year in MODEL_EUR_GBP and year!=2015:
         return round(amount*MODEL_EUR_GBP[year]),"EUR","assumed_weekly_fx_model"
     return None,"unknown","unusable_source_wage"
+
+
+FC27_NEXT_YEAR_SIMULATION_INCREASE=1.075
+# Only source-backed wages may be carried forward. Never match IDs alone.
+CLUB_ALIASES={
+  "parissg":"parissaintgermain",
+  "psg":"parissaintgermain",
+  "napoli":"sscnapoli",
+  "lilleosc":"losclille",
+  "manutd":"manchesterunited",
+  "spurs":"tottenhamhotspur",
+  "manchestercity":"manchestercity",
+  "mancity":"manchestercity",
+}
+
+def _same_club(a,b):
+    left=CLUB_ALIASES.get(norm(a),norm(a))
+    right=CLUB_ALIASES.get(norm(b),norm(b))
+    return bool(left) and left==right
+
+def _source_identity(row):
+    # A numeric FIFA ID is insufficient across different source editions.
+    # Require shared ID, birth date AND nationality before wage continuity.
+    sid=str(row.get("source_id") or "").strip()
+    dob=str(row.get("dob") or "").strip()
+    nationality=norm(row.get("nationality"))
+    return (sid,dob,nationality) if sid and len(dob)==10 and nationality else None
+
+def fc27_source_wage_index(rows_2026):
+    index=defaultdict(list)
+    for row in rows_2026:
+        ident=_source_identity(row)
+        if ident and row.get("observed") is not None and row["observed"]>=50:
+            index[ident].append(row)
+    return {key:items[0] for key,items in index.items() if len(items)==1}
+
+def revise_fc27_wage(row,normal_estimate,source_2026_index):
+    """Predict only FC27; preserve all other 21 editions' wage policy.
+
+    Unchanged employer: continuity of a credible prior FIFA weekly wage plus
+    a FIXED 7.5% game assumption (not an evidenced new contract).
+    Different employer: conservative blend with new club's financial model,
+    capped at 2.5x the new-club baseline, not a fictional retained contract.
+    No matched identity -> preserve the rating-based original prediction.
+    """
+    identity=_source_identity(row)
+    prior=source_2026_index.get(identity) if identity else None
+    if not prior or abs(row["rating"]-prior["rating"])>10:
+        return normal_estimate,"game_estimate_fc27_unmatched","",None,None
+    if not row.get("club_name") or not prior.get("club_name"):
+        return normal_estimate,"game_estimate_fc27_missing_club","",None,None
+    prev=round(prior["observed"])
+    if _same_club(row["club_name"],prior["club_name"]):
+        next_wage=round(prev*FC27_NEXT_YEAR_SIMULATION_INCREASE/50)*50
+        return (max(100,min(750000,next_wage)),
+                "game_estimate_fc27_same_club_2026_wage_carried",
+                "verified_id_dob_nationality_and_same_club",prev,prior["key"])
+    implied=prev*FC27_NEXT_YEAR_SIMULATION_INCREASE
+    blended=0.55*implied+0.45*normal_estimate
+    next_wage=round(min(max(blended,normal_estimate*.75),
+                        normal_estimate*2.5)/50)*50
+    return (max(100,min(750000,next_wage)),
+            "game_estimate_fc27_changed_club_2026_wage_blend",
+            "verified_id_dob_nationality_club_changed",prev,prior["key"])
 
 
 def expiry_source(year,value):
@@ -245,11 +312,13 @@ def _season_contract_end(year,expiry_raw,player_key,age):
 
 def _gather_source(sqlite_conn,z,year,member):
     src=read_ed(z,{year:member},year)
-    people=sqlite_conn.execute("""SELECT player_key,source_row_number,club_key,
-           source_overall,date_of_birth,primary_position,loaned_from
-           FROM players WHERE edition=? ORDER BY source_row_number""",(year,)).fetchall()
+    people=sqlite_conn.execute("""SELECT p.player_key,p.source_row_number,p.club_key,
+           p.source_overall,p.date_of_birth,p.primary_position,p.loaned_from,
+           p.source_player_id,p.nationality,c.name
+           FROM players p LEFT JOIN clubs c ON c.club_key=p.club_key
+           WHERE p.edition=? ORDER BY p.source_row_number""",(year,)).fetchall()
     rows=[]
-    for key,n,club,ovr,dob,position,parent in people:
+    for key,n,club,ovr,dob,position,parent,source_id,nationality,club_name in people:
         if not 1<=n<=len(src):raise ValueError("Source row ordinal invalid")
         row=src[n-1]
         wage_key=WAGE_KEYS.get(year)
@@ -259,6 +328,8 @@ def _gather_source(sqlite_conn,z,year,member):
         rating=ovr if ovr is not None and 35<=ovr<=99 else 65
         rows.append({
            "key":key,"year":year,"club":club,"rating":rating,
+           "source_id":source_id,"dob":dob,"nationality":nationality,
+           "club_name":club_name,
            "position":position,"age":age_on(dob,year),
            "raw_wage":raw_wage,"currency":currency,
            "wage_warning":source_quality,
@@ -305,6 +376,7 @@ def build(catalog,source_zip,output):
         for year in YEARS:
             annual[year]=_gather_source(db,archive,year,source_files[year])
         base,club_cal,holdouts=calibration_wages(annual)
+        fc27_prev=fc27_source_wage_index(annual[2026])
         club_names=defaultdict(lambda:defaultdict(set))
         club_ratings=defaultdict(lambda:defaultdict(list))
         for year in YEARS:
@@ -331,6 +403,15 @@ def build(catalog,source_zip,output):
                 else:
                     value=predicted_wage(row,baseline,club_cal.get(year,{}),club_ratings[year])
                     provenance="game_estimate_"+baseline_method
+                reference_2026_wage=reference_2026_key=reference_match=None
+                if year==2027 and source is None:
+                    (value,provenance,reference_match,
+                     reference_2026_wage,reference_2026_key)=revise_fc27_wage(
+                        row,value,fc27_prev)
+                    if reference_2026_wage is not None:
+                        q["fc27_reference_carries"]+=1
+                        q["fc27_same_club_carries" if "same_club" in provenance
+                          else "fc27_changed_club_blends"]+=1
                 expiry,expiry_method=_season_contract_end(
                     year,row["source_expiry"],row["key"],row["age"])
                 tier=role_level(row["rating"],club_ratings[year].get(row["club"],[]))
@@ -338,7 +419,8 @@ def build(catalog,source_zip,output):
                     str(row["raw_wage"] or "") or None,row["currency"],
                     round(source) if source is not None else None,value,
                     provenance,str(row["source_expiry"] or "") or None,
-                    expiry,expiry_method,tier,VERSION,row["wage_warning"]))
+                    expiry,expiry_method,tier,VERSION,row["wage_warning"],
+                    reference_2026_wage,reference_2026_key,reference_match))
                 q[provenance]+=1
                 q["game_expiry_estimated" if expiry_method.startswith("estimated") else "source_expiry_year"]+=1
                 if row["loan_parent"]:
@@ -355,8 +437,9 @@ def build(catalog,source_zip,output):
                 (player_key,edition,raw_wage,raw_wage_currency,source_wage_weekly_gbp,
                  model_weekly_wage_gbp,wage_provenance,source_expiry_raw,
                  game_contract_expires_on,expiry_provenance,estimated_squad_tier,
-                 model_version,wage_quality_warning)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",wages)
+                 model_version,wage_quality_warning,reference_2026_weekly_wage_gbp,
+                 reference_2026_player_key,reference_2026_match_status)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",wages)
             db.executemany("""INSERT INTO starting_source_loans
                 (player_key,edition,borrower_club_key,raw_parent_club,
                 resolved_parent_club_key,parent_status,game_return_date,
@@ -421,6 +504,8 @@ def build(catalog,source_zip,output):
             "loan_return_policy":"modelled June 30 starting season after verified PES season end",
             "loan_share_policy":"50% borrower share ONLY for modelled loan budget; not historical fact",
             "player_source_wages_provisional_game_units_not_verified_real_pay":True,
+            "fc27_wage_correction":"Conservative verified ID+DOB+nationality link to FC26 source wages; same club carry +7.5% simulation, new club blend capped at 2.5x baseline",
+            "fc27_2026_wage_carries_are_estimates_not_verified_salaries":True,
             "yearly":quality,"totals":dict(totals)
         }
         (output.parent/"STARTING_FINANCES_AND_LOANS_AUDIT.json").write_text(
