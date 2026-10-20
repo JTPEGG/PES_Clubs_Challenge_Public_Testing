@@ -120,6 +120,16 @@ class HistoricalSquadTests(unittest.TestCase):
         arsenal_w["club_team_id"]="999"
         self.assertNotEqual(club_ref(arsenal_m,2027),club_ref(arsenal_w,2027))
 
+    def test_homonymous_clubs_differ_by_source_league_without_id(self):
+        portugal={"club":"Nacional","league":"Liga Portugal","gender":"Men's Football"}
+        uruguay={"club":"Nacional","league":"CONMEBOL Libertadores",
+                 "gender":"Men's Football"}
+        self.assertNotEqual(club_ref(portugal,2027),club_ref(uruguay,2027))
+        # Where an actual source club ID is available, it remains authoritative.
+        portugal["club_team_id"]="217"
+        uruguay["club_team_id"]="217"
+        self.assertEqual(club_ref(portugal,2027),club_ref(uruguay,2027))
+
     def test_sources_without_leagues_remain_unknown(self):
         from world_historical_club_squads import league_ref, source_club
         self.assertIsNone(league_ref({"club":"Liverpool"},2005))
