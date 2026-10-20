@@ -76,6 +76,21 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
         _stable(career_id,player_id,VERSION,"exit-pressure")%13==0))
     estimated=min(350000,max(1000,round(
         1000*2**((target["overall"]-55)/8)/500)*500))
+    historical_source=False
+    from world_historical_career_finances import is_historical_finance_career
+    if is_historical_finance_career(conn,career_id):
+        frozen=conn.execute("""SELECT weekly_wage_gbp,expires_on,source_kind
+            FROM world_career_contract_snapshots
+            WHERE career_id=? AND player_id=?""",
+            (career_id,player_id)).fetchone()
+        if frozen is None or frozen[0] is None:
+            raise ValueError("Historical AI seller has no starting contract salary")
+        estimated=int(frozen[0])
+        if frozen[1]:
+            today=conn.execute("""SELECT pes_lock_date FROM world_career_saves
+                WHERE career_id=?""",(career_id,)).fetchone()[0]
+            term=max(1,min(6,int(frozen[1][:4])-int(today[:4])))
+        historical_source=True
     existing=get_seller_assumptions(conn,career_id,player_id)
     if existing is None:
         record_seller_assumptions(
@@ -111,7 +126,8 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             VALUES(?,?,?,?,?,?,?)""",
             (career_id,player_id,estimated,role,int(listed),
              "not_offered" if term==1 else "renewal_offered",
-             "fictional-autonomous-seller-v1"))
+             "historical-contract-and-modelled-role-v1" if historical_source
+             else "fictional-autonomous-seller-v1"))
         conn.commit()
     return dict(role=role,contract_years=term,listed=listed,rank=rank+1,
                 modelled_wage=estimated)
