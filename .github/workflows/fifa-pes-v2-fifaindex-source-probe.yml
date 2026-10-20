@@ -1,4 +1,4 @@
-name: PES V2 FIFA Index dated league source access probe
+name: PES V2 historic SoFIFA official API roster source probe
 on:
   workflow_dispatch:
   push:
@@ -9,29 +9,26 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-      - name: Probe early game league roster pages and inspect actual HTML structure
+      - name: Probe documented historical SoFIFA roster API by edition
         run: |
           python - <<'PY'
-          import urllib.request,urllib.error,re,html
-          for address in ("https://fifaindex.com/leagues/fifa05",
-                          "https://fifaindex.com/leagues/13-england-premier-league-1/fifa05",
-                          "https://fifaindex.com/leagues/fc26"):
+          import urllib.request,urllib.error,json
+          for roster in ("050001","060001","070001","100001","140001","240001","260001","270001"):
+              address="https://api.sofifa.net/teams/"+roster
               req=urllib.request.Request(address,headers={
-                  "User-Agent":"Mozilla/5.0 (compatible; PES-Historical-Source-Audit/1.0)",
-                  "Accept":"text/html,application/xhtml+xml"})
+                  "User-Agent":"PES-Clubs-Challenge-Historic-Data-Probe/1.0",
+                  "Accept":"application/json"})
               try:
-                  with urllib.request.urlopen(req,timeout=16) as response:
-                      data=response.read(2000000).decode("utf-8","replace")
-                  print("PAGE",address,"bytes",len(data),
-                        "tables",data.lower().count("<table"),"html",data[:220])
-                  for line in re.findall(r'<a[^>]+href="[^"]+"[^>]*>.*?</a>',data,re.I|re.S):
-                      if "/leagues/" in line or "/teams/" in line:
-                          print("ANCHOR",re.sub(r"\s+"," ",line)[:440])
-                          if data.index(line)>24000:break
-                  assert "<html" in data.lower()
+                  with urllib.request.urlopen(req,timeout=12) as response:
+                      data=response.read(4000000)
+                  parsed=json.loads(data)
+                  teams=parsed.get("data",[])
+                  print("ROSTER",roster,"teams",len(teams),"sample",
+                      [(x.get("id"),x.get("name"),x.get("version"),x.get("league"))
+                       for x in teams[:2]],flush=True)
               except Exception as e:
-                  print("SOURCE_ACCESS_FAILED",address,type(e).__name__,str(e))
+                  print("ROSTER_UNAVAILABLE",roster,type(e).__name__,str(e),flush=True)
           PY
