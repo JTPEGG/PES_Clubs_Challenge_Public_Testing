@@ -50,6 +50,18 @@ For every converted player record, the V2 export requires **25 integer PES-style
 - Existing launch-date snapshots, source completeness and EA/Konami cross-game identity mappings are **not independently certified**.
 - The rating CSVs are **not native PES2020 Xbox/PC/PS4 option files**. PES overall formula, appearance IDs, skills, playing styles, physical completion and platform-specific game-file encoding belong to the next development phase. Xbox does not support ordinary external PES option-file imports.
 
+## Final end-to-end verification — 20 October 2026
+
+**[Completed GitHub Actions run](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39397460464) — SUCCESS.**
+
+**[Download the versioned full player database starter package](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39397460464/artifacts/12253683166)**. This artifact contains the converted PES2020-style player rating ZIP, the separately preserved 22-edition source ZIP, and `START_HERE.txt`.
+
+Final validation confirmed **319,389 annual player records**, **7,984,725 valid integer core ratings**, and **1,277,556 valid integer auxiliary ratings** across **22 editions**. No FC25 player rows were included, and no original career or production data was modified.
+
+**Identity follow-up:** The release audit found **zero missing source player IDs**, but **139 repeated provider-and-year-namespaced source IDs** across the 319,389 exported annual records. Such collisions may reflect duplicate source rows or source identity reuse; they have **not** been silently deduplicated. Until investigated, the `namespaced_source_player_key` field MUST NOT be treated as a guaranteed primary/foreign key in a future game-file importer. A stable per-row source-record key, documented collision handling, and duplicate identity review are a specific next-stage task; do not invent identities or drop players automatically.
+
+This is a **complete numerical starter database**, not an officially complete EA/Konami original roster, validated gameplay-rating replication, or native PES2020 game-import asset. Artifact retention is time limited by GitHub Actions, so archive the package separately before expiry.
+
 ## Remaining work after starter database creation
 
 1. Prioritise native PES player-editor fields and a real PES2020 game-file encoder for a suitable supported platform.
