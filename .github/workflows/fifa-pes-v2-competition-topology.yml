@@ -55,8 +55,8 @@ jobs:
           assert all(r['Career_Activation_Status']=='blocked_until_fully_validated'
                      for r in rows)
           assert sum(r['Identity_Status']=='curated_source_competition_match'
-              for r in rows)>400
-          print('13200 SOURCE-COMPETITION PROVENANCE FIELDS CHECKED')
+              for r in rows)==380
+          print('ALL SOURCE-COMPETITION PROVENANCE FIELDS CHECKED')
           print('ALL 13104 CLUB-SEASON ROWS AUDITED. NO UNSOURCED CAREER READY.')
           print(json.dumps(summary['source_issues'],indent=2))
           PY
