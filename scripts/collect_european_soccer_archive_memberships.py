@@ -52,7 +52,10 @@ def extract(source_sqlite,output,source_checksum=""):
             skipped["source_country_not_approved"]+=1;continue
         pair=[teams.get(h),teams.get(a)]
         if any(not t for t in pair) or pair[0]==pair[1]:
-            raise ValueError("Historical match team identity missing or duplicated")
+            # The Kaggle match table contains occasional empty/team-ID
+            # anomalies. Reject only those fixtures; never invent a team.
+            skipped["match_missing_team_identity"]+=1
+            continue
         key=(edition,country)
         seasons[key]["teams"].update(pair)
         seasons[key]["matches"]+=1
