@@ -14,6 +14,7 @@ class SameEditionGameLeagueTests(unittest.TestCase):
      (2022,"club3","Rangers",None),
      (2022,"club4","Same Name",None),
      (2022,"club5","Same Name",None),
+     (2022,"club8","St Mirren",None),
      (2021,"club6","Manchester United",None),
      (2024,"club7","Arsenal",None)])
    with sqlite3.connect(d/"registry.sqlite") as db:
@@ -29,18 +30,20 @@ class SameEditionGameLeagueTests(unittest.TestCase):
       ("22","Rangers",13,50,"Scottish Premiership",1,"Scotland","1"),
       ("22","Rangers",13,52,"EFL Championship",2,"England","2"),
       ("22","Same Name",14,13,"Premier League",1,"England","1"),
+      ("22","Saint Mirren",16,50,"Scottish Premiership",1,"Scotland","1"),
       ("21","Arsenal",12,13,"Premier League",1,"England","1"),
       ("25","Manchester United",11,13,"Premier League",1,"England","1"),
       ("22","Southampton",15,0,"Rest of World",1,"England","1"),
      ])
    result=audit(d/"original.sqlite",d/"teams.csv",d/"out",d/"registry.sqlite")
-   self.assertEqual(result["new_game_home_leagues_not_previously_in_fixture_register"],1)
+   self.assertEqual(result["new_game_home_leagues_not_previously_in_fixture_register"],2)
+   self.assertEqual(result["source_game_name_controlled_alias"],1)
    self.assertEqual(result["previous_independent_fixture_evidence_corroborated"],1)
    self.assertEqual(result["ambiguous_source_or_game_names"],3)
-   self.assertEqual(result["unique_same_edition_name_domestic_league_matches"],2)
+   self.assertEqual(result["unique_same_edition_name_domestic_league_matches"],3)
    with (d/"out/FIFA_GAME_EDITION_EXACT_CLUB_DOMESTIC_LEAGUES.csv").open(encoding="utf-8-sig") as f:
     rows=list(csv.DictReader(f))
-   self.assertEqual({x["FIFA_Club_Key"] for x in rows},{"club1","club2"})
+   self.assertEqual({x["FIFA_Club_Key"] for x in rows},{"club1","club2","club8"})
    self.assertTrue(result["no_cross_year_inheritance"])
    self.assertFalse(result["modified_squads"])
    self.assertTrue(result["no_career_activation"])
