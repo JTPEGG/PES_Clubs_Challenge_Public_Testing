@@ -107,6 +107,19 @@ class HistoricalSquadTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 select_edition(conn,2025)
 
+    def test_female_and_male_sides_are_distinct_even_at_same_named_club(self):
+        from world_historical_club_squads import league_ref, gender_group
+        arsenal_m={"club":"Arsenal","league":"Premier League","gender":"Men's Football"}
+        arsenal_w={"club":"Arsenal","league":"Barclays WSL","gender":"Women's Football"}
+        self.assertEqual(gender_group(arsenal_m),"men")
+        self.assertEqual(gender_group(arsenal_w),"women")
+        self.assertNotEqual(club_ref(arsenal_m,2027),club_ref(arsenal_w,2027))
+        self.assertNotEqual(league_ref(arsenal_m,2027),league_ref(arsenal_w,2027))
+        # A borrowed cross-gender numeric club ID must not undo separation.
+        arsenal_m["club_team_id"]="999"
+        arsenal_w["club_team_id"]="999"
+        self.assertNotEqual(club_ref(arsenal_m,2027),club_ref(arsenal_w,2027))
+
     def test_sources_without_leagues_remain_unknown(self):
         from world_historical_club_squads import league_ref, source_club
         self.assertIsNone(league_ref({"club":"Liverpool"},2005))
