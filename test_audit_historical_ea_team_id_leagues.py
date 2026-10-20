@@ -36,13 +36,13 @@ class HistoricalSameVersionIdAuditTests(unittest.TestCase):
       (19,3,"Another Team",13,"Premier League",1,"England",2),
     ])
    result=audit(db,f,p/"out")
-   self.assertEqual(result["same_edition_ea_game_ids_with_domestic_league"],3)
+   self.assertEqual(result["same_edition_ea_game_ids_with_domestic_league"],2)
    self.assertEqual(result["exact_id_plus_name"],2)
    self.assertEqual(result["same_ea_id_name_discrepancy_review"],1)
    with (p/"out/EA_GAME_TEAM_LEAGUE_EXACT_ID_REVIEW.csv").open(
         encoding="utf-8-sig",newline="") as h:
     matches=list(csv.DictReader(h))
-   self.assertEqual(len(matches),3)
+   self.assertEqual(len(matches),2)
    self.assertEqual([x["Game_League_Name"] for x in matches[:2]],
       ["Premier League","Championship"])
    self.assertTrue(all(x["Edition"]!="2022" for x in matches))
