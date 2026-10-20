@@ -13,6 +13,9 @@ from world_preseason_window import window_snapshot
 
 def run(db_path,year):
     conn=sqlite3.connect(db_path)
+    # The web-app connection uses sqlite3.Row; the autonomous inbox returns
+    # dictionaries from rows, so this must match the real application.
+    conn.row_factory=sqlite3.Row
     conn.execute("PRAGMA foreign_keys=ON")
     ds=f"pes-v2-{year}-mens-01"
     club=conn.execute("""SELECT e.club_id FROM world_dataset_entries e
