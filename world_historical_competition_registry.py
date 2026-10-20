@@ -75,8 +75,21 @@ CREATE TABLE dated_movement_edges(edition INTEGER NOT NULL,lower TEXT NOT NULL,
 CREATE TABLE external_feeder_requirements(edition INTEGER NOT NULL,
   source_competition TEXT NOT NULL,destination TEXT NOT NULL,
   requirement TEXT NOT NULL,PRIMARY KEY(edition,source_competition,destination));
+CREATE TABLE season_versioned_rules(
+  edition INTEGER NOT NULL,lower TEXT NOT NULL,upper TEXT NOT NULL,
+  direct_promotions INTEGER NOT NULL,playoff_promotions INTEGER NOT NULL,
+  eligible_ranks TEXT NOT NULL,direct_relegations INTEGER NOT NULL,
+  evidence_url TEXT NOT NULL,source_status TEXT NOT NULL,
+  feeder_verified INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(edition,lower,upper));
+CREATE TABLE sourced_nonplayable_feeder_clubs(
+  edition INTEGER NOT NULL,competition_code TEXT NOT NULL,
+  club_name TEXT NOT NULL,tier INTEGER NOT NULL,
+  source_url TEXT NOT NULL,source_sha256 TEXT NOT NULL,
+  status TEXT NOT NULL,
+  PRIMARY KEY(edition,competition_code,club_name));
 """
-def collect(source,recent_dir,early_dir,graph_file,output):
+def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"HISTORICAL_COMPETITION_REGISTER.sqlite"
     if target.exists():raise FileExistsError("Do not overwrite a previous release")
@@ -171,6 +184,18 @@ def collect(source,recent_dir,early_dir,graph_file,output):
               else "unresolved")
         rows.append((y,key,name,label,kind,comp,conf,"blocked"))
         if comp:per_year[y]+=1
+    # Date-scoped rules remain separately distinguishable from verified
+    # full feeder pools. A National League fixture list is not a game squad.
+    from world_historical_movement_rules import EDITION_YEARS,source_rules
+    season_rules=[r for yr in EDITION_YEARS for r in source_rules(yr)]
+    feeder_clubs=[]
+    if feeder_dir is not None:
+        for row in csvrows(Path(feeder_dir)/"NATIONAL_LEAGUE_HISTORICAL_FEEDER_CLUBS.csv"):
+            yr=int(row["Edition"]);tier=int(row["Tier"])
+            if yr not in YEARS or tier!=5 or row["Competition_Code"]!="ENG:NL":
+                raise ValueError("Invalid source feeder division")
+            feeder_clubs.append((yr,row["Competition_Code"],row["Club"],
+                tier,row["Fixture_URL"],row["Source_SHA256"],row["Evidence_Status"]))
     graphs=json.loads(Path(graph_file).read_text())["graphs"]
     edges=[];boundaries=[]
     for stringyear,data in graphs.items():
@@ -197,6 +222,12 @@ def collect(source,recent_dir,early_dir,graph_file,output):
               sum(a==y for a,k,t in conflicts),0) for y in sorted(YEARS)))
         db.executemany("INSERT INTO dated_movement_edges VALUES (?,?,?,?,?,?,?,?)",edges)
         db.executemany("INSERT INTO external_feeder_requirements VALUES (?,?,?,?)",boundaries)
+        db.executemany("INSERT INTO season_versioned_rules VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ((r["edition"],r["lower"],r["upper"],r["direct_promotions"],
+             r["playoff_promotions"],r["playoff_entrants"],r["direct_relegations"],
+             r["evidence_url"],r["source_status"],0) for r in season_rules))
+        db.executemany("INSERT INTO sourced_nonplayable_feeder_clubs VALUES (?,?,?,?,?,?,?)",
+            feeder_clubs)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("SQLite integrity failure")
         if db.execute("PRAGMA foreign_key_check").fetchall():
@@ -225,14 +256,18 @@ def collect(source,recent_dir,early_dir,graph_file,output):
        "club_years_with_sourced_home_league_evidence":sum(per_year.values()),
        "club_years_unresolved":len(rows)-sum(per_year.values()),
        "disputed_club_years":len(conflicts),"dated_movement_edges_staged":len(edges),
-       "external_feeders_unverified":len(boundaries),"career_ready_editions":[],
+       "external_feeders_unverified":len(boundaries),
+       "season_versioned_rule_records":len(season_rules),
+       "historical_nonplayable_feeder_club_years":len(feeder_clubs),
+       "career_ready_editions":[],
        "comment":"Historical fixture data and provider league labels are evidence only. Complete country-wide feeders and all club assignments are NOT yet verified."}
     (out/"COMPETITION_REGISTRY_AUDIT.json").write_text(json.dumps(report,indent=2))
     return report
 
 if __name__=="__main__":
     p=argparse.ArgumentParser()
-    for x in ("source","recent-dir","early-dir","graph","output"):
+    for x in ("source","recent-dir","early-dir","graph","output","feeder-dir"):
         p.add_argument("--"+x,required=True)
     a=p.parse_args()
-    print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,a.output),indent=2))
+    print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,
+        a.output,feeder_dir=a.feeder_dir),indent=2))
