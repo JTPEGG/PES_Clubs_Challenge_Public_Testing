@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'world_historical_competition_registry.py'
+      - 'scripts/collect_historical_domestic_backfill.py'
       - 'data/warehouse/historical_club_identity_disambiguation_v1.json'
       - 'scripts/collect_legacy_multicountry_leagues.py'
       - 'world_historical_movement_rules.py'
@@ -61,6 +62,13 @@ jobs:
           run-id: 39457937149
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: supplement/
+      - name: Read 69 missing CC0 edition-specific league-seasons across Japan Brazil Turkey Mexico and Europe
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-BULK-PINNED-HISTORICAL-DOMESTIC-SOURCE-CLUB-RECOVERY
+          run-id: 39501058740
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: backfill/
       - name: Read pinned FC27 domestic and regional nonplayable fixture-member review
         uses: actions/download-artifact@v4
         with:
@@ -104,6 +112,7 @@ jobs:
             --graph topo/HISTORICAL_PROMOTION_RELEGATION_GRAPH.json \
             --feeder-dir feeders/ --legacy-multicountry-dir legacy/ \
             --supplement-dir supplement/ \
+            --backfill-dir backfill/ \
             --current-edition-dir current2027/ \
             --fa-allocations-dir fa-official/ \
             --official-mls-dir official-mls/ \
@@ -120,7 +129,7 @@ jobs:
           movement=json.loads((d/'SEASON_VERSIONED_MOVEMENT_RULES_AUDIT.json').read_text())
           assert summary['source_clubs']==13104
           assert summary['source_years']==22
-          assert summary['historical_domestic_league_seasons']==367
+          assert summary['historical_domestic_league_seasons']==436
           assert summary['current_edition_third_party_snapshot_memberships']==328
           assert summary['current_edition_source_feeder_entries']==72
           assert summary['official_fa_2027_allocations_crosschecked']==72
@@ -128,7 +137,8 @@ jobs:
           assert summary['official_2026_non_pyramid_league_formats']==1
           assert summary['exact_matches']>=2800
           assert summary['normalized_alias_candidates']>=700
-          assert summary['independent_domestic_fixture_club_years']==7073
+          assert summary['independent_domestic_fixture_club_years']==8339
+          assert summary['new_pinned_backfill_source_memberships']==1266
           assert summary['source_identity_country_guards']==2
           assert summary['curated_named_groups_with_independent_fixture_count']>=0
           assert summary['source_club_country_count']>=19
@@ -155,7 +165,7 @@ jobs:
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules').fetchone()[0]==128
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules WHERE feeder_verified!=0').fetchone()[0]==0
               assert db.execute('SELECT COUNT(*) FROM edition_club_competitions WHERE group_type=?',('continental_cup_bucket',)).fetchone()[0]==40
-          print('SUCCESS 22 years / 367 domestic league seasons: 13,104 source clubs, NO unverified ready careers')
+          print('SUCCESS 22 years / 436 domestic league seasons: 13,104 source clubs, NO unverified ready careers')
           print(json.dumps(summary,indent=2))
           PY
       - name: Upload evidence SQLite and season-to-season movement documentation
