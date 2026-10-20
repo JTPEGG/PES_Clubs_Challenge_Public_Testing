@@ -30,6 +30,18 @@ TEXT_FAMILIES=(
  ("br.1","Brazil",1,"Série A","south","brazil/{year}_br1.txt","calendar"),
  ("tr.1","Turkey",1,"Süper Lig","europe","turkey/{season}_tr1.txt","season"),
  ("co.1","Colombia",1,"Primera A","south","colombia/{year}_co1.txt","calendar"),
+ ("nl.1","Netherlands",1,"Eredivisie","europe","netherlands/{season}_nl1.txt","season"),
+ ("pt.1","Portugal",1,"Primeira Liga","europe","portugal/{season}_pt1.txt","season"),
+ ("sco.1","Scotland",1,"Scottish Premiership","europe","scotland/{season}_sco1.txt","season"),
+ ("gr.1","Greece",1,"Super League","europe","greece/{season}_gr1.txt","season"),
+ ("ch.1","Switzerland",1,"Super League","europe","switzerland/{season}_ch1.txt","season"),
+ ("ru.1","Russia",1,"Premier League","europe","russia/{season}_ru1.txt","season"),
+ ("ie.1","Ireland",1,"Premier Division","europe","ireland/{year}_ie1.txt","calendar"),
+ ("se.1","Sweden",1,"Allsvenskan","europe","sweden/{year}_se1.txt","calendar"),
+ ("no.1","Norway",1,"Eliteserien","europe","norway/{year}_no1.txt","calendar"),
+ ("cz.1","Czech Republic",1,"First League","europe","czech-republic/{season}_cz1.txt","season"),
+ ("il.1","Israel",1,"Premier League","world","asia/israel/{season}_il1.txt","season"),
+ ("sa.1","Saudi Arabia",1,"Saudi Pro League","world","asia/saudi-arabia/{season}_sa1.txt","season"),
 )
 # FIFA 2005-2010 legacy already collected; 2011-2019 independent season
 # CSVs may fill gaps where the original JSON export has no league.
@@ -50,7 +62,7 @@ def source_targets(edition,already):
     year=edition-1
     out=[]
     for code,country,tier,name,repo,pattern,mapping in TEXT_FAMILIES:
-        if (edition,code) not in already and edition>=2011:
+        if (edition,code) not in already and edition>=2011 and (edition>=2020 or code not in {"nl.1","pt.1"}):
             url=REPOS[repo]+"/"+pattern.format(season=season,year=year)
             out.append((edition,str(year) if mapping=="calendar" else season,
                         code,country,tier,name,url,"footballtxt"))
