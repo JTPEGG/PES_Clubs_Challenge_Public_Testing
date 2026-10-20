@@ -61,6 +61,14 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM starting_source_loans WHERE parent_status='resolved' AND resolved_parent_club_key=borrower_club_key").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM starting_source_loans l JOIN players p ON l.player_key=p.player_key WHERE p.club_key!=l.borrower_club_key").fetchone()[0]==0
               assert db.execute('SELECT COUNT(*) FROM players WHERE edition=2025').fetchone()[0]==0
+              # Regression guards against bad FIFAIndex monetary units making
+              # low-tier historical players earn modern superstar wages.
+              for year,max_median in (('2005',6000),('2012',12000),
+                                      ('2014',12000),('2015',12000)):
+                  assert j['yearly'][year]['median_simulated_weekly_wage']<max_median
+              assert j['totals']['loan_resolved']>=10000
+              assert j['totals']['source_valid_wages']>150000
+              assert j['totals']['players']==317449
               print('VALIDATED MENS ONLY SALARY, CONTRACT AND SOURCE LOAN MODELS')
               print(json.dumps(j['totals'],indent=2))
               for year in ('2005','2012','2015','2020','2026','2027'):
