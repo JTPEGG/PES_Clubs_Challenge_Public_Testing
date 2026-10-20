@@ -107,18 +107,73 @@ class HistoricalSquadTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 select_edition(conn,2025)
 
-    def test_female_and_male_sides_are_distinct_even_at_same_named_club(self):
-        from world_historical_club_squads import league_ref, gender_group
-        arsenal_m={"club":"Arsenal","league":"Premier League","gender":"Men's Football"}
-        arsenal_w={"club":"Arsenal","league":"Barclays WSL","gender":"Women's Football"}
-        self.assertEqual(gender_group(arsenal_m),"men")
-        self.assertEqual(gender_group(arsenal_w),"women")
-        self.assertNotEqual(club_ref(arsenal_m,2027),club_ref(arsenal_w,2027))
-        self.assertNotEqual(league_ref(arsenal_m,2027),league_ref(arsenal_w,2027))
-        # A borrowed cross-gender numeric club ID must not undo separation.
-        arsenal_m["club_team_id"]="999"
-        arsenal_w["club_team_id"]="999"
-        self.assertNotEqual(club_ref(arsenal_m,2027),club_ref(arsenal_w,2027))
+    def test_mens_only_source_filter_handles_gender_teams_and_leagues(self):
+        from world_historical_club_squads import is_womens_source_row
+        self.assertFalse(is_womens_source_row(
+            {"club":"Arsenal","league":"Premier League","gender":"Men's Football"}))
+        self.assertFalse(is_womens_source_row(
+            {"club":"Arsenal","league":"Premier League"}))
+        self.assertTrue(is_womens_source_row(
+            {"club":"Arsenal","league":"Barclays WSL","gender":"Women's Football"}))
+        self.assertTrue(is_womens_source_row({"club":"Arsenal Women"}))
+        self.assertTrue(is_womens_source_row({"club":"Portland Thorns","league":"NWSL"}))
+        self.assertTrue(is_womens_source_row({"club":"Bayern","league":"Frauen Bundesliga"}))
+
+    def test_excluded_womens_players_do_not_create_clubs_leagues_or_free_agents(self):
+        from world_historical_club_squads import is_womens_source_row
+        year=2027
+        rows=[
+            {"player_id":"21","club_name":"Arsenal","club_team_id":"1",
+             "league_name":"Premier League","gender":"Men's Football","name":"Male Player"},
+            {"player_id":"22","club_name":"Arsenal","club_team_id":"1",
+             "league_name":"Barclays WSL","gender":"Women's Football","name":"Female Player"},
+            {"player_id":"23","club_name":"Free Agents","club_team_id":"",
+             "league_name":"NWSL","gender":"Women's Football","name":"Free Female"},
+            {"player_id":"24","club_name":"Brighton","club_team_id":"8",
+             "league_name":"Premier League","gender":"Men's Football","name":"Another Male"},
+        ]
+        self.assertEqual(sum(map(is_womens_source_row,rows)),2)
+        provider="test/pinned-source"
+        converted=[]
+        for row in rows:
+            converted.append({
+                "source_edition":year,"source_player_id":row["player_id"],
+                "player_name":row["name"],"source_provider":provider,
+                "source_club":row["club_name"],
+                "namespaced_source_player_key":f"{year}:{provider}:{row['player_id']}",
+                "identity_dob":"1999-04-12","source_nationality":"England",
+                "source_preferred_foot":"Right","source_height_cm":"180",
+                "source_weight_kg":"75","source_overall":"78",
+                "primary_position":"CMF","alternative_positions":"[]",
+                "position_fit_indices":'{"CMF":{"value":72}}',
+                **{stat:75 for stat in ATTRS},**{stat:2 for stat in AUX}
+            })
+        with tempfile.TemporaryDirectory() as path:
+            base=Path(path)
+            with ZipFile(base/"source.zip","w") as z:
+                z.writestr("data/2027_mixed.csv",csvdata(rows))
+            with ZipFile(base/"ratings.zip","w") as z:
+                z.writestr("PES2020_v2/2027_FIFA_to_PES2020_Complete.csv",
+                           csvdata(converted))
+            import hashlib
+            digest=hashlib.sha256(csvdata(rows).encode("utf-8")).hexdigest()
+            conn=sqlite3.connect(":memory:")
+            conn.executescript(SCHEMA)
+            with ZipFile(base/"source.zip") as source,ZipFile(base/"ratings.zip") as ratings:
+                result=process_ed(conn,source,ratings,year,{
+                    "sha256":digest,"player_rows":4,"catalog_source":provider
+                },{"converted_players":4},"data/2027_mixed.csv")
+            self.assertEqual(result["source_player_rows"],4)
+            self.assertEqual(result["excluded_womens_rows"],2)
+            self.assertEqual(result["players"],2)
+            self.assertEqual(result["clubs"],2)
+            self.assertEqual(result["free_agent_rows"],0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM players").fetchone()[0],2)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM clubs").fetchone()[0],2)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM leagues").fetchone()[0],1)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM players WHERE gender='women'").fetchone()[0],0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM clubs WHERE gender='women'").fetchone()[0],0)
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM leagues WHERE gender='women'").fetchone()[0],0)
 
     def test_homonymous_clubs_differ_by_source_league_without_id(self):
         portugal={"club":"Nacional","league":"Liga Portugal","gender":"Men's Football"}
