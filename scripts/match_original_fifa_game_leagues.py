@@ -37,6 +37,10 @@ def audit(original_database,source_csv,output,registry_db=None):
         by_edition[y]+=1
         originals[(y,canonical(name))].append((y,key,name,group))
     source_by_name=defaultdict(list)
+    source_by_alias=defaultdict(list)
+    original_aliases=defaultdict(list)
+    for y,key,name,group in clubs:
+        if y in COVERED:original_aliases[(y,alias_key(name))].append(key)
     read_count=Counter()
     with open(source_csv,encoding="utf-8-sig",newline="") as h:
         rd=csv.DictReader(h)
@@ -57,11 +61,11 @@ def audit(original_database,source_csv,output,registry_db=None):
                    str(row.get("nationality_name") or "").strip(),
                    str(row.get("fifa_update") or "").strip())
             source_by_name[(y,canonical(name))].append(datum)
+            source_by_alias[(y,alias_key(name))].append(datum)
             read_count[y]+=1
     passed=[];reviews=[];count=Counter()
     for (edition,canon),records in sorted(originals.items()):
         src=source_by_name.get((edition,canon),[])
-        if not src:continue
         if len(records)!=1:
             for _,key,name,group in records:
                 reviews.append((edition,key,name,group,"","","","",0,"",0,
@@ -69,6 +73,14 @@ def audit(original_database,source_csv,output,registry_db=None):
             count["original_name_collisions"]+=len(records)
             continue
         y,key,name,group=records[0]
+        method="unique_same_edition_exact_name"
+        if not src:
+            new_key=alias_key(name)
+            if len(original_aliases[(edition,new_key)])!=1:
+                count["controlled_alias_game_name_collision"]+=1
+                continue
+            src=source_by_alias.get((edition,new_key),[])
+            method="unique_same_edition_controlled_alias"
         if not src:continue
         team_ids={x[0] for x in src}
         identities={(x[0],x[2],x[3],x[4],x[5]) for x in src}
@@ -83,8 +95,10 @@ def audit(original_database,source_csv,output,registry_db=None):
         status=("previous_fixture_evidence_corroborated" if (edition,key) in linked
                 else "game_edition_home_league_identified")
         passed.append((edition,key,name,group,team_id,game_name,league_id,
-                       league_name,level,country,len(src),"unique_same_edition_exact_name",
+                       league_name,level,country,len(src),method,
                        status,"historical_game_team_league_evidence_not_full_pyramid"))
+        if method=="unique_same_edition_controlled_alias":
+            count["source_game_name_controlled_alias"]+=1
         count[status]+=1
     seen={(r[0],r[1]) for r in passed}
     def dump(path,rows):
@@ -104,6 +118,7 @@ def audit(original_database,source_csv,output,registry_db=None):
       "previous_independent_fixture_evidence_corroborated":
          count["previous_fixture_evidence_corroborated"],
       "ambiguous_source_or_game_names":len(reviews),
+      "source_game_name_controlled_alias":count["source_game_name_controlled_alias"],
       "per_edition_matching":dict(Counter(str(x[0]) for x in passed)),
       "game_clubs_with_no_exact_game_team_name":sum(by_edition.values())-len(seen)-len(reviews),
       "no_game_team_id_only_joins":True,"no_cross_year_inheritance":True,
