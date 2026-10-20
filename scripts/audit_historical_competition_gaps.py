@@ -84,7 +84,7 @@ def audit(source_database, register_database, output, *, strict=True,
         if payload.get("version")!="historical-club-identity-disambiguation-v1":
             raise ValueError("Unrecognised historical club identity ledger")
         for row in payload["entries"]:
-            if row["domestic_competition_status"]!="requires_independent_uruguayan_home_league_source":
+            if row["domestic_competition_status"]!="requires_independent_home_league_source":
                 raise ValueError("Identity ledger cannot assign a domestic league")
             if not str(row["evidence_url"]).startswith("https://"):
                 raise ValueError("Identity record has no independently reviewable evidence")
