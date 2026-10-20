@@ -1,0 +1,94 @@
+name: PES V2 consolidated 22-year historical competition registry
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_competition_registry.py'
+      - 'world_historical_movement_rules.py'
+      - 'test_world_historical_competition_registry.py'
+      - '.github/workflows/fifa-pes-v2-consolidated-competition-registry.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: historical-consolidated-competition-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  audit-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify 22 season rules and no cup/pyramid identity guessing
+        run: python -m unittest -v test_world_historical_competition_registry
+      - name: Read pinned immutable FIFA/PES V2 clubs and source leagues
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Read 2010-11 onward independent fixture membership data
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-DOMESTIC-LEAGUE-MEMBERSHIP-EVIDENCE-2011-2027
+          run-id: 39443264830
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: recent/
+      - name: Read pinned 2004-05 through 2009-10 English fixture data
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-ENGLAND-2005-2010-HISTORICAL-DOMESTIC-COMPETITION-MEMBERSHIPS
+          run-id: 39443877744
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: early/
+      - name: Read audited dated England Germany Spain competition topology
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-GRAPH-AND-UNRESOLVED-MEMBERSHIP-AUDIT
+          run-id: 39442462702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: topo/
+      - name: Produce single history-wide immutable competition evidence register
+        run: |
+          python -u -m world_historical_competition_registry \
+            --source input/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --recent-dir recent/ --early-dir early/ \
+            --graph topo/HISTORICAL_PROMOTION_RELEGATION_GRAPH.json \
+            --output release/
+          python -m world_historical_movement_rules --output release/
+      - name: Fail closed until all teams and promotion feeders are proved
+        run: |
+          python - <<'PY'
+          import sqlite3,json,csv
+          from pathlib import Path
+          d=Path('release')
+          summary=json.loads((d/'COMPETITION_REGISTRY_AUDIT.json').read_text())
+          movement=json.loads((d/'SEASON_VERSIONED_MOVEMENT_RULES_AUDIT.json').read_text())
+          assert summary['source_clubs']==13104
+          assert summary['source_years']==22
+          assert summary['historical_domestic_league_seasons']==176
+          assert summary['exact_matches']==2029
+          assert summary['normalized_alias_candidates']>=700
+          assert not summary['career_ready_editions']
+          assert movement['editions']==22
+          assert movement['movement_rule_records']==128
+          with sqlite3.connect(d/'HISTORICAL_COMPETITION_REGISTER.sqlite') as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM edition_club_competitions').fetchone()[0]==13104
+              assert db.execute('SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM edition_club_competitions WHERE group_type=?',('continental_cup_bucket',)).fetchone()[0]==40
+          print('SUCCESS 22 years audited: 13,104 source clubs, NO unverified ready careers')
+          print(json.dumps(summary,indent=2))
+          PY
+      - name: Upload evidence SQLite and season-to-season movement documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
