@@ -23,6 +23,8 @@ def run(db_path,year):
     cid=club[0];career=f"live_historical_{year}_ci"
     from world_career_transfer_protocol import initialize_transfer_protocol
     initialize_transfer_protocol(conn)
+    from world_career_incoming import initialize_incoming_approaches
+    initialize_incoming_approaches(conn)
     initialise_live_market(conn)
     start_sandbox(conn,career_id=career,dataset_id=ds,
         title=f"Sandbox FIFA {year} autonomous market validation",manager_club_id=cid,
