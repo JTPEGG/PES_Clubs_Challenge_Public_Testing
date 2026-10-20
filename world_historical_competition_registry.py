@@ -130,6 +130,13 @@ CREATE TABLE sourced_domestic_league_clubs(
   verification TEXT NOT NULL CHECK(verification IN ('independent_fixture_membership',
       'pinned_third_party_snapshot_review')),
   PRIMARY KEY(edition,competition_code,club_name));
+CREATE TABLE official_fa_nls_allocations(
+  edition INTEGER NOT NULL,competition_code TEXT NOT NULL
+  REFERENCES competition_seasons(code),step INTEGER NOT NULL,
+  club_name TEXT NOT NULL,source_url TEXT NOT NULL,
+  allocation_as_at TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status='fa_official_allocation_crosschecked'),
+  PRIMARY KEY(edition,competition_code,club_name));
 CREATE TABLE sourced_nonplayable_feeder_clubs(
   edition INTEGER NOT NULL,competition_code TEXT NOT NULL,
   club_name TEXT NOT NULL,tier INTEGER NOT NULL,
@@ -139,7 +146,8 @@ CREATE TABLE sourced_nonplayable_feeder_clubs(
 """
 def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
             legacy_multicountry_dir=None,supplement_dir=None,
-            identity_review_file=None,current_edition_dir=None):
+            identity_review_file=None,current_edition_dir=None,
+            fa_allocations_dir=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"HISTORICAL_COMPETITION_REGISTER.sqlite"
     if target.exists():raise FileExistsError("Do not overwrite a previous release")
@@ -418,6 +426,23 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
     # full feeder pools. A National League fixture list is not a game squad.
     from world_historical_movement_rules import EDITION_YEARS,source_rules
     season_rules=[r for yr in EDITION_YEARS for r in source_rules(yr)]
+    official_fa_clubs=[]
+    if fa_allocations_dir is not None:
+        for row in csvrows(Path(fa_allocations_dir)/
+                            "FA_NLS_2027_OFFICIAL_ALLOCATION_CROSSCHECK.csv"):
+            y=int(row["Edition"]);code=row["Competition_Code"]
+            if (y!=2027 or code not in comps or
+                row["Status"]!="fixture_name_corroborates_FA_division"
+                or row["FA_Source_URL"].startswith("https://www.thefa.com/") is False
+                or row["Allocation_As_At"]!="2026-05-14"):
+                raise ValueError("Unverified official FA allocation fixture review")
+            if comps[code][1]!="England" or comps[code][2]!=int(row["Step"])+4:
+                raise ValueError("Invalid FA National League pyramid step/tier")
+            official_fa_clubs.append((y,code,int(row["Step"]),
+                  row["Official_Club"],row["FA_Source_URL"],row["Allocation_As_At"],
+                  "fa_official_allocation_crosschecked"))
+        if len(official_fa_clubs)!=72 or len({x[1] for x in official_fa_clubs})!=3:
+            raise ValueError("Incomplete 72-team official National League allocation evidence")
     feeder_clubs=[]
     if current_edition_dir is not None:
         # This distinct tier-5/6 source pool does NOT certify movement routes.
@@ -471,6 +496,8 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
              r["evidence_url"],r["source_status"],0) for r in season_rules))
         db.executemany("INSERT INTO sourced_domestic_league_clubs VALUES (?,?,?,?,?,?)",
             source_clubs.values())
+        db.executemany("INSERT INTO official_fa_nls_allocations VALUES (?,?,?,?,?,?,?)",
+            official_fa_clubs)
         db.executemany("INSERT INTO sourced_nonplayable_feeder_clubs VALUES (?,?,?,?,?,?,?)",
             feeder_clubs)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
@@ -509,6 +536,7 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
        "historical_nonplayable_feeder_club_years":len(feeder_clubs),
        "current_edition_third_party_snapshot_memberships":snapshot_member_count,
        "current_edition_source_feeder_entries":sum(x[0]==2027 for x in feeder_clubs),
+       "official_fa_2027_allocations_crosschecked":len(official_fa_clubs),
        "independent_domestic_fixture_club_years":len(source_clubs),
        "source_club_country_count":len({v[1] for v in comps.values()}),
        "career_ready_editions":[],
@@ -524,10 +552,12 @@ if __name__=="__main__":
     p.add_argument("--supplement-dir")
     p.add_argument("--identity-review")
     p.add_argument("--current-edition-dir")
+    p.add_argument("--fa-allocations-dir")
     a=p.parse_args()
     print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,
         a.output,feeder_dir=a.feeder_dir,
         legacy_multicountry_dir=a.legacy_multicountry_dir,
         supplement_dir=a.supplement_dir,
         identity_review_file=a.identity_review,
-        current_edition_dir=a.current_edition_dir),indent=2))
+        current_edition_dir=a.current_edition_dir,
+        fa_allocations_dir=a.fa_allocations_dir),indent=2))
