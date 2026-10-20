@@ -26,6 +26,18 @@ class OpenFootballCompetitionTests(unittest.TestCase):
   self.assertIsNone(match_club("Man United",idx))
   idx[namekey("Manchester United")].append(("collision","Manchester United"))
   self.assertIsNone(match_club("Manchester United",idx))
+ def test_additional_countries_are_not_cup_groups(self):
+  # Same immutable source, broader verified country coverage.
+  self.assertEqual(len(LEAGUES),34)
+  for code,country in (
+      ("sco.1","Scotland"),("nl.1","Netherlands"),
+      ("pt.1","Portugal"),("tr.1","Turkey"),
+      ("mx.1","Mexico"),("au.1","Australia"),
+      ("ar.1","Argentina"),("at.2","Austria")):
+   self.assertEqual(LEAGUES[code][0],country)
+  self.assertEqual(LEAGUES["ru.2"][1],2)
+  self.assertEqual(LEAGUES["ch.2"][1],2)
+  self.assertFalse(any(".cup" in code or "uefa" in code for code in LEAGUES))
  def test_invalid_source_payload_is_blocked(self):
   with self.assertRaises(ValueError):matches_to_teams({"teams":[]})
 
