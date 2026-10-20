@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'world_historical_career_import.py'
+      - 'world_historical_career_setup_ui.py'
+      - 'test_world_historical_career_setup_ui.py'
       - 'test_world_historical_career_import.py'
       - '.github/workflows/fifa-pes-v2-historical-career-integration.yml'
 permissions:
@@ -28,7 +30,7 @@ jobs:
       - name: Install existing sandbox web dependencies
         run: python -m pip install Flask==3.0.3
       - name: Test unsupported early years and dataset setup invariants
-        run: python -m unittest -v test_world_historical_career_import
+        run: python -m unittest -v test_world_historical_career_import test_world_historical_career_setup_ui
       - name: Download approved original 22-season mens' wages/loans
         uses: actions/download-artifact@v4
         with:
