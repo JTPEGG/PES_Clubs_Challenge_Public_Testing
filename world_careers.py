@@ -1033,6 +1033,17 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
     initialize_progression(conn)
     buyer_profile=current_career_appeal(conn,career_id,row[1])
     seller_profile=current_career_appeal(conn,career_id,row[2])
+    # The pre-existing English-only sporting model has no entries for FIFA26
+    # or FC27 historical source competition codes. Without an explicit
+    # historical fallback it vetoes every AI player-agent conversation.
+    # Apply only to historical opt-in worlds, not existing live careers.
+    from world_historical_career_finances import is_historical_finance_career
+    if is_historical_finance_career(conn,career_id):
+        from world_historical_career_appeal import historical_club_appeal
+        buyer_profile=(buyer_profile or historical_club_appeal(
+            conn,career_id=career_id,club_id=row[1]))
+        seller_profile=(seller_profile or historical_club_appeal(
+            conn,career_id=career_id,club_id=row[2]))
     tiers=dict(conn.execute("SELECT competition_id,tier FROM world_competitions").fetchall())
     buyer=tiers.get(buyer_profile["competition_id"]) if buyer_profile else None
     seller=tiers.get(seller_profile["competition_id"]) if seller_profile else None
