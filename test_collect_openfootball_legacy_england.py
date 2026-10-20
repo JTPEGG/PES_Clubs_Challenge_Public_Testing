@@ -6,7 +6,9 @@ class LegacyEnglandCompetitionTests(unittest.TestCase):
   rows="= English Premier League 2004/05\n# Teams 20\n▪ Matchday 1\nSat Aug 14\n"
   rows+="  12:45  Tottenham Hotspur        1-1 (1-1)  Liverpool FC\n"
   rows+="  15:00  Aston Villa              2-0 (2-0)  Southampton FC\n"
-  rows+="         Newcastle United         2-1 (1-1)  Everton FC\n"\n  rows+="         Arsenal FC               2-1 (1-1)  West Ham United\n"\n  rows+=("         Blackburn Rovers         1-1 (1-1)  Manchester City\n"*60)
+  rows+="         Newcastle United         2-1 (1-1)  Everton FC\n"
+  rows+="         Arsenal FC               2-1 (1-1)  West Ham United\n"
+  rows+=("         Blackburn Rovers         1-1 (1-1)  Manchester City\n"*60)
   clubs,num,results=teams_from_text(rows)
   self.assertEqual(num,20)
   self.assertIn("Liverpool FC",clubs)
