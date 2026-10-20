@@ -1,0 +1,67 @@
+name: PES V2 22-edition source-plus-FC26 original game league database
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_fc26_game_overlay.py'
+      - 'test_world_historical_fc26_game_overlay.py'
+      - '.github/workflows/fifa-pes-v2-integrate-fc26-game-leagues.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download source-reviewed 22-edition historical game and fixture league evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-GAME-AND-11-EUROPEAN-2009-16-LEAGUE-EVIDENCE
+          run-id: 39506787823
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Download matched authentic FC26 original game club league IDs
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-2026-GAME-BINARY-TEAM-LEAGUE-MEMBERSHIPS-CROSSWALK
+          run-id: 39507150616
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: game/
+      - name: Construct non-destructive original FC26 game league overlay
+        run: |
+          python -u -m world_historical_fc26_game_overlay \
+            --registry input/HISTORICAL_COMPETITION_REGISTER_WITH_EUROPEAN_SOURCE_LEAGUES.sqlite \
+            --source game/FC26_ORIGINAL_GAME_CLUB_LEAGUES.csv \
+            --output release/
+      - name: Validate all source clubs, unique FC26 assignments, careers remain disabled
+        run: |
+          python - <<'PY'
+          import sqlite3,json
+          from pathlib import Path
+          p=Path("release")
+          d=json.loads((p/"COMPLETE_22_EDITION_FC26_GAME_LEAGUE_AUDIT.json").read_text())
+          assert d["original_22_edition_game_clubs"]==13104
+          assert d["previous_club_seasons_with_home_league_evidence"]==8544
+          assert d["fc26_source_game_name_links"]==499
+          assert d["new_fc26_original_game_home_leagues"]==128
+          assert d["combined_club_seasons_with_starting_league_evidence"]==8672
+          assert d["original_game_club_seasons_remaining_unresolved"]==4432
+          assert d["career_ready_editions"]==0 and d["original_squads_untouched"]
+          with sqlite3.connect(p/"HISTORICAL_COMPETITION_REGISTER_22_EDITION_FC26_EXTENDED.sqlite") as db:
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("SELECT COUNT(*) FROM full_historical_club_starting_leagues").fetchone()[0]==13104
+              assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready!=0").fetchone()[0]==0
+          print(json.dumps(d,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-CLUB-LEAGUE-RECOVERY-FC26
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
