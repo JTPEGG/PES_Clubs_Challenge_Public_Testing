@@ -1,0 +1,39 @@
+name: PES V2 FC26 original bundled game team league probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fifa-pes-v2-fc26-game-league-probe.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read pinned public FC26 binary decoder and original database templates
+        run: |
+          git clone --quiet --filter=blob:none https://github.com/ViniMacacari/api-eafc-files.git source-decoder
+          cd source-decoder
+          git checkout --quiet 7592f1734afff43d7dbc7161565732e9ba3d28bc
+          npm ci --ignore-scripts --quiet
+          npm run build
+      - name: Inspect real FC26 teams and their original game league fields
+        run: |
+          cd source-decoder
+          node --input-type=module - <<'JS'
+          import {readTemplateDatabase} from './dist/index.js';
+          const x=await readTemplateDatabase({version:'FC 26',tables:['teams','leagues','leagueteamlinks']});
+          const tables=x.databases.flatMap(db=>db.tables);
+          for(const t of tables){
+            console.log('FC26_TABLE',t.name,t.records.length,
+              'COLUMNS',JSON.stringify(Object.keys(t.records[0]??{}).slice(0,80)));
+            console.log('FC26_EXAMPLE',JSON.stringify(t.records.slice(0,2)).slice(0,2500));
+          }
+          if(!tables.some(t=>t.name==='teams'&&t.records.length>100))
+             throw Error('No usable genuine game team records');
+          JS
