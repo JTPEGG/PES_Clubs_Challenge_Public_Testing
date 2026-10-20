@@ -58,7 +58,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: PES-V2-PINNED-ENGLISH-MLS-ARGENTINA-HISTORIC-DOMESTIC-MEMBERSHIPS
-          run-id: 39456711979
+          run-id: 39457937149
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: supplement/
       - name: Read sourced historical fifth-tier National League feeder clubs
@@ -96,10 +96,10 @@ jobs:
           movement=json.loads((d/'SEASON_VERSIONED_MOVEMENT_RULES_AUDIT.json').read_text())
           assert summary['source_clubs']==13104
           assert summary['source_years']==22
-          assert summary['historical_domestic_league_seasons']==341
+          assert summary['historical_domestic_league_seasons']==351
           assert summary['exact_matches']>=2800
           assert summary['normalized_alias_candidates']>=700
-          assert summary['independent_domestic_fixture_club_years']==6539
+          assert summary['independent_domestic_fixture_club_years']==6745
           assert summary['source_identity_country_guards']==2
           assert summary['curated_named_groups_with_independent_fixture_count']>=0
           assert summary['source_club_country_count']>=19
@@ -119,7 +119,7 @@ jobs:
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules').fetchone()[0]==128
               assert db.execute('SELECT COUNT(*) FROM season_versioned_rules WHERE feeder_verified!=0').fetchone()[0]==0
               assert db.execute('SELECT COUNT(*) FROM edition_club_competitions WHERE group_type=?',('continental_cup_bucket',)).fetchone()[0]==40
-          print('SUCCESS 22 years / 341 domestic league seasons: 13,104 source clubs, NO unverified ready careers')
+          print('SUCCESS 22 years / 351 domestic league seasons: 13,104 source clubs, NO unverified ready careers')
           print(json.dumps(summary,indent=2))
           PY
       - name: Upload evidence SQLite and season-to-season movement documentation
