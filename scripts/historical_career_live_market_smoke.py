@@ -21,6 +21,8 @@ def run(db_path,year):
        HAVING COUNT(r.player_id)>=20 ORDER BY e.club_id LIMIT 1""",(ds,)).fetchone()
     if club is None:raise ValueError("No managed club with a complete source squad")
     cid=club[0];career=f"live_historical_{year}_ci"
+    from world_career_transfer_protocol import initialize_transfer_protocol
+    initialize_transfer_protocol(conn)
     initialise_live_market(conn)
     start_sandbox(conn,career_id=career,dataset_id=ds,
         title=f"Sandbox FIFA {year} autonomous market validation",manager_club_id=cid,
