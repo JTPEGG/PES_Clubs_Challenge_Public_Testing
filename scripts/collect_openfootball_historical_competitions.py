@@ -30,6 +30,30 @@ LEAGUES={
 "it.2":("Italy",2,"Serie B"),
 "fr.1":("France",1,"Ligue 1"),
 "fr.2":("France",2,"Ligue 2"),
+# Additional pinned domestic sources. Availability varies by season; a 404
+# is recorded as a missing *source*, never imputed from a later season.
+# Cup files (at.cup, uefa.cl, etc.) are deliberately excluded.
+"ar.1":("Argentina",1,"Primera División"),
+"at.1":("Austria",1,"Bundesliga"),
+"at.2":("Austria",2,"2. Liga"),
+"au.1":("Australia",1,"A-League Men"),
+"be.1":("Belgium",1,"Belgian Pro League"),
+"ch.1":("Switzerland",1,"Swiss Super League"),
+"ch.2":("Switzerland",2,"Swiss Challenge League"),
+"cz.1":("Czech Republic",1,"Czech First League"),
+"dz.1":("Algeria",1,"Algerian Ligue 1"),
+"eg.1":("Egypt",1,"Egyptian Premier League"),
+"gr.1":("Greece",1,"Super League Greece"),
+"hu.1":("Hungary",1,"Nemzeti Bajnokság I"),
+"ma.1":("Morocco",1,"Botola Pro"),
+"mx.1":("Mexico",1,"Liga MX"),
+"nl.1":("Netherlands",1,"Eredivisie"),
+"pt.1":("Portugal",1,"Primeira Liga"),
+"ru.1":("Russia",1,"Russian Premier League"),
+"ru.2":("Russia",2,"Russian First League"),
+"sco.1":("Scotland",1,"Scottish Premiership"),
+"tr.1":("Turkey",1,"Süper Lig"),
+"tr.2":("Turkey",2,"TFF First League"),
 }
 def namekey(name):
     return "".join(x for x in unicodedata.normalize("NFKD",str(name)).casefold()
