@@ -31,11 +31,11 @@ jobs:
           run-id: 39409971210
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: input/
-      - name: Read latest verified 367-season competition evidence registry
+      - name: Read latest verified 436-season source-backed historical competition registry
         uses: actions/download-artifact@v4
         with:
           name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
-          run-id: 39467266710
+          run-id: 39501180151
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: input/
       - name: Produce fully enumerated source identity and country review backlog
@@ -54,10 +54,10 @@ jobs:
           report=json.loads((d/'HISTORICAL_COMPETITION_GAP_AUDIT.json').read_text())
           assert report['source_clubs']==13104
           assert report['editions']==22
-          assert report['independent_league_seasons']==367
-          assert report['unresolved']==7877
-          assert report['linked_provisional_evidence']==5227
-          assert report['alias_identity_review']==1241
+          assert report['independent_league_seasons']==436
+          assert report['unresolved']==7244
+          assert report['linked_provisional_evidence']==5860
+          assert report['alias_identity_review']==1382
           assert report['uncrosswalked_name_candidates']==0
           assert report['game_id_disambiguations']==2
           assert sum(report['reasons_unresolved'].values())==7877
