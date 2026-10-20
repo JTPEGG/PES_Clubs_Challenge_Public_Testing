@@ -190,6 +190,6 @@ if __name__=="__main__":
         "FC25_excluded":True,
         "cross_provider_matches":{
             k:v["unique_name_dob_nationality_candidate_matches"]
-            for k,v in result["provider_crosswalk_quality_review"].items(),
+            for k,v in result["provider_crosswalk_quality_review"].items()
         }
     }),flush=True)
