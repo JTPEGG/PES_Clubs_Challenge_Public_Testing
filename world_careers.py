@@ -243,6 +243,12 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
             (career_id,dataset_id))
         from world_career_lifecycle import seed_career_contracts
         seed_career_contracts(conn,career_id=career_id,dataset_id=dataset_id)
+        # The historical finance policy is opt-in on a newly created dataset.
+        # Existing careers and non-historical saves retain their prior economy.
+        from world_historical_career_finances import seed_existing_loans_and_payroll
+        seed_existing_loans_and_payroll(conn,career_id=career_id,
+             dataset_id=dataset_id,pes_lock_date=pes_lock_date,
+             next_summer_date=next_summer_date)
         # Each opt-in new career receives its own frozen prestige inputs.
         # Subsequent global rebalancing cannot retroactively alter offers.
         if player_decision_version in (DECISION_VERSION,DECISION_V2_VERSION):
