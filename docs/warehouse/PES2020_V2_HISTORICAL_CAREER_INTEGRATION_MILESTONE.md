@@ -6,12 +6,14 @@ Date: 20 October 2026. Men's football only. PC and PlayStation. Isolated develop
 
 The approved 22-edition player/wage/loan source and the two-layer club-finance model now have an actual **historical career world importer**: `world_historical_career_import.py`.
 
-[Successful complete-world and first 30-minute window validation](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39433587799).
+[Successful complete-world, all 29 PES numerical attributes and first 30-minute window validation](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39437011805).
 
 | Edition | Historical game season | Clubs | Registered players | Contracts | Starting loans | Source unknown-club players omitted |
 |---|---|---:|---:|---:|---:|---:|
 | FIFA26 | 2025/26 | 662 | 18,316 | 18,316 | 1,325 | 89 |
 | FC27 | 2026/27 | 670 | 17,849 | 17,849 | 0 | 0 |
+
+Each registered player also carries all **25 PES2020 V2 core numerical ratings + four auxiliary ratings**, plus original source height, weight, preferred foot, alternative positions and positional familiarity in dedicated world tables. The successful build validates **531,164** attribute values for FIFA26 and **517,621** for FC27, with 1:1 metadata record coverage. Source unknown-club FIFA26 players are intentionally not assigned to invented clubs.
 
 The imported worlds include source-club key -> internal world club ID and edition-row player key -> internal world player ID mappings. Identical club names in different seasons or competitions are not automatically treated as the same business identity. Each world uses source-named league labels (not claimed independent verification of each historic registration), source-registered squads, source or game-estimated weekly wages and contract expiries, separately owned incoming loans, approved PES-converted rating references and V2 starting transfer/wage budgets.
 
@@ -38,6 +40,8 @@ The imported datasets are **new, review-only, immutable snapshots**. Test career
 - No production deployment occurred; the actual live web link is not yet available until the approved test-world packages are provisioned in a test Render instance.
 
 [Historical edition setup integration and read-only UI tests](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39435242547).
+
+[Download FIFA26 test career database](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39437011805/artifacts/12272931320) · [Download FC27 test career database](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39437011805/artifacts/12273106404).
 
 ## Longer AI-market validation
 
