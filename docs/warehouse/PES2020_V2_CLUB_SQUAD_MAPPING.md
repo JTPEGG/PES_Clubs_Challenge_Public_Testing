@@ -4,6 +4,21 @@
 **Status:** Complete independent source-to-club map; **not yet activated in a saved career**.  
 **Platform target:** PC and PlayStation (actual PES game-file imports are a later stage).
 
+## Verified first release (20 October 2026)
+
+**[GitHub Actions run — PASS](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39406815878)**  
+**[Download the validated 22-edition club and squad catalogue](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39406815878/artifacts/12257801670)**
+
+- 319,389 source player records mapped, exactly one entry per original source row
+- 13,188 edition-specific club/team entries (**not 13,188 unique clubs**)
+- 316,624 player rows at known source clubs; 531 explicitly listed free agents; 2,234 players with no reliable source club
+- 271 source-labelled competition entries, with historical memberships absent/unknown in some editions
+- 139 repeated source player ID occurrences preserved safely under distinct source-row player keys
+- 22/22 edition manifests, SQLite foreign keys and all source/player count checks passed
+- FC27: source has 17,849 men's and 1,940 women's player records; men/women team names are separated, and homonymous Nacional clubs from different sourced leagues no longer merge
+
+**Scope:** Every source player is represented; this does not prove complete original game rosters, verified league membership or import-ready PES saves. The generated SQLite database has not been installed into live careers or deployed.
+
 ## Inputs
 
 Uses the exact two versioned files previously published in [the completed V2 player database release](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39397460464):
