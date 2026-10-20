@@ -27,7 +27,10 @@ def make_db(*, expiry="2021-06-30", parent_budget=3000, borrower_budget=2500):
       );
       CREATE TABLE world_career_offers(
           offer_id INTEGER PRIMARY KEY,
-          career_id TEXT,request_key TEXT
+          career_id TEXT,request_key TEXT,
+          buying_club_id INTEGER,
+          offered_wage_weekly INTEGER,
+          status TEXT
       );
       CREATE TABLE world_career_registrations(
          career_id TEXT NOT NULL,player_id INTEGER NOT NULL,
