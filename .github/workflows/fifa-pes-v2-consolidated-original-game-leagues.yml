@@ -1,0 +1,72 @@
+name: PES V2 consolidated game-plus-fixture club home league database
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_game_league_overlay.py'
+      - 'test_world_historical_game_league_overlay.py'
+      - '.github/workflows/fifa-pes-v2-consolidated-original-game-leagues.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  combine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test non-destructive historical FIFA game league SQLite crosswalk
+        run: python -m unittest -v test_world_historical_game_league_overlay
+      - name: Download immutable independently sourced 447-season competition registry
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
+          run-id: 39501911329
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: prior/
+      - name: Download independently audited same-edition FIFA15-23 game league assignments
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-2015-2023-DIRECT-FIFA-GAME-CLUB-HOME-LEAGUES
+          run-id: 39504234946
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: game/
+      - name: Write merged career-staging SQLite with original FIFA games and fixture leagues
+        run: |
+          python -u -m world_historical_game_league_overlay \
+            --registry prior/HISTORICAL_COMPETITION_REGISTER.sqlite \
+            --game-leagues game/FIFA_GAME_EDITION_EXACT_CLUB_DOMESTIC_LEAGUES.csv \
+            --output release/
+      - name: Verify 13,104 original clubs retain provenance and no career activation
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          p=Path("release")
+          a=json.loads((p/"CONSOLIDATED_GAME_HOME_LEAGUE_OVERLAY_AUDIT.json").read_text())
+          assert a["original_club_seasons"]==13104
+          assert a["source_fixture_club_seasons_with_evidence"]==5941
+          assert a["direct_fifa_game_club_league_records"]>=4500
+          assert a["game_home_leagues_filling_prior_gaps"]>=2000
+          assert a["remaining_without_any_starting_league_evidence"]<=5163
+          assert a["club_seasons_with_starting_league_evidence"]+a["remaining_without_any_starting_league_evidence"]==13104
+          assert not a["career_ready_editions"]
+          assert not a["squads_modified"] and not a["source_fixture_data_overwritten"]
+          with sqlite3.connect(p/"HISTORICAL_COMPETITION_REGISTER_WITH_ORIGINAL_FIFA_LEAGUES.sqlite") as db:
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM historical_club_starting_leagues").fetchone()[0]==13104
+              assert db.execute("SELECT COUNT(*) FROM game_source_club_home_leagues").fetchone()[0]==a["direct_fifa_game_club_league_records"]
+              assert db.execute("SELECT COUNT(*) FROM competition_seasons").fetchone()[0]==447
+          print(json.dumps(a,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-ORIGINAL-GAME-AND-SOURCED-COMPETITION-DATABASE
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
