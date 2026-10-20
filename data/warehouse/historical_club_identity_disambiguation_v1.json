@@ -1,0 +1,18 @@
+{
+  "version": "historical-club-identity-disambiguation-v1",
+  "explanation": "Pinned human-reviewed game-club IDs that must never be assigned a domestic league from an unrelated same-named team. Does NOT populate missing domestic competitions or activate careers.",
+  "entries": [
+    {
+      "edition": 2024,
+      "game_club_key": "c2024:unspecified:id:111326-e474f330f9",
+      "original_display_name": "Liverpool",
+      "source_game_club_id": "111326",
+      "resolved_identity": "Liverpool Fútbol Club Uruguay",
+      "country": "Uruguay",
+      "provider_game_edition": "FC24",
+      "evidence_url": "https://www.fifacm.com/24/team/111326/liverpool-futbol-club-uruguay?vid=335",
+      "do_not_use_fixture_country": "England",
+      "domestic_competition_status": "requires_independent_uruguayan_home_league_source"
+    }
+  ]
+}
