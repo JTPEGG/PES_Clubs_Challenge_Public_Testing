@@ -20,6 +20,7 @@ REASONS = (
     "conflicting_domestic_evidence",
     "fixture_name_in_multiple_divisions",
     "unique_external_name_not_crosswalked",
+    "game_id_identified_domestic_league_unsourced",
     "unidentified_original_source_group",
     "unlabelled_game_club_without_identity_evidence",
 )
@@ -28,6 +29,7 @@ RESOLUTION = {
     "conflicting_domestic_evidence": "review_conflicting_club_identity",
     "fixture_name_in_multiple_divisions": "review_cross_league_name_collision",
     "unique_external_name_not_crosswalked": "inspect_exact_identity_join",
+    "game_id_identified_domestic_league_unsourced": "source_home_league_using_verified_game_club_id",
     "unidentified_original_source_group": "identify_original_league_and_source_dated_members",
     "unlabelled_game_club_without_identity_evidence": "source_historical_home_division",
 }
@@ -42,12 +44,14 @@ def read_only(path):
     return sqlite3.connect(f"file:{Path(path).resolve()}?mode=ro", uri=True)
 
 
-def classify_unresolved(group_type, confidence, league_key, candidates):
+def classify_unresolved(group_type, confidence, league_key, candidates, identity_known=False):
     """Mutually exclusive, evidence-derived triage. No nation guessing."""
     if group_type == "continental_cup_bucket":
         return "continental_bucket_needs_home_league"
     if confidence == "conflict":
         return "conflicting_domestic_evidence"
+    if identity_known:
+        return "game_id_identified_domestic_league_unsourced"
     if len({entry[0] for entry in candidates}) > 1:
         return "fixture_name_in_multiple_divisions"
     if candidates:
@@ -70,9 +74,24 @@ def export_csv(path, columns, data):
         writer.writerows(data)
 
 
-def audit(source_database, register_database, output, *, strict=True):
+def audit(source_database, register_database, output, *, strict=True,
+          identity_review_file=None):
     out = Path(output)
     out.mkdir(parents=True, exist_ok=True)
+    identified={}
+    if identity_review_file:
+        payload=json.loads(Path(identity_review_file).read_text(encoding="utf-8"))
+        if payload.get("version")!="historical-club-identity-disambiguation-v1":
+            raise ValueError("Unrecognised historical club identity ledger")
+        for row in payload["entries"]:
+            if row["domestic_competition_status"]!="requires_independent_uruguayan_home_league_source":
+                raise ValueError("Identity ledger cannot assign a domestic league")
+            if not str(row["evidence_url"]).startswith("https://"):
+                raise ValueError("Identity record has no independently reviewable evidence")
+            key=(int(row["edition"]),str(row["game_club_key"]))
+            if key in identified:
+                raise ValueError("Duplicate game-club identity proof")
+            identified[key]=row
     with read_only(source_database) as src, read_only(register_database) as reg:
         if reg.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise ValueError("Invalid historical competition registry SQLite")
@@ -147,15 +166,23 @@ def audit(source_database, register_database, output, *, strict=True):
         original_name,league_key,_,source_league_id = record
         if career_status != "blocked":
             raise ValueError("Unverified historical club should remain blocked")
+        identity=identified.get((y,key))
+        if identity:
+            if identity["original_display_name"] != club or (
+                "id:"+identity["source_game_club_id"]+"-" not in key):
+                raise ValueError("Pinned game ID or game name does not match original")
         matches = sorted(ext_names.get((y,canonical(club)), set()))
         if code is not None and code not in competitions:
             raise ValueError("Club refers to nonexistent competition season")
         if code is not None and competitions[code]["edition"] != y:
             raise ValueError("Club refers to a competition in the wrong edition")
+        if identity and code and competitions[code]["country"]!=identity["country"]:
+            raise ValueError("Country conflict with pinned historical game-club ID")
         if code is None:
             if confidence in KNOWN_LINKS:
                 raise ValueError("Club has linked confidence without source competition")
-            reason = classify_unresolved(group_type,confidence,league_key,matches)
+            reason = classify_unresolved(group_type,confidence,league_key,matches,
+                                         identity_known=bool(identity))
             status = "unresolved"
             action = RESOLUTION[reason]
             reason_counts[reason] += 1
@@ -168,7 +195,7 @@ def audit(source_database, register_database, output, *, strict=True):
                       else "verify_individual_membership" if confidence=="source_group_corroborated"
                       else "validate_game_identity_and_movement_graph")
         country = competitions[code]["country"] if code else ""
-        hint = candidate_country(matches) if not country else ""
+        hint = candidate_country(matches) if not country and not identity else ""
         fixture_record = fixture.get((y,key))
         entry = {
             "Edition": y, "Source_Club_Key": key, "Club": club,
@@ -177,6 +204,9 @@ def audit(source_database, register_database, output, *, strict=True):
             "Original_Source_League_Label": label or "",
             "Original_Group_Type": group_type, "Evidence_Competition": code or "",
             "Evidence_Country": country, "Candidate_Country_Review_Only": hint,
+            "Independent_Game_ID_Country": identity["country"] if identity else "",
+            "Independent_Game_ID_Identity": identity["resolved_identity"] if identity else "",
+            "Independent_Identity_Evidence_URL": identity["evidence_url"] if identity else "",
             "Evidence_Status": confidence, "Triage_Status": status,
             "Triage_Reason": reason, "Recommended_Action": action,
             "Candidate_Fixture_Division_Count": len({v[0] for v in matches}),
@@ -318,6 +348,7 @@ def audit(source_database, register_database, output, *, strict=True):
         "independent_league_seasons":len(competitions),
         "original_source_group_review_rows":len(group_rows),
         "uncrosswalked_name_candidates":len(uncrosswalked),
+        "game_id_disambiguations":len(identified),
         "recurring_group_review_rows":len(recurring_rows),
         "top_recurrent_source_groups":recurring_rows[:20],
         "source_countries":len({p["country"] for p in competitions.values()}),
@@ -401,6 +432,8 @@ if __name__=="__main__":
     parser.add_argument("--source",required=True)
     parser.add_argument("--registry",required=True)
     parser.add_argument("--output",required=True)
+    parser.add_argument("--identity-review")
     opts=parser.parse_args()
-    outcome=audit(opts.source,opts.registry,opts.output)
+    outcome=audit(opts.source,opts.registry,opts.output,
+                  identity_review_file=opts.identity_review)
     print(json.dumps(outcome,indent=2,ensure_ascii=False))
