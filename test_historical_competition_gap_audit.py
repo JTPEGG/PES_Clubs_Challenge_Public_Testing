@@ -34,6 +34,10 @@ class HistoricalCompetitionGapAuditTests(unittest.TestCase):
         self.assertEqual(classify_unresolved(
             "missing_original_source_league","unresolved","",ambiguous),
             "fixture_name_in_multiple_divisions")
+        self.assertEqual(classify_unresolved(
+            "missing_original_source_league","unresolved","",candidates,
+            identity_known=True),
+            "game_id_identified_domestic_league_unsourced")
         self.assertEqual(candidate_country(candidates),"England")
         self.assertEqual(candidate_country(ambiguous),"")
 
