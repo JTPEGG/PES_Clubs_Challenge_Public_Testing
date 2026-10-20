@@ -201,7 +201,7 @@ def build(source,output):
           game_wage_budget_weekly_gbp,starting_wage_headroom_weekly_gbp,
           game_transfer_budget_gbp,wage_budget_coverage_multiple,
           reliability_flag,rationale) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-         ((*output_row(r)[:22],r["flags"],
+         ((output_row(r)[2],output_row(r)[0],output_row(r)[1],*output_row(r)[3:22],r["flags"],
            "22-year relative payroll proxy; 18-player planning when sparse; "
            "7.5%-40% annualized projected wage payroll for discretionary game "
            "transfer budget, reduced for wage concentration") for r in rows))
