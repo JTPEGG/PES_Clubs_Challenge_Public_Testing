@@ -45,6 +45,13 @@ jobs:
           run-id: 39443877744
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: early/
+      - name: Read sourced historical fifth-tier National League feeder clubs
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-NATIONAL-LEAGUE-TIER5-FEEDER-CLUBS
+          run-id: 39447460963
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: feeders/
       - name: Read audited dated England Germany Spain competition topology
         uses: actions/download-artifact@v4
         with:
@@ -58,7 +65,7 @@ jobs:
             --source input/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
             --recent-dir recent/ --early-dir early/ \
             --graph topo/HISTORICAL_PROMOTION_RELEGATION_GRAPH.json \
-            --output release/
+            --feeder-dir feeders/ --output release/
           python -m world_historical_movement_rules --output release/
       - name: Fail closed until all teams and promotion feeders are proved
         run: |
@@ -74,6 +81,8 @@ jobs:
           assert summary['exact_matches']==2029
           assert summary['normalized_alias_candidates']>=700
           assert not summary['career_ready_editions']
+          assert summary['season_versioned_rule_records']==128
+          assert summary['historical_nonplayable_feeder_club_years']==239
           assert movement['editions']==22
           assert movement['movement_rule_records']==128
           with sqlite3.connect(d/'HISTORICAL_COMPETITION_REGISTER.sqlite') as db:
@@ -81,6 +90,9 @@ jobs:
               assert not db.execute('PRAGMA foreign_key_check').fetchall()
               assert db.execute('SELECT COUNT(*) FROM edition_club_competitions').fetchone()[0]==13104
               assert db.execute('SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM sourced_nonplayable_feeder_clubs').fetchone()[0]==239
+              assert db.execute('SELECT COUNT(*) FROM season_versioned_rules').fetchone()[0]==128
+              assert db.execute('SELECT COUNT(*) FROM season_versioned_rules WHERE feeder_verified!=0').fetchone()[0]==0
               assert db.execute('SELECT COUNT(*) FROM edition_club_competitions WHERE group_type=?',('continental_cup_bucket',)).fetchone()[0]==40
           print('SUCCESS 22 years audited: 13,104 source clubs, NO unverified ready careers')
           print(json.dumps(summary,indent=2))
