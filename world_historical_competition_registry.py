@@ -151,6 +151,20 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,legacy
             y=int(row["Edition"])
             add(y,row["FIFA_Club_Key"],f"{y}:{row['League_Code']}",
                 row["Fixture_Club"],"exact",row["Source_URL"])
+        # The older eight-country importer previously staged exact names
+        # but omitted normalized name-review candidates (Ajax/AFC Ajax etc).
+        # We only stage unique in-edition original club names. They remain
+        # UNVERIFIED alias identity candidates; never automatic career clubs.
+        for row in csvrows(Path(legacy_multicountry_dir)/
+                           "LEGACY_MULTICOUNTRY_SOURCE_CLUBS.csv"):
+            y=int(row["Edition"])
+            if row["Evidence_Status"]!="pinned_fixture_membership_not_game_identity":
+                raise ValueError("Cannot infer identity from unverified fixture")
+            hits=aliases[(y,canonical(row["Fixture_Club"]))]
+            if len(hits)!=1:
+                continue
+            add(y,hits[0][0],f"{y}:{row['League_Code']}",
+                row["Fixture_Club"],"alias_requires_review",row["Source_URL"])
     # Alias candidates never override an exact fixture match and are never
     # presented as verified game club identity.
     for rows,edition_col,code_col,name_col in (
