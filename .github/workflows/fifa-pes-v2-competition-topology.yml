@@ -1,0 +1,68 @@
+name: PES V2 verified historical domestic competition topology and membership
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_competition_topology.py'
+      - 'test_world_historical_competition_topology.py'
+      - '.github/workflows/fifa-pes-v2-competition-topology.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: historical-competition-audit-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  competition-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate 2025-26 and 2026-27 England/Germany/Spain edition-specific rules
+        run: python -m unittest -v test_world_historical_competition_topology
+      - name: Download unchanged 22-season men-only source leagues and squads
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: inputs/
+      - name: Audit every historic source club and reject cup-only domestic memberships
+        run: |
+          python -u -m world_historical_competition_topology \
+            --source inputs/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --output release/
+      - name: Verify 22 editions and fail-closed simulation readiness
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          d=Path('release/')
+          summary=json.loads((d/'HISTORICAL_COMPETITION_READINESS.json').read_text())
+          graph=json.loads((d/'HISTORICAL_PROMOTION_RELEGATION_GRAPH.json').read_text())
+          with (d/'HISTORICAL_CLUB_COMPETITION_COVERAGE.csv').open(
+                 encoding='utf-8-sig',newline='') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==13104
+          assert summary['editions']==22
+          assert not summary['full_career_editions_ready']
+          assert len(graph['graphs'])==2
+          assert len([r for r in rows if r['Edition']=='2027' and
+              r['Identity_Status']=='continental_cup_not_domestic_league'])==40
+          assert all(r['Career_Activation_Status']=='blocked_until_fully_validated'
+                     for r in rows)
+          assert sum(r['Identity_Status']=='curated_source_competition_match'
+              for r in rows)>400
+          print('13200 SOURCE-COMPETITION PROVENANCE FIELDS CHECKED')
+          print('ALL 13104 CLUB-SEASON ROWS AUDITED. NO UNSOURCED CAREER READY.')
+          print(json.dumps(summary['source_issues'],indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-GRAPH-AND-UNRESOLVED-MEMBERSHIP-AUDIT
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
