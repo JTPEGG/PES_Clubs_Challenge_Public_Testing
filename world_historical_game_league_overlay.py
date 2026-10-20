@@ -142,6 +142,15 @@ def build(registry,game_csv,outdir,*,strict=True):
         original_rows=db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]
         game_only=db.execute("""SELECT COUNT(*) FROM historical_club_starting_leagues
                   WHERE evidence_origin='original_fifa_game_source'""").fetchone()[0]
+        edition_coverage=db.execute("""
+           SELECT edition,COUNT(*),
+              SUM(CASE WHEN evidence_origin='independent_fixture_evidence' THEN 1 ELSE 0 END),
+              SUM(CASE WHEN evidence_origin='original_fifa_game_source' THEN 1 ELSE 0 END),
+              SUM(CASE WHEN evidence_origin='unresolved' THEN 1 ELSE 0 END)
+           FROM historical_club_starting_leagues
+           GROUP BY edition ORDER BY edition""").fetchall()
+        if any(total!=fixture+game+missing for _,total,fixture,game,missing in edition_coverage):
+            raise ValueError("Edition source coverage did not reconcile")
         careers=db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready!=0").fetchone()[0]
         if careers:raise ValueError("Overlay cannot activate unverified careers")
         if before+game_only!=after:raise ValueError("Overlay evidence count unexpectedly overlaps")
@@ -155,6 +164,9 @@ def build(registry,game_csv,outdir,*,strict=True):
         w=csv.writer(f);w.writerow(("Edition","Game_League_ID","Corroborated_Competition",
             "Fixture_Clubs_For_Best","Distinct_Fixture_Competitions","Crosswalk_Status"))
         w.writerows(review)
+    with (out/"GAME_STARTING_LEAGUE_COVERAGE_BY_EDITION.csv").open("w",newline="",encoding="utf-8-sig") as f:
+        w=csv.writer(f);w.writerow(("Edition","Original_Clubs","Fixture_Evidence",
+            "New_Game_Source_Leagues","Remaining_Unresolved"));w.writerows(edition_coverage)
     summary=dict(version=VERSION,original_club_seasons=original_rows,
         source_fixture_club_seasons_with_evidence=before,
         direct_fifa_game_club_league_records=len(accepted),
