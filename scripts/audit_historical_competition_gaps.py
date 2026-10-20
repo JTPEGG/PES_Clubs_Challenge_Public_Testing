@@ -254,6 +254,37 @@ def audit(source_database, register_database, output, *, strict=True):
         })
     group_rows.sort(key=lambda x:(-x["Unresolved_Club_Years"], x["Edition"],
                                   x["Original_League_Key"]))
+    # Repeated original source IDs are prioritisation candidates across years,
+    # never a proof that two same-named football competitions are identical.
+    recurring = defaultdict(list)
+    for group in group_rows:
+        source_id=group["Source_League_ID"]
+        label=group["Source_League_Label"]
+        if source_id and label:
+            key=("same_source_id_and_label",source_id,label)
+        else:
+            key=("edition_scoped_original_group",str(group["Edition"]),
+                 group["Original_League_Key"])
+        recurring[key].append(group)
+    recurring_rows=[]
+    for key,items in recurring.items():
+        recurring_rows.append({
+            "Review_Grouping_Method":key[0],
+            "Original_League_Source_ID":key[1] if key[0]=="same_source_id_and_label" else "",
+            "Original_League_Label":items[0]["Source_League_Label"],
+            "Distinct_Editions":len({x["Edition"] for x in items}),
+            "Edition_List":" | ".join(str(e) for e in sorted({x["Edition"] for x in items})),
+            "Total_Unresolved_Club_Years":sum(x["Unresolved_Club_Years"] for x in items),
+            "Source_Group_Count":len(items),
+            "Country_Assignment":"not_inferred_from_source_label_or_id",
+            "Next_Action":"find_pinned_dated_domestic_source_for_each_edition",
+        })
+    recurring_rows.sort(key=lambda x:(-x["Total_Unresolved_Club_Years"],
+                -x["Distinct_Editions"],x["Original_League_Label"]))
+
+    uncrosswalked=[x for x in details
+                   if x["Triage_Reason"]=="unique_external_name_not_crosswalked"]
+    uncrosswalked.sort(key=lambda x:(x["Edition"],x["Club"],x["Source_Club_Key"]))
 
     country_rows=[]
     by_comp=Counter(d["Evidence_Competition"] for d in details if d["Evidence_Competition"])
@@ -270,15 +301,22 @@ def audit(source_database, register_database, output, *, strict=True):
     detail_columns=list(details[0])
     export_csv(out/"HISTORICAL_COMPETITION_CLUB_TRIAGE.csv",detail_columns,details)
     export_csv(out/"HISTORICAL_COMPETITION_ALIAS_REVIEW.csv",detail_columns,aliases)
+    export_csv(out/"HISTORICAL_COMPETITION_UNCROSSWALKED_NAME_REVIEW.csv",
+               detail_columns,uncrosswalked)
     export_csv(out/"HISTORICAL_COMPETITION_EDITION_GAPS.csv",list(edition_rows[0]),edition_rows)
     export_csv(out/"HISTORICAL_COMPETITION_CAUSES_BY_EDITION.csv",list(reason_rows[0]),reason_rows)
     export_csv(out/"HISTORICAL_COMPETITION_SOURCE_GROUP_PRIORITY.csv",list(group_rows[0]),group_rows)
     export_csv(out/"HISTORICAL_COMPETITION_SOURCE_COVERAGE.csv",list(country_rows[0]),country_rows)
+    export_csv(out/"HISTORICAL_COMPETITION_RECURRENT_SOURCE_ID_PRIORITIES.csv",
+               list(recurring_rows[0]),recurring_rows)
     report = {
         "source_clubs":len(details),
         "editions":len(edition_rows),
         "independent_league_seasons":len(competitions),
         "original_source_group_review_rows":len(group_rows),
+        "uncrosswalked_name_candidates":len(uncrosswalked),
+        "recurring_group_review_rows":len(recurring_rows),
+        "top_recurrent_source_groups":recurring_rows[:20],
         "source_countries":len({p["country"] for p in competitions.values()}),
         "linked_provisional_evidence":sum(x["Triage_Status"]=="provisional_league_evidence" for x in details),
         "unresolved":sum(x["Triage_Status"]=="unresolved" for x in details),
@@ -301,6 +339,7 @@ def audit(source_database, register_database, output, *, strict=True):
         f"Unresolved original club-season records: **{report['unresolved']:,} / {len(details):,}**.",
         f"Linked to SOME source evidence (not certified identities): **{report['linked_provisional_evidence']:,}**.",
         f"Alias review queue (part of linked, NOT part of unresolved): **{len(aliases):,}**.",
+        f"Unique external-name/crosswalk discrepancies: **{len(uncrosswalked):,}**.",
         "",
         "## Why the records are blocked",
         "",
@@ -313,6 +352,14 @@ def audit(source_database, register_database, output, *, strict=True):
            "|---|---|---:|"]
     md += [f"| {r['Edition']} | {r['Source_League_Label'] or '(no source league)'}"
            f" | {r['Unresolved_Club_Years']} |" for r in group_rows[:30]]
+    md += [
+        "", "## Source IDs recurring across editions (REVIEW only)", "",
+        "| Original FIFA source league ID | Label | Editions | Outstanding club-years |",
+        "|---|---|---:|---:|",
+    ]
+    md += [f"| {r['Original_League_Source_ID'] or '(edition scoped)'} | "
+           f"{r['Original_League_Label'] or '(unknown)'} | {r['Distinct_Editions']} "
+           f"| {r['Total_Unresolved_Club_Years']} |" for r in recurring_rows[:30]]
     md += [
         "", "## How to resolve without inventing divisions", "",
         "1. Prioritise original source-group clusters and find a dated independent domestic league membership source.",
