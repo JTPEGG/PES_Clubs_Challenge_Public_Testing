@@ -22,7 +22,12 @@ def make_db(*, expiry="2021-06-30", parent_budget=3000, borrower_budget=2500):
       CREATE TABLE world_career_saves(
          career_id TEXT PRIMARY KEY,dataset_id TEXT,
          state TEXT NOT NULL DEFAULT 'sandbox',
-         next_summer_date TEXT NOT NULL,pes_lock_date TEXT NOT NULL
+         next_summer_date TEXT NOT NULL,pes_lock_date TEXT NOT NULL,
+         economy_version TEXT NOT NULL DEFAULT 'prototype-v1'
+      );
+      CREATE TABLE world_career_offers(
+          offer_id INTEGER PRIMARY KEY,
+          career_id TEXT,request_key TEXT
       );
       CREATE TABLE world_career_registrations(
          career_id TEXT NOT NULL,player_id INTEGER NOT NULL,
@@ -47,7 +52,8 @@ def make_db(*, expiry="2021-06-30", parent_budget=3000, borrower_budget=2500):
       INSERT INTO world_datasets VALUES ('historical_2020');
       INSERT INTO world_players VALUES (1),(2);
       INSERT INTO world_clubs VALUES (10),(20);
-      INSERT INTO world_career_saves VALUES
+      INSERT INTO world_career_saves
+          (career_id,dataset_id,state,next_summer_date,pes_lock_date) VALUES
           ('new_career','historical_2020','sandbox','2020-07-01','2019-08-01');
       INSERT INTO world_career_registrations VALUES
           ('new_career',1,20),('new_career',2,20);
@@ -149,6 +155,22 @@ class InitialHistoricalLoanTests(unittest.TestCase):
                 seed_existing_loans_and_payroll(
                     db,career_id="new_career",dataset_id="historical_2020",
                     pes_lock_date="2019-08-01",next_summer_date="2020-07-01")
+
+    def test_borrower_cannot_sell_a_player_on_active_source_loan(self):
+        from world_careers import propose_offer
+        with make_db() as db:
+            self._setup(db)
+            db.commit()
+            with patch("world_preseason_window.assert_window_allows_negotiation",
+                       return_value=None):
+                with self.assertRaisesRegex(ValueError,
+                                            "must be negotiated with the parent club"):
+                    propose_offer(db,career_id="new_career",
+                       request_key="invalid-borrower-sale",player_id=1,
+                       buying_club_id=10,offered_fee=10000,
+                       agreement_date="2020-01-10")
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM world_career_offers"
+                                        ).fetchone()[0],0)
 
     def test_below_starting_payroll_budget_fails_closed(self):
         with make_db(parent_budget=100) as db:
