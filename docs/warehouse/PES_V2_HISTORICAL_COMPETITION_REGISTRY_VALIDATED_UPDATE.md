@@ -1,4 +1,4 @@
-# PES Clubs Challenge V2 — Season-specific competition database, implementation update
+> **Latest milestone:** This report is a previous-stage snapshot. The [351-season competition membership expansion and 8,083 remaining-club audit](PES_V2_HISTORICAL_COMPETITION_MEMBERSHIP_EXPANSION_OCT2026.md) supersedes these counts; the older runs are retained for reproducibility.\n\n# PES Clubs Challenge V2 — Season-specific competition database, implementation update
 
 **20 October 2026 · Men's football · PC / PlayStation · Test branch only**
 
