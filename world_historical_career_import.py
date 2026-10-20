@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS world_dataset_pes_v2_player_map(
  dataset_id TEXT NOT NULL REFERENCES world_datasets(dataset_id),
  source_key TEXT NOT NULL,world_id INTEGER NOT NULL REFERENCES world_players(player_id),
  PRIMARY KEY(dataset_id,source_key),UNIQUE(dataset_id,world_id));
+CREATE TABLE IF NOT EXISTS world_dataset_pes_v2_player_details(
+ dataset_id TEXT NOT NULL REFERENCES world_datasets(dataset_id),
+ player_id INTEGER NOT NULL REFERENCES world_players(player_id),
+ preferred_foot TEXT,height_cm TEXT,weight_kg TEXT,
+ alternative_positions_json TEXT NOT NULL,
+ position_fit_json TEXT NOT NULL,
+ PRIMARY KEY(dataset_id,player_id));
 """
 def checksum(path):
     h=hashlib.sha256()
@@ -88,7 +95,9 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
         players=conn.execute("""SELECT p.player_key,p.player_name,p.date_of_birth,
              p.nationality,p.primary_position,p.source_overall,p.source_player_id,
              p.club_key,p.assignment,f.model_weekly_wage_gbp,
-             f.game_contract_expires_on,f.wage_provenance
+             f.game_contract_expires_on,f.wage_provenance,
+             p.pes_abilities_json,p.pes_additional_json,p.preferred_foot,
+             p.height_cm,p.weight_kg,p.alternative_positions,p.position_fit_indices
              FROM hist.players p JOIN hist.starting_player_finances f
              ON f.player_key=p.player_key WHERE p.edition=?
              ORDER BY p.source_row_number""",(edition,)).fetchall()
@@ -148,7 +157,10 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
                   (dataset_id,club_id,transfer_budget_gbp,weekly_wage_budget_gbp,source_name)
                   VALUES(?,?,?,?,?)""",(ds,cid,*budgets[key],"GAME_MODEL:historical_financial_circumstances_v2"))
             registered=0
-            for key,name,dob,nation,position,overall,srcid,club,assignment,wage,expires,provenance in players:
+            pes_rows=0
+            for (key,name,dob,nation,position,overall,srcid,club,assignment,
+                 wage,expires,provenance,abilities_json,additional_json,
+                 foot,height,weight,alternative,fit) in players:
                 if assignment!="at_club":continue
                 registered+=1
                 pid=conn.execute("""INSERT INTO world_players
@@ -165,6 +177,26 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
                      (dataset_id,player_id,club_id,evidence,verification_status)
                      VALUES(?,?,?,?,?)""",(ds,pid,clubmap[club],"source listed borrowing/owning club",
                            "source_snapshot"))
+                conn.execute("""INSERT INTO world_dataset_pes_v2_player_details
+                    (dataset_id,player_id,preferred_foot,height_cm,weight_kg,
+                     alternative_positions_json,position_fit_json)
+                     VALUES(?,?,?,?,?,?,?)""",
+                     (ds,pid,foot,height,weight,alternative,fit))
+                abilities=json.loads(abilities_json)
+                extra=json.loads(additional_json)
+                if not isinstance(abilities,dict) or len(abilities)!=25:
+                    raise ValueError("Historical PES player must have 25 ability ratings")
+                if not isinstance(extra,dict) or len(extra)!=4:
+                    raise ValueError("Historical PES player missing auxiliary ratings")
+                values=list(abilities.items())+list(extra.items())
+                if any(type(v) is not int or not 1<=v<=200 for k,v in values):
+                    raise ValueError("Invalid PES V2 converted attribute")
+                conn.executemany("""INSERT INTO world_dataset_extended_attributes
+                     (dataset_id,player_id,attribute,value,source_name)
+                     VALUES(?,?,?,?,?)""",
+                     ((ds,pid,"PES2020V2:"+attribute,value,
+                       "FIFA-to-PES2020 V2 game conversion") for attribute,value in values))
+                pes_rows+=len(values)
                 if overall is not None and 1<=int(overall)<=99:
                     conn.execute("""INSERT INTO world_dataset_ratings
                         (dataset_id,player_id,source_name,source_edition,source_date,
@@ -188,6 +220,8 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
                      renewal_status,source_name) VALUES(?,?,?,?,?,'unknown',?)""",
                     (ds,pid,clubmap[parent],wage,expires,provenance))
             if registered!=expect:raise ValueError("Player registration loss")
+            if pes_rows!=registered*29:
+                raise ValueError("PES full attribute coverage failed")
             conn.execute("""INSERT INTO world_dataset_historical_finance_policy
                 (dataset_id,model_version,provenance) VALUES(?,?,?)""",
                 (ds,"historical-finance-events-v2","loan and wages sourced or game-estimated"))
@@ -198,6 +232,8 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
             counts=dict(clubs=len(clubmap),registered_players=registered,
                 contracts=conn.execute("SELECT COUNT(*) FROM world_dataset_contract_snapshots WHERE dataset_id=?",(ds,)).fetchone()[0],
                 loans=conn.execute("SELECT COUNT(*) FROM world_dataset_initial_loans WHERE dataset_id=?",(ds,)).fetchone()[0],
+                pes_attribute_values=pes_rows,
+                player_detail_records=conn.execute("SELECT COUNT(*) FROM world_dataset_pes_v2_player_details WHERE dataset_id=?",(ds,)).fetchone()[0],
                 unknown_unregistered=len(players)-registered)
             if counts["contracts"]!=registered or counts["loans"]!=len(loans):
                 raise ValueError("Historical career count reconciliation failed")
