@@ -42,6 +42,20 @@ class LightweightOneHopFeederTests(unittest.TestCase):
         self.assertEqual(len(original[ENGLISH_NATIONAL]),24)
         self.assertTrue(first["no_game_squads_generated"])
         self.assertFalse(first["career_activation_approved"])
+    def test_two_simulated_seasons_without_external_regional_division(self):
+        original=pools()
+        first=rollover(original,playable_floor="league_two",starting_season=2026,
+                       relegated_from_playable=original[ENGLISH_LEAGUE_TWO][:2])
+        after=first["club_pools_after"]
+        demoted=after[ENGLISH_LEAGUE_TWO][-2:]
+        second=rollover(after,playable_floor="league_two",starting_season=2027,
+                        relegated_from_playable=demoted)
+        self.assertEqual(len(second["club_pools_after"][ENGLISH_LEAGUE_TWO]),24)
+        self.assertEqual(len(second["club_pools_after"][ENGLISH_NATIONAL]),24)
+        self.assertEqual(second["simulated_feeders"],[ENGLISH_NATIONAL])
+        self.assertEqual(len(set(second["club_pools_after"][ENGLISH_NATIONAL])),24)
+        self.assertEqual(second["bottom_external_depth"],1)
+        self.assertNotIn("en.7",str(second))
     def test_option_nl_playable_uses_north_south_no_step_three_four(self):
         original=pools()
         demoted=original[ENGLISH_NATIONAL][:4]
