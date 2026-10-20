@@ -64,13 +64,12 @@ def reconcile(source_sqlite,register_sqlite,output,identity_file=None):
                                  c.source_url,c.source_sha256,c.verification
                              FROM sourced_domestic_league_clubs c
                              ORDER BY c.edition,c.competition_code,c.club_name""")
-        checked=read_rows(db,"SELECT edition,club_key,competition_code FROM fixture_club_evidence")
+        checked=read_rows(db,"SELECT edition,club_key,competition_code,fixture_club FROM fixture_club_evidence")
     orig={(int(y),str(k)):(str(name),str(group or "")) for y,k,name,group in games}
     linked={(int(y),str(k)) for y,k,conf,typ in existing if conf!="unresolved"}
     conflicted={(int(y),str(k)) for y,k,conf,typ in existing if conf=="conflict"}
     cups={(int(y),str(k)) for y,k,conf,typ in existing if typ=="continental_cup_bucket"}
-    fixture_taken={(int(y),code,canonical(name)) for y,key,code in checked
-                   for name in [orig[(int(y),str(key))][0]]}
+    fixture_taken={(int(y),code,canonical(name)) for y,key,code,name in checked}
     games_by_alias=defaultdict(list)
     for y,k,name,group in games:
         ident=(int(y),str(k))
