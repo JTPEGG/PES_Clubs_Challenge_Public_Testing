@@ -94,7 +94,7 @@ def generate(source_sqlite,out_dir,*,edition_min=2011,edition_max=2027):
             if edition_min<=year<=edition_max:
                 by_year[year][namekey(name)].append((key,name))
         expected={x[0] for x in db.execute("SELECT edition FROM editions")}
-    covered=[];observations=[];unmatched=[];status=Counter()
+    covered=[];observations=[];unmatched=[];source_teams=[];status=Counter()
     for year in range(edition_min,edition_max+1):
         if year not in expected:continue
         folder=source_season(year)
@@ -115,6 +115,12 @@ def generate(source_sqlite,out_dir,*,edition_min=2011,edition_max=2027):
                                 "incomplete_source_teams",len(teams),0,sha))
                 status["incomplete_source_teams"]+=1
                 continue
+            # Preserve every externally sourced league member, including
+            # clubs that cannot yet be identified in the FIFA archive.
+            # These rows are NOT playable squads and imply no automatic promotion.
+            for team in teams:
+                source_teams.append((year,folder,file,country,league,tier,
+                    team,url,sha,"pinned_fixture_membership_not_game_identity"))
             source_matches=0
             for team in teams:
                 index=by_year[year]
@@ -145,6 +151,10 @@ def generate(source_sqlite,out_dir,*,edition_min=2011,edition_max=2027):
            ("Edition","Starting_Season","Source_File","Country","Competition",
             "Tier","Source_URL","Source_Status","Source_Teams","Matched_FIFA_Clubs",
             "SHA256"),covered)
+    export("PINNED_OPENFOOTBALL_ALL_SOURCE_TEAMS.csv",
+           ("Edition","Starting_Season","League_Code","Country","Competition",
+            "Tier","Fixture_Club","Source_URL","Source_SHA256","Evidence_Status"),
+           source_teams)
     export("EXACT_HISTORICAL_CLUB_LEAGUE_MATCHES.csv",
            ("Edition","Starting_Season","League_Code","Country","Competition",
             "Tier","Fixture_Club","FIFA_Club","FIFA_Club_Key",
@@ -160,6 +170,7 @@ def generate(source_sqlite,out_dir,*,edition_min=2011,edition_max=2027):
       "license":"CC0 public domain per openfootball/football.json",
       "source_catalogue_untouched":True,"global_career_ready":False,
       "source_leagues_available":sum(o[7]=="source_team_list_available" for o in covered),
+      "independent_fixture_source_memberships":len(source_teams),
       "provisional_exact_club_memberships":len(valid),
       "needs_manual_alias_or_identity_review":len(unmatched),
       "cross_league_conflict_rows":len(conflicts),
