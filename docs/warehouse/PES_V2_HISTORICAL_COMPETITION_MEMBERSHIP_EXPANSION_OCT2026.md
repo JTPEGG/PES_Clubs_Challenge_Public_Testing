@@ -1,4 +1,4 @@
-# PES Clubs Challenge V2 — historic FIFA/FC domestic competition expansion
+> **Superseded evidence snapshot:** see the [latest 367-season competition and official FA/MLS milestone](PES_V2_2026_27_COMPETITION_FEEDER_VERIFIED_STAGE.md), validated in [GitHub Actions run 39467266710](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39467266710). The previous counts below remain for reproducibility.\n\n# PES Clubs Challenge V2 — historic FIFA/FC domestic competition expansion
 
 **20 October 2026 | Men's football | PC/PlayStation | Testing branch only**
 
