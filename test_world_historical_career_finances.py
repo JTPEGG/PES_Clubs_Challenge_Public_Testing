@@ -172,15 +172,21 @@ class InitialHistoricalLoanTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT COUNT(*) FROM world_career_offers"
                                         ).fetchone()[0],0)
 
-    def test_below_starting_payroll_budget_fails_closed(self):
+    def test_oversubscribed_club_can_start_but_has_negative_wage_headroom(self):
+        # A club with inherited payroll above its budget must remain playable.
+        from world_careers import wage_budget_breakdown
         with make_db(parent_budget=100) as db:
             seed_career_contracts(db,career_id="new_career",dataset_id="historical_2020")
-            with self.assertRaisesRegex(ValueError,"Starting payroll exceeds budget"):
-                seed_existing_loans_and_payroll(
-                    db,career_id="new_career",dataset_id="historical_2020",
-                    pes_lock_date="2019-08-01",next_summer_date="2020-07-01")
+            summary=seed_existing_loans_and_payroll(
+                db,career_id="new_career",dataset_id="historical_2020",
+                pes_lock_date="2019-08-01",next_summer_date="2020-07-01")
+            self.assertEqual(summary["clubs_over_wage_budget"],1)
+            self.assertEqual(summary["oversubscribed_wages_weekly"],400)
             self.assertEqual(db.execute("""SELECT SUM(committed_wages)
-              FROM world_career_club_ledger""").fetchone()[0],0)
+              FROM world_career_club_ledger""").fetchone()[0],1500)
+            self.assertEqual(wage_budget_breakdown(db,"new_career",10)["remaining"],-400)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM world_career_loan_agreements"
+                                        ).fetchone()[0],1)
 
 
 if __name__=="__main__":
