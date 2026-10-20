@@ -6,7 +6,7 @@
 
 **Latest expanded consolidated CI passed:** [historical competition registry run 39450980308](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39453612685).
 
-[Download the **complete current competition-registry review package** (SQLite, memberships and 22-season rule CSV)](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39453612685/artifacts/12278501550).
+[Download the **complete current competition-registry review package** (SQLite, memberships and 22-season rule CSV)](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39453612685/artifacts/12279568437).
 
 The existing `world_historical_competition_registry.py` now merges the original game-club source with three pinned fixture pipelines: 2011–2027 OpenFootball, 2005–2010 England Football.TXT, and 2005–2010 multi-country CC0 Soccerverse. The 5,709 fixture-source club entries are persisted in the new `sourced_domestic_league_clubs` table. They are **source observations, not manufactured playable PES squads**.
 
