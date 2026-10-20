@@ -13,6 +13,18 @@
       "evidence_url": "https://www.fifacm.com/24/team/111326/liverpool-futbol-club-uruguay?vid=335",
       "do_not_use_fixture_country": "England",
       "domestic_competition_status": "requires_independent_home_league_source"
+    },
+    {
+      "edition": 2024,
+      "game_club_key": "c2024:unspecified:id:112184-5d75de4f82",
+      "original_display_name": "River Plate",
+      "source_game_club_id": "112184",
+      "resolved_identity": "River Plate Montevideo (Uruguay)",
+      "country": "Uruguay",
+      "provider_game_edition": "FC24",
+      "evidence_url": "https://www.fifacm.com/24/players?nations=60&order=asc&sort=potential&teams=112184&vid=335",
+      "do_not_use_fixture_country": "Argentina",
+      "domestic_competition_status": "requires_independent_home_league_source"
     }
   ]
 }
