@@ -147,6 +147,22 @@ def _seed_context(conn,*,career_id,window_id):
         contract_years=1+_stable(career_id,player_id,VERSION)%4
         listed=int(role=="fringe" and contract_years<=2)
         estimated=min(350000,max(1000,round(1000*2**((overall-55)/8)/500)*500))
+        model_note=("Career-only modelling from player ability; "
+                    "no verified historical wage available")
+        source_contract=conn.execute("""SELECT weekly_wage_gbp,expires_on,
+            source_kind FROM world_career_contract_snapshots
+            WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
+        from world_historical_career_finances import is_historical_finance_career
+        if is_historical_finance_career(conn,career_id):
+            if source_contract is None or source_contract[0] is None:
+                raise ValueError("Historical starting contract wage is missing")
+            estimated=int(source_contract[0])
+            locked=conn.execute("""SELECT pes_lock_date FROM world_career_saves
+                WHERE career_id=?""",(career_id,)).fetchone()[0]
+            if source_contract[1]:
+                contract_years=max(1,min(10,int(source_contract[1][:4])-int(locked[:4])))
+            model_note=("Starting historical contract snapshot, source or flagged "
+                        "game estimate: "+str(source_contract[2]))
         manager_changes=conn.execute("""SELECT current_role,transfer_listed
             FROM world_career_player_circumstances
             WHERE career_id=? AND player_id=?""",
@@ -159,8 +175,7 @@ def _seed_context(conn,*,career_id,window_id):
             contract_years_estimate,squad_role_estimate,transfer_listed_estimate,model_note)
             VALUES(?,?,?,?,?,?,?,?,?,?)""",(career_id,player_id,window_id,ref,
             overall,estimated,contract_years,role,listed,
-            "Career-only modelling from PES-rated squad rank, age/rating proxies "
-            "and deterministic policy; NOT verified contracts, wages or wishes."))
+            model_note))
         # Feed the game's existing player-choice rules without asking
         # the human manager for missing wages or playing-time circumstances.
         existing=conn.execute("""SELECT 1 FROM world_career_player_circumstances
@@ -171,7 +186,8 @@ def _seed_context(conn,*,career_id,window_id):
                  transfer_listed,renewal_status,source_kind)
                 VALUES(?,?,?,?,?,?,?)""",(career_id,player_id,estimated,role,listed,
                 "not_offered" if contract_years==1 else "renewal_offered",
-                "modelled-autonomous-v1"))
+                "historical-contract-snapshot" if is_historical_finance_career(conn,career_id)
+                else "modelled-autonomous-v1"))
     conn.commit()
 
 def start_live_market(conn,*,career_id,now=None):
