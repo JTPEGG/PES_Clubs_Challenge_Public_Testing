@@ -19,6 +19,14 @@ class HistoricalFootballWorldTests(unittest.TestCase):
   self.assertIn("CREATE TABLE sourced_domestic_league_clubs(",SCHEMA)
   self.assertIn("REFERENCES competition_seasons(code)",SCHEMA)
   self.assertIn("independent_fixture_membership",SCHEMA)
+ def test_early_multi_country_aliases_are_only_identity_review_keys(self):
+  from world_historical_competition_registry import canonical
+  self.assertEqual(canonical("AFC Ajax"),canonical("Ajax"))
+  self.assertEqual(canonical("Getafe CF"),canonical("Getafe"))
+  self.assertEqual(canonical("Valencia CF"),canonical("Valencia"))
+  self.assertEqual(canonical("FC Hansa Rostock"),canonical("Hansa Rostock"))
+  self.assertEqual(canonical("AC Siena"),canonical("Siena"))
+  self.assertNotEqual(canonical("Ajax Cape Town"),canonical("Ajax"))
  def test_continental_cup_never_counts_as_domestic_division(self):
   self.assertTrue(cup_group("CONMEBOL Libertadores"))
   self.assertTrue(cup_group("CONMEBOL Sudamericana"))
