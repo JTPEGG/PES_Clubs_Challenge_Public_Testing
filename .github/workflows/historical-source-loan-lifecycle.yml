@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install web dependency used by existing transfer engine
+        run: python -m pip install Flask==3.0.3
       - name: Test starting loans payroll and end-of-season returns
         run: |
           python -m unittest -v \
