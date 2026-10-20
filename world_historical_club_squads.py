@@ -145,7 +145,14 @@ def club_ref(row,year):
     if not name or norm(name) in FREE_AGENT:
         return None
     sid=first(row,CLUB_ID_COLS)
-    return f"c{year}:{gender_group(row)}:{slug(sid) if sid else slug(name)}"
+    # Explicit provider club IDs win. Without one, differentiate homonymous
+    # clubs by the SOURCE-LISTED competition (e.g. Portugal and Uruguay's
+    # Nacional). Do not invent a league for older FIFA seasons.
+    if sid:
+        return f"c{year}:{gender_group(row)}:id:{slug(sid)}"
+    league=first(row,LEAGUE_COLS)
+    suffix=f":league:{slug(league)}" if league else ""
+    return f"c{year}:{gender_group(row)}:name:{slug(name)}{suffix}"
 
 def league_ref(row,year):
     name=first(row,LEAGUE_COLS)
