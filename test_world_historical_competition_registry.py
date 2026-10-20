@@ -60,6 +60,13 @@ class HistoricalFootballWorldTests(unittest.TestCase):
   self.assertIn("fa_official_allocation_crosschecked",SCHEMA)
   self.assertIn("REFERENCES competition_seasons(code)",SCHEMA)
   self.assertIn("pinned_third_party_snapshot_review",SCHEMA)
+ def test_mls_official_closed_league_is_not_european_pyramid_edge(self):
+  from world_historical_competition_registry import SCHEMA
+  self.assertIn("CREATE TABLE official_mls_conference_clubs(",SCHEMA)
+  self.assertIn("CREATE TABLE season_non_pyramid_formats(",SCHEMA)
+  self.assertIn("CHECK(direct_promotions=0)",SCHEMA)
+  self.assertIn("CHECK(direct_relegations=0)",SCHEMA)
+  self.assertIn("CHECK(career_ready=0)",SCHEMA)
  def test_continental_cup_never_counts_as_domestic_division(self):
   self.assertTrue(cup_group("CONMEBOL Libertadores"))
   self.assertTrue(cup_group("CONMEBOL Sudamericana"))
