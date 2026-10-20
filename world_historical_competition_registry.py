@@ -8,7 +8,7 @@ import argparse,csv,hashlib,json,re,sqlite3,unicodedata
 from collections import defaultdict,Counter
 from pathlib import Path
 
-VERSION="historical-competition-register-v5"
+VERSION="historical-competition-register-v6"
 YEARS=set(range(2005,2028))-{2025}
 CUPS=("conmebol libertadores","conmebol sudamericana","uefa champions","uefa europa")
 # Only genuinely country-specific labels are eligible for provisional SOURCE
@@ -164,7 +164,7 @@ CREATE TABLE sourced_nonplayable_feeder_clubs(
 def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
             legacy_multicountry_dir=None,supplement_dir=None,
             identity_review_file=None,current_edition_dir=None,
-            fa_allocations_dir=None,official_mls_dir=None):
+            fa_allocations_dir=None,official_mls_dir=None,backfill_dir=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"HISTORICAL_COMPETITION_REGISTER.sqlite"
     if target.exists():raise FileExistsError("Do not overwrite a previous release")
@@ -232,6 +232,17 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
             comps[code]=(y,row["Country"],int(row["Tier"]),
                 row["Competition"],row["Source_URL"],row["Source_SHA256"])
             source_sizes[code]=int(row["Parsed_Teams"])
+    if backfill_dir is not None:
+        for row in csvrows(Path(backfill_dir)/
+                           "EXPANDED_DOMESTIC_LEAGUE_SEASONS.csv"):
+            edition=int(row["Edition"]);code=f"{edition}:{row['League_Code']}"
+            if row["Source_Status"]!="independent_pinned_source_fixture_team_count_checked":
+                raise ValueError("Historical source was not fixture-count checked")
+            if edition not in YEARS or code in comps or int(row["Parsed_Teams"])<10:
+                raise ValueError("Backfill overlaps a sourced division or invents an edition")
+            comps[code]=(edition,row["Country"],int(row["Tier"]),row["Competition"],
+                         row["Source_URL"],row["Source_SHA256"])
+            source_sizes[code]=int(row["Parsed_Teams"])
     if current_edition_dir is not None:
         for row in csvrows(Path(current_edition_dir)/
                       "FC27_PINNED_CURRENT_COMPETITION_SEASONS.csv"):
@@ -297,6 +308,22 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
             method=("exact" if game_name.strip().casefold()==fixture.strip().casefold()
                     else "alias_requires_review")
             add(y,key,code,fixture,method,row["Source_URL"])
+    if backfill_dir is not None:
+        for row in csvrows(Path(backfill_dir)/"EXPANDED_DOMESTIC_SOURCE_CLUBS.csv"):
+            edition=int(row["Edition"]);code=f"{edition}:{row['League_Code']}"
+            if row["Evidence_Status"]!="independent_fixture_membership_pending_game_id":
+                raise ValueError("Unreviewed backfill club evidence")
+            if code not in comps or (row["Source_URL"],row["Source_SHA256"])!=comps[code][4:6]:
+                raise ValueError("Backfill club source hashes disagree with division")
+            fixture=row["Fixture_Club"]
+            hits=aliases[(edition,canonical(fixture))]
+            if len(hits)!=1:continue
+            game_key,game_name=hits[0]
+            if identity_guard.get((edition,game_key),comps[code][1])!=comps[code][1]:
+                continue
+            method=("exact" if game_name.strip().casefold()==fixture.strip().casefold()
+                    else "alias_requires_review")
+            add(edition,game_key,code,fixture,method,row["Source_URL"])
     if current_edition_dir is not None:
         for row in csvrows(Path(current_edition_dir)/
                             "FC27_PINNED_CURRENT_SOURCE_CLUBS.csv"):
@@ -421,6 +448,15 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
                 raise ValueError("Invalid independent supplemental source status")
             register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
                 row["Source_SHA256"])
+    recovered_source_memberships=0
+    if backfill_dir is not None:
+        for row in csvrows(Path(backfill_dir)/"EXPANDED_DOMESTIC_SOURCE_CLUBS.csv"):
+            edition=int(row["Edition"]);code=f"{edition}:{row['League_Code']}"
+            if row["Evidence_Status"]!="independent_fixture_membership_pending_game_id":
+                raise ValueError("Backfill club source has no independent game-name proof")
+            register_source_club(edition,code,row["Fixture_Club"],row["Source_URL"],
+                                 row["Source_SHA256"])
+            recovered_source_memberships+=1
     snapshot_member_count=0
     if current_edition_dir is not None:
         for row in csvrows(Path(current_edition_dir)/
@@ -582,6 +618,7 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None,
        "external_feeders_unverified":len(boundaries),
        "season_versioned_rule_records":len(season_rules),
        "historical_nonplayable_feeder_club_years":len(feeder_clubs),
+       "new_pinned_backfill_source_memberships":recovered_source_memberships,
        "current_edition_third_party_snapshot_memberships":snapshot_member_count,
        "current_edition_source_feeder_entries":sum(x[0]==2027 for x in feeder_clubs),
        "official_fa_2027_allocations_crosschecked":len(official_fa_clubs),
@@ -604,6 +641,7 @@ if __name__=="__main__":
     p.add_argument("--current-edition-dir")
     p.add_argument("--fa-allocations-dir")
     p.add_argument("--official-mls-dir")
+    p.add_argument("--backfill-dir")
     a=p.parse_args()
     print(json.dumps(collect(a.source,a.recent_dir,a.early_dir,a.graph,
         a.output,feeder_dir=a.feeder_dir,
@@ -612,4 +650,5 @@ if __name__=="__main__":
         identity_review_file=a.identity_review,
         current_edition_dir=a.current_edition_dir,
         fa_allocations_dir=a.fa_allocations_dir,
-        official_mls_dir=a.official_mls_dir),indent=2))
+        official_mls_dir=a.official_mls_dir,
+        backfill_dir=a.backfill_dir),indent=2))
