@@ -75,9 +75,20 @@ jobs:
               assert row
               club_id=row[0]
               career=f'historical_{y}_smoke'
+              # The player/source data is a QA-only snapshot until the
+              # full domestic competition graph and feeder pools are verified.
+              try:
+                  start_sandbox(db,career_id=career,dataset_id=ds,title='Historical career smoke',
+                      manager_club_id=club_id,pes_lock_date=f'{y-1}-08-01',
+                      next_summer_date=f'{y}-07-01')
+              except ValueError as e:
+                  assert 'Historical competition hierarchy incomplete' in str(e)
+              else:
+                  raise AssertionError('Unverified historical world was incorrectly playable')
+              assert db.execute('SELECT COUNT(*) FROM world_career_saves WHERE career_id=?',(career,)).fetchone()[0]==0
               count=start_sandbox(db,career_id=career,dataset_id=ds,title='Historical career smoke',
                    manager_club_id=club_id,pes_lock_date=f'{y-1}-08-01',
-                   next_summer_date=f'{y}-07-01')
+                   next_summer_date=f'{y}-07-01',competition_qa_override=True)
               assert count>=600
               registered=db.execute('SELECT COUNT(*) FROM world_career_registrations WHERE career_id=?',(career,)).fetchone()[0]
               expected=db.execute('SELECT COUNT(*) FROM world_dataset_rosters WHERE dataset_id=?',(ds,)).fetchone()[0]
