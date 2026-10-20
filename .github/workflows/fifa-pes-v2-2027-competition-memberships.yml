@@ -45,7 +45,10 @@ jobs:
           assert j["manufactured_game_players"]==0
           codes={r["League_Code"] for r in seasons}
           assert {"en.3","en.4","de.3","es.2","it.2","fr.2","us.mls","ar.1"}.issubset(codes)
-          assert {"en.5","en.6n","en.6s"}.issubset(codes)
+          assert {"en.5","en.6n","en.6s","sco.3","sco.4"}.issubset(codes)
+          assert j["independently_observed_competitions"]==16
+          assert j["independently_observed_club_memberships"]==328
+          assert j["rejected_competitions"]==0
           assert len({(r["Edition"],r["League_Code"]) for r in seasons})==len(seasons)
           assert all(r["Edition"]=="2027" for r in names)
           assert all(r["Evidence_Status"]=="source_observation_pending_game_identity_review" for r in names)
