@@ -49,7 +49,7 @@ class HistoricalSquadTests(unittest.TestCase):
             {"player_id":"12","club_name":"Free Agents","club_team_id":"",
              "league_name":"","league_id":"","name":"Free","club_loaned_from":""},
             {"player_id":"13","club_name":"","club_team_id":"",
-             "league_name":"","league_id":"","name":"Unknown","club_loaned_from":""},
+             "league_name":"","league_id":"","name":"Unassigned Player","club_loaned_from":""},
         ]
         provider="test/pinned-source"
         converted=[]
