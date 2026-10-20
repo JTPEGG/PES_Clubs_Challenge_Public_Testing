@@ -143,7 +143,8 @@ class InitialHistoricalLoanTests(unittest.TestCase):
     def test_inconsistent_parent_loan_refuses_to_seed(self):
         with make_db() as db:
             seed_career_contracts(db,career_id="new_career",dataset_id="historical_2020")
-            db.execute("UPDATE world_dataset_initial_loans SET parent_club_id=20")
+            db.execute("""UPDATE world_dataset_initial_loans
+                SET parent_club_id=20,borrower_club_id=10""")
             with self.assertRaises(ValueError):
                 seed_existing_loans_and_payroll(
                     db,career_id="new_career",dataset_id="historical_2020",
