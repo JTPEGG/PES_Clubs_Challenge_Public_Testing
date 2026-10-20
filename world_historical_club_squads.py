@@ -37,7 +37,7 @@ CLUB_ID_COLS=("club_team_id","club_id","clubId","ClubID")
 LEAGUE_COLS=("club_league_name","league_name","league","League","LeagueName")
 LEAGUE_ID_COLS=("club_league_id","league_id","LeagueID")
 LEAGUE_LEVEL_COLS=("league_level","league_rank")
-LOAN_COLS=("club_loaned_from","loaned_from","loanedFrom","OnLoad")
+LOAN_COLS=("club_loaned_from","loaned_from","loanedFrom")
 SCHEMA="""
 PRAGMA foreign_keys=ON;
 CREATE TABLE editions(
@@ -179,11 +179,18 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
     duplicate_ids=Counter()
     club_league_seen=defaultdict(set)
     conflicting_names=defaultdict(set)
+    club_sizes=Counter()
     assigned=free=unknown=0
     for ordinal,(src,pes) in enumerate(zip(source_rows,rating_rows),start=1):
         source_id=clean(pes["source_player_id"])
         if not source_id or not clean(pes["player_name"]):
             raise ValueError(f"{year} row {ordinal}: missing source identity")
+        raw_player_id=first(src,("player_id","sofifa_id","ID"))
+        if raw_player_id and raw_player_id!=source_id:
+            raise ValueError(f"{year} row {ordinal}: source/player CSV ordering mismatch")
+        raw_club=source_club(src)
+        if raw_club!=clean(pes["source_club"]):
+            raise ValueError(f"{year} row {ordinal}: source club/converted club mismatch")
         if int(pes["source_edition"])!=year or pes["source_provider"]!=provider:
             raise ValueError(f"{year} row {ordinal}: invalid source edition/provider")
         expected_namespaced=f"{year}:{provider}:{source_id}"
@@ -198,6 +205,7 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
         league_key=league_ref(src,year)
         if club_key:
             assigned+=1
+            club_sizes[club_key]+=1
             source_club_id=first(src,CLUB_ID_COLS)
             if club_key not in clubs:
                 clubs[club_key]=(club_name,source_club_id)
@@ -271,7 +279,7 @@ def process_ed(conn,original,conversion,year,source_rec,pes_stats,source_file):
            league_conflicts,squad_size,source_provider)
           VALUES (?,?,?,?,?,?,?,?,?)""",(
             club_key,year,name,sid or None,lk,status,conflict,
-            sum(p[15]==club_key for p in players),provider))
+            club_sizes[club_key],provider))
     conn.executemany("""INSERT INTO players
        (player_key,edition,source_row_number,source_player_id,
         namespaced_source_player_key,player_name,date_of_birth,nationality,
