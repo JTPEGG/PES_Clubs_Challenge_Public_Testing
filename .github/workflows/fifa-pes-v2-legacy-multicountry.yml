@@ -1,0 +1,64 @@
+name: PES V2 2005-2010 additional multi-country competition sources
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/collect_legacy_multicountry_leagues.py'
+      - 'test_collect_legacy_multicountry_leagues.py'
+      - '.github/workflows/fifa-pes-v2-legacy-multicountry.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: historical-legacy-multicountry-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test historical membership CSV format and country scope
+        run: python -m unittest -v test_collect_legacy_multicountry_leagues
+      - name: Download existing men's source club data
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Collect immutable CC0 pre-2010 domestic first divisions
+        run: |
+          python -u -m scripts.collect_legacy_multicountry_leagues \
+            --catalog input/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --output release/
+      - name: Verify 48 dated competitions and no simulated playable clubs
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          d=Path('release')
+          j=json.loads((d/'LEGACY_MULTICOUNTRY_AUDIT.json').read_text())
+          assert j['years']==6 and j['countries']==8
+          assert j['independently_sourced_league_seasons']==48
+          assert j['source_club_memberships']>=700
+          assert j['exact_name_matches_provisional']>0
+          assert not j['complete_career_editions']
+          assert j['original_fifa_squads_modified'] is False
+          with (d/'LEGACY_MULTICOUNTRY_SOURCE_CLUBS.csv').open(
+              encoding='utf-8-sig',newline='') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==j['source_club_memberships']
+          assert all(row['Tier']=='1' for row in rows)
+          print(json.dumps(j,indent=2))
+          PY
+      - name: Upload season-specific club source evidence and identity review
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-2005-2010-EIGHT-COUNTRY-DOMESTIC-LEAGUE-MEMBERSHIPS
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
