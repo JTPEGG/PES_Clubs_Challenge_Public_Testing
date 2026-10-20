@@ -139,6 +139,8 @@ def collect(output):
            "independently_observed_competitions":len(competitions),
            "independently_observed_club_memberships":len(memberships),
            "rejected_competitions":len(skipped),
+           "quarantined_source_details":[{"code":c,"folder":folder,"reason":reason}
+                for _,c,folder,reason in skipped],
            "counts_by_family":dict(source_stats),
            "staging_only":True,
            "game_club_identity_confirmed":False,
