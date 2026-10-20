@@ -58,7 +58,7 @@ jobs:
           assert report['unresolved']==8083
           assert report['linked_provisional_evidence']==5021
           assert report['alias_identity_review']==1106
-          assert report['uncrosswalked_name_candidates']<=25
+          assert report['uncrosswalked_name_candidates']==0
           assert report['game_id_disambiguations']==2
           assert sum(report['reasons_unresolved'].values())==8083
           assert not report['career_ready_editions']
