@@ -17,6 +17,11 @@ class FC27CompetitionMembershipTests(unittest.TestCase):
         self.assertEqual(canonical_team("Milton Keynes Dons"),"MK Dons")
         self.assertEqual(canonical_team("Los Angeles Football Club"),"LAFC")
         self.assertEqual(canonical_team("Orlando City SC"),"Orlando City")
+        self.assertEqual(canonical_team("Airdrie Utd"),"Airdrieonians")
+        self.assertEqual(canonical_team("Queen of Sth"),"Queen of South")
+        self.assertEqual(canonical_team("Annan Athletic"),"Annan")
+        self.assertEqual(canonical_team("Elgin"),"Elgin City")
+        self.assertEqual(canonical_team("Forfar"),"Forfar Athletic")
         self.assertEqual(canonical_team("Manchester United"),"Manchester United")
     def test_reject_outside_starting_edition_dates(self):
         with self.assertRaises(ValueError):
