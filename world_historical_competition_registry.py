@@ -82,6 +82,12 @@ CREATE TABLE season_versioned_rules(
   evidence_url TEXT NOT NULL,source_status TEXT NOT NULL,
   feeder_verified INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(edition,lower,upper));
+CREATE TABLE sourced_domestic_league_clubs(
+  edition INTEGER NOT NULL,competition_code TEXT NOT NULL
+  REFERENCES competition_seasons(code),club_name TEXT NOT NULL,
+  source_url TEXT NOT NULL,source_sha256 TEXT NOT NULL,
+  verification TEXT NOT NULL CHECK(verification='independent_fixture_membership'),
+  PRIMARY KEY(edition,competition_code,club_name));
 CREATE TABLE sourced_nonplayable_feeder_clubs(
   edition INTEGER NOT NULL,competition_code TEXT NOT NULL,
   club_name TEXT NOT NULL,tier INTEGER NOT NULL,
@@ -184,6 +190,33 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
               else "unresolved")
         rows.append((y,key,name,label,kind,comp,conf,"blocked"))
         if comp:per_year[y]+=1
+    # Preserve *all* historical source teams, even where no matching FIFA
+    # squad exists. Each team is a dated independent fixture participant,
+    # never a manufactured playable club or future career entrant.
+    source_clubs={}
+    def register_source_club(y,code,team,url,source_sha):
+        if code not in comps or comps[code][0]!=y:
+            raise ValueError("External team linked to non-existent domestic season")
+        if comps[code][4]!=url or comps[code][5]!=source_sha:
+            raise ValueError("External team evidence disagrees with pinned league")
+        key=(y,code,team)
+        if key in source_clubs:raise ValueError("Duplicate external team membership")
+        source_clubs[key]=(y,code,team,url,source_sha,
+             "independent_fixture_membership")
+    for row in csvrows(recent_dir/"PINNED_OPENFOOTBALL_ALL_SOURCE_TEAMS.csv"):
+        y=int(row["Edition"]);code=f"{y}:{row['League_Code']}"
+        if row["Evidence_Status"]!="pinned_fixture_membership_not_game_identity":
+            raise ValueError("Unverified source club offered as league membership")
+        register_source_club(y,code,row["Fixture_Club"],row["Source_URL"],
+            row["Source_SHA256"])
+    # Legacy source exports split independent teams between exact candidates
+    # and name-review rows; both are actual source fixture participants.
+    for file in ("ENGLAND_2005_2010_PROVISIONAL_CLUB_COMPETITIONS.csv",
+                 "ENGLAND_2005_2010_CLUB_NAME_REVIEW.csv"):
+        for row in csvrows(early_dir/file):
+            y=int(row["FIFA_Edition"]);code=f"{y}:en.{row['Tier']}"
+            register_source_club(y,code,row["Source_Team"],row["Source_URL"],
+                comps[code][5])
     # Date-scoped rules remain separately distinguishable from verified
     # full feeder pools. A National League fixture list is not a game squad.
     from world_historical_movement_rules import EDITION_YEARS,source_rules
@@ -230,6 +263,8 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
             ((r["edition"],r["lower"],r["upper"],r["direct_promotions"],
              r["playoff_promotions"],r["playoff_entrants"],r["direct_relegations"],
              r["evidence_url"],r["source_status"],0) for r in season_rules))
+        db.executemany("INSERT INTO sourced_domestic_league_clubs VALUES (?,?,?,?,?,?)",
+            source_clubs.values())
         db.executemany("INSERT INTO sourced_nonplayable_feeder_clubs VALUES (?,?,?,?,?,?,?)",
             feeder_clubs)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
@@ -263,6 +298,8 @@ def collect(source,recent_dir,early_dir,graph_file,output,feeder_dir=None):
        "external_feeders_unverified":len(boundaries),
        "season_versioned_rule_records":len(season_rules),
        "historical_nonplayable_feeder_club_years":len(feeder_clubs),
+       "independent_domestic_fixture_club_years":len(source_clubs),
+       "source_club_country_count":len({v[1] for v in comps.values()}),
        "career_ready_editions":[],
        "comment":"Historical fixture data and provider league labels are evidence only. Complete country-wide feeders and all club assignments are NOT yet verified."}
     (out/"COMPETITION_REGISTRY_AUDIT.json").write_text(json.dumps(report,indent=2))
