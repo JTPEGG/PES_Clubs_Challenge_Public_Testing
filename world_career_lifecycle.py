@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS world_career_lifecycle_events(
 
 def initialize_career_lifecycle(conn):
     conn.executescript(SCHEMA)
+    from world_historical_career_finances import initialize_historical_finances
+    initialize_historical_finances(conn)
     conn.commit()
 
 
@@ -75,8 +77,12 @@ def seed_career_contracts(conn, *, career_id, dataset_id):
                d.renewal_status,d.source_name
         FROM world_dataset_contract_snapshots d
         JOIN world_career_registrations r ON r.player_id=d.player_id
-            AND r.career_id=? AND r.club_id=d.club_id
-        WHERE d.dataset_id=?""",(career_id,career_id,dataset_id))
+            AND r.career_id=?
+        WHERE d.dataset_id=? AND (r.club_id=d.club_id OR EXISTS (
+             SELECT 1 FROM world_dataset_initial_loans l
+             WHERE l.dataset_id=d.dataset_id AND l.player_id=d.player_id
+               AND l.parent_club_id=d.club_id AND l.borrower_club_id=r.club_id
+        ))""",(career_id,career_id,dataset_id))
     return conn.total_changes-before
 
 
@@ -211,6 +217,8 @@ def reconcile_verified_season_end(conn, *, career_id, season_index, as_of):
         WHERE career_id=?""",(career_id,)).fetchone()
     if season is None or as_of<season[0]:
         raise ValueError("Do not mature contracts before next summer")
+    from world_historical_career_finances import is_historical_finance_career
+    payroll_tracking=is_historical_finance_career(conn,career_id)
     conn.execute("BEGIN IMMEDIATE")
     try:
         returned=0
@@ -226,9 +234,19 @@ def reconcile_verified_season_end(conn, *, career_id, season_index, as_of):
                 raise ValueError("Loan return conflicts with player ownership")
             conn.execute("""UPDATE world_career_registrations SET club_id=?
                 WHERE career_id=? AND player_id=?""",(parent,career_id,pid))
-            conn.execute("""UPDATE world_career_club_ledger SET
+            changed=conn.execute("""UPDATE world_career_club_ledger SET
                 committed_wages=committed_wages-? WHERE career_id=? AND club_id=?
                 AND committed_wages>=?""",(wage,career_id,borrower,wage))
+            if changed.rowcount!=1:
+                raise ValueError("Borrower payroll underflow at loan return")
+            if payroll_tracking:
+                # The initial-loan parent originally paid the remaining wage.
+                # Returning the player increases parent liability to 100%.
+                changed=conn.execute("""UPDATE world_career_club_ledger SET
+                    committed_wages=committed_wages+?
+                    WHERE career_id=? AND club_id=?""",(wage,career_id,parent))
+                if changed.rowcount!=1:
+                    raise ValueError("Loan parent missing from financial career")
             conn.execute("""UPDATE world_career_loan_agreements
                 SET status='returned' WHERE loan_id=?""",(lid,))
             conn.execute("""INSERT OR IGNORE INTO world_career_lifecycle_events
@@ -247,6 +265,18 @@ def reconcile_verified_season_end(conn, *, career_id, season_index, as_of):
             conn.execute("""INSERT OR IGNORE INTO world_career_free_agents
                 (career_id,player_id,former_club_id,available_from,reason)
                 VALUES(?,?,?,?,'contract_expired')""",(career_id,pid,parent,expires))
+            if payroll_tracking:
+                record=conn.execute("""SELECT weekly_wage_gbp FROM
+                   world_career_contract_snapshots WHERE career_id=?
+                   AND player_id=?""",(career_id,pid)).fetchone()
+                if record and record[0] is not None:
+                    changed=conn.execute("""UPDATE world_career_club_ledger SET
+                        committed_wages=committed_wages-?
+                        WHERE career_id=? AND club_id=?
+                        AND committed_wages>=?""",
+                        (record[0],career_id,parent,record[0]))
+                    if changed.rowcount!=1:
+                        raise ValueError("Parent payroll underflow on contract expiry")
             conn.execute("""DELETE FROM world_career_registrations
                 WHERE career_id=? AND player_id=?""",(career_id,pid))
             conn.execute("""INSERT OR IGNORE INTO world_career_lifecycle_events
