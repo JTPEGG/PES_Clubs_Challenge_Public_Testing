@@ -1,0 +1,74 @@
+name: PES V2 historical men-only club finance database
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_club_financials.py'
+      - 'test_world_historical_club_financials.py'
+      - '.github/workflows/fifa-pes-v2-club-finances.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: v2-club-financials-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build-club-finances:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test assumptions, locked payroll obligations and transfer budgets
+        run: python -m unittest -v test_world_historical_club_financials
+      - name: Download approved FC27 v4 men's wages contracts and loans
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-MENS-22-EDITION-STARTING-WAGES-CONTRACTS-LOANS
+          run-id: 39423495384
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Build immutable all-22-season club budgets and transparent review CSVs
+        run: |
+          python -u -m world_historical_club_financials \
+            --input source/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite \
+            --output release/
+      - name: Validate all club salary obligations and requested release views
+        run: |
+          python - <<'PY'
+          import csv,hashlib,json,sqlite3
+          from pathlib import Path
+          p=Path('release/PES_V2_HISTORICAL_CLUB_FINANCIALS.sqlite')
+          raw=Path('source/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite')
+          report=json.loads(Path('release/CLUB_FINANCE_AUDIT.json').read_text())
+          with sqlite3.connect(p) as db, sqlite3.connect(raw) as src:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert db.execute('SELECT COUNT(*) FROM club_financial_profiles').fetchone()[0]==13104
+              assert len(db.execute('SELECT DISTINCT edition FROM club_financial_profiles').fetchall())==22
+              assert db.execute('SELECT COUNT(*) FROM club_financial_profiles WHERE edition=2025').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM club_financial_profiles WHERE game_wage_budget_weekly_gbp < starting_payroll_weekly_gbp').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM club_financial_profiles WHERE starting_wage_headroom_weekly_gbp != game_wage_budget_weekly_gbp - starting_payroll_weekly_gbp').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM club_financial_profiles WHERE game_transfer_budget_gbp <= 0').fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM club_financial_profiles WHERE finance_source != 'game_model_estimate'").fetchone()[0]==0
+              expected=dict(src.execute('SELECT club_key,model_payroll_weekly_gbp FROM starting_club_finances').fetchall())
+              actual=dict(db.execute('SELECT club_key,starting_payroll_weekly_gbp FROM club_financial_profiles'))
+              assert actual==expected, 'Source loan-adjusted payroll must not change'
+              assert src.execute('SELECT COUNT(*) FROM starting_player_finances').fetchone()[0]==317449
+              assert src.execute('SELECT COUNT(*) FROM starting_source_loans').fetchone()[0]==10861
+              assert report['source_wage_model']=='historical-wage-and-loan-v4-fc27-quality-reviewed'
+              print('ALL 13104 GAME CLUB BUDGETS VALIDATED; ORIGINAL 317449 SALARIES AND 10861 LOANS UNCHANGED')
+          for name,n in (('ALL_22_EDITIONS_CLUB_FINANCES.csv',13104),
+                        ('FC27_CLUB_FINANCES.csv',670)):
+              with (Path('release')/name).open(encoding='utf-8-sig',newline='') as f:
+                  assert sum(1 for _ in csv.DictReader(f))==n
+          print('RELEASE CSV ROW COUNTS PASS')
+          PY
+      - name: Upload historical club finance reference and CSV review package
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-MENS-22-SEASON-CLUB-FINANCIALS-REVIEW
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
