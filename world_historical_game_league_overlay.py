@@ -25,7 +25,8 @@ CREATE TABLE game_source_club_home_leagues(
   game_league_id TEXT NOT NULL,ea_team_id TEXT NOT NULL,ea_team_name TEXT NOT NULL,
   team_nationality TEXT NOT NULL,source_observations INTEGER NOT NULL,
   original_game_name_match TEXT NOT NULL
-    CHECK(original_game_name_match='unique_same_edition_exact_name'),
+    CHECK(original_game_name_match IN ('unique_same_edition_exact_name',
+         'unique_same_edition_controlled_alias')),
   source_sha256 TEXT NOT NULL,
   FOREIGN KEY(edition,club_key)
     REFERENCES edition_club_competitions(edition,club_key),
@@ -75,7 +76,8 @@ def build(registry,game_csv,outdir,*,strict=True):
         y=int(x["Edition"]);ident=x["Game_League_ID"]
         if y not in range(2015,2024) or not ident.isdigit():
             raise ValueError("Invalid same-edition FIFA league ID")
-        if (x["Name_Method"]!="unique_same_edition_exact_name"
+        if (x["Name_Method"] not in {"unique_same_edition_exact_name",
+                                      "unique_same_edition_controlled_alias"}
             or x["Evidence_Status"] not in
               {"game_edition_home_league_identified","previous_fixture_evidence_corroborated"}
             or not x["EA_Team_ID"].isdigit()):
