@@ -32,7 +32,8 @@ def run(db_path,year):
     initialise_live_market(conn)
     start_sandbox(conn,career_id=career,dataset_id=ds,
         title=f"Sandbox FIFA {year} autonomous market validation",manager_club_id=cid,
-        pes_lock_date=f"{year-1}-08-01",next_summer_date=f"{year}-07-01")
+        pes_lock_date=f"{year-1}-08-01",next_summer_date=f"{year}-07-01",
+        competition_qa_override=True)
     # Live market offer checks use the real server clock internally. A
     # historical noon test clock would already be expired and reject every
     # attempt, falsely reporting zero organic offers. Start NOW; fast-forward
