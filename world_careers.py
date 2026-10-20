@@ -513,6 +513,18 @@ def propose_offer(conn, *, career_id, request_key, player_id, buying_club_id,
         if not reg:raise ValueError("Player not registered in this career")
         seller=reg[0]
         if seller==buying_club_id:raise ValueError("Player is already at buying club")
+        # A borrower holds playing registration but never sale ownership.
+        # Until parent-owned permanent transfers can cancel/settle active loan
+        # obligations atomically, block rather than let the borrower sell him.
+        from world_historical_career_finances import is_historical_finance_career
+        if is_historical_finance_career(conn,career_id):
+            on_loan=_one(conn,"""SELECT parent_club_id FROM
+              world_career_loan_agreements WHERE career_id=? AND player_id=?
+              AND status='active'""",(career_id,player_id))
+            if on_loan:
+                raise ValueError("Player is on loan. Permanent transfers must be "
+                    "negotiated with the parent club; owner-aware loan-sale "
+                    "settlement is not enabled in this career version.")
         active=_one(conn,"""SELECT offer_id FROM world_career_offers WHERE career_id=?
             AND player_id=? AND status IN ('proposed','countered','accepted_pending_contract','agreed_future')
             AND buying_club_id=?""",(career_id,player_id,buying_club_id))
