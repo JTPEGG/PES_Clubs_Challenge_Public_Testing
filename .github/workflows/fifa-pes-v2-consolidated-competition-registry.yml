@@ -100,7 +100,7 @@ jobs:
           assert summary['exact_matches']>=2800
           assert summary['normalized_alias_candidates']>=700
           assert summary['independent_domestic_fixture_club_years']==6539
-          assert summary['source_identity_country_guards']==1
+          assert summary['source_identity_country_guards']==2
           assert summary['curated_named_groups_with_independent_fixture_count']>=0
           assert summary['source_club_country_count']>=19
           assert not summary['career_ready_editions']
