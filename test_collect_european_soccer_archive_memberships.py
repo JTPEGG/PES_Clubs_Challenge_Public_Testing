@@ -27,7 +27,7 @@ class EuropeanHistoricalClubPools(unittest.TestCase):
    self.assertTrue(SOURCE_COMMIT)
    self.assertEqual(len(COUNTRIES),11)
    self.assertFalse(result["historical_careers_ready"])
- def test_wrong_team_identity_rejected(self):
+ def test_wrong_team_identity_is_not_fabricated(self):
   with tempfile.TemporaryDirectory() as folder:
    d=Path(folder);src=d/"matches.sqlite"
    with sqlite3.connect(src) as db:
@@ -41,7 +41,8 @@ class EuropeanHistoricalClubPools(unittest.TestCase):
     db.execute("INSERT INTO League VALUES(13,1)")
     db.execute("INSERT INTO Team VALUES(1,'Arsenal')")
     db.execute("INSERT INTO Match VALUES(1,'2008/2009',13,1,2)")
-   with self.assertRaises(ValueError):
-    extract(src,d/"output")
+   result=extract(src,d/"output")
+   self.assertEqual(result["complete_season_divisions"],0)
+   self.assertEqual(result["skipped_match_rows"].get("match_missing_team_identity"),1)
 
 if __name__=="__main__":unittest.main()
