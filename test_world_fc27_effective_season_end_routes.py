@@ -54,18 +54,18 @@ class AllFC27EffectiveRoutesTests(unittest.TestCase):
                WHERE route_type='regional_4_up_4_down'
             """).fetchone()[0],2)
     def test_cannot_activate_mls_as_relegation_pyramid(self):
+        import sqlite3
         with prepared() as db:
-            db.execute("""
-              UPDATE fc27_mls_playable_closed_league_approval
-              SET no_promotion_or_relegation=0
-            """)
-            with self.assertRaises(Exception):
-                stage(db,strict=False)
+            with self.assertRaises(sqlite3.IntegrityError):
+                db.execute("""
+                  UPDATE fc27_mls_playable_closed_league_approval
+                  SET no_promotion_or_relegation=0
+                """)
     def test_reject_disabled_german_route(self):
         with prepared() as db:
             db.execute("""
                UPDATE fc27_effective_core_pyramid_game_boundaries
-               SET game_enabled=0 WHERE upper_code='2027:de.3'
+               SET game_enabled=0 WHERE upper_code='2027:de.2'
             """)
             with self.assertRaisesRegex(ValueError,"seven official"):
                 stage(db,strict=False)
