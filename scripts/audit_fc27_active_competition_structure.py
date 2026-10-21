@@ -110,6 +110,20 @@ def audit(connection, *, strict=True):
     }
     if len(staged_additional)!=9:
         raise ValueError("Expected all nine additional country movement routes")
+    gameplay_decisions={
+        (lower,upper):(up,playoff,down,tie,policy)
+        for lower,upper,up,playoff,down,tie,policy in connection.execute("""
+          SELECT lower_code,upper_code,direct_promotions,playoff_promotions,
+                 direct_relegations,interdivision_playoff_places,status
+          FROM fc27_user_approved_movement_game_rules WHERE edition=2027
+        """)
+    }
+    if len(gameplay_decisions)!=2:
+        raise ValueError("FC27 user-approved Italian and Austrian game decisions missing")
+    if gameplay_decisions[("2027:it.2","2027:it.1")][:4]!=(2,1,3,0):
+        raise ValueError("Italian game play-off numbers changed")
+    if gameplay_decisions[("2027:at.2","2027:at.1")][:4]!=(1,0,1,0):
+        raise ValueError("Austria direct-exchange game simplification changed")
     named_nonplayable_feeders=connection.execute("""
         SELECT COUNT(*) FROM fc27_extra_movement_feeder_nodes
         WHERE edition=2027 AND club_roster_verified=0
@@ -190,6 +204,10 @@ def audit(connection, *, strict=True):
             for x in diagnostics),
         "known_dated_2027_pyramid_edges":len(season["promotion_edges"]),
         "additional_source_country_movement_edges":len(staged_additional),
+        "user_approved_explicit_gameplay_movement_simplifications":len(gameplay_decisions),
+        "italian_serie_b_gameplay_uses_promotion_playoff":True,
+        "austrian_gameplay_uses_direct_one_up_one_down":True,
+        "game_assumptions_separated_from_historical_regulations":True,
         "total_staged_2027_movement_edges":len(season["promotion_edges"])+len(staged_additional),
         "additional_one_hop_feeder_names_without_game_rosters":named_nonplayable_feeders,
         "competitions_with_additional_season_dated_movement_rules":sum(
