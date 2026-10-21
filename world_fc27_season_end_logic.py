@@ -105,7 +105,9 @@ def resolve_boundary(
     elif interdivision_winner is not None:
         raise ValueError("Result provided for a non-existent interdivision playoff")
     promoted=tuple(direct+playoffs)
-    relegated=tuple(drops)
+    # Keep the original standings order for deterministic club movement logs,
+    # even when the conditional play-off adds the 16th-place survival club.
+    relegated=tuple(sorted(drops,key=upper.index))
     if len(promoted)!=len(relegated):
         raise ValueError("Unbalanced club exchange")
     new_upper=tuple([x for x in upper if x not in relegated]+list(promoted))
