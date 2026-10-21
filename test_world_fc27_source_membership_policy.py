@@ -15,10 +15,21 @@ def fixture():
       evidence_origin TEXT,verification_scope TEXT);
     CREATE TABLE sourced_domestic_league_clubs(
       edition INTEGER,competition_code TEXT,club_name TEXT);
+    CREATE TABLE competition_seasons(
+      edition INTEGER,code TEXT,country TEXT,tier INTEGER,name TEXT);
+    CREATE TABLE fc27_reviewed_domestic_competitions(
+      edition INTEGER,canonical_code TEXT,country TEXT,tier INTEGER,
+      competition TEXT,calendar TEXT);
+    CREATE TABLE fc27_conmebol_2026_domestic_league_sources(
+      edition INTEGER,league_code TEXT,country TEXT,
+      national_competition_tier INTEGER,competition TEXT,source_year INTEGER);
     CREATE TABLE edition_readiness(edition INTEGER,career_ready INTEGER);
     INSERT INTO edition_readiness VALUES(2027,0);
     """)
     for code,count in SOURCE_AS_PROVIDED_COUNTS.items():
+        db.execute("""
+          INSERT INTO fc27_reviewed_domestic_competitions VALUES(2027,?,?,?,?,?)
+        """,(code,"Test association",1,code,"autumn_spring"))
         for i in range(count):
             db.execute("""
               INSERT INTO fc27_2026_27_complete_source_competition_alignment
@@ -52,6 +63,12 @@ class FC27SourceAsProvidedPolicyTests(unittest.TestCase):
             self.assertEqual(db.execute(
                 "SELECT COUNT(*) FROM fc27_accepted_source_as_provided_clubs"
             ).fetchone()[0],280)
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM fc27_source_as_provided_competition_seasons"
+            ).fetchone()[0],33)
+            self.assertEqual(db.execute(
+                "SELECT COUNT(*) FROM fc27_2026_27_active_domestic_competitions"
+            ).fetchone()[0],33)
             self.assertEqual(db.execute(
                 "SELECT COUNT(*) FROM fc27_source_as_provided_membership_policy "
                 "WHERE independent_fixture_roster_verified=0 "
