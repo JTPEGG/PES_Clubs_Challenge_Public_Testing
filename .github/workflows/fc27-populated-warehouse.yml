@@ -192,6 +192,7 @@ jobs:
           assert report["club_financial_circumstances"]==659
           assert report["personality_priors"]==17593
           assert report["fictional_manager_recruitment_policies"]==659
+          assert report["anonymous_simulated_manager_agent_profiles"]==659
           assert report["real_verified_manager_profiles"]==0
           assert report["ai_club_joined_contexts"]==659
           assert report["estimated_club_reputations_without_real_prestige"]==659
@@ -212,8 +213,26 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM wh_fc27_decision_model_versions").fetchone()[0]==4
               assert db.execute("SELECT COUNT(*) FROM wh_fc27_financial_evidence_events").fetchone()[0]==report["financial_source_events_as_of_preseason"]
               assert db.execute("SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'world_career_%'").fetchone()[0]==0
+          from warehouse.fc27_reference_reader import FC27WarehouseReader
+          with FC27WarehouseReader(file) as wh:
+              coverage=wh.decision_dimension_coverage()
+              assert coverage["clubs"]==659
+              assert coverage["finances"]==659
+              assert coverage["personalities"]==17593
+              assert coverage["anonymous_manager_simulation"]==659
+              assert coverage["actual_verified_managers"]==0
+              club=db.execute("SELECT club_key FROM wh_fc27_clubs ORDER BY club_key LIMIT 1").fetchone()[0]
+              player=db.execute("SELECT player_key FROM wh_fc27_players ORDER BY player_key LIMIT 1").fetchone()[0]
+              profile=wh.get_club_ai_context(club)
+              assert profile["institutional_prestige"] is None
+              assert profile["game_manager_key"].startswith("simulation-manager:")
+              assert profile["verified_owner_capital_injection_gbp"] is None
+              individual=wh.get_player_ai_context(player)
+              assert individual["gameplay_personality"]["observed_real_personality_json"] is None
+              assert len(individual["pes2020_estimated_attributes"])==29
+              assert isinstance(wh.get_club_financial_events(club),list)
           print(json.dumps(report,indent=2))
-          print("FC27 AI DECISION REFERENCE BUILT; REAL MANAGERS/PERSONALITY/CASH NOT INVENTED")
+          print("FC27 AI REFERENCE BUILT; ANONYMOUS GAME AGENTS, NO FAKE REAL MANAGERS, CASH OR PERSONALITY FACTS")
           PY
       - name: Publish immutable FC27 reference warehouse snapshot
         uses: actions/upload-artifact@v4
