@@ -16,6 +16,8 @@ on:
       - 'world_fc27_season_end_logic.py'
       - 'world_fc27_regional_feeder_rosters.py'
       - 'world_fc27_regional_season_end.py'
+      - 'world_fc27_effective_season_end_routes.py'
+      - 'test_world_fc27_effective_season_end_routes.py'
       - 'test_world_fc27_regional_feeder_rosters.py'
       - 'data/warehouse/fc27_2026_27_es_de_regional_feeder_clubs.json'
       - 'test_world_fc27_season_end_logic.py'
@@ -74,6 +76,7 @@ jobs:
             test_world_fc27_nl_pt_feeder_review \
             test_world_fc27_season_end_logic \
             test_world_fc27_regional_feeder_rosters \
+            test_world_fc27_effective_season_end_routes \
             test_world_fc27_six_country_playable_scope \
             test_world_fc27_eight_country_playable_scope \
             test_world_fc27_domestic_competition_alignment \
@@ -133,6 +136,8 @@ jobs:
           assert j["Dutch_Portuguese_2026_27_real_feeder_name_registration"]["open_feeders_without_real_named_club_members"]==0
           assert j["Spain_Germany_2026_27_regional_feeder_registration"]["new_real_feeder_club_names"]==131
           assert j["Spain_Germany_2026_27_regional_feeder_registration"]["separate_one_hop_regional_groups"]==7
+          assert j["FC27_16_open_league_effective_season_end_routes"]["open_playable_routes_with_derived_effective_rule"]==16
+          assert j["FC27_16_open_league_effective_season_end_routes"]["MLS_erroneous_relegation_routes"]==0
           assert j["source_club_career_world_and_real_2027_feeders"]["open_pyramid_season_candidate_clubs"]==314
           assert j["source_club_career_world_and_real_2027_feeders"]["official_feeder_names_active_in_open_game_competitions"]==78
           assert j["source_club_career_world_and_real_2027_feeders"]["manager_career_target_countries"]==9
@@ -181,6 +186,8 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_2026_27_group").fetchone()[0]==7
               assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_2026_27_club").fetchone()[0]==131
               assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_game_policy").fetchone()[0]==2
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_playable_season_end_routes").fetchone()[0]==16
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_playable_season_end_routes WHERE executable_career_movement!=0 OR upper_code='2027:us.mls'").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness").fetchone()[0]==4
               assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness WHERE published_real_club_names>0").fetchone()[0]==4
               assert db.execute("SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs WHERE PES_player_squad_imported=1").fetchone()[0]==0
@@ -261,6 +268,9 @@ jobs:
           assert data["dated_real_german_regional_feeder_names"]==91
           assert data["named_regional_source_groups"]==7
           assert data["regional_game_4up_4down_policies_staged"]==2
+          assert data["fc27_effective_open_playable_season_end_routes"]==16
+          assert data["fc27_career_movement_routes_actually_executable"]==0
+          assert data["fc27_MLS_separate_playable_without_relegation_route"]
           assert data["feeder_divisions_with_official_real_2026_27_memberships"]==4
           assert data["feeder_divisions_still_without_any_2026_27_real_club_pool"]==0
           assert data["original_clubs_eligible_for_open_league_schedule_after_game_import"]==314
