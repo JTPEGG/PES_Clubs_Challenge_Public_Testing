@@ -1,0 +1,36 @@
+name: PES V2 excluded league no-regression guard
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_competition_exclusions.py'
+      - 'world_historical_career_import.py'
+      - 'world_fc27_domestic_competition_alignment.py'
+      - 'test_world_competition_exclusions.py'
+      - 'test_world_fc27_domestic_competition_alignment.py'
+      - 'test_world_historical_career_import.py'
+      - '.github/workflows/fifa-pes-v2-excluded-league-guard.yml'
+permissions:
+  contents: read
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Excluded domestic league must not enter historical game setup
+        run: |
+          python -m unittest -v \
+            test_world_competition_exclusions \
+            test_world_fc27_domestic_competition_alignment \
+            test_world_historical_career_import
+      - name: Check no compiled modules have source errors
+        run: |
+          python -m compileall -q world_competition_exclusions.py \
+            world_historical_career_import.py \
+            world_fc27_domestic_competition_alignment.py \
+            world_fc27_2026_conmebol_domestic_overlay.py \
+            scripts/audit_fc27_official_season_participants.py
