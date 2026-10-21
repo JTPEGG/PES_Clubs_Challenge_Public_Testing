@@ -1,4 +1,4 @@
-name: PES V2 FC27 2026-27 all 670 club source home division associations
+name: PES V2 FC27 2026-27 all 659 eligible club home division associations
 on:
   workflow_dispatch:
   push:
@@ -19,11 +19,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Download 253-club source-group edition-specific domestic competition database
+      - name: Download 242-club source-group active domestic competition database
         uses: actions/download-artifact@v4
         with:
-          name: PES-V2-FC27-2026-27-REVIEWED-DOMESTIC-COMPETITION-GROUP-ALIGNMENT
-          run-id: 39567617440
+          name: PES-V2-FC27-2026-27-659-ACTIVE-DOMESTIC-COMPETITION-GROUPS
+          run-id: 39578545599
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: prior/
       - name: Validate every original FC27 source club against its real 2026 first division
@@ -33,34 +33,37 @@ jobs:
             --countries data/warehouse/fc27_2026_conmebol_official_country_review.json \
             --domestic data/warehouse/fc27_2026_conmebol_domestic_participation_review.json \
             --output release/
-      - name: Confirm 670 distinct edition source clubs and unchanged original career guards
+      - name: Confirm 659 active source clubs and original 670 records retained without career changes
         run: |
           python - <<'PY'
           import sqlite3,json,csv
           from pathlib import Path
           p=Path("release")
-          j=json.loads((p/"FC27_ALL_670_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").read_text())
+          j=json.loads((p/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").read_text())
           assert j["edition"]==2027
-          assert j["fc27_source_club_records"]==670
-          assert j["previously_domestic_source_groups"]==630
+          assert j["fc27_active_club_records"]==659
+          assert j["archived_unchanged_FC27_club_records"]==670
+          assert j["excluded_original_source_clubs"]==11
+          assert j["previously_domestic_source_groups"]==619
           assert j["new_2026_country_backed_domestic_league_candidates"]==40
-          assert j["total_staged_domestic_source_competition_associations"]==670
+          assert j["total_staged_domestic_source_competition_associations"]==659
           assert j["national_2026_first_division_evidence_sources"]==9
           assert j["source_club_identity_EA_ids_not_verified"]
           assert j["full_real_world_league_rosters_not_verified"]
           assert not j["season_promotion_relegation_graph_complete"] and not j["career_ready"]
-          with sqlite3.connect(p/"FC27_2026_27_ALL_670_SOURCE_CLUB_HOME_COMPETITIONS.sqlite") as db:
+          with sqlite3.connect(p/"FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite") as db:
               assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
               assert not db.execute("PRAGMA foreign_key_check").fetchall()
               assert db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]==13104
               assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition IS NULL").fetchone()[0]==0
-              assert db.execute("SELECT COUNT(DISTINCT club_key) FROM fc27_2026_27_complete_source_competition_alignment").fetchone()[0]==670
+              assert db.execute("SELECT COUNT(DISTINCT club_key) FROM fc27_2026_27_complete_source_competition_alignment").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition='2027:in.1'").fetchone()[0]==0
           print(json.dumps(j,indent=2))
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: PES-V2-FC27-2026-27-ALL-670-SOURCE-CLUB-DOMESTIC-LEAGUES-STAGED
+          name: PES-V2-FC27-2026-27-ALL-659-ACTIVE-SOURCE-CLUB-DOMESTIC-LEAGUES
           path: release/
           retention-days: 30
           if-no-files-found: error
