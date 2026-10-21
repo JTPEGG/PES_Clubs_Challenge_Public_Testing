@@ -56,6 +56,26 @@ class LightweightOneHopFeederTests(unittest.TestCase):
         self.assertEqual(len(set(second["club_pools_after"][ENGLISH_NATIONAL])),24)
         self.assertEqual(second["bottom_external_depth"],1)
         self.assertNotIn("en.7",str(second))
+    def test_historical_fifa15_league_two_to_actual_2014_15_conference_boundary(self):
+        original=pools()
+        names={code.replace("2027:","2015:"):teams for code,teams in original.items()}
+        relegated=names["2015:en.4"][:2]
+        result=rollover(names,playable_floor="league_two",
+             starting_season=2014,relegated_from_playable=relegated,edition=2015)
+        self.assertEqual(result["edition"],2015)
+        self.assertEqual(result["playable_division"],"2015:en.4")
+        self.assertEqual(result["simulated_feeders"],["2015:en.5"])
+        self.assertEqual(len(result["promoted_into_playable"]),2)
+        self.assertEqual(len(result["club_pools_after"]["2015:en.4"]),24)
+        self.assertEqual(len(result["club_pools_after"]["2015:en.5"]),24)
+        self.assertFalse(result["career_activation_approved"])
+        with self.assertRaises(ValueError):
+            rollover(names,playable_floor="league_two",starting_season=2014,
+                  relegated_from_playable=relegated,edition=2025)
+        with self.assertRaises(ValueError):
+            rollover(names,playable_floor="league_two",starting_season=2013,
+                  relegated_from_playable=relegated,edition=2015)
+
     def test_option_nl_playable_uses_north_south_no_step_three_four(self):
         original=pools()
         demoted=original[ENGLISH_NATIONAL][:4]
