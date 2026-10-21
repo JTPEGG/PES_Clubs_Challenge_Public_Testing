@@ -1,9 +1,9 @@
 {
-  "version": "fc27-one-hop-official-2026-27-feeder-memberships-v1",
+  "version": "fc27-one-hop-reviewed-2026-27-feeder-memberships-v2",
   "edition": 2027,
   "season": "2026-27",
   "scope": "actual_named_clubs_only_not_playable_squads",
-  "game_policy": "Real 2026/27 feeder club identities are imported without inventing PES players; reserve/youth clubs are treated as ineligible for the game's first-team promotion pool (pragmatic gameplay restriction, not a statement of official eligibility).",
+  "game_policy": "Real 2026/27 named feeder club identities are retained from source fixtures/season member lists without inventing PES players. Dutch full roster uses VI season list crosschecked with KNVB fixtures; Portuguese complete roster uses Liga Portugal official 2026/27 standings. Reserve/youth clubs are ineligible for in-game senior promotion (game simplification, not certified real eligibility).",
   "groups": [
     {
       "edition": 2027,
@@ -501,6 +501,223 @@
         {
           "club_name": "SORRENTO",
           "regional_group": "C",
+          "reserve_or_youth": false
+        }
+      ],
+      "original_game_player_squad_imported": false
+    },
+    {
+      "edition": 2027,
+      "feeder_competition_code": "2027:nl.2",
+      "country": "Netherlands",
+      "competition": "Eerste Divisie",
+      "source_official_url": "https://www.vi.nl/competities/eerste-divisie/over",
+      "secondary_confirmation_url": "https://www.knvb.nl/nieuws/betaald-voetbal/competitiezaken/71918/definitief-competitieprogramma-202627-vastgesteld",
+      "source_status": "dated_season_full_member_list_secondary_source_crosschecked_against_knvb",
+      "season": "2026-27",
+      "roster_count": 20,
+      "clubs": [
+        {
+          "club_name": "Heracles Almelo",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "NAC Breda",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Volendam",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Dordrecht",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "MVV Maastricht",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Roda JC Kerkrade",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "De Graafschap",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Eindhoven",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Emmen",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "TOP Oss",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "RKC Waalwijk",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Jong Ajax",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "Jong PSV",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "Jong FC Utrecht",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "Jong AZ",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "Helmond Sport",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Almere City FC",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Den Bosch",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "VVV-Venlo",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Vitesse",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        }
+      ],
+      "original_game_player_squad_imported": false
+    },
+    {
+      "edition": 2027,
+      "feeder_competition_code": "2027:pt.2",
+      "country": "Portugal",
+      "competition": "Liga Portugal 2",
+      "source_official_url": "https://www.ligaportugal.pt/competition/912/liga-portugal-meu-super/round/20262027?stat=players&tab=stats&type=50",
+      "source_status": "official_2026_27_professional_league_standings_18_members",
+      "season": "2026-27",
+      "roster_count": 18,
+      "clubs": [
+        {
+          "club_name": "Académica OAF",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "AFS",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Amarante FC",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SL Benfica B",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "GD Chaves",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Porto B",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "SC Farense",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CD Feirense",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Felgueiras",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Leixões SC",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Lusitânia de Lourosa",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Penafiel",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Portimonense",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Sporting CP B",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "CD Tondela",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SCU Torreense",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "UD Leiria",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Vizela",
+          "regional_group": "national",
           "reserve_or_youth": false
         }
       ],
