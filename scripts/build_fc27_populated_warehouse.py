@@ -82,7 +82,7 @@ def build(world_db,contracts_db,finances_db,output,*,strict=True):
         )
         out.executemany("INSERT INTO wh_fc27_source_manifest VALUES(?,?,?,?,?,?)",manifest)
         leagues=list(world.execute("""
-          SELECT s.competition_code,s.country,s.name,s.tier,s.movement_policy,
+          SELECT s.competition_code,s.country,c.name,s.tier,s.movement_policy,
                  s.original_game_source_clubs,c.membership_basis,
                  CASE WHEN p.competition_code IS NULL THEN 0 ELSE 1 END
           FROM fc27_effective_world_league_movement_scope s
