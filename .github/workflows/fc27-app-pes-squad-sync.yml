@@ -96,6 +96,57 @@ jobs:
                             "playable":e["registered_players_currently_at_playable_clubs"],
                             "game_export_ready":False},indent=2))
           PY
+      - name: Dry-run one genuine background player transfer and verify changed playable CSV
+        run: |
+          python - <<'PY'
+          import json,shutil,sqlite3,tempfile
+          from pathlib import Path
+          from world_fc27_app_pes_squad_sync import move_player,export_playable_preview
+          source=Path("fc27-squad-sync-preview/FC27_2026_27_APP_PLAYER_REGISTRATION_STAGING.sqlite")
+          with tempfile.TemporaryDirectory() as work:
+              sandbox=Path(work)/"disposable.sqlite"
+              shutil.copy2(source,sandbox)
+              with sqlite3.connect(sandbox) as db:
+                  db.execute("PRAGMA foreign_keys=ON")
+                  candidate=db.execute("""
+                    SELECT p.player_key,p.current_club_key,p.source_club_key
+                    FROM fc27_app_player_registration p
+                    JOIN fc27_career_world_clubs c
+                      ON c.club_key=p.current_club_key AND c.edition=p.edition
+                    WHERE c.competition_mode='closed_background_world'
+                    ORDER BY p.player_key LIMIT 1
+                  """).fetchone()
+                  receiving=db.execute("""
+                    SELECT club_key FROM fc27_career_world_clubs
+                    WHERE edition=2027 AND competition_mode='open_league_season_candidate'
+                    ORDER BY club_key LIMIT 1
+                  """).fetchone()[0]
+                  assert candidate and receiving
+                  move=move_player(db,player_key=candidate[0],
+                      from_club_key=candidate[1],to_club_key=receiving,
+                      transaction_key="test-integration-transfer-from-background-to-playable")
+                  assert move["status"]=="applied"
+                  preview=export_playable_preview(db,Path(work)/"changed")
+                  assert preview["registered_players_currently_at_playable_clubs"]==9270
+                  assert db.execute("""
+                    SELECT source_club_key,current_club_key,registration_revision
+                    FROM fc27_app_player_registration WHERE player_key=?
+                  """,(candidate[0],)).fetchone()==(candidate[2],receiving,1)
+                  assert db.execute("SELECT COUNT(*) FROM fc27_app_transfer_ledger").fetchone()[0]==1
+                  assert preview["ready_for_game_import"] is False
+              with sqlite3.connect(source) as original:
+                  assert original.execute(
+                    "SELECT COUNT(*) FROM fc27_app_transfer_ledger"
+                  ).fetchone()[0]==0
+                  assert original.execute(
+                    "SELECT COUNT(*) FROM fc27_playable_current_squad"
+                  ).fetchone()[0]==9269
+              print(json.dumps({"real_player_source_key":candidate[0],
+                    "background_to_playable_transfer_confirmed":True,
+                    "disposable_preview_player_rows":9270,
+                    "delivered_starting_world_player_rows":9269,
+                    "game_native_import_unverified":True},indent=2))
+          PY
       - name: Upload app squad sync staging database, CSV and truthful readiness report
         uses: actions/upload-artifact@v4
         with:
