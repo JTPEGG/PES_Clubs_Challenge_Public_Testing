@@ -31,6 +31,16 @@ NAME_ALIASES={
  "universidadcentralevenezuela":"ucv",
  "independientedelvalle":"independientevalle",
  "lduquito":"lduquito",
+ "barcelonasc":"barcelona",
+ "deplaguaira":"deportivolaguaira",
+ "idv":"independentevalle",
+ "indepmedellin":"independentemedellin",
+ "indepsantafe":"independentesantafe",
+ "unicatolica":"universidadcatolica",
+ "depcuenca":"deportivocuenca",
+ "indpetrolero":"independiente",
+ "macar":"macara",
+ "puertocabello":"academiapuertocabello",
 }
 def namekey(s):
     x=canonical(s)
@@ -74,7 +84,7 @@ def retrieve(url):
         data=f.read(6_000_000)
     return data.decode("utf-8","replace"),hashlib.sha256(data).hexdigest()
 
-def audit(registry,output):
+def audit(registry,output,reviewed_official=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     with sqlite3.connect(f"file:{Path(registry).resolve()}?mode=ro",uri=True) as db:
         countries={code:country for code,country in db.execute(
@@ -92,17 +102,44 @@ def audit(registry,output):
     if len(source)!=40 or Counter(x[2] for x in source)!={
         "CONMEBOL Libertadores":20,"CONMEBOL Sudamericana":20}:
         raise ValueError("40 original CONMEBOL game bucket teams unexpectedly changed")
-    print("FC27_CUP_CLUB_SOURCE_LIST",json.dumps(
-         [(name,group) for _,name,group in source],ensure_ascii=False),flush=True)
     official={}
     official_audit={}
-    for label,url in SOURCES.items():
-        page,digest=retrieve(url)
-        print("OFFICIAL_PAGE_PROBE",label,"html_chars",len(page),
-              "head",page[:600].replace("\\n"," "),flush=True)
-        clubs,pairs=parse_country_directory(page)
-        official[label]=clubs
-        official_audit[label]={"url":url,"sha256":digest,"clubs_and_country_observations":len(pairs)}
+    if reviewed_official is not None:
+        raw=Path(reviewed_official).read_bytes()
+        payload=json.loads(raw.decode("utf-8"))
+        if (payload.get("version")!="fc27-conmebol-official-2026-team-country-reviewed-v1"
+            or payload.get("edition")!=2027 or payload.get("actual_competition_year")!=2026):
+            raise ValueError("Wrong official country season review")
+        observations={(x["source_group"],x["source_club"]):x for x in payload["entries"]}
+        if len(payload["entries"])!=40 or len(observations)!=40:
+            raise ValueError("Duplicate, incomplete CONMEBOL official club country review")
+        if set(observations)!={(group,name) for _,name,group in source}:
+            raise ValueError("Reviewed original club names not equal to the actual 40 cup source clubs")
+        digest=hashlib.sha256(raw).hexdigest()
+        for label,url in SOURCES.items():
+            if payload["group_sources"].get(label)!=url:
+                raise ValueError("Official source URL does not match 2026 review")
+            members=[x for x in payload["entries"] if x["source_group"]==label]
+            if len(members)!=20:raise ValueError("Cup group missing members")
+            mapping={}
+            for item in members:
+                if item["country"] not in COUNTRIES:raise ValueError("Invalid national association")
+                if namekey(item["source_club"])!=namekey(item["official_club"]):
+                    raise ValueError(f"Name alias not independently reviewed: {item['source_club']}")
+                mapping[namekey(item["source_club"])]={item["country"]}
+            official[label]=mapping
+            official_audit[label]={"url":url,"sha256":digest,
+                "clubs_and_country_observations":len(members),
+                "source_type":"curated_official_2026_team_directory_review"}
+    else:
+        # An AWS WAF challenge blocks GitHub CI. Do not bypass it.
+        for label,url in SOURCES.items():
+            page,digest=retrieve(url)
+            clubs,pairs=parse_country_directory(page)
+            official[label]=clubs
+            official_audit[label]={"url":url,"sha256":digest,
+                "clubs_and_country_observations":len(pairs),
+                "source_type":"live_official_team_directory"}
     candidates=[];unmatched=[];explicit=[];counts=Counter()
     for clubkey,name,group in source:
         countries_for_name=official[group].get(namekey(name),set())
@@ -147,12 +184,15 @@ def audit(registry,output):
        "domestic_home_division_unresolved":len(source)-counts["source_domestic_club_candidate"],
        "country_known_but_domestic_membership_unsourced":counts["national_country_only"],
        "same_country_domestic_source_collisions":counts["domestic_division_collision"],
-       "continents_are_not_leagues":True,"career_ready":False}
+       "continents_are_not_leagues":True,"career_ready":False,
+       "official_country_source_manual_snapshot":reviewed_official is not None}
     (out/"FC27_CONMEBOL_ASSOCIATION_REVIEW_AUDIT.json").write_text(
         json.dumps(result,indent=2),encoding="utf-8")
     return result
 
 if __name__=="__main__":
     a=argparse.ArgumentParser();a.add_argument("--registry",required=True)
-    a.add_argument("--output",required=True);args=a.parse_args()
-    print(json.dumps(audit(args.registry,args.output),indent=2))
+    a.add_argument("--output",required=True)
+    a.add_argument("--reviewed-official")
+    args=a.parse_args()
+    print(json.dumps(audit(args.registry,args.output,args.reviewed_official),indent=2))
