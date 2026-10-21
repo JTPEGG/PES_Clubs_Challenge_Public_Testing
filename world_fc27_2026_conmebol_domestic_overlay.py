@@ -19,6 +19,7 @@ from world_fc27_broader_closed_league_scope import close_peripheral_leagues
 from world_fc27_career_world_playability import stage as stage_career_world
 from world_fc27_mls_playable_scope import stage_mls
 from world_fc27_nl_pt_feeder_review import stage as stage_nl_pt_feeders
+from world_fc27_regional_feeder_rosters import stage as stage_regional_feeders
 from world_fc27_eight_country_playable_scope import apply_eight_country_scope
 VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
@@ -98,7 +99,7 @@ def export(path,head,rows):
     with path.open("w",encoding="utf-8-sig",newline="") as f:
         wr=csv.writer(f);wr.writerow(head);wr.writerows(rows)
 
-def build(registry,country_review_path,domestic_review_path,output,strict=True,movement_rules_path=None,gameplay_decisions_path=None,remaining_game_rules_path=None,official_feeder_rosters_path=None,playable_scope_path=None,mls_scope_path=None,nl_pt_feeders_path=None):
+def build(registry,country_review_path,domestic_review_path,output,strict=True,movement_rules_path=None,gameplay_decisions_path=None,remaining_game_rules_path=None,official_feeder_rosters_path=None,playable_scope_path=None,mls_scope_path=None,nl_pt_feeders_path=None,regional_feeders_path=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     official=json.loads(Path(country_review_path).read_text(encoding="utf-8"))
     domestic=json.loads(Path(domestic_review_path).read_text(encoding="utf-8"))
@@ -217,6 +218,10 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
             raise ValueError("Dutch Portuguese club lists require earlier three source lists")
         nl_pt_real_feeders=(stage_nl_pt_feeders(db,nl_pt_feeders_path,strict=strict)
                             if nl_pt_feeders_path is not None else None)
+        if regional_feeders_path is not None and nl_pt_real_feeders is None:
+            raise ValueError("Regional one-hop sources require completed existing feeder pool mapping")
+        regional_one_hop=(stage_regional_feeders(db,regional_feeders_path,strict=strict)
+                          if regional_feeders_path is not None else None)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
@@ -272,6 +277,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
        "source_club_career_world_and_real_2027_feeders":career_world,
        "MLS_2026_closed_division_intended_playable":mls_playable,
        "Dutch_Portuguese_2026_27_real_feeder_name_registration":nl_pt_real_feeders,
+       "Spain_Germany_2026_27_regional_feeder_registration":regional_one_hop,
        "original_player_data_unmodified":True}
     (out/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
        json.dumps(report,indent=2),encoding="utf-8")
@@ -288,6 +294,7 @@ if __name__=="__main__":
     a.add_argument("--playable-scope")
     a.add_argument("--mls-scope")
     a.add_argument("--nl-pt-feeders")
+    a.add_argument("--regional-feeders")
     a.add_argument("--output",required=True)
     x=a.parse_args()
     print(json.dumps(build(x.registry,x.countries,x.domestic,x.output,
@@ -297,4 +304,5 @@ if __name__=="__main__":
        official_feeder_rosters_path=x.official_feeder_rosters,
        playable_scope_path=x.playable_scope,
        mls_scope_path=x.mls_scope,
-       nl_pt_feeders_path=x.nl_pt_feeders),indent=2))
+       nl_pt_feeders_path=x.nl_pt_feeders,
+       regional_feeders_path=x.regional_feeders),indent=2))
