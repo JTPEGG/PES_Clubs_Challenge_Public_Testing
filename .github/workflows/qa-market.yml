@@ -20,7 +20,7 @@ jobs:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt
       - name: Check versatility and elite rotation regression tests
-        run: python -m unittest -v test_world_squad_planner test_world_recruitment_strategy
+        run: python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_elite_balance
       - name: Run two end-to-end 30-minute market windows
         run: python -u qa_twenty_windows.py --windows 2 --output qa-two-windows.json
       - uses: actions/upload-artifact@v4
