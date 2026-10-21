@@ -7,6 +7,7 @@ source loans and modelled club budgets. Does not touch production careers.
 import argparse,hashlib,json,sqlite3
 from pathlib import Path
 from datetime import date
+from world_competition_exclusions import excluded_competition
 
 SUPPORTED=(2026,2027)
 SCHEMA="""
@@ -81,17 +82,23 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
             raise ValueError("Incomplete historical source league membership")
         leagues=conn.execute("""SELECT league_key,league_name,source_league_level
           FROM hist.leagues WHERE edition=?""",(edition,)).fetchall()
-        clubs=conn.execute("""SELECT club_key,name,league_key,league_conflicts FROM
+        archived_clubs=conn.execute("""SELECT club_key,name,league_key,league_conflicts FROM
           hist.clubs WHERE edition=? ORDER BY club_key""",(edition,)).fetchall()
-        if len(clubs)!=meta[1] or any(not c[2] or c[3] for c in clubs):
+        if len(archived_clubs)!=meta[1] or any(not c[2] or c[3] for c in archived_clubs):
             raise ValueError("Historical club references are incomplete or conflicting")
+        omitted_leagues={key for key,name,tier in leagues
+                         if excluded_competition(label=name,code=key)}
+        omitted_keys={key for key,name,lkey,conflict in archived_clubs
+                      if lkey in omitted_leagues}
+        leagues=[l for l in leagues if l[0] not in omitted_leagues]
+        clubs=[c for c in archived_clubs if c[0] not in omitted_keys]
         league_ids={l[0] for l in leagues}
         if not all(c[2] in league_ids for c in clubs):
             raise ValueError("Historical club references an unknown source league")
         budgets={k:(tb,wb) for k,tb,wb in conn.execute("""SELECT club_key,
              revised_transfer_budget_gbp,revised_total_wage_budget_weekly_gbp
              FROM policy.historical_club_circumstances WHERE edition=?""",(edition,))}
-        if len(budgets)!=len(clubs):raise ValueError("Missing club financial profiles")
+        if any(c[0] not in budgets for c in clubs):raise ValueError("Missing active club financial profiles")
         players=conn.execute("""SELECT p.player_key,p.player_name,p.date_of_birth,
              p.nationality,p.primary_position,p.source_overall,p.source_player_id,
              p.club_key,p.assignment,f.model_weekly_wage_gbp,
@@ -102,12 +109,18 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
              ON f.player_key=p.player_key WHERE p.edition=?
              ORDER BY p.source_row_number""",(edition,)).fetchall()
         if len(players)!=meta[0]:raise ValueError("Incomplete player roster")
+        source_players=len(players)
+        players=[p for p in players if not (
+            p[8]=="at_club" and p[7] in omitted_keys)]
         loans=conn.execute("""SELECT player_key,borrower_club_key,
             resolved_parent_club_key,game_return_date,
             simulated_borrower_wage_share_pct,parent_status
             FROM hist.starting_source_loans WHERE edition=?""",(edition,)).fetchall()
         if any(x[5]!="resolved" for x in loans):
             raise ValueError("Unresolved source loan parent must be reconciled")
+        if any(x[1] not in omitted_keys and x[2] in omitted_keys for x in loans):
+            raise ValueError("Included club has loan from an excluded parent; review before import")
+        loans=[row for row in loans if row[1] not in omitted_keys]
         loanmap={r[0]:r for r in loans}
         clubset={c[0] for c in clubs}
         if any(x[1] not in clubset or x[2] not in clubset for x in loans):
@@ -234,7 +247,9 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
                 loans=conn.execute("SELECT COUNT(*) FROM world_dataset_initial_loans WHERE dataset_id=?",(ds,)).fetchone()[0],
                 pes_attribute_values=pes_rows,
                 player_detail_records=conn.execute("SELECT COUNT(*) FROM world_dataset_pes_v2_player_details WHERE dataset_id=?",(ds,)).fetchone()[0],
-                unknown_unregistered=len(players)-registered)
+                unknown_unregistered=len(players)-registered,
+                 excluded_source_clubs=len(omitted_keys),
+                 excluded_source_players=source_players-len(players))
             if counts["contracts"]!=registered or counts["loans"]!=len(loans):
                 raise ValueError("Historical career count reconciliation failed")
             if conn.execute("PRAGMA foreign_key_check").fetchall():
