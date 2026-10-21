@@ -192,19 +192,6 @@
       "source_backing": "original_FC27_player_source_club_and_league_label"
     },
     {
-      "source_group": "ISL",
-      "code": "in.1",
-      "country": "India",
-      "competition": "Indian Super League",
-      "tier": 1,
-      "expected_original_clubs": 11,
-      "calendar": "autumn_spring",
-      "registration_scope": "original_source_group_needs_official_season_club_crosscheck",
-      "evidence_kind": "exact_original_fc27_imported_source_league_label",
-      "individual_club_identity_status": "source_club_key_not_verified_original_EA_id",
-      "source_backing": "original_FC27_player_source_club_and_league_label"
-    },
-    {
       "source_group": "SSE Airtricity Men's Premier Division",
       "code": "ie.1",
       "country": "Ireland",
