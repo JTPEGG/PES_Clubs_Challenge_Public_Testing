@@ -116,6 +116,29 @@ CREATE TABLE wh_fc27_manager_recruitment_policy (
   FOREIGN KEY(edition,named_manager_source_key)
        REFERENCES wh_fc27_manager_profiles(edition,manager_source_key),
   CHECK(named_manager_source_key IS NULL));
+-- Anonymised game-AI coaching behaviour; this is NOT a verified human manager
+-- identity, appointment, real tactical formation or observed personality.
+CREATE TABLE wh_fc27_simulated_manager_agents (
+  edition INTEGER NOT NULL CHECK(edition=2027),
+  game_manager_key TEXT NOT NULL,
+  starting_club_key TEXT NOT NULL,
+  real_manager_source_key TEXT,
+  real_manager_name TEXT,
+  display_role TEXT NOT NULL CHECK(display_role='Anonymous simulated coaching agent'),
+  game_coaching_ability INTEGER NOT NULL CHECK(game_coaching_ability BETWEEN 15 AND 95),
+  youth_development_bias INTEGER NOT NULL CHECK(youth_development_bias BETWEEN 15 AND 95),
+  tactical_flexibility INTEGER NOT NULL CHECK(tactical_flexibility BETWEEN 15 AND 95),
+  recruitment_risk_appetite INTEGER NOT NULL CHECK(recruitment_risk_appetite BETWEEN 15 AND 95),
+  financial_discipline INTEGER NOT NULL CHECK(financial_discipline BETWEEN 15 AND 95),
+  playing_style TEXT NOT NULL CHECK(playing_style IN
+    ('development','balanced','results_first','financial_rebuild')),
+  provenance TEXT NOT NULL CHECK(provenance='fictional_game_ai_agent_not_a_real_person_or_appointment'),
+  model_version TEXT NOT NULL,
+  PRIMARY KEY(edition,game_manager_key),
+  UNIQUE(edition,starting_club_key),
+  FOREIGN KEY(edition,starting_club_key) REFERENCES wh_fc27_clubs(edition,club_key),
+  CHECK(real_manager_source_key IS NULL AND real_manager_name IS NULL)
+);
 CREATE VIEW wh_fc27_ai_club_decision_context AS
  SELECT c.edition,c.club_key,c.name,c.competition_code,c.career_scope,
         d.sporting_appeal,d.institutional_prestige,d.ambition_level,
