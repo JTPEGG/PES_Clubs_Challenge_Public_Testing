@@ -51,7 +51,7 @@ CREATE TABLE fc27_eight_country_playable_approval(
   FOREIGN KEY(edition,competition_code)
     REFERENCES fc27_effective_world_league_movement_scope(edition,competition_code)
 );
-CREATE TABLE fc27_newly_closed_country_scope_decisions(
+CREATE TABLE fc27_eight_country_new_closed_decisions(
   edition INTEGER NOT NULL CHECK(edition=2027),
   competition_code TEXT NOT NULL,
   previous_policy TEXT NOT NULL CHECK(previous_policy='open_pyramid'),
@@ -136,7 +136,7 @@ def apply_eight_country_scope(db:sqlite3.Connection, path, *, strict=True):
         # SQLite changes() tracks the last UPDATE (one row); full count checked below.
         raise ValueError("FC27 targeted closure update did not affect expected final row")
     db.executemany("""
-      INSERT INTO fc27_newly_closed_country_scope_decisions VALUES(
+      INSERT INTO fc27_eight_country_new_closed_decisions VALUES(
         2027,?,'open_pyramid','closed',?,'2026-10-21',1)
     """,[(code,
          f"User's final playable-country list excludes {rows[code][0]}; "
