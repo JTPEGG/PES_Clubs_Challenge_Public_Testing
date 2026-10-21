@@ -11,6 +11,7 @@ on:
       - 'warehouse/fc27_disposable_career.py'
       - 'warehouse/fc27_decision_dimensions_v1.sql'
       - 'warehouse/fc27_enrich_decision_dimensions.py'
+      - 'warehouse/fc27_ai_decision_review_exports.py'
       - 'test_fc27_decision_dimensions.py'
       - 'test_fc27_reference_reader.py'
       - '.github/workflows/fc27-populated-warehouse.yml'
@@ -233,6 +234,35 @@ jobs:
               assert isinstance(wh.get_club_financial_events(club),list)
           print(json.dumps(report,indent=2))
           print("FC27 AI REFERENCE BUILT; ANONYMOUS GAME AGENTS, NO FAKE REAL MANAGERS, CASH OR PERSONALITY FACTS")
+          PY
+      - name: Publish decision-model review CSVs with clearly unknown true traits and finances
+        run: |
+          python -m warehouse.fc27_ai_decision_review_exports \
+            --source fc27-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --output fc27-warehouse/ai-review/
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          root=Path("fc27-warehouse/ai-review")
+          audit=json.loads((root/"FC27_AI_REFERENCE_REVIEW_COUNTS.json").read_text())
+          assert audit["league_and_club_game_profiles"]==659
+          assert audit["club_financial_circumstances"]==659
+          assert audit["fictional_anonymous_manager_agents"]==659
+          assert audit["fictional_player_personality_game_priors"]==17593
+          assert audit["unknown_real_manager_names"]==659
+          assert audit["unknown_verified_institutional_prestige"]==659
+          assert audit["unknown_real_personalities"]==17593
+          assert audit["no_individual_real_cash_or_ownership_amounts_claimed"] is True
+          for name,total in (
+            ("FC27_CLUB_SPORTING_APPEAL_AND_AMBITION_GAME_MODEL.csv",659),
+            ("FC27_CLUB_FINANCIAL_PRESSURE_SOURCE_VS_MODEL.csv",659),
+            ("FC27_ANONYMOUS_SIMULATED_MANAGER_PROFILES.csv",659),
+            ("FC27_PLAYER_PERSONALITY_FICTIONAL_GAME_PRIORS.csv",17593),
+            ("FC27_VERIFIED_AS_OF_PRESEASON_FINANCIAL_EVENTS.csv",
+                audit["real_sourced_preseason_club_events"])):
+              with (root/name).open(encoding="utf-8-sig",newline="") as f:
+                  assert sum(1 for _ in csv.DictReader(f))==total
+          print("AI GAME MODELS REVIEWABLE; REAL UNKNOWN VALUES BLANK; NO FALSE PEOPLE OR BALANCES")
           PY
       - name: Publish immutable FC27 reference warehouse snapshot
         uses: actions/upload-artifact@v4
