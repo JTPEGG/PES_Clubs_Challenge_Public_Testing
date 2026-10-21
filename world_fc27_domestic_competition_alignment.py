@@ -43,14 +43,15 @@ CREATE VIEW fc27_one_year_club_competition_alignment AS
         ELSE 'no_domestic_league_identity' END AS registration_scope,
    c.country,c.competition,c.tier
  FROM edition_career_starting_league_candidates old
+ JOIN edition_club_competitions original
+   ON original.edition=old.edition AND original.club_key=old.club_key
  LEFT JOIN fc27_reviewed_source_club_assignments x
    ON x.edition=old.edition AND x.club_key=old.club_key
  LEFT JOIN fc27_reviewed_domestic_competitions c
    ON c.edition=x.edition AND c.source_group=x.source_group
- WHERE old.edition=2027 AND NOT EXISTS (
-   SELECT 1 FROM edition_club_competitions o
-   WHERE o.edition=old.edition AND o.club_key=old.club_key
-     AND o.original_source_league IN ('ISL','Indian Super League'));
+ WHERE old.edition=2027
+   AND LOWER(TRIM(COALESCE(original.original_source_league,'')))
+       NOT IN ('isl','indian super league');
 """
 
 def export(path,headers,rows):
