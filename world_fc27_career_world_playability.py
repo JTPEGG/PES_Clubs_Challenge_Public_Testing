@@ -163,7 +163,7 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
       VALUES(?,?,?,?,?,?,?,?,?,?)
     """,verified)
     db.executemany("""
-      INSERT INTO fc27_feeder_pool_readiness VALUES(?,?,?,?,?,?,0,0)
+      INSERT INTO fc27_feeder_pool_readiness VALUES(?,?,?,?,?,?,?,0,0)
     """,[(2027,code,country,tier,name,per_group.get(code,0),
          "official_published_2026_27_club_pool" if code in per_group
          else "name_only_not_eligible_for_promotion")
