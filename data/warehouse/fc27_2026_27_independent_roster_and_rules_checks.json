@@ -1,0 +1,85 @@
+{
+  "version": "fc27-independent-2026-27-domestic-roster-check-v1",
+  "edition": 2027,
+  "starting_season": "2026-27",
+  "competitions": [
+    {
+      "original_group": "Scottish Premiership",
+      "competition_code": "2027:sco.1",
+      "country": "Scotland",
+      "league_name": "Scottish Premiership",
+      "official_source_url": "https://en.wikipedia.org/wiki/2026%E2%80%9327_Scottish_Premiership",
+      "official_clubs": [
+        "Aberdeen",
+        "Celtic",
+        "Dundee FC",
+        "Dundee United",
+        "Falkirk",
+        "Hearts",
+        "Hibernian",
+        "Kilmarnock",
+        "Motherwell",
+        "Rangers",
+        "St. Johnstone",
+        "St. Mirren"
+      ],
+      "aliases": {
+        "Heart of Midlothian": "Hearts",
+        "Dundee": "Dundee FC",
+        "St Johnstone": "St. Johnstone",
+        "St Mirren": "St. Mirren"
+      },
+      "confidence": "independently_dated_published_2026_27_participant_list",
+      "policy": "no_source_clubs_added_or_deleted"
+    },
+    {
+      "original_group": "ISL",
+      "competition_code": "2027:in.1",
+      "country": "India",
+      "league_name": "Indian Super League",
+      "official_source_url": "https://www.indiansuperleague.com/Clubs",
+      "official_clubs": [
+        "Bengaluru FC",
+        "Chennaiyin FC",
+        "East Bengal FC",
+        "FC Goa",
+        "Inter Kashi FC",
+        "Kerala Blasters FC",
+        "Churchill Brothers FC",
+        "Sporting Club Delhi",
+        "Mohun Bagan Super Giant",
+        "Mumbai City FC",
+        "NorthEast United FC",
+        "Odisha FC",
+        "Punjab FC"
+      ],
+      "aliases": {
+        "Inter Kashi": "Inter Kashi FC",
+        "Kerala Blasters": "Kerala Blasters FC",
+        "Mohun Bagan SG": "Mohun Bagan Super Giant",
+        "NorthEast United": "NorthEast United FC",
+        "Churchill Brothers": "Churchill Brothers FC",
+        "East Bengal": "East Bengal FC",
+        "Hyderabad FC": "Sporting Club Delhi"
+      },
+      "nonidentity_successor_names": [
+        "Hyderabad FC"
+      ],
+      "confidence": "independently_dated_official_league_current_club_list",
+      "policy": "renamed_or_licence_successor_is_not_the_same_source_game_club_without_review"
+    }
+  ],
+  "movement_rules": [
+    {
+      "country": "Belgium",
+      "competition_code": "2027:be.1",
+      "competition": "Belgian Pro League",
+      "league_size": 18,
+      "regular_season_matches_per_club": 34,
+      "championship_playoffs": false,
+      "direct_relegations": 2,
+      "source_url": "https://www.proleague.be/nieuws/vanaf-seizoen-26-27-met-18-clubs-in-de-jupiler-pro-league",
+      "verification": "official_2026_27_domestic_competition_format_only; separate 2026_27 division-to-feeder mapping pending"
+    }
+  ]
+}
