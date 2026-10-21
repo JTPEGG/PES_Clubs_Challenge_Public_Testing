@@ -95,6 +95,12 @@ def audit(connection, *, strict=True):
         "WHERE edition=2027 AND registration_scope LIKE 'partial_licensed_subset%'"
     ).fetchone()[0]
 
+    source_accepted={code:count for code,count in connection.execute("""
+        SELECT competition_code,retained_source_club_count
+        FROM fc27_source_as_provided_membership_policy WHERE edition=2027
+    """)}
+    if len(source_accepted)!=33 or sum(source_accepted.values())!=280:
+        raise ValueError("FC27 user-accepted source groups missing from release")
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
         country,tier,name,meta_scope=meta.get(code,("unregistered",None,"not registered",
@@ -107,6 +113,12 @@ def audit(connection, *, strict=True):
             rule="partial_dated_pyramid_rules_external_feeder_unverified"
         else:
             rule="season_end_movement_rules_not_linked_or_unverified"
+        # Accepted source clubs stay in the world, without fabricated extra clubs.
+        accepted=code in source_accepted
+        if accepted and source_accepted[code]!=len(members):
+            raise ValueError("FC27 source acceptance does not match the club group")
+        membership_status=("accepted_current_FC27_membership_as_provided"
+                           if accepted else "independent_dated_membership_evidence_present")
         # One immediate lower tier only: never discover lower-of-lower clubs.
         direct_feeder=feeder_by_country_tier.get((country,tier+1),0) if tier else 0
         reasons=[]
@@ -115,8 +127,9 @@ def audit(connection, *, strict=True):
             reasons.append("licensed_subset_not_complete_domestic_division")
         if "individual_2026_club_membership" in scope:
             reasons.append("individual_clubs_reviewed_but_full_domestic_roster_not_verified")
-        if not fixture_count[code]:
+        if not fixture_count[code] and not accepted:
             reasons.append("no_independent_dated_fixture_member_pool_for_this_competition")
+
         if rule.startswith("season_end_movement_rules"):
             reasons.append("2026_27_movement_destinations_missing")
         if rule=="partial_dated_pyramid_rules_external_feeder_unverified":
@@ -128,6 +141,9 @@ def audit(connection, *, strict=True):
             "dated_fixture_member_count":fixture_count[code],
             "independent_immediate_feeder_observations":direct_feeder,
             "registration_scope":scope,"movement_rule_status":rule,
+            "membership_status":membership_status,
+            "additional_roster_membership_research_required":False,
+            "playability_decision":"unchanged_pending_topology_review" if accepted else "unchanged",
             "certified_for_career":False,
             "remaining_blockers":";".join(reasons)
         })
@@ -136,6 +152,12 @@ def audit(connection, *, strict=True):
         "edition":2027,"active_source_clubs":len(rows),
         "distinct_active_domestic_competitions":len(diagnostics),
         "unknown_home_league_clubs":0,
+        "source_as_provided_competitions_user_accepted":len(source_accepted),
+        "source_as_provided_original_clubs_preserved":sum(source_accepted.values()),
+        "additional_membership_roster_research_required_for_current_scope":0,
+        "greece_original_source_clubs_preserved":source_accepted["2027:gr.1"],
+        "germany_second_division_source_clubs_preserved":source_accepted["2027:de.2"],
+        "competition_playability_not_changed_by_this_decision":True,
         "clubs_in_partial_licensed_source_competitions":partial_licensed_original_clubs,
         "clubs_in_continental_source_domestic_review":conmebol_original_clubs,
         "competitions_without_independent_dated_membership_pool":sum(
@@ -152,6 +174,8 @@ def audit(connection, *, strict=True):
         "known_dated_2027_pyramid_edges":len(season["promotion_edges"]),
         "complete_2027_canonical_movement_destinations":False,
         "one_hop_feeder_policy":"only tier+1 observed; never recursively generated",
+        "next_task":"2026_27_promotion_relegation_and_one_hop_feeder_rules",
+        "membership_scope_accepted_is_not_independent_fixture_verification":True,
         "all_original_EA_IDs_certified":False,
         "competition_rosters_and_feeders_certified":False,
         "career_ready":False,"FC26_allowed_to_start":False,
