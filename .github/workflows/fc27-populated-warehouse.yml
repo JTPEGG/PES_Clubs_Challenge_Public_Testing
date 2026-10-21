@@ -6,6 +6,8 @@ on:
       - 'warehouse/fc27_populated_reference_v1.sql'
       - 'scripts/build_fc27_populated_warehouse.py'
       - 'test_fc27_populated_warehouse.py'
+      - 'warehouse/fc27_reference_reader.py'
+      - 'test_fc27_reference_reader.py'
       - '.github/workflows/fc27-populated-warehouse.yml'
 permissions:
   contents: read
@@ -23,7 +25,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test existing architecture and populated reference constraints
-        run: python -m unittest -v test_warehouse_schema_v1 test_fc27_populated_warehouse
+        run: python -m unittest -v test_warehouse_schema_v1 test_fc27_populated_warehouse test_fc27_reference_reader
       - name: Obtain frozen tested FC27 competition world
         uses: actions/download-artifact@v4
         with:
@@ -87,7 +89,21 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM wh_fc27_movement_routes WHERE upper_code='2027:us.mls'").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM wh_fc27_coverage_gaps WHERE domain='managers' AND coverage_status='not_populated'").fetchone()[0]==1
               assert db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'world_career_%'").fetchone()[0]==0
-          print("REAL FC27 659-CLUB / 17593-PLAYER POPULATED REFERENCE WAREHOUSE VERIFIED")
+          from warehouse.fc27_reference_reader import FC27WarehouseReader
+          with FC27WarehouseReader(target) as wh:
+              playable=wh.get_playable_competitions()
+              assert len(playable)==17
+              assert wh.snapshot_health()["players"]==17593
+              assert wh.snapshot_health()["ratings"]==17593*29
+              assert len(wh.get_known_gaps())>=5
+              named_club=db.execute("SELECT club_key FROM wh_fc27_clubs ORDER BY club_key LIMIT 1").fetchone()[0]
+              assert wh.get_club(named_club)["club_key"]==named_club
+              roster_club=db.execute("SELECT club_key FROM wh_fc27_starting_rosters LIMIT 1").fetchone()[0]
+              roster=wh.get_starting_roster(roster_club)
+              assert roster
+              assert wh.get_player(roster[0]["player_key"]) is not None
+              assert wh.get_season_end_route("2027:us.mls") is None
+          print("REAL FC27 659-CLUB / 17593-PLAYER POPULATED REFERENCE WAREHOUSE AND CAREER READ ADAPTER VERIFIED")
           PY
       - name: Publish immutable FC27 reference warehouse snapshot
         uses: actions/upload-artifact@v4
