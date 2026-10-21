@@ -11,6 +11,7 @@ on:
       - 'test_world_fc27_release_exclusions.py'
       - 'test_world_fc27_source_membership_policy.py'
       - 'scripts/audit_fc27_active_competition_structure.py'
+      - 'scripts/audit_fc27_canonical_movement_crosswalk.py'
       - 'data/warehouse/fc27_2026_conmebol_domestic_participation_review.json'
       - 'data/warehouse/fc27_2026_conmebol_official_country_review.json'
       - '.github/workflows/fifa-pes-v2-fc27-all-670-home-leagues.yml'
@@ -114,6 +115,21 @@ jobs:
           assert data["distinct_active_domestic_competitions"]>0
           assert not data["career_ready"] and not data["FC26_allowed_to_start"]
           assert not data["complete_2027_canonical_movement_destinations"]
+          PY
+      - name: Crosswalk existing FC27 England Germany Spain pyramid boundaries
+        run: |
+          python -m scripts.audit_fc27_canonical_movement_crosswalk \
+            --registry release/FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite \
+            --output release/
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads((Path("release")/"FC27_MOVEMENT_BOUNDARY_NEXT_STAGE.json").read_text())
+          assert result["edition"]==2027
+          assert result["source_2027_competition_edges_canonically_linked"]==7
+          assert result["german_second_tier_original_clubs_preserved"]==18
+          assert result["national_league_one_hop_feeder_present"]
+          assert not result["all_53_competitions_career_ready"]
           PY
       - uses: actions/upload-artifact@v4
         with:
