@@ -32,9 +32,11 @@ CREATE TABLE fc27_conmebol_original_club_domestic_candidates(
     source_domestic_competition TEXT NOT NULL,
     reviewed_2026_official_cup_name TEXT NOT NULL,
     official_cup_source_url TEXT NOT NULL,
+    reviewed_2026_domestic_club_name TEXT NOT NULL,
+    individual_2026_membership_source_url TEXT NOT NULL,
     national_2026_league_source_url TEXT NOT NULL,
     evidence_status TEXT NOT NULL
-      CHECK(evidence_status='official_country_plus_2026_domestic_division_candidate_membership_pending'),
+      CHECK(evidence_status='reviewed_individual_2026_domestic_membership_EA_identity_pending'),
     PRIMARY KEY(edition,club_key),
     FOREIGN KEY(edition,club_key)
        REFERENCES edition_club_competitions(edition,club_key),
@@ -45,16 +47,43 @@ CREATE VIEW fc27_2026_27_complete_source_competition_alignment AS
         COALESCE(o.starting_competition,c.source_domestic_competition) AS starting_competition,
         CASE WHEN o.starting_competition IS NOT NULL THEN o.evidence_origin
              WHEN c.source_domestic_competition IS NOT NULL THEN
-               'reviewed_2026_official_cup_country_and_independent_domestic_first_tier'
+               'official_2026_country_plus_named_2026_domestic_membership_review'
              ELSE 'unresolved' END AS evidence_origin,
         CASE WHEN o.starting_competition IS NOT NULL THEN o.registration_scope
              WHEN c.source_domestic_competition IS NOT NULL THEN
-               'country_backed_home_division_candidate_no_individual_roster_certificate'
+               'individual_2026_club_membership_review_original_EA_ID_pending'
              ELSE 'home_league_missing' END AS verification_scope
  FROM fc27_one_year_club_competition_alignment o
  LEFT JOIN fc27_conmebol_original_club_domestic_candidates c
    ON o.edition=c.edition AND o.club_key=c.club_key;
 """
+def validate_individual_memberships(official_entries, domestic):
+    """Require a season-dated domestic member witness for every cup-source club.
+
+    National association alone does not prove a domestic division. This review
+    does not certify original EA team IDs or an entire league's registration.
+    """
+    records=domestic.get("individual_club_memberships")
+    if not isinstance(records,list) or len(records)!=len(official_entries):
+        raise ValueError("Every cup-source club needs a separate 2026 domestic membership witness")
+    bykey={(x["continental_source_group"],x["original_source_club"]):x for x in records}
+    official={(x["source_group"],x["source_club"]):x for x in official_entries}
+    if len(bykey)!=len(records) or set(bykey)!=set(official):
+        raise ValueError("Missing, duplicated or unexpected individual 2026 domestic club review")
+    for key,record in bykey.items():
+        source=official[key]
+        country=source["country"]
+        league=domestic["countries"].get(country)
+        if (league is None or record["national_association"]!=country
+            or record["domestic_code"]!=league["code"]
+            or record["verified_season"]!=2026
+            or record["domestic_membership_source"]!=league["source"]
+            or record["status"]!="2026_named_first_division_participation_review_game_identity_not_verified"
+            or not str(record["domestic_2026_roster_club"]).strip()
+            or not str(record["domestic_membership_source"]).startswith("https://")):
+            raise ValueError(f"Unsupported 2026 individual domestic league member: {key}")
+    return bykey
+
 def export(path,head,rows):
     with path.open("w",encoding="utf-8-sig",newline="") as f:
         wr=csv.writer(f);wr.writerow(head);wr.writerows(rows)
@@ -74,6 +103,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
     if len(entries)!=40 or len(reviewed)!=40:
         raise ValueError("Must independently identify exactly 40 game-source CONMEBOL club countries")
     leagues=domestic["countries"]
+    individual_members=validate_individual_memberships(entries,domestic)
     if len(leagues)!=9:
         raise ValueError("Expected exactly nine source domestic league associations for 2026")
     dbfile=out/"FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite"
@@ -110,6 +140,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
         rows=[]
         for key,name,group in cup_candidates:
             reviewed_club=reviewed[(group,name)]
+            member=individual_members[(group,name)]
             country=reviewed_club["country"]
             info=leagues.get(country)
             if info is None:raise ValueError("National 2026 domestic source not verified")
@@ -117,8 +148,9 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
                 raise ValueError("Official 2026 club name or primary source unavailable")
             rows.append((2027,key,name,group,country,"2027:"+info["code"],
                  reviewed_club["official_club"],official["group_sources"][group],
-                 info["source"],"official_country_plus_2026_domestic_division_candidate_membership_pending"))
-        db.executemany("INSERT INTO fc27_conmebol_original_club_domestic_candidates VALUES (?,?,?,?,?,?,?,?,?,?)",rows)
+                 member["domestic_2026_roster_club"],member["domestic_membership_source"],
+                 info["source"],"reviewed_individual_2026_domestic_membership_EA_identity_pending"))
+        db.executemany("INSERT INTO fc27_conmebol_original_club_domestic_candidates VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",rows)
         before=db.execute("""SELECT COUNT(*) FROM fc27_one_year_club_competition_alignment
                       WHERE starting_competition IS NOT NULL""").fetchone()[0]
         after=db.execute("""SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment
@@ -138,16 +170,19 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
     export(out/"FC27_CONMEBOL_REVIEWED_2026_HOME_DOMESTIC_LEAGUES.csv",
       ("Edition","Club_Key","Original_FC27_Club","Original_Continental_Source_Group",
        "Official_Country","2026_Domestic_Competition_Code","Official_Cup_Club_Name",
-       "Official_2026_Cup_Source","Independent_2026_Domestic_Club_Source","Evidence_Status"),rows)
+       "Official_2026_Cup_Source","Reviewed_2026_Domestic_Club",
+       "Individual_2026_Domestic_Source","Country_Division_Source","Evidence_Status"),rows)
     report={"version":VERSION,"edition":2027,
        "fc27_active_club_records":total,
        "excluded_original_source_clubs":11,
        "archived_unchanged_FC27_club_records":670,"previously_domestic_source_groups":before,
        "new_2026_country_backed_domestic_league_candidates":len(rows),
+       "individually_reviewed_2026_domestic_club_memberships":len(individual_members),
        "total_staged_domestic_source_competition_associations":after,
        "national_2026_first_division_evidence_sources":len(leagues),
        "source_club_identity_EA_ids_not_verified":True,
        "full_real_world_league_rosters_not_verified":True,
+       "individual_member_name_matches_not_EA_team_id_proof":True,
        "season_promotion_relegation_graph_complete":False,
        "career_ready":False,"other_21_editions_unmodified":True,
        "original_player_data_unmodified":True}
