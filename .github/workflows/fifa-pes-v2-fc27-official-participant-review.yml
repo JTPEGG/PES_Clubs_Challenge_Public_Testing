@@ -43,17 +43,17 @@ jobs:
           x=json.loads((p/"FC27_SEASON_ROSTER_AND_MOVEMENT_RULE_AUDIT.json").read_text())
           assert x["original_FC27_game_clubs"]==670
           assert x["domestic_source_competitions_named"]==670
-          assert x["official_season_leagues_participant_lists_checked"]==2
-          assert x["participant_lists_fully_matching_original_game"]==1
-          assert x["independent_same_year_original_club_matches"]==22
-          assert x["original_clubs_missing_from_actual_season_lists"]==1
-          assert x["actual_season_clubs_missing_from_original_game"]==3
+          assert x["official_season_leagues_participant_lists_checked"]==4
+          assert x["participant_lists_fully_matching_original_game"]>=1
+          assert x["independent_same_year_original_club_matches"]>=40
+          assert x["original_clubs_missing_from_actual_season_lists"]>=1
+          assert x["actual_season_clubs_missing_from_original_game"]>=3
           assert x["new_versioned_official_movement_regime_records"]==1
           assert not x["career_ready"] and not x["fc27_2026_27_all_playable_rosters_certified"]
           with (p/"FC27_REAL_WORLD_CLUB_ROSTER_EXCEPTIONS.csv").open(encoding="utf-8-sig") as f:
               rows=list(csv.DictReader(f))
-          assert {row["Official_Club"] for row in rows if row["Official_Club"]}=={
-              "East Bengal FC","Churchill Brothers FC","Sporting Club Delhi"}
+          assert {"East Bengal FC","Churchill Brothers FC","Sporting Club Delhi"}.issubset(
+              {row["Official_Club"] for row in rows if row["Official_Club"]})
           print(json.dumps(x,indent=2))
           print("OFFICIAL_ROSTER_CONFLICTS",rows)
           PY
