@@ -7,6 +7,8 @@ on:
       - 'scripts/build_fc27_populated_warehouse.py'
       - 'test_fc27_populated_warehouse.py'
       - 'warehouse/fc27_reference_reader.py'
+      - 'warehouse/fc27_disposable_career_overlay.sql'
+      - 'warehouse/fc27_disposable_career.py'
       - 'test_fc27_reference_reader.py'
       - '.github/workflows/fc27-populated-warehouse.yml'
 permissions:
@@ -104,6 +106,64 @@ jobs:
               assert wh.get_player(roster[0]["player_key"]) is not None
               assert wh.get_season_end_route("2027:us.mls") is None
           print("REAL FC27 659-CLUB / 17593-PLAYER POPULATED REFERENCE WAREHOUSE AND CAREER READ ADAPTER VERIFIED")
+          PY
+      - name: Verify isolated disposable career seeding and independent registration history
+        run: |
+          python - <<'PY'
+          import json,sqlite3,tempfile
+          from pathlib import Path
+          from warehouse.fc27_disposable_career import seed_test_career,apply_test_registration_change
+          master=Path("fc27-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_V1.sqlite")
+          with tempfile.TemporaryDirectory() as directory:
+              career_file=Path(directory)/"isolated-career.sqlite"
+              result=seed_test_career(master,career_file)
+              assert result["clubs"]==659 and result["players"]==17593
+              assert result["contracts"]==17593 and result["club_finances"]==659
+              assert result["intended_selectable_clubs"]==344
+              with sqlite3.connect(career_file) as career:
+                  career.execute("PRAGMA foreign_keys=ON")
+                  player=career.execute("""
+                    SELECT r.player_key,r.current_club_key
+                    FROM fc27_demo_career_registrations r
+                    JOIN fc27_demo_career_clubs c ON c.career_id=r.career_id
+                      AND c.club_key=r.current_club_key
+                    WHERE c.intended_manager_selectable=0
+                    ORDER BY r.player_key LIMIT 1
+                  """).fetchone()
+                  target=career.execute("""
+                    SELECT club_key FROM fc27_demo_career_clubs
+                    WHERE intended_manager_selectable=1
+                    ORDER BY club_key LIMIT 1
+                  """).fetchone()[0]
+                  assert player and target
+                  result=apply_test_registration_change(career,career_id="fc27-isolated-qa",
+                    player_key=player[0],from_club=player[1],to_club=target,
+                    transaction_key="dry-run-1")
+                  assert result=="applied"
+                  assert apply_test_registration_change(career,career_id="fc27-isolated-qa",
+                    player_key=player[0],from_club=player[1],to_club=target,
+                    transaction_key="dry-run-1")=="already_applied"
+                  assert career.execute("""
+                    SELECT COUNT(*) FROM fc27_demo_registration_events
+                  """).fetchone()[0]==1
+                  assert career.execute("""
+                    SELECT original_club_key,current_club_key,revision
+                    FROM fc27_demo_career_registrations WHERE player_key=?
+                  """,(player[0],)).fetchone()==(player[1],target,1)
+              with sqlite3.connect(f"file:{master.resolve().as_posix()}?mode=ro",uri=True) as frozen:
+                  assert frozen.execute("""
+                    SELECT club_key FROM wh_fc27_starting_rosters
+                    WHERE player_key=?
+                  """,(player[0],)).fetchone()[0]==player[1]
+                  assert frozen.execute("""
+                    SELECT COUNT(*) FROM wh_fc27_starting_rosters
+                  """).fetchone()[0]==17593
+              print(json.dumps({"career_seeded_clubs":659,
+                 "career_seeded_players":17593,
+                 "single_real_source_player_test_move":True,
+                 "career_event_duplicate_rejected":True,
+                 "frozen_warehouse_unchanged":True,
+                 "production_career_integration":False},indent=2))
           PY
       - name: Publish immutable FC27 reference warehouse snapshot
         uses: actions/upload-artifact@v4
