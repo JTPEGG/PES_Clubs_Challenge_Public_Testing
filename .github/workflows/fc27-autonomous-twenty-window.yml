@@ -36,6 +36,7 @@ jobs:
             test_transfer_negotiations
       - name: Simulate 20 complete actual autonomous 30-minute career transfer windows
         run: |
+          mkdir -p audit
           python -u qa_twenty_windows.py \
             --windows 20 \
             --output audit/FC27_AI_AUTONOMOUS_TWENTY_WINDOWS.json
