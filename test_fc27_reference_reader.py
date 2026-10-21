@@ -77,8 +77,10 @@ class FC27WarehouseReadOnlyTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):FC27WarehouseReader(
           Path(self.folder.name)/"not-here.sqlite")
         with sqlite3.connect(self.path) as db:
-            db.execute("""
-              UPDATE wh_fc27_snapshot SET state='tampered' WHERE edition=2027
-            """)
-        with self.assertRaises(ValueError):FC27WarehouseReader(self.path)
+            with self.assertRaises(sqlite3.IntegrityError):
+                db.execute("""
+                  UPDATE wh_fc27_snapshot SET state='tampered' WHERE edition=2027
+                """)
+        with FC27WarehouseReader(self.path) as warehouse:
+            self.assertTrue(warehouse.snapshot_health()["immutable_reference"])
 if __name__=="__main__":unittest.main()
