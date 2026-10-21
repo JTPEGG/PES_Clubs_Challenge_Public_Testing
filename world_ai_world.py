@@ -26,8 +26,9 @@ AI_WORLD_VERSION = "ai-world-v6-versatile-cover-rotation-quality"
 # Global ceiling is a safety bound, not a target. A real market may be quiet.
 # Multiple independent clubs may agree moves during one market interval.
 MAX_AI_DEALS = 90  # upper safety bound, not a minimum or forced sales
-MAX_SIGNINGS_PER_AI_CLUB = 3  # do not let one club dominate a short window
-MAX_OUTGOING_PER_AI_CLUB = 4
+# No arbitrary per-club incoming/outgoing count limits: actual budget,
+# projected football needs, seller pricing, player consent and risk prioritise
+# deals. MAX_AI_DEALS above is only a global computation safety ceiling.
 AI_APPROACHES_PER_ATTEMPT = 5
 
 
@@ -250,10 +251,10 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                    if len(projected.get(club,{}).get(lane,())) <
                    max(MIN_COVER[lane],STARTERS[lane]))
     buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
+        signings_by_buyer[club],
         _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
     for buyer in buyers[:32]:
-        if (signings_by_buyer[buyer]>=MAX_SIGNINGS_PER_AI_CLUB or
-                budget_remaining(conn,career_id,buyer)<=0):
+        if budget_remaining(conn,career_id,buyer)<=0:
             continue
         profiles=squads[buyer]
         # Do not ignore an entire missing position family.
@@ -289,8 +290,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
             club_ratings=profiles[family]
             options=[]
             for seller,pid,overall in players[family]:
-                if (seller==buyer or pid in signed_players or
-                        signings_by_seller[seller]>=MAX_OUTGOING_PER_AI_CLUB):
+                if seller==buyer or pid in signed_players:
                     continue
                 try:
                     from world_player_morale import is_unavailable
@@ -347,6 +347,10 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # needs more compensation. This changes market PRIORITY, never
                 # forbids a sale or assumes a prospect has already agreed.
                 seller_fit-=min(100,replacement_plan["strategic_sale_risk_weight"])
+                # Selling repeatedly in this window raises the opportunity
+                # cost, without setting a numerical quota or guaranteeing
+                # a replacement. Financial/player/board decisions still stand.
+                seller_fit-=min(75,12*signings_by_seller[seller])
                 options.append((seller,pid,overall,need,
                                 need+seller_fit,fit,sale,replacement_plan))
             options.sort(key=lambda v:(-v[4],
