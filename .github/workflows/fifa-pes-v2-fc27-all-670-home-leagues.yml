@@ -180,7 +180,7 @@ jobs:
           assert data["italian_serie_b_gameplay_uses_promotion_playoff"]
           assert data["austrian_gameplay_uses_direct_one_up_one_down"]
           assert data["total_staged_2027_movement_edges"]==16
-          assert data["competitions_with_additional_season_dated_movement_rules"]==9
+          assert data["competitions_with_additional_season_dated_movement_rules"]==8  # Swiss rule retained as historical but closed for game
           assert data["additional_one_hop_feeder_names_without_game_rosters"]==6
           assert data["greece_original_source_clubs_preserved"]==4
           assert data["germany_second_division_source_clubs_preserved"]==18
