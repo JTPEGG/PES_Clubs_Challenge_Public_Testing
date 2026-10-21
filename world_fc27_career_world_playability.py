@@ -68,7 +68,7 @@ CREATE VIEW fc27_manager_selectable_career_clubs AS
  SELECT c.edition,c.club_key,c.original_club,c.competition_code,
         c.playable_in_PES_verified AS PES_playable_now
  FROM fc27_career_world_clubs c
- JOIN fc27_six_country_playable_approval p
+ JOIN fc27_eight_country_playable_approval p
    ON p.edition=c.edition AND p.competition_code=c.competition_code
  WHERE c.competition_mode='open_league_season_candidate';
 CREATE VIEW fc27_career_world_gameplay_scope AS
@@ -107,17 +107,17 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
        WHERE edition=2027 GROUP BY movement_policy
     """).fetchall()
     if dict((m,(n,clubs)) for m,n,clubs in league_scope)!={
-        "closed":(41,419),"open_pyramid":(12,240)}:
-        raise ValueError("FC27 12 playable-league targets / 41 closed background leagues changed")
+        "closed":(37,345),"open_pyramid":(16,314)}:
+        raise ValueError("FC27 16 playable-league targets / 37 closed background leagues changed")
     named={
       code:(country,int(tier),name)
       for _,code,country,tier,name,_ in db.execute("""
         SELECT * FROM fc27_effective_named_immediate_game_feeders WHERE edition=2027
       """)
     }
-    if len(named)!=3:
-        raise ValueError("Effective named feeder scope must be French Ligue 3, Italian Serie C and Portuguese Liga 2")
-    if set(named)!={"2027:fr.3","2027:it.3","2027:pt.2"}:
+    if len(named)!=4:
+        raise ValueError("Effective named feeder scope must include Dutch Eerste Divisie, French Ligue 3, Italian Serie C and Portuguese Liga 2")
+    if set(named)!={"2027:fr.3","2027:it.3","2027:pt.2","2027:nl.2"}:
         raise ValueError("Unexpected feeder retained after final six-country choice")
     # Belgian original official roster evidence stays retained but is no longer
     # in the effective feeder scope; the league has been closed for gameplay.
@@ -192,8 +192,8 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
          for code,(country,tier,name) in sorted(named.items())])
     if db.execute(
         "SELECT COUNT(*) FROM fc27_manager_selectable_career_clubs"
-    ).fetchone()[0]!=240:
-        raise ValueError("Manager-selectable target clubs must be the 240 original six-country clubs")
+    ).fetchone()[0]!=314:
+        raise ValueError("Manager-selectable target clubs must be the 314 original eight-country clubs")
     original_count=db.execute(
         "SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027"
     ).fetchone()[0]
@@ -201,10 +201,10 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
         raise ValueError("Feeder sourcing damaged immutable original FC27 clubs")
     return {
       "edition":2027,"all_original_clubs_with_explicit_career_world_role":len(original),
-      "open_pyramid_season_candidate_clubs":240,
-      "closed_background_world_clubs":419,
-      "manager_career_intended_selectable_clubs":240,
-      "manager_career_target_countries":6,
+      "open_pyramid_season_candidate_clubs":314,
+      "closed_background_world_clubs":345,
+      "manager_career_intended_selectable_clubs":314,
+      "manager_career_target_countries":8,
       "manager_job_market_source_clubs_retained":659,
       "official_real_feeder_clubs_now_named":len(verified),
       "official_feeder_names_active_in_open_game_competitions":78,
