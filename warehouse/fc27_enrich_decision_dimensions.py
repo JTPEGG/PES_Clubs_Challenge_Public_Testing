@@ -275,7 +275,7 @@ def build(reference_db,circumstances_db,output,*,strict=True):
                 raise ValueError("Financial observed event references unmapped club")
             target.executemany("""
               INSERT INTO wh_fc27_financial_evidence_events VALUES(
-               2027,?,?,?,?,?,?,?,1,0)
+               2027,?,?,?,?,?,?,?,1,1,0)
             """,observed)
             target.execute("""
                UPDATE wh_fc27_coverage_gaps
