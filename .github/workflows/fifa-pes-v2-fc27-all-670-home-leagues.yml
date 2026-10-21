@@ -8,6 +8,9 @@ on:
       - 'world_fc27_source_membership_policy.py'
       - 'world_fc27_additional_movement_rules.py'
       - 'world_fc27_movement_gameplay_policy.py'
+      - 'world_fc27_remaining_movement_game_policy.py'
+      - 'data/warehouse/fc27_remaining_34_gameplay_movement_policy.json'
+      - 'test_world_fc27_remaining_movement_game_policy.py'
       - 'data/warehouse/fc27_2026_27_gameplay_movement_decisions.json'
       - 'test_world_fc27_movement_gameplay_policy.py'
       - 'data/warehouse/fc27_2026_27_additional_movement_regimes.json'
@@ -41,6 +44,7 @@ jobs:
             test_world_fc27_source_membership_policy \
             test_world_fc27_additional_movement_rules \
             test_world_fc27_movement_gameplay_policy \
+            test_world_fc27_remaining_movement_game_policy \
             test_world_fc27_domestic_competition_alignment \
             test_world_competition_exclusions
       - name: Download 242-club source-group active domestic competition database
@@ -58,6 +62,7 @@ jobs:
             --domestic data/warehouse/fc27_2026_conmebol_domestic_participation_review.json \
             --movement-rules data/warehouse/fc27_2026_27_additional_movement_regimes.json \
             --gameplay-decisions data/warehouse/fc27_2026_27_gameplay_movement_decisions.json \
+            --remaining-game-rules data/warehouse/fc27_remaining_34_gameplay_movement_policy.json \
             --output release/
       - name: Confirm 659 active source clubs and original 670 records retained without career changes
         run: |
@@ -75,6 +80,8 @@ jobs:
           assert j["individually_reviewed_2026_domestic_club_memberships"]==40
           assert j["additional_2027_movement_rules_staged"]["additional_2026_27_movements"]==9
           assert j["user_approved_2027_gameplay_movement_assumptions"]["explicitly_logged_gameplay_assumptions"]==2
+          assert j["remaining_2027_gameplay_movement_scope"]["source_competitions_with_new_game_rules"]==34
+          assert j["remaining_2027_gameplay_movement_scope"]["new_named_nonplayable_single_step_feeders_without_squads"]==32
           assert j["user_approved_2027_gameplay_movement_assumptions"]["source_regulations_preserved"]
           assert j["additional_2027_movement_rules_staged"]["first_time_named_one_hop_feeder_competitions"]==6
           assert j["user_approved_source_membership_scope"]["accepted_source_as_provided_competitions"]==33
@@ -99,6 +106,15 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM fc27_source_as_provided_membership_policy").fetchone()[0]==33
               assert db.execute("SELECT COUNT(*) FROM fc27_additional_movement_boundaries").fetchone()[0]==9
               assert db.execute("SELECT COUNT(*) FROM fc27_user_approved_movement_game_rules").fetchone()[0]==2
+              assert db.execute("SELECT COUNT(*) FROM fc27_remaining_34_gameplay_movement").fetchone()[0]==34
+              assert db.execute("SELECT COUNT(*) FROM fc27_game_only_named_immediate_feeders").fetchone()[0]==32
+              assert db.execute("""SELECT direct_promotions,playoff_promotions,
+                direct_relegations,top_division_size_delta
+                FROM fc27_simplified_game_movement_scope
+                WHERE upper_code='2027:kr.1'""").fetchone()==(3,0,1,2)
+              assert db.execute("""SELECT direct_promotions,playoff_promotions,
+                direct_relegations FROM fc27_simplified_game_movement_scope
+                WHERE upper_code='2027:mx.1'""").fetchone()==(0,0,0)
               assert db.execute("SELECT COUNT(*) FROM fc27_effective_additional_game_movement_rules").fetchone()[0]==9
               assert db.execute("""SELECT effective_direct_promotions,effective_playoff_promotions,
                   effective_direct_relegations,effective_interdivision_playoff_places
@@ -138,6 +154,11 @@ jobs:
           assert data["additional_membership_roster_research_required_for_current_scope"]==0
           assert data["additional_source_country_movement_edges"]==9
           assert data["user_approved_explicit_gameplay_movement_simplifications"]==2
+          assert data["new_pragmatic_gameplay_competition_decisions"]==34
+          assert data["gameplay_competitions_with_closed_division_format"]==2
+          assert data["gameplay_named_one_hop_feeders_without_club_squads"]==32
+          assert data["no_remaining_completely_unmapped_active_movement_policy"]
+          assert data["competitions_with_no_linked_season_end_movement_rule"]==0
           assert data["italian_serie_b_gameplay_uses_promotion_playoff"]
           assert data["austrian_gameplay_uses_direct_one_up_one_down"]
           assert data["total_staged_2027_movement_edges"]==16
