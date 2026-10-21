@@ -14,8 +14,8 @@ class FC27PublishedSeasonParticipants(unittest.TestCase):
     """)
     conn.executemany("INSERT INTO edition_club_competitions VALUES(?,?,?,?)",[
       (2027,"S","Aberdeen","Scottish Premiership"),
-      (2027,"I","Hyderabad FC","ISL"),
-      (2027,"M","Mohun Bagan SG","ISL")])
+      (2027,"B","Anderlecht","1A Pro League"),
+      (2027,"R","FCSB","SUPERLIGA")])
     conn.execute("INSERT INTO edition_readiness VALUES(0)")
     conn.executemany("INSERT INTO fc27_2026_27_complete_source_competition_alignment VALUES(2027,'x')",[( ) for _ in range(670)])
     conn.executemany("INSERT INTO edition_club_competitions VALUES(2026,?,?,?)",
@@ -23,10 +23,9 @@ class FC27PublishedSeasonParticipants(unittest.TestCase):
    cfg={"version":"fc27-independent-2026-27-domestic-roster-check-v1","edition":2027,
     "competitions":[{"original_group":"Scottish Premiership","competition_code":"2027:sco.1",
         "official_clubs":["Aberdeen"],"aliases":{},"official_source_url":"https://official"},
-      {"original_group":"ISL","competition_code":"2027:in.1",
-       "official_clubs":["Sporting Club Delhi","Mohun Bagan Super Giant"],
-       "aliases":{"Mohun Bagan SG":"Mohun Bagan Super Giant","Hyderabad FC":"Sporting Club Delhi"},
-       "nonidentity_successor_names":["Hyderabad FC"],"official_source_url":"https://official"}],
+      {"original_group":"1A Pro League","competition_code":"2027:be.1",
+       "official_clubs":["RSC Anderlecht"],"aliases":{"RSC Anderlecht":"Anderlecht"},
+       "official_source_url":"https://official"}],
     "movement_rules":[{"source_url":"https://official","competition_code":"2027:be.1",
          "league_size":18,"regular_season_matches_per_club":34,
          "championship_playoffs":False,"direct_relegations":2,
