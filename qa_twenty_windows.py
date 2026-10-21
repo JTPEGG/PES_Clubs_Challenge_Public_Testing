@@ -242,7 +242,11 @@ def score_window(conn,career,initial,final,index,market_outcome):
           WHERE career_id=? AND season_index=1)""",(career,)).fetchone()[0]
     considered=conn.execute("""SELECT COUNT(*) FROM world_career_offers
         WHERE career_id=?""",(career,)).fetchone()[0]
+    signed=conn.execute("""SELECT COUNT(*) FROM world_career_offer_events e JOIN world_career_offers o ON o.offer_id=e.offer_id WHERE o.career_id=? AND e.event_type='ai_world_signed'""",(career,)).fetchone()[0]
     return dict(index=index,completed_transfers=len(moves),offer_count=considered,
+        ai_signed_agreements=signed,ai_global_cap=90,
+        ai_cap_reached=(signed>=90),
+        offers_per_attempt=round(considered/max(1,attempts),3),
         ai_attempts=attempts,goalkeeper_transfers=keepers,
         prospect_signings=sum(m[0] in prospects for m in moves),
         elite=by_elite,defensive_coverage_flags=quality_risks,
@@ -365,6 +369,7 @@ def run(windows):
                    max(1,sum(x["completed_transfers"] for x in results)),3),
                "coverage_flag_count":sum(len(x["defensive_coverage_flags"])
                                           for x in results)},
+            diagnostic_windows=[{"window":w["index"],"attempts":w["ai_attempts"],"offers":w["offer_count"],"signed":w["ai_signed_agreements"],"cap_reached":w["ai_cap_reached"],"transfers":w["completed_transfers"]} for w in results],
             windows=results)
 
 
