@@ -99,6 +99,67 @@ class FC27WarehouseReader:
           SELECT domain,coverage_status,outstanding_reason
           FROM wh_fc27_coverage_gaps ORDER BY domain
         """)
+    def get_club_ai_context(self,club_key):
+        """Game-model reputation, board policy and dated finance circumstances.
+
+        All simulated values carry explicit fields; observed prestige, cash,
+        debt and owner injections remain NULL. No actual manager is implied.
+        """
+        rows=self._rows("""
+           SELECT c.*,
+              f.preseason_as_of,f.active_evidence_event_ids_json,
+              f.verified_revenue_gbp,f.verified_net_debt_gbp,
+              f.verified_owner_capital_injection_gbp,
+              a.game_manager_key,a.display_role,
+              a.game_coaching_ability,a.youth_development_bias,
+              a.tactical_flexibility,a.recruitment_risk_appetite,
+              a.financial_discipline,a.provenance AS simulated_manager_origin
+           FROM wh_fc27_ai_club_decision_context c
+           JOIN wh_fc27_club_financial_circumstances f
+             ON f.edition=c.edition AND f.club_key=c.club_key
+           JOIN wh_fc27_simulated_manager_agents a
+             ON a.edition=c.edition AND a.starting_club_key=c.club_key
+           WHERE c.edition=2027 AND c.club_key=?
+        """,(club_key,))
+        return rows[0] if rows else None
+
+    def get_player_ai_context(self,player_key):
+        """Existing sourced abilities/contracts and labelled fictional priors."""
+        result=self.get_player(player_key)
+        if result is None:return None
+        traits=self._rows("""
+           SELECT ambition_prior,loyalty_prior,professionalism_prior,
+             temperament_prior,adaptability_prior,wage_motivation_prior,
+             observed_real_personality_json,origin,
+             identity_personality_source_status,model_version
+           FROM wh_fc27_player_game_personality
+           WHERE edition=2027 AND player_key=?
+        """,(player_key,))
+        if not traits:
+            raise ValueError("FC27 decision reference lacks player gameplay priors")
+        result["gameplay_personality"]=traits[0]
+        return result
+
+    def get_club_financial_events(self,club_key):
+        return self._rows("""
+          SELECT event_id,event_date,event_category,source_authority,
+                 source_url,observed_fact,active_at_preseason
+          FROM wh_fc27_financial_evidence_events
+          WHERE edition=2027 AND club_key=? ORDER BY event_date,event_id
+        """,(club_key,))
+
+    def decision_dimension_coverage(self):
+        domains=[
+          ("clubs","wh_fc27_club_decision_profile"),
+          ("finances","wh_fc27_club_financial_circumstances"),
+          ("personalities","wh_fc27_player_game_personality"),
+          ("anonymous_manager_simulation","wh_fc27_simulated_manager_agents"),
+          ("actual_verified_managers","wh_fc27_manager_profiles"),
+          ("source_financial_events","wh_fc27_financial_evidence_events")]
+        return {name:self.conn.execute(
+          f"SELECT COUNT(*) FROM {table} WHERE edition=2027"
+        ).fetchone()[0] for name,table in domains}
+
     def snapshot_health(self):
         counts={}
         for name,table in [
