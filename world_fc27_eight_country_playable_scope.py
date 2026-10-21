@@ -71,7 +71,7 @@ CREATE TABLE fc27_effective_core_pyramid_game_boundaries(
   reason TEXT NOT NULL,
   PRIMARY KEY(edition,lower_code,upper_code)
 );
-CREATE VIEW fc27_intended_playable_club_candidates AS
+CREATE VIEW fc27_eight_country_playable_club_candidates AS
  SELECT c.edition,c.club_key,c.club,c.starting_competition
  FROM fc27_2026_27_complete_source_competition_alignment c
  JOIN fc27_eight_country_playable_approval p
@@ -87,7 +87,7 @@ def apply_eight_country_scope(db:sqlite3.Connection, path, *, strict=True):
         raise ValueError("FC27 eight-country gameplay approval not confirmed")
     groups=cfg.get("open_and_intended_playable_countries")
     if not isinstance(groups,list) or len(groups)!=8:
-        raise ValueError("Exactly six playable countries must be specified")
+        raise ValueError("Exactly eight playable countries must be specified")
     if {x["country"]:tuple(x["competition_codes"]) for x in groups}!=COUNTRY_CODES:
         raise ValueError("Playable competition list differs from eight-country user decision")
     if (set(cfg.get("recorded_new_closure_countries",[]))!=
@@ -169,9 +169,9 @@ def apply_eight_country_scope(db:sqlite3.Connection, path, *, strict=True):
     if actual!={"closed":37,"open_pyramid":16}:
         raise ValueError("Final game scope must be 16 open and 37 closed")
     if db.execute("""
-      SELECT COUNT(*) FROM fc27_intended_playable_club_candidates
+      SELECT COUNT(*) FROM fc27_eight_country_playable_club_candidates
     """).fetchone()[0]!=314:
-        raise ValueError("Playable manager club candidates not 240")
+        raise ValueError("Playable manager club candidates not 314")
     if db.execute("""
       SELECT COUNT(*) FROM fc27_effective_named_immediate_game_feeders
     """).fetchone()[0]!=4:
