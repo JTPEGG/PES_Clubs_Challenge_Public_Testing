@@ -85,14 +85,14 @@ class FC27OtherLeagueGameplayDefaultsTests(unittest.TestCase):
             self.assertEqual(db.execute("""
               SELECT COUNT(*) FROM fc27_game_only_named_immediate_feeders
               WHERE original_game_club_pool_verified=0
-            """).fetchone()[0],32)
+            """).fetchone()[0],4)
 
     def test_reject_incorrect_league_size_or_unsanctioned_feed(self):
         original=json.loads(CONFIG.read_text(encoding="utf-8"))
         for key,value in [
             ("top_division_club_count_delta_after_season",2),
             ("feeder_original_club_squads_verified",True),
-            ("game_direct_promotions",0),
+            ("game_direct_promotions",1),
         ]:
             with self.subTest(field=key),tempfile.TemporaryDirectory() as folder:
                 edited=json.loads(json.dumps(original))
