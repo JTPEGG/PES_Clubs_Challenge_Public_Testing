@@ -268,6 +268,22 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
           ("Edition","Lower_Competition","Regional_Group","Sourced_Club_Name",
            "Reserve_Youth","2026_27_Source","Matches_Original_Club_Name",
            "PES_Squad_Imported"),regional_rows)
+    if effective_route_index is not None:
+        with sqlite3.connect(dbfile) as route_db:
+            route_rows=route_db.execute("""
+               SELECT edition,upper_code,lower_code,route_type,
+                      direct_promotions,lower_playoff_promotions,
+                      upper_direct_relegations,upper_conditional_survival_places,
+                      rule_notes,executable_career_movement
+               FROM fc27_effective_playable_season_end_routes
+               ORDER BY upper_code
+            """).fetchall()
+        export(out/"FC27_2026_27_EFFECTIVE_OPEN_PLAYABLE_SEASON_END_ROUTES.csv",
+          ("Edition","Playable_Upper_Competition","Immediate_Lower_Feeder",
+           "Rule_Source_Kind","Direct_Promotions",
+           "Guaranteed_Lower_Playoff_Promotions","Direct_Relegations",
+           "Conditional_Survival_Playoff","Gameplay_Rule_Notes",
+           "Career_Movement_Currently_Executable"),route_rows)
     export(out/"FC27_CONMEBOL_REVIEWED_2026_HOME_DOMESTIC_LEAGUES.csv",
       ("Edition","Club_Key","Original_FC27_Club","Original_Continental_Source_Group",
        "Official_Country","2026_Domestic_Competition_Code","Official_Cup_Club_Name",
