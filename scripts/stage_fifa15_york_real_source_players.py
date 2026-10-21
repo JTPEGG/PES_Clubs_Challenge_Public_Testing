@@ -15,6 +15,11 @@ YORK_KEY="external_original_fifa_team:2015:1948"
 TEAM_ID=1948
 SRC_PIN="13389f463935d257e92811eebbd50405df1a982aa45233a63d1ce075daca133e"
 SQL="""
+CREATE TABLE pilot_fifa15_original_game_roster_counts(
+ edition INTEGER NOT NULL CHECK(edition=2015),
+ game_club_key TEXT NOT NULL,
+ original_player_count INTEGER NOT NULL CHECK(original_player_count>=0),
+ PRIMARY KEY(edition,game_club_key));
 CREATE TABLE pilot_fifa15_real_york_source_players(
  edition INTEGER NOT NULL CHECK(edition=2015),
  team_id INTEGER NOT NULL CHECK(team_id=1948),
@@ -29,8 +34,10 @@ CREATE TABLE pilot_fifa15_real_york_source_players(
 CREATE VIEW pilot_fifa15_playable_roster_inventory AS
 SELECT s.edition,s.competition_code,s.source_fixture_club,
  s.game_club_key,s.verified_game_team_id,
- (SELECT COUNT(*) FROM players p WHERE p.edition=s.edition
-        AND p.club_key=s.game_club_key) AS imported_original_squad_players,
+ COALESCE((SELECT m.original_player_count
+        FROM pilot_fifa15_original_game_roster_counts m
+        WHERE m.edition=s.edition AND m.game_club_key=s.game_club_key),0)
+        AS imported_original_squad_players,
  (SELECT COUNT(*) FROM pilot_fifa15_real_york_source_players y
         WHERE s.game_club_key='external_original_fifa_team:2015:1948'
         AND y.edition=s.edition AND y.team_id=1948) AS restored_york_source_players,
@@ -38,7 +45,7 @@ SELECT s.edition,s.competition_code,s.source_fixture_club,
  FROM pilot_fifa15_playable_club_placements s;
 """
 
-def build(source_db,york_csv,source_audit,output):
+def build(source_db,york_csv,source_audit,output,squads_sqlite):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     target=out/"FIFA15_ENGLAND_92_REAL_SOURCE_SQUAD_PILOT.sqlite"
     if target.exists():raise FileExistsError("Don't overwrite a historical staging release")
@@ -79,14 +86,28 @@ def build(source_db,york_csv,source_audit,output):
     with sqlite3.connect(f"file:{Path(source_db).resolve()}?mode=ro",uri=True) as source,\
          sqlite3.connect(target) as dst:
         source.backup(dst)
+    with sqlite3.connect(f"file:{Path(squads_sqlite).resolve()}?mode=ro",uri=True) as source_squads:
+        original_clubs={str(key):str(name) for key,name in source_squads.execute(
+            "SELECT club_key,name FROM clubs WHERE edition=2015")}
+        source_counts={str(key):int(count) for key,count in source_squads.execute("""
+            SELECT club_key,COUNT(*) FROM players WHERE edition=2015
+            AND club_key IS NOT NULL AND assignment='at_club' GROUP BY club_key""")}
+        if len(original_clubs)!=596:
+            raise ValueError("Original immutable FIFA15 imported player/squad catalogue changed")
     with sqlite3.connect(target) as db:
         db.execute("PRAGMA foreign_keys=ON")
         db.executescript(SQL)
+        db.executemany("INSERT INTO pilot_fifa15_original_game_roster_counts VALUES(?,?,?)",
+           [(2015,key,source_counts.get(key,0)) for key in sorted(original_clubs)])
         york=db.execute("""SELECT source_fixture_club,verified_game_team_id,game_club_key
               FROM pilot_fifa15_playable_club_placements
               WHERE edition=2015 AND game_club_key=?""",(YORK_KEY,)).fetchall()
         if york!=[("York City",1948,YORK_KEY)]:
             raise ValueError("Source restoration not linked to approved original FIFA15 York team")
+        for name,key,game_name in db.execute(
+            "SELECT source_fixture_club,game_club_key,game_display_name FROM pilot_fifa15_playable_club_placements"):
+            if key!=YORK_KEY and original_clubs.get(key)!=game_name:
+                raise ValueError("Original FIFA15 playable roster club identity mismatch")
         db.executemany("""INSERT INTO pilot_fifa15_real_york_source_players
            VALUES(?,?,?,?,?,?,?,?,?)""",original)
         inventory=db.execute("""SELECT source_fixture_club,
@@ -133,6 +154,7 @@ if __name__=="__main__":
     a.add_argument("--registry",required=True)
     a.add_argument("--york",required=True)
     a.add_argument("--source-audit",required=True)
+    a.add_argument("--squads",required=True)
     a.add_argument("--output",required=True)
     x=a.parse_args()
-    print(json.dumps(build(x.registry,x.york,x.source_audit,x.output),indent=2))
+    print(json.dumps(build(x.registry,x.york,x.source_audit,x.output,x.squads),indent=2))
