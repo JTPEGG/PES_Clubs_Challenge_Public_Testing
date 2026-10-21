@@ -43,8 +43,8 @@ jobs:
           assert j["edition"]==2027
           assert j["fc27_source_club_records"]==670
           assert j["previously_domestic_source_groups"]==630
-          assert j["new_2026_country_and_domestic_participation_reviewed"]==40
-          assert j["total_starting_domestic_source_competition_associations"]==670
+          assert j["new_2026_country_backed_domestic_league_candidates"]==40
+          assert j["total_staged_domestic_source_competition_associations"]==670
           assert j["national_2026_first_division_evidence_sources"]==9
           assert j["source_club_identity_EA_ids_not_verified"]
           assert j["full_real_world_league_rosters_not_verified"]
