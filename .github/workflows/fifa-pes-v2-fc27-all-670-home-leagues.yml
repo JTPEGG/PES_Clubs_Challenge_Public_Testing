@@ -156,11 +156,14 @@ jobs:
                   direct_relegations,interdivision_playoff_places
                   FROM fc27_effective_additional_movement_after_world_closure
                   WHERE upper_code='2027:ch.1'""").fetchone()==(0,0,0,0)
-              for disabled in ('2027:at.1','2027:be.1','2027:nl.1'):
+              for disabled in ('2027:at.1','2027:be.1'):
                   assert db.execute("""SELECT direct_promotions,playoff_promotions,
                       direct_relegations,interdivision_playoff_places
                       FROM fc27_effective_additional_movement_after_world_closure
                       WHERE upper_code=?""",(disabled,)).fetchone()==(0,0,0,0)
+              assert db.execute("""SELECT direct_promotions,direct_relegations
+                  FROM fc27_effective_additional_movement_after_world_closure
+                  WHERE upper_code='2027:nl.1'""").fetchone()==(2,2)
               assert db.execute("""SELECT direct_promotions,playoff_promotions,
                 direct_relegations,top_division_size_delta
                 FROM fc27_simplified_game_movement_scope
