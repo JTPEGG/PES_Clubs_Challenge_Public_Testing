@@ -113,7 +113,7 @@ def build(source_db, leagues_csv, clubs_csv, matches_csv, output, strict=True):
                 raise ValueError("Unsafe original FIFA club-to-dated Segunda match")
             candidate_rows.append((y,key,league,x["Fixture_Club"],x["SHA256"],x["Evidence_Method"]))
         db.executemany("""INSERT INTO early_spanish_segunda_season_sources
-                            VALUES(?,?,?,?,?)""",((y,code,*v) for (y,code),v in seasons.items()))
+                            VALUES(?,?,?,?,?,?)""",((y,code,*v) for (y,code),v in seasons.items()))
         db.executemany("""INSERT INTO early_spanish_segunda_club_memberships
                             VALUES(?,?,?,?)""",(
           (int(x["Edition"]),x["League_Code"],x["Club"],x["SHA256"]) for x in clubs))
