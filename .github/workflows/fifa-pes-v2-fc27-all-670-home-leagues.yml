@@ -6,6 +6,9 @@ on:
       - 'world_fc27_2026_conmebol_domestic_overlay.py'
       - 'world_fc27_release_exclusions.py'
       - 'world_fc27_source_membership_policy.py'
+      - 'world_fc27_additional_movement_rules.py'
+      - 'data/warehouse/fc27_2026_27_additional_movement_regimes.json'
+      - 'test_world_fc27_additional_movement_rules.py'
       - 'world_fc27_domestic_competition_alignment.py'
       - 'test_world_fc27_2026_conmebol_membership_review.py'
       - 'test_world_fc27_release_exclusions.py'
@@ -33,6 +36,7 @@ jobs:
             test_world_fc27_2026_conmebol_membership_review \
             test_world_fc27_release_exclusions \
             test_world_fc27_source_membership_policy \
+            test_world_fc27_additional_movement_rules \
             test_world_fc27_domestic_competition_alignment \
             test_world_competition_exclusions
       - name: Download 242-club source-group active domestic competition database
@@ -48,6 +52,7 @@ jobs:
             --registry prior/FC27_2026_27_CLUB_COMPETITION_SOURCE_ASSOCIATION.sqlite \
             --countries data/warehouse/fc27_2026_conmebol_official_country_review.json \
             --domestic data/warehouse/fc27_2026_conmebol_domestic_participation_review.json \
+            --movement-rules data/warehouse/fc27_2026_27_additional_movement_regimes.json \
             --output release/
       - name: Confirm 659 active source clubs and original 670 records retained without career changes
         run: |
@@ -63,6 +68,8 @@ jobs:
           assert j["excluded_clubs_remaining_in_derived_SQLite"]==0
           assert j["derived_SQLite_club_season_rows"]==13093
           assert j["individually_reviewed_2026_domestic_club_memberships"]==40
+          assert j["additional_2027_movement_rules_staged"]["additional_2026_27_movements"]==9
+          assert j["additional_2027_movement_rules_staged"]["first_time_named_one_hop_feeder_competitions"]==6
           assert j["user_approved_source_membership_scope"]["accepted_source_as_provided_competitions"]==33
           assert j["user_approved_source_membership_scope"]["retained_source_clubs_in_accepted_groups"]==280
           assert j["user_approved_source_membership_scope"]["source_as_provided_canonical_division_records"]==33
@@ -83,6 +90,8 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027").fetchone()[0]==659
               assert db.execute("SELECT COUNT(*) FROM fc27_conmebol_original_club_domestic_candidates").fetchone()[0]==40
               assert db.execute("SELECT COUNT(*) FROM fc27_source_as_provided_membership_policy").fetchone()[0]==33
+              assert db.execute("SELECT COUNT(*) FROM fc27_additional_movement_boundaries").fetchone()[0]==9
+              assert db.execute("SELECT COUNT(*) FROM fc27_extra_movement_feeder_nodes").fetchone()[0]==6
               assert db.execute("SELECT COUNT(*) FROM fc27_accepted_source_as_provided_clubs").fetchone()[0]==280
               assert db.execute("SELECT COUNT(*) FROM fc27_source_as_provided_competition_seasons").fetchone()[0]==33
               assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_active_domestic_competitions").fetchone()[0]==53
@@ -110,6 +119,10 @@ jobs:
           assert data["source_as_provided_competitions_user_accepted"]==33
           assert data["source_as_provided_original_clubs_preserved"]==280
           assert data["additional_membership_roster_research_required_for_current_scope"]==0
+          assert data["additional_source_country_movement_edges"]==9
+          assert data["total_staged_2027_movement_edges"]==16
+          assert data["competitions_with_additional_season_dated_movement_rules"]==9
+          assert data["additional_one_hop_feeder_names_without_game_rosters"]==6
           assert data["greece_original_source_clubs_preserved"]==4
           assert data["germany_second_division_source_clubs_preserved"]==18
           assert data["distinct_active_domestic_competitions"]>0
