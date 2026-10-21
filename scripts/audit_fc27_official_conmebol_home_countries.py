@@ -92,10 +92,14 @@ def audit(registry,output):
     if len(source)!=40 or Counter(x[2] for x in source)!={
         "CONMEBOL Libertadores":20,"CONMEBOL Sudamericana":20}:
         raise ValueError("40 original CONMEBOL game bucket teams unexpectedly changed")
+    print("FC27_CUP_CLUB_SOURCE_LIST",json.dumps(
+         [(name,group) for _,name,group in source],ensure_ascii=False),flush=True)
     official={}
     official_audit={}
     for label,url in SOURCES.items():
         page,digest=retrieve(url)
+        print("OFFICIAL_PAGE_PROBE",label,"html_chars",len(page),
+              "head",page[:600].replace("\\n"," "),flush=True)
         clubs,pairs=parse_country_directory(page)
         official[label]=clubs
         official_audit[label]={"url":url,"sha256":digest,"clubs_and_country_observations":len(pairs)}
