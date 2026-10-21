@@ -42,6 +42,8 @@ ELITE=("Arsenal","Chelsea","Manchester City")
 # would make those API calls see an already-expired 30-minute window, causing
 # zero transfers for the wrong reason.
 FIXED_START=datetime.now(timezone.utc).replace(microsecond=0)
+# Reset the QA clock for each isolated run; avoid elapsed wall-clock time
+# making later simulations appear expired to legacy internal API calls.
 INITIALIZERS=(
     initialize_world,initialize_catalog,initialize_market,
     initialize_career_engine,initialize_career_management,
@@ -256,6 +258,8 @@ def one_window(template,workdir,index):
     with connect(template) as base,connect(path) as conn:
         base.backup(conn)
     with connect(path) as conn:
+        global FIXED_START
+        FIXED_START=datetime.now(timezone.utc).replace(microsecond=0)
         career=f"market-qa-{index:02d}"
         manager=conn.execute("""SELECT club_id FROM world_clubs
             WHERE name='Nottingham Forest'""").fetchone()[0]
