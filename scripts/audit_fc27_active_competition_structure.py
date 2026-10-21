@@ -124,8 +124,8 @@ def audit(connection, *, strict=True):
        SELECT COUNT(*) FROM fc27_game_only_named_immediate_feeders
        WHERE edition=2027 AND original_game_club_pool_verified=0
     """).fetchone()[0]
-    if game_feeders!=32:
-        raise ValueError("Game policy must have 32 one-hop feeder names and two closed leagues")
+    if game_feeders!=4:
+        raise ValueError("Game policy must retain four open one-hop game feeder names")
 
     gameplay_decisions={
         (lower,upper):(up,playoff,down,tie,policy)
@@ -145,13 +145,34 @@ def audit(connection, *, strict=True):
         SELECT COUNT(*) FROM fc27_extra_movement_feeder_nodes
         WHERE edition=2027 AND club_roster_verified=0
     """).fetchone()[0]
+    effective_scope={
+       code:(policy,basis,disclosure)
+       for code,policy,basis,disclosure in connection.execute("""
+          SELECT competition_code,movement_policy,policy_basis,
+                 simplification_disclosure
+          FROM fc27_effective_world_league_movement_scope WHERE edition=2027
+       """)
+    }
+    if len(effective_scope)!=53:
+        raise ValueError("Every active FC27 division requires an effective movement scope")
+    closed_count=sum(v[0]=="closed" for v in effective_scope.values())
+    if closed_count!=32 or sum(v[0]=="open_pyramid" for v in effective_scope.values())!=21:
+        raise ValueError("Expected broad user-approved 32-closed 21-open FC27 world")
+    remaining_effective_feeders=connection.execute("""
+      SELECT COUNT(*) FROM fc27_effective_named_immediate_game_feeders
+    """).fetchone()[0]
+    if remaining_effective_feeders!=9:
+        raise ValueError("Nine unpopulated one-hop feeders remain in the active game scope")
+
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
         country,tier,name,meta_scope=meta.get(code,("unregistered",None,"not registered",
                                             "no_canonical_competition_metadata"))
         scope="|".join(sorted(scopes_by_code[code]))
         rule_id=by_rule_id.get((country,tier))
-        if code in closed:
+        if effective_scope.get(code,(None,))[0]=="closed":
+            rule="user_approved_closed_game_league_no_promotion_relegation"
+        elif code in closed:
             rule="verified_closed_or_no_promotion_format"
         elif code in staged_additional:
             rule="season_dated_source_rules_mapped_feeder_not_certified"
@@ -188,8 +209,9 @@ def audit(connection, *, strict=True):
             reasons.append("published_movement_regime_mapped_but_lower_club_eligibility_pending")
         if rule=="game_policy_simplified_one_hop_unpopulated_feeder":
             reasons.append("game_assumption_identifies_only_lower_division_not_promotion_eligible_clubs")
-        if rule=="game_policy_no_promotion_relegation":
-            reasons.append("game_policy_treats_this_competition_as_closed_for_2027")
+        if rule in ("game_policy_no_promotion_relegation",
+                    "user_approved_closed_game_league_no_promotion_relegation"):
+            reasons.append("gameplay_closed_no_feeder_required_source_clubs_remain")
         reasons.append("source_club_original_EA_identity_not_certified")
         diagnostics.append({
             "competition_code":code,"country":country,"tier":tier,
@@ -197,6 +219,9 @@ def audit(connection, *, strict=True):
             "dated_fixture_member_count":fixture_count[code],
             "independent_immediate_feeder_observations":direct_feeder,
             "registration_scope":scope,"movement_rule_status":rule,
+            "effective_game_movement_scope":effective_scope[code][0],
+            "effective_game_scope_origin":effective_scope[code][1],
+            "effective_gameplay_simplification":effective_scope[code][2],
             "membership_status":membership_status,
             "additional_roster_membership_research_required":False,
             "playability_decision":"unchanged_pending_topology_review" if accepted else "unchanged",
@@ -230,9 +255,14 @@ def audit(connection, *, strict=True):
         "known_dated_2027_pyramid_edges":len(season["promotion_edges"]),
         "additional_source_country_movement_edges":len(staged_additional),
         "new_pragmatic_gameplay_competition_decisions":len(pragmatic_game_rules),
+        "gameplay_closed_leagues_across_entire_fc27":closed_count,
+        "gameplay_open_leagues_across_entire_fc27":53-closed_count,
+        "gameplay_remaining_effective_feeders_without_club_rosters":remaining_effective_feeders,
+        "no_feeder_required_for_closed_leagues":True,
         "gameplay_competitions_with_closed_division_format":sum(
             x[-1]=="no_promotion_or_relegation" for x in pragmatic_game_rules.values()),
         "gameplay_named_one_hop_feeders_without_club_squads":game_feeders,
+        "gameplay_original_extra_named_feeder_nodes_before_closure_filter":named_nonplayable_feeders,
         "gameplay_country_rule_codes_mapped_in_existing_active_competitions":len(pragmatic_game_rules),
         "no_remaining_completely_unmapped_active_movement_policy":True,
         "user_approved_explicit_gameplay_movement_simplifications":len(gameplay_decisions),
