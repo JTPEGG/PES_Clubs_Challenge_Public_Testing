@@ -33,42 +33,6 @@
       "policy": "no_source_clubs_added_or_deleted"
     },
     {
-      "original_group": "ISL",
-      "competition_code": "2027:in.1",
-      "country": "India",
-      "league_name": "Indian Super League",
-      "official_source_url": "https://www.indiansuperleague.com/Clubs",
-      "official_clubs": [
-        "Bengaluru FC",
-        "Chennaiyin FC",
-        "East Bengal FC",
-        "FC Goa",
-        "Inter Kashi FC",
-        "Kerala Blasters FC",
-        "Churchill Brothers FC",
-        "Sporting Club Delhi",
-        "Mohun Bagan Super Giant",
-        "Mumbai City FC",
-        "NorthEast United FC",
-        "Odisha FC",
-        "Punjab FC"
-      ],
-      "aliases": {
-        "Inter Kashi": "Inter Kashi FC",
-        "Kerala Blasters": "Kerala Blasters FC",
-        "Mohun Bagan SG": "Mohun Bagan Super Giant",
-        "NorthEast United": "NorthEast United FC",
-        "Churchill Brothers": "Churchill Brothers FC",
-        "East Bengal": "East Bengal FC",
-        "Hyderabad FC": "Sporting Club Delhi"
-      },
-      "nonidentity_successor_names": [
-        "Hyderabad FC"
-      ],
-      "confidence": "independently_dated_official_league_current_club_list",
-      "policy": "renamed_or_licence_successor_is_not_the_same_source_game_club_without_review"
-    },
-    {
       "original_group": "1A Pro League",
       "competition_code": "2027:be.1",
       "country": "Belgium",
