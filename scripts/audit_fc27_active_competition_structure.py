@@ -205,6 +205,36 @@ def audit(connection, *, strict=True):
         raise ValueError("Seven historical England/Germany/Spain movement edges must be open in gameplay")
 
 
+    regional_groups=connection.execute("""
+       SELECT country,regional_group,expected_members FROM
+          fc27_regional_feeder_2026_27_group WHERE edition=2027
+       ORDER BY country,regional_group
+    """).fetchall()
+    regional_clubs=connection.execute("""
+       SELECT code,COUNT(*) FROM fc27_regional_feeder_2026_27_club
+       WHERE edition=2027 GROUP BY code
+    """).fetchall()
+    if (len(regional_groups)!=7 or
+        dict(regional_clubs)!={"2027:es.3":40,"2027:de.4":91} or
+        sorted(n for c,g,n in regional_groups)!=[18,18,18,18,19,20,20]):
+        raise ValueError("Spain two / Germany five sourced regional club pools must contain 40+91 teams")
+    regional_policies=connection.execute("""
+       SELECT lower_code,upper_code,expected_promoted,upper_relegated,
+              promotion_simulation_enabled
+       FROM fc27_regional_feeder_game_policy
+       WHERE edition=2027 ORDER BY lower_code
+    """).fetchall()
+    if regional_policies!=[
+      ("2027:de.4","2027:de.3",4,4,0),
+      ("2027:es.3","2027:es.2",4,4,0)
+    ]:
+        raise ValueError("German Spanish two one-hop 4-up/4-down game policies changed")
+    if connection.execute("""
+       SELECT COUNT(*) FROM fc27_regional_feeder_2026_27_club
+       WHERE PES_player_squad_imported!=0 OR promotion_eligible_game_registration!=0
+    """).fetchone()[0]:
+        raise ValueError("Regional players or promotion eligibility falsely certified")
+
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
         country,tier,name,meta_scope=meta.get(code,("unregistered",None,"not registered",
@@ -307,6 +337,11 @@ def audit(connection, *, strict=True):
         "effective_historical_core_pyramid_edges_enabled":core_enabled,
         "former_german_core_edges_effectively_disabled":0,
         "gameplay_remaining_effective_feeders_without_club_rosters":remaining_effective_feeders,
+        "dated_real_spanish_regional_feeder_names":dict(regional_clubs)["2027:es.3"],
+        "dated_real_german_regional_feeder_names":dict(regional_clubs)["2027:de.4"],
+        "named_regional_source_groups":len(regional_groups),
+        "regional_game_4up_4down_policies_staged":len(regional_policies),
+        "regional_playable_PES_squads_verified":0,
         "feeder_divisions_with_official_real_2026_27_memberships":sum(
             n>0 for n,e in feeder_quality.values()),
         "genuine_feeder_club_names_registered":connection.execute("""
