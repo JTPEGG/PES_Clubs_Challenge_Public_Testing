@@ -10,6 +10,9 @@ on:
       - 'world_fc27_movement_gameplay_policy.py'
       - 'world_fc27_remaining_movement_game_policy.py'
       - 'world_fc27_broader_closed_league_scope.py'
+      - 'world_fc27_career_world_playability.py'
+      - 'test_world_fc27_career_world_playability.py'
+      - 'data/warehouse/fc27_2026_27_verified_feeder_club_rosters.json'
       - 'test_world_fc27_broader_closed_league_scope.py'
       - 'data/warehouse/fc27_remaining_34_gameplay_movement_policy.json'
       - 'test_world_fc27_remaining_movement_game_policy.py'
@@ -48,6 +51,7 @@ jobs:
             test_world_fc27_movement_gameplay_policy \
             test_world_fc27_remaining_movement_game_policy \
             test_world_fc27_broader_closed_league_scope \
+            test_world_fc27_career_world_playability \
             test_world_fc27_domestic_competition_alignment \
             test_world_competition_exclusions
       - name: Download 242-club source-group active domestic competition database
@@ -66,6 +70,7 @@ jobs:
             --movement-rules data/warehouse/fc27_2026_27_additional_movement_regimes.json \
             --gameplay-decisions data/warehouse/fc27_2026_27_gameplay_movement_decisions.json \
             --remaining-game-rules data/warehouse/fc27_remaining_34_gameplay_movement_policy.json \
+            --official-feeder-rosters data/warehouse/fc27_2026_27_verified_feeder_club_rosters.json \
             --output release/
       - name: Confirm 659 active source clubs and original 670 records retained without career changes
         run: |
@@ -88,6 +93,9 @@ jobs:
           assert j["remaining_2027_gameplay_movement_scope"]["closed_2026_27_game_competitions"]==30
           assert j["remaining_2027_gameplay_movement_scope"]["south_korea_2027_k_league_expansion_applied_in_game"]==False
           assert j["final_2027_open_and_closed_gameplay_scope"]["closed_game_domestic_competitions"]==32
+          assert j["source_club_career_world_and_real_2027_feeders"]["official_real_feeder_clubs_now_named"]==93
+          assert j["source_club_career_world_and_real_2027_feeders"]["open_pyramid_season_candidate_clubs"]==410
+          assert j["source_club_career_world_and_real_2027_feeders"]["closed_background_world_clubs"]==249
           assert j["final_2027_open_and_closed_gameplay_scope"]["open_game_domestic_competitions"]==21
           assert j["final_2027_open_and_closed_gameplay_scope"]["remaining_game_one_hop_named_feeders_without_rosters"]==9
           assert j["user_approved_2027_gameplay_movement_assumptions"]["source_regulations_preserved"]
@@ -117,6 +125,11 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM fc27_remaining_34_gameplay_movement").fetchone()[0]==34
               assert db.execute("SELECT COUNT(*) FROM fc27_game_only_named_immediate_feeders").fetchone()[0]==4
               assert db.execute("SELECT COUNT(*) FROM fc27_effective_world_league_movement_scope").fetchone()[0]==53
+              assert db.execute("SELECT COUNT(*) FROM fc27_career_world_clubs").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs").fetchone()[0]==93
+              assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness").fetchone()[0]==9
+              assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness WHERE published_real_club_names>0").fetchone()[0]==3
+              assert db.execute("SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs WHERE PES_player_squad_imported=1").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM fc27_effective_world_league_movement_scope WHERE movement_policy='closed'").fetchone()[0]==32
               assert db.execute("SELECT COUNT(*) FROM fc27_effective_named_immediate_game_feeders").fetchone()[0]==9
               assert db.execute("""SELECT direct_promotions,playoff_promotions,
@@ -174,6 +187,11 @@ jobs:
           assert data["gameplay_closed_leagues_across_entire_fc27"]==32
           assert data["gameplay_open_leagues_across_entire_fc27"]==21
           assert data["gameplay_remaining_effective_feeders_without_club_rosters"]==9
+          assert data["genuine_feeder_club_names_registered"]==93
+          assert data["feeder_divisions_with_official_real_2026_27_memberships"]==3
+          assert data["feeder_divisions_still_without_any_2026_27_real_club_pool"]==6
+          assert data["original_clubs_eligible_for_open_league_schedule_after_game_import"]==410
+          assert data["original_clubs_retained_in_closed_background_job_and_transfer_market"]==249
           assert data["gameplay_named_one_hop_feeders_without_club_squads"]==4
           assert data["no_remaining_completely_unmapped_active_movement_policy"]
           assert data["competitions_with_no_linked_season_end_movement_rule"]==0
