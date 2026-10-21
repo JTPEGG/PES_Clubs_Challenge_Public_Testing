@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/audit_fc27_official_conmebol_home_countries.py'
       - 'test_audit_fc27_official_conmebol_home_countries.py'
+      - 'data/warehouse/fc27_2026_conmebol_official_country_review.json'
       - '.github/workflows/fifa-pes-v2-fc27-conmebol-official-country.yml'
 permissions:
   contents: read
@@ -31,6 +32,7 @@ jobs:
         run: |
           python -u -m scripts.audit_fc27_official_conmebol_home_countries \
             --registry baseline/FC27_2026_27_CLUB_COMPETITION_SOURCE_ASSOCIATION.sqlite \
+            --reviewed-official data/warehouse/fc27_2026_conmebol_official_country_review.json \
             --output release/
       - name: Preserve unknown home domestic leagues, never pretend cup is a domestic league
         run: |
