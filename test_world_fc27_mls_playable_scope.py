@@ -8,10 +8,24 @@ from world_fc27_eight_country_playable_scope import apply_eight_country_scope
 from world_fc27_mls_playable_scope import stage_mls
 MLS=Path(__file__).parent/"data/warehouse/fc27_2026_mls_playable_competition.json"
 
+def populate_existing_mls_names(db):
+    names=[club["original_FC27_club_name"] for club in
+           json.loads(MLS.read_text(encoding="utf-8"))["official_clubs"]]
+    keys=[k for (k,) in db.execute("""
+        SELECT club_key FROM fc27_2026_27_complete_source_competition_alignment
+        WHERE edition=2027 AND starting_competition='2027:us.mls' ORDER BY club_key
+    """).fetchall()]
+    assert len(keys)==len(names)==30
+    db.executemany("""
+        UPDATE fc27_2026_27_complete_source_competition_alignment
+        SET club=? WHERE edition=2027 AND club_key=?
+    """,zip(names,keys))
+
 class MLSPlayable2026Tests(unittest.TestCase):
     def test_selectable_closed_league_2026_calendar_and_cup(self):
         with prepared_fixture() as db:
             apply_eight_country_scope(db,CFG,strict=False)
+            populate_existing_mls_names(db)
             original=db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]
             res=stage_mls(db,MLS,strict=False)
             self.assertEqual(res["intended_selectable_original_game_clubs"],344)
@@ -31,7 +45,7 @@ class MLSPlayable2026Tests(unittest.TestCase):
             self.assertEqual(db.execute("""
               SELECT COUNT(*) FROM fc27_mls_official_conference_membership
               WHERE mapped_original_game_club_key IS NOT NULL
-            """).fetchone()[0],0)
+            """).fetchone()[0],30)
     def test_rejects_made_up_conference_members(self):
         config=json.loads(MLS.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as tmp:
@@ -39,11 +53,13 @@ class MLSPlayable2026Tests(unittest.TestCase):
             f=Path(tmp)/"tamper.json";f.write_text(json.dumps(config))
             with prepared_fixture() as db:
                 apply_eight_country_scope(db,CFG,strict=False)
+                populate_existing_mls_names(db)
                 with self.assertRaisesRegex(ValueError,"30 named official MLS"):
                     stage_mls(db,f,strict=False)
     def test_source_squad_readiness_remains_disabled(self):
         with prepared_fixture() as db:
             apply_eight_country_scope(db,CFG,strict=False)
+            populate_existing_mls_names(db)
             stage_mls(db,MLS,strict=False)
             self.assertEqual(db.execute("""
                 SELECT SUM(PES_match_roster_verified),SUM(season_schedule_activated)
