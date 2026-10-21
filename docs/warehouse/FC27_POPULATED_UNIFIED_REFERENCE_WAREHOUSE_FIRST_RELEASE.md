@@ -51,6 +51,16 @@ Frozen snapshot contains:
 - `test_fc27_populated_warehouse.py` and `test_fc27_reference_reader.py` — baseline schema, read-only guards, source/model provenance and no phantom entities.
 - `.github/workflows/fc27-populated-warehouse.yml` — build and data-integrity validation, ships `FC27_UNIFIED_REFERENCE_WAREHOUSE_V1.sqlite` plus `FC27_UNIFIED_REFERENCE_WAREHOUSE_V1.audit.json` in a GitHub Actions artifact.
 
+## Verified disposable career read/seed integration
+
+**Successful complete validation:** [GitHub Actions run 39612664519](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39612664519) — 13 Python unit tests passed, original 659/17,593/53 source counts reconciled, and a genuine standalone career overlay was seeded and exercised without mutating the warehouse. The published artifact `FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1` contains the populated immutable SQLite and source/audit JSON.
+
+The separate `warehouse/fc27_reference_reader.py` is **read-only** and returns original club budgets and source-provenance, player attributes, starting club roster, and season-end rule information. The career seeding proof (`warehouse/fc27_disposable_career.py`, `warehouse/fc27_disposable_career_overlay.sql`) copies the entire starting 659-club/17,593-player world plus 17,593 starting contracts and 659 modelled club finances into a **new disposable, SHA256-source-pinned career**.
+
+Its regression uses a **real source-player ID** from the background club pool, moves that registration to an intended playable club in the disposable career, proves duplicate-event replay is idempotent, and confirms the source warehouse still contains the original starting assignment and all 17,593 immutable player registrations.
+
+**Precisely what is not claimed:** This proves the isolation and reference-data access boundary. It does not assert deployment, authentication, production `world_career_*` adapter compatibility, real transfers, game season fixtures, effective transfer fee/payroll postings, actual decisions from AI, or a native PES-compatible game file.
+
 ## Real project readiness and next tasks
 
 **Achieved:** the 2027 immutable reference read model is actually populated and checked from the previously approved player, club and financial data; app read interface is available. This removes the earlier need to keep multiple different source files in business-logic call paths.
@@ -59,7 +69,7 @@ Frozen snapshot contains:
 
 Recommended sequencing:
 
-1. **Career integration:** introduce a versioned `dataset_id` referencing a checksum of the warehouse snapshot. Seed disposable career overlay contracts, squads and finances from the reader; prove post-seed transfers never mutate the reference warehouse. No import into production saves.
+1. **Actual world_career_* binding:** the SHA256-pinned *disposable* career snapshot/seeding tests now pass. Map the read-only warehouse IDs into the existing career creation and event persistence engine under an explicit dataset version and test its real contract, transfer, finance and registration pathways. Do **not** treat the isolated example as deployment or a completed production integration.
 2. **AI data contract:** confirm exact fields the AI decision engine uses, resolve salary/role/reputation fallbacks and their provenance from the canonical warehouse. Test contract expiring, source loans and outside-squad club requirements.
 3. **Missing domains:** add manager/stadium/institutional stature/personality only where source-backed or explicitly modelled, with separate coverage percentages and `NULL` where unknown.
 4. **Game simulation:** connect complete seasonal standings to the 16 routes, including closed league background results and MLS playoffs, using app player registrations. PES game compatibility isn't a gate.
