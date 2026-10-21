@@ -11,7 +11,7 @@ import sqlite3
 from pathlib import Path
 from urllib.parse import urlparse
 
-VERSION="fc27-user-delegated-gameplay-movement-gaps-v1"
+VERSION="fc27-user-delegated-gameplay-movement-gaps-v2"
 EXPECTED=set((
  "ae.1 ar.1 au.1 az.1 bg.1 bo.1 br.1 cl.1 cn.1 co.1 "
  "cy.1 cz.1 dk.1 ec.1 fi.1 gr.1 hr.1 hu.1 ie.1 it.2 "
@@ -19,7 +19,12 @@ EXPECTED=set((
  "tr.1 ua.1 uy.1 ve.1"
 ).split())
 EXPECTED_CODES={"2027:"+code for code in EXPECTED}
-CLOSED={"2027:au.1","2027:mx.1"}
+# Only major career-route lower divisions stay open in this 34-code tranche.
+# Wider sourced European pyramids are handled separately and never overridden here.
+OPEN_PYRAMIDS=frozenset({"2027:ar.1","2027:it.2","2027:pl.1","2027:tr.1"})
+CLOSED=EXPECTED_CODES-OPEN_PYRAMIDS
+if len(CLOSED)!=30:
+    raise RuntimeError("FC27 explicitly approved broad closed-league scope drift")
 PINNED={"2027:tr.1":18,"2027:pl.1":18,"2027:dk.1":12,
         "2027:se.1":16,"2027:no.1":16,"2027:kr.1":12,
         "2027:gr.1":4,"2027:it.2":20,
@@ -66,7 +71,7 @@ CREATE VIEW fc27_simplified_game_movement_scope AS
 def stage_game_defaults(db:sqlite3.Connection, path, *, strict=True):
     config=json.loads(Path(path).read_text(encoding="utf-8"))
     if (config.get("version")!=VERSION or config.get("edition")!=2027 or
-        config.get("policy")!="pragmatic_gameplay_defaults_not_claims_of_exact_official_rules"):
+        config.get("policy")!="pragmatic_broad_closed_league_defaults_preserve_four_select_open_pyramids"):
         raise ValueError("Wrong historical edition or gameplay-policy provenance")
     rows=config.get("rules")
     if not isinstance(rows,list) or len(rows)!=34:
@@ -122,7 +127,8 @@ def stage_game_defaults(db:sqlite3.Connection, path, *, strict=True):
         if code in CLOSED:
             if (mode!="no_promotion_or_relegation" or
                 any((up,playoff,down,delta)) or lower is not None or lower_name is not None
-                or r["rule_provenance"]!="game_policy_closed_league"):
+                or r["rule_provenance"] not in
+                ("game_policy_closed_league","user_delegated_closed_league")):
                 raise ValueError("2026/27 closed league must not exchange fictional teams")
         else:
             expected_lower="2027:"+code.split(":")[1].split(".")[0]+"."+str(tier+1)
@@ -134,10 +140,10 @@ def stage_game_defaults(db:sqlite3.Connection, path, *, strict=True):
             if lower in feeders and feeders[lower]!=(country,tier+1,lower_name):
                 raise ValueError("Duplicate lower division name or country conflict")
             feeders[lower]=(country,tier+1,lower_name)
-        if code=="2027:kr.1" and (up,playoff,down,delta)!=(3,0,1,2):
-            raise ValueError("K League 2027 increases from 12 to 14 members")
-        if code!="2027:kr.1" and delta!=0:
-            raise ValueError("Unapproved league-size change")
+        if delta!=0:
+            raise ValueError("FC27 league-size change is suppressed for closed leagues, including Korea")
+        if code in ("2027:kr.1","2027:ro.1","2027:se.1","2027:no.1") and mode!="no_promotion_or_relegation":
+            raise ValueError("Explicit user's four named minor leagues must remain closed")
         if code=="2027:pl.1" and (up,playoff,down)!=(2,1,3):
             raise ValueError("Polish three-team relegation / second-tier playoff changed")
         if code=="2027:it.2" and (up,playoff,down)!=(4,0,4):
@@ -174,8 +180,13 @@ def stage_game_defaults(db:sqlite3.Connection, path, *, strict=True):
       "edition":2027, "source_competitions_with_new_game_rules":len(validated),
       "closed_2026_27_game_competitions":len(CLOSED),
       "new_named_nonplayable_single_step_feeders_without_squads":len(feeders),
+      "game_scope_does_not_require_feeders_for_closed_leagues":True,
       "source_competitions_with_nonzero_game_exchange":len(validated)-len(CLOSED),
-      "south_korea_2027_k_league_top_division_expansion":2,
+      "south_korea_2027_k_league_expansion_applied_in_game":False,
+      "source_starting_2027_k_league_club_count_retained":available["2027:kr.1"][2],
+      "explicitly_2027_closed_country_examples":["South Korea","Romania","Sweden","Norway"],
+      "original_game_clubs_retained_in_all_closed_leagues":True,
+      "closed_game_competitions_can_still_have_clubs_transfers_and_manager_jobs":True,
       "simulation_roster_certification":False,
       "original_club_records_modified":False,"career_activated":False
     }
