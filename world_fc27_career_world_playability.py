@@ -30,7 +30,9 @@ CREATE TABLE fc27_career_world_clubs (
   original_club TEXT NOT NULL,
   competition_code TEXT NOT NULL,
   competition_mode TEXT NOT NULL CHECK(
-    competition_mode IN ('open_league_season_candidate','closed_background_world')),
+    competition_mode IN (
+       'open_league_season_candidate','playable_closed_league_candidate',
+       'closed_background_world')),
   transfer_market_candidate INTEGER NOT NULL CHECK(transfer_market_candidate=1),
   manager_job_market_candidate INTEGER NOT NULL CHECK(manager_job_market_candidate=1),
   playable_in_PES_verified INTEGER NOT NULL CHECK(playable_in_PES_verified=0),
@@ -46,7 +48,9 @@ CREATE TABLE fc27_sourced_real_one_hop_feeder_clubs (
   reserve_or_youth INTEGER NOT NULL CHECK(reserve_or_youth IN (0,1)),
   source_url TEXT NOT NULL,
   source_evidence TEXT NOT NULL CHECK(
-    source_evidence='league_or_federation_published_2026_27_competition_membership'),
+    source_evidence IN (
+       'league_or_federation_published_2026_27_competition_membership',
+       'season_named_clubs_secondary_source_crosschecked_with_federation')),
   original_FC27_game_club_record INTEGER NOT NULL CHECK(original_FC27_game_club_record=0),
   PES_player_squad_imported INTEGER NOT NULL CHECK(PES_player_squad_imported=0),
   game_promotion_registered INTEGER NOT NULL CHECK(game_promotion_registered=0),
@@ -68,16 +72,21 @@ CREATE VIEW fc27_manager_selectable_career_clubs AS
  SELECT c.edition,c.club_key,c.original_club,c.competition_code,
         c.playable_in_PES_verified AS PES_playable_now
  FROM fc27_career_world_clubs c
- JOIN fc27_eight_country_playable_approval p
+ JOIN fc27_effective_manager_selectable_competitions p
    ON p.edition=c.edition AND p.competition_code=c.competition_code
- WHERE c.competition_mode='open_league_season_candidate';
+ WHERE c.competition_mode IN
+   ('open_league_season_candidate','playable_closed_league_candidate');
 CREATE VIEW fc27_career_world_gameplay_scope AS
  SELECT s.edition,s.competition_code,s.country,s.name,s.original_game_source_clubs,
         s.movement_policy,
         CASE WHEN s.movement_policy='open_pyramid' THEN 'simulated_league_candidate'
+             WHEN m.competition_code IS NOT NULL THEN
+               'playable_closed_mls_conference_season_with_cup_playoffs'
              ELSE 'passive_background_no_sporting_movement'
         END AS season_role
- FROM fc27_effective_world_league_movement_scope s;
+ FROM fc27_effective_world_league_movement_scope s
+ LEFT JOIN fc27_mls_playable_closed_league_approval m
+   ON m.edition=s.edition AND m.competition_code=s.competition_code;
 """
 
 def namekey(name):
@@ -118,7 +127,7 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
     if len(named)!=4:
         raise ValueError("Effective named feeder scope must include Dutch Eerste Divisie, French Ligue 3, Italian Serie C and Portuguese Liga 2")
     if set(named)!={"2027:fr.3","2027:it.3","2027:pt.2","2027:nl.2"}:
-        raise ValueError("Unexpected feeder retained after final six-country choice")
+        raise ValueError("Unexpected feeder retained after final eight-European-country choice")
     # Belgian original official roster evidence stays retained but is no longer
     # in the effective feeder scope; the league has been closed for gameplay.
     archived_belgian_feeder=db.execute("""
@@ -170,7 +179,7 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
                 0,0,0))
         per_group[code]=len(clubs)
     if len(verified)!=93:
-        raise ValueError("Officially named feeder club count changed")
+        raise ValueError("Original three dated feeder lists changed")
     if sum(per_group[c] for c in per_group if c in named)!=78:
         raise ValueError("Only French and Italian feeder club names are active in six-country game")
 
@@ -178,8 +187,10 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
     db.executemany("""
       INSERT INTO fc27_career_world_clubs VALUES(?,?,?,?,?,1,1,0,0)
     """,[(2027,key,name,competition,
-          "open_league_season_candidate" if mode=="open_pyramid"
-          else "closed_background_world") for key,name,competition,mode in original])
+          ("open_league_season_candidate" if mode=="open_pyramid"
+           else "playable_closed_league_candidate" if competition=="2027:us.mls"
+           else "closed_background_world"))
+          for key,name,competition,mode in original])
     db.executemany("""
       INSERT INTO fc27_sourced_real_one_hop_feeder_clubs
       VALUES(?,?,?,?,?,?,?,?,?,?)
@@ -192,8 +203,8 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
          for code,(country,tier,name) in sorted(named.items())])
     if db.execute(
         "SELECT COUNT(*) FROM fc27_manager_selectable_career_clubs"
-    ).fetchone()[0]!=314:
-        raise ValueError("Manager-selectable target clubs must be the 314 original eight-country clubs")
+    ).fetchone()[0]!=344:
+        raise ValueError("Manager-selectable target clubs must include 314 European and 30 MLS clubs")
     original_count=db.execute(
         "SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027"
     ).fetchone()[0]
@@ -202,9 +213,10 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
     return {
       "edition":2027,"all_original_clubs_with_explicit_career_world_role":len(original),
       "open_pyramid_season_candidate_clubs":314,
-      "closed_background_world_clubs":345,
-      "manager_career_intended_selectable_clubs":314,
-      "manager_career_target_countries":8,
+      "playable_closed_mls_clubs":30,
+      "closed_background_world_clubs":315,
+      "manager_career_intended_selectable_clubs":344,
+      "manager_career_target_countries":9,
       "manager_job_market_source_clubs_retained":659,
       "official_real_feeder_clubs_now_named":len(verified),
       "official_feeder_names_active_in_open_game_competitions":78,
