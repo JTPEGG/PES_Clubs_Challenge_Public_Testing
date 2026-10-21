@@ -1,0 +1,28 @@
+name: PES V2 original FIFA05-14 team league fields source probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fifa-pes-v2-legacy-game-source-probe.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect immutable FIFA Index 2005-2014 extracted player columns
+        run: |
+          python - <<'PY'
+          import csv,io,urllib.request
+          commit='2901373e446cc21671916ac0f25ca30716b626aa'
+          for year in (2005,2007,2010,2012,2014):
+              url=f'https://raw.githubusercontent.com/lbenz730/fifa_model/{commit}/stats/player_stats_{year}.csv'
+              with urllib.request.urlopen(url,timeout=65) as source:
+                  sample=source.read(200000).decode('utf-8-sig',errors='replace')
+              reader=csv.DictReader(io.StringIO(sample[:sample.rfind('\n')]))
+              print('YEAR',year,'HEADERS',reader.fieldnames,flush=True)
+              records=[next(reader) for _ in range(3)]
+              print('YEAR',year,'SAMPLES',records,flush=True)
+          PY
