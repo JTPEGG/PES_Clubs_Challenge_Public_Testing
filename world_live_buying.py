@@ -46,7 +46,7 @@ def _buyer_target(conn,*,career_id,player_id):
 
 
 def _model_player_and_seller(conn,*,career_id,player_id,target,
-                             autonomous_club=False):
+                             autonomous_club=False,replacement_outlook=None):
     """Fill missing facts from a documented fictional policy, never user forms.
 
     Recorded historical circumstances always win. We cannot retroactively
@@ -91,6 +91,9 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
                 WHERE career_id=?""",(career_id,)).fetchone()[0]
             term=max(1,min(6,int(frozen[1][:4])-int(today[:4])))
         historical_source=True
+    if replacement_outlook is not None and (
+            not autonomous_club or replacement_outlook not in ("available","difficult")):
+        raise ValueError("Only autonomous AI may supply a modelled future replacement outlook")
     existing=get_seller_assumptions(conn,career_id,player_id)
     if existing is None:
         record_seller_assumptions(
@@ -99,7 +102,8 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             squad_role=role,transfer_listed=listed,
             player_wants_exit=bool(exit_pressure),
             financial_state="stable",
-            replacement="difficult" if rank<11 else "available",
+            replacement=(replacement_outlook if replacement_outlook is not None
+                         else "difficult" if rank<11 else "available"),
             seller_stance=("retain" if rank<3 else
                            "neutral" if rank<18 else "sell"),
             # Only AI-vs-AI uses an automatically modelled board override.
@@ -115,7 +119,8 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             source_note=(
                 "fictional-autonomous-seller-v2: squad-ranked role, "
                 "deterministic contract and rare exit pressure; "
-                "board exceptional sale only for autonomous AI clubs. "
+                "board exceptional sale only for autonomous AI clubs; "
+                "plausible future replacements are unagreed scouting prospects. "
                 "Not a verified wage, player intention or contract."))
     known=conn.execute("""SELECT 1 FROM world_career_player_circumstances
         WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
