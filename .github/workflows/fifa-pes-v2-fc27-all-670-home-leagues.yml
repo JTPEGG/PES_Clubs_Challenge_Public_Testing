@@ -14,6 +14,10 @@ on:
       - 'world_fc27_mls_playable_scope.py'
       - 'world_fc27_nl_pt_feeder_review.py'
       - 'world_fc27_season_end_logic.py'
+      - 'world_fc27_regional_feeder_rosters.py'
+      - 'world_fc27_regional_season_end.py'
+      - 'test_world_fc27_regional_feeder_rosters.py'
+      - 'data/warehouse/fc27_2026_27_es_de_regional_feeder_clubs.json'
       - 'test_world_fc27_season_end_logic.py'
       - 'data/warehouse/fc27_2026_mls_playable_competition.json'
       - 'data/warehouse/fc27_2026_27_netherlands_portugal_feeder_clubs.json'
@@ -69,6 +73,7 @@ jobs:
             test_world_fc27_mls_playable_scope \
             test_world_fc27_nl_pt_feeder_review \
             test_world_fc27_season_end_logic \
+            test_world_fc27_regional_feeder_rosters \
             test_world_fc27_six_country_playable_scope \
             test_world_fc27_eight_country_playable_scope \
             test_world_fc27_domestic_competition_alignment \
@@ -93,6 +98,7 @@ jobs:
             --playable-scope data/warehouse/fc27_2026_27_eight_country_playable_scope.json \
             --mls-scope data/warehouse/fc27_2026_mls_playable_competition.json \
             --nl-pt-feeders data/warehouse/fc27_2026_27_netherlands_portugal_feeder_clubs.json \
+            --regional-feeders data/warehouse/fc27_2026_27_es_de_regional_feeder_clubs.json \
             --output release/
       - name: Confirm 659 active source clubs and original 670 records retained without career changes
         run: |
@@ -125,6 +131,8 @@ jobs:
           assert j["MLS_2026_closed_division_intended_playable"]["mls_regular_season_matches_per_club"]==34
           assert j["Dutch_Portuguese_2026_27_real_feeder_name_registration"]["newly_sourced_named_feeder_clubs"]==38
           assert j["Dutch_Portuguese_2026_27_real_feeder_name_registration"]["open_feeders_without_real_named_club_members"]==0
+          assert j["Spain_Germany_2026_27_regional_feeder_registration"]["new_real_feeder_club_names"]==131
+          assert j["Spain_Germany_2026_27_regional_feeder_registration"]["separate_one_hop_regional_groups"]==7
           assert j["source_club_career_world_and_real_2027_feeders"]["open_pyramid_season_candidate_clubs"]==314
           assert j["source_club_career_world_and_real_2027_feeders"]["official_feeder_names_active_in_open_game_competitions"]==78
           assert j["source_club_career_world_and_real_2027_feeders"]["manager_career_target_countries"]==9
@@ -170,6 +178,9 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM fc27_career_world_clubs WHERE competition_mode='playable_closed_league_candidate'").fetchone()[0]==30
               assert db.execute("SELECT COUNT(*) FROM fc27_effective_core_pyramid_game_boundaries WHERE game_enabled=1").fetchone()[0]==7
               assert db.execute("SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs").fetchone()[0]==131
+              assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_2026_27_group").fetchone()[0]==7
+              assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_2026_27_club").fetchone()[0]==131
+              assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_game_policy").fetchone()[0]==2
               assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness").fetchone()[0]==4
               assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness WHERE published_real_club_names>0").fetchone()[0]==4
               assert db.execute("SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs WHERE PES_player_squad_imported=1").fetchone()[0]==0
@@ -246,6 +257,10 @@ jobs:
           assert data["gameplay_remaining_effective_feeders_without_club_rosters"]==4
           assert data["official_real_feeder_clubs_in_current_open_league_scope"]==116
           assert data["genuine_feeder_club_names_registered"]==131
+          assert data["dated_real_spanish_regional_feeder_names"]==40
+          assert data["dated_real_german_regional_feeder_names"]==91
+          assert data["named_regional_source_groups"]==7
+          assert data["regional_game_4up_4down_policies_staged"]==2
           assert data["feeder_divisions_with_official_real_2026_27_memberships"]==4
           assert data["feeder_divisions_still_without_any_2026_27_real_club_pool"]==0
           assert data["original_clubs_eligible_for_open_league_schedule_after_game_import"]==314
