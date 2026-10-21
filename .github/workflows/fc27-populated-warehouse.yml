@@ -1,0 +1,99 @@
+name: FC27 populated unified warehouse reference build
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'warehouse/fc27_populated_reference_v1.sql'
+      - 'scripts/build_fc27_populated_warehouse.py'
+      - 'test_fc27_populated_warehouse.py'
+      - '.github/workflows/fc27-populated-warehouse.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fc27-populated-warehouse-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build-frozen-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test existing architecture and populated reference constraints
+        run: python -m unittest -v test_warehouse_schema_v1 test_fc27_populated_warehouse
+      - name: Obtain frozen tested FC27 competition world
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-ALL-659-ACTIVE-SOURCE-CLUB-DOMESTIC-LEAGUES
+          run-id: 39602792857
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-world/
+      - name: Obtain frozen reviewed 22-edition contracts and existing loans
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-MENS-22-EDITION-STARTING-WAGES-CONTRACTS-LOANS
+          run-id: 39423495384
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-contracts/
+      - name: Obtain frozen validated club finance game-model inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-MENS-22-SEASON-CLUB-FINANCIALS-REVIEW
+          run-id: 39427144648
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-finance/
+      - name: Create independent FC27 warehouse with no career changes
+        run: |
+          python -u -m scripts.build_fc27_populated_warehouse \
+            --world source-world/FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite \
+            --contracts source-contracts/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite \
+            --club-finances source-finance/PES_V2_HISTORICAL_CLUB_FINANCIALS.sqlite \
+            --output fc27-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_V1.sqlite
+      - name: Assert source-key parity and disclosed coverage gaps
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          target=Path("fc27-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_V1.sqlite")
+          audit=json.loads(target.with_suffix(".audit.json").read_text())
+          assert audit["reference_clubs"]==659
+          assert audit["reference_competitions"]==53
+          assert audit["intended_playable_competitions"]==17
+          assert audit["intended_playable_clubs"]==344
+          assert audit["unified_registered_players"]==17593
+          assert audit["source_mens_player_records"]==17849
+          assert audit["out_of_scope_source_player_rows_retained_only_in_archive"]==256
+          assert audit["normalized_player_attributes"]==17593*29
+          assert audit["starting_player_contracts"]==17593
+          assert audit["starting_club_finance_profiles"]==659
+          assert audit["playable_starting_roster_players"]==9269
+          assert audit["sourced_season_end_routes"]==16
+          assert audit["known_coverage_gap_domains"]>=5
+          assert audit["snapshot_lifecycle"]=="frozen_reference_not_live_career"
+          with sqlite3.connect(target) as db:
+              db.execute("PRAGMA foreign_keys=ON")
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("SELECT COUNT(DISTINCT club_key) FROM wh_fc27_clubs").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(DISTINCT player_key) FROM wh_fc27_players").fetchone()[0]==17593
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_player_attributes WHERE rating_layer='pes2020_core_estimate'").fetchone()[0]==17593*25
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_player_attributes WHERE rating_layer='pes2020_auxiliary_estimate'").fetchone()[0]==17593*4
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_source_manifest").fetchone()[0]==3
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_club_financials WHERE finance_provenance!='game_model_estimate'").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_competitions WHERE country='United States' AND intended_playable=1").fetchone()[0] in (0,1)
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_movement_routes WHERE upper_code='2027:us.mls'").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_coverage_gaps WHERE domain='managers' AND coverage_status='not_populated'").fetchone()[0]==1
+              assert db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name LIKE 'world_career_%'").fetchone()[0]==0
+          print("REAL FC27 659-CLUB / 17593-PLAYER POPULATED REFERENCE WAREHOUSE VERIFIED")
+          PY
+      - name: Publish immutable FC27 reference warehouse snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          path: fc27-warehouse/
+          retention-days: 30
+          compression-level: 6
+          if-no-files-found: error
