@@ -6,6 +6,7 @@ on:
       - 'warehouse/fc27_ai_realism_audit.py'
       - 'test_fc27_ai_realism.py'
       - 'world_transfer_affordability.py'
+      - 'world_player_decisions.py'
       - '.github/workflows/fc27-warehouse-realism-audit.yml'
 permissions:
   contents: read
