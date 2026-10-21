@@ -22,7 +22,7 @@ from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
 from world_ai_replacement_outlook import assess_future_replacement
 
-AI_WORLD_VERSION = "ai-world-v6-versatile-cover-rotation-quality"
+AI_WORLD_VERSION = "ai-world-v7-senior-need-first"
 # Global ceiling is a safety bound, not a target. A real market may be quiet.
 # Multiple independent clubs may agree moves during one market interval.
 MAX_AI_DEALS = 90  # upper safety bound, not a minimum or forced sales
