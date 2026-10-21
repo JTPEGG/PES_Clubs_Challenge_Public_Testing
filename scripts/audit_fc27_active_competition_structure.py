@@ -110,6 +110,23 @@ def audit(connection, *, strict=True):
     }
     if len(staged_additional)!=9:
         raise ValueError("Expected all nine additional country movement routes")
+    pragmatic_game_rules={
+        code:(lower,up,playoff,down,delta,mode)
+        for code,lower,up,playoff,down,delta,mode in connection.execute("""
+          SELECT upper_code,immediate_lower_code,direct_promotions,
+            playoff_promotions,direct_relegations,top_division_size_delta,movement_mode
+          FROM fc27_remaining_34_gameplay_movement WHERE edition=2027
+        """)
+    }
+    if len(pragmatic_game_rules)!=34:
+        raise ValueError("Exactly 34 additional 2027 source league gameplay regimes required")
+    game_feeders=connection.execute("""
+       SELECT COUNT(*) FROM fc27_game_only_named_immediate_feeders
+       WHERE edition=2027 AND original_game_club_pool_verified=0
+    """).fetchone()[0]
+    if game_feeders!=32:
+        raise ValueError("Game policy must have 32 one-hop feeder names and two closed leagues")
+
     gameplay_decisions={
         (lower,upper):(up,playoff,down,tie,policy)
         for lower,upper,up,playoff,down,tie,policy in connection.execute("""
@@ -138,6 +155,10 @@ def audit(connection, *, strict=True):
             rule="verified_closed_or_no_promotion_format"
         elif code in staged_additional:
             rule="season_dated_source_rules_mapped_feeder_not_certified"
+        elif code in pragmatic_game_rules:
+            rule=("game_policy_no_promotion_relegation"
+                  if pragmatic_game_rules[code][-1]=="no_promotion_or_relegation"
+                  else "game_policy_simplified_one_hop_unpopulated_feeder")
         elif rule_id in touched_nodes:
             rule="partial_dated_pyramid_rules_external_feeder_unverified"
         else:
@@ -165,6 +186,10 @@ def audit(connection, *, strict=True):
             reasons.append("movement_rules_partial_or_feeder_not_certified")
         if rule=="season_dated_source_rules_mapped_feeder_not_certified":
             reasons.append("published_movement_regime_mapped_but_lower_club_eligibility_pending")
+        if rule=="game_policy_simplified_one_hop_unpopulated_feeder":
+            reasons.append("game_assumption_identifies_only_lower_division_not_promotion_eligible_clubs")
+        if rule=="game_policy_no_promotion_relegation":
+            reasons.append("game_policy_treats_this_competition_as_closed_for_2027")
         reasons.append("source_club_original_EA_identity_not_certified")
         diagnostics.append({
             "competition_code":code,"country":country,"tier":tier,
@@ -204,6 +229,12 @@ def audit(connection, *, strict=True):
             for x in diagnostics),
         "known_dated_2027_pyramid_edges":len(season["promotion_edges"]),
         "additional_source_country_movement_edges":len(staged_additional),
+        "new_pragmatic_gameplay_competition_decisions":len(pragmatic_game_rules),
+        "gameplay_competitions_with_closed_division_format":sum(
+            x[-1]=="no_promotion_or_relegation" for x in pragmatic_game_rules.values()),
+        "gameplay_named_one_hop_feeders_without_club_squads":game_feeders,
+        "gameplay_country_rule_codes_mapped_in_existing_active_competitions":len(pragmatic_game_rules),
+        "no_remaining_completely_unmapped_active_movement_policy":True,
         "user_approved_explicit_gameplay_movement_simplifications":len(gameplay_decisions),
         "italian_serie_b_gameplay_uses_promotion_playoff":True,
         "austrian_gameplay_uses_direct_one_up_one_down":True,
@@ -215,7 +246,7 @@ def audit(connection, *, strict=True):
             for x in diagnostics),
         "complete_2027_canonical_movement_destinations":False,
         "one_hop_feeder_policy":"only tier+1 observed; never recursively generated",
-        "next_task":"2026_27_promotion_relegation_and_one_hop_feeder_rules",
+        "next_task":"verify_promotion_eligible_one_hop_club_pools_and_apply_playable_gameplay_rules",
         "membership_scope_accepted_is_not_independent_fixture_verification":True,
         "all_original_EA_IDs_certified":False,
         "competition_rosters_and_feeders_certified":False,
