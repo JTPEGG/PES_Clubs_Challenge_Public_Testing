@@ -1,0 +1,76 @@
+name: FC27 real autonomous 20-window recruitment audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fc27-autonomous-twenty-window.yml'
+      - 'qa_twenty_windows.py'
+      - 'world_ai_world.py'
+      - 'world_squad_planner.py'
+      - 'world_recruitment_strategy.py'
+      - 'world_transfer_affordability.py'
+      - 'world_player_decisions.py'
+permissions:
+  contents: read
+concurrency:
+  group: fc27-autonomous-twenty-window-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  twenty-full-windows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install application requirements
+        run: python -m pip install -r requirements.txt
+      - name: Verify projected squad and player/board regression suites
+        run: |
+          python -m unittest -v \
+            test_world_squad_planner \
+            test_world_recruitment_strategy \
+            test_fc27_ai_realism \
+            test_transfer_affordability \
+            test_transfer_negotiations
+      - name: Simulate 20 complete actual autonomous 30-minute career transfer windows
+        run: |
+          python -u qa_twenty_windows.py \
+            --windows 20 \
+            --output audit/FC27_AI_AUTONOMOUS_TWENTY_WINDOWS.json
+      - name: Inspect full engine audit without inventing performance targets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('audit/FC27_AI_AUTONOMOUS_TWENTY_WINDOWS.json')
+          a=json.loads(p.read_text())
+          assert a["simulated_windows"]==20
+          assert len(a["windows"])==20
+          assert a["source_dataset"]=="england-2026-27-fc27"
+          assert sum(w["completed_transfers"] for w in a["windows"])==a["total_completed"]
+          assert all(w["final_state"]=="closed" for w in a["windows"])
+          assert all(w["completed_transfers"]>=0 for w in a["windows"])
+          assert all(w["ai_attempts"]>=0 for w in a["windows"])
+          assert isinstance(a["elite_totals"],dict)
+          assert set(("Arsenal","Chelsea","Manchester City")).issubset(a["elite_totals"])
+          print(json.dumps({
+            "scope":"existing autonomous 92-club development engine ONLY; not the new 659-club warehouse",
+            "windows":20,"completed":a["total_completed"],
+            "mean":a["mean_completed"],"GK_share":a["goalkeeper_share"],
+            "elite":a["elite_totals"],
+            "cover_alerts":a["position_coverage_alerts"],
+            "quality_alerts":a["position_quality_alerts"],
+            "rotation_alerts":a["position_rotation_alerts"],
+            "status":"completed real code paths, metrics not pre-judged"
+          },indent=2))
+          PY
+      - name: Upload complete 20-window event/position and elite-team audit
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: FC27-AUTONOMOUS-92-CLUB-20-WINDOW-AUDIT
+          path: audit/
+          retention-days: 30
+          if-no-files-found: warn
