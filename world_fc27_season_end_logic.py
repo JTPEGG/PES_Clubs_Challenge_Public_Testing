@@ -75,7 +75,11 @@ def resolve_boundary(
         raise ValueError("One game club registered in two different divisions")
     if not set(upper).issubset(eligible_upper_clubs):
         raise ValueError("Top-division real registered senior club eligibility missing")
-    direct=list(lower[:counts[0]])
+    # Skip explicitly ineligible youth/reserve teams for the game's
+    # sporting promotion decision; never create stand-in club identities.
+    direct=[x for x in lower if x in eligible_lower_clubs][:counts[0]]
+    if len(direct)!=counts[0]:
+        raise ValueError("Not enough certified eligible lower-division clubs to promote")
     playoffs=list(playoff_promoted)
     if len(playoffs)!=counts[1] or len(set(playoffs))!=len(playoffs):
         raise ValueError("Explicit result needed for every lower-division play-off promotion")
