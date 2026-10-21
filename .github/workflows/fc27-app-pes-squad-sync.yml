@@ -1,0 +1,106 @@
+name: FC27 app player-to-PES squad sync proof
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_fc27_app_pes_squad_sync.py'
+      - 'scripts/build_fc27_app_pes_squad_sync_preview.py'
+      - 'test_world_fc27_app_pes_squad_sync.py'
+      - '.github/workflows/fc27-app-pes-squad-sync.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fc27-pes-squad-sync-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  validate-and-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify transfer ledger, source ID integrity and PES ID gates
+        run: python -m unittest -v test_world_fc27_app_pes_squad_sync
+      - name: Download completed original men-only player archive
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original-men-only/
+      - name: Download passing active FC27 world competition release
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-ALL-659-ACTIVE-SOURCE-CLUB-DOMESTIC-LEAGUES
+          run-id: 39602792857
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original-fc27-world/
+      - name: Build real FC27 player-to-club review and isolated editable app registration
+        run: |
+          python -u -m scripts.build_fc27_app_pes_squad_sync_preview \
+            --fc27-world original-fc27-world/FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite \
+            --historical-mens-squads original-men-only/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --output fc27-squad-sync-preview
+      - name: Assert source-to-game readiness honestly and preserve game/player IDs
+        run: |
+          python - <<'PY'
+          import json,sqlite3,csv
+          from pathlib import Path
+          out=Path("fc27-squad-sync-preview")
+          report=json.loads((out/"FC27_APP_PES_SQUAD_SYNC_BUILD_REPORT.json").read_text())
+          p=report["data_population"]; e=report["export"];checks=report["verification"]
+          assert p["historical_mens_source_player_rows"]==17849
+          assert p["active_app_player_rows"]==17593
+          assert p["original_player_rows_outside_active_FC27_world"]==256
+          assert p["active_source_club_ID_direct_matches"]==659
+          assert p["playable_squad_players_at_start"]==9269
+          assert p["initial_game_team_ID_crosswalks"]==0
+          assert p["initial_game_player_ID_crosswalks"]==0
+          assert e["registered_players_currently_at_playable_clubs"]==9269
+          assert e["missing_pes_team_mappings_for_playable_clubs"]==344
+          assert e["playable_player_rows_missing_pes_player_id"]==9269
+          assert e["native_pes_edit_file_created"] is False
+          assert e["ready_for_game_import"] is False
+          assert checks["playable_teams"]==344
+          assert checks["background_teams"]==315
+          assert checks["app_player_rows"]==17593
+          assert checks["starting_transfer_ledger_events"]==0
+          file=out/"FC27_PLAYABLE_CURRENT_SQUADS_PES2020_REVIEW_ONLY.csv"
+          with file.open(encoding="utf-8-sig",newline="") as stream:
+              rows=csv.DictReader(stream)
+              assert len(rows.fieldnames)==42
+              assert sum(1 for r in rows)==9269
+          with sqlite3.connect(out/"FC27_2026_27_APP_PLAYER_REGISTRATION_STAGING.sqlite") as db:
+              db.execute("PRAGMA foreign_keys=ON")
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("""
+                SELECT COUNT(*) FROM fc27_app_player_registration
+                WHERE current_club_key!=source_club_key
+              """).fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM fc27_career_world_clubs").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_app_transfer_ledger").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM fc27_verified_pes_team_identity").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM fc27_verified_pes_player_identity").fetchone()[0]==0
+              assert db.execute("""
+                SELECT COUNT(*) FROM fc27_effective_manager_selectable_original_clubs
+              """).fetchone()[0]==344
+              assert db.execute("""
+                SELECT COUNT(*) FROM edition_readiness WHERE edition=2027 AND career_ready!=0
+              """).fetchone()[0]==0
+          print(json.dumps({"status":"FC27 APP-TO-PES PREVIEW VERIFIED",
+                            "players":p["active_app_player_rows"],
+                            "playable":e["registered_players_currently_at_playable_clubs"],
+                            "game_export_ready":False},indent=2))
+          PY
+      - name: Upload app squad sync staging database, CSV and truthful readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC27-APP-TO-PES-CURRENT-SQUAD-REVIEW-AND-STAGING
+          path: fc27-squad-sync-preview/
+          retention-days: 30
+          compression-level: 6
+          if-no-files-found: error
