@@ -4,6 +4,10 @@ on:
   push:
     paths:
       - 'world_fc27_2026_conmebol_domestic_overlay.py'
+      - 'world_fc27_release_exclusions.py'
+      - 'world_fc27_domestic_competition_alignment.py'
+      - 'test_world_fc27_2026_conmebol_membership_review.py'
+      - 'test_world_fc27_release_exclusions.py'
       - 'data/warehouse/fc27_2026_conmebol_domestic_participation_review.json'
       - 'data/warehouse/fc27_2026_conmebol_official_country_review.json'
       - '.github/workflows/fifa-pes-v2-fc27-all-670-home-leagues.yml'
@@ -19,6 +23,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Test individual CONMEBOL memberships, FC27 active exclusions and source overlays
+        run: |
+          python -m unittest -v \
+            test_world_fc27_2026_conmebol_membership_review \
+            test_world_fc27_release_exclusions \
+            test_world_fc27_domestic_competition_alignment \
+            test_world_competition_exclusions
       - name: Download 242-club source-group active domestic competition database
         uses: actions/download-artifact@v4
         with:
@@ -44,6 +55,9 @@ jobs:
           assert j["fc27_active_club_records"]==659
           assert j["archived_unchanged_FC27_club_records"]==670
           assert j["excluded_original_source_clubs"]==11
+          assert j["excluded_clubs_remaining_in_derived_SQLite"]==0
+          assert j["derived_SQLite_club_season_rows"]==13093
+          assert j["individually_reviewed_2026_domestic_club_memberships"]==40
           assert j["previously_domestic_source_groups"]==619
           assert j["new_2026_country_backed_domestic_league_candidates"]==40
           assert j["total_staged_domestic_source_competition_associations"]==659
@@ -54,7 +68,11 @@ jobs:
           with sqlite3.connect(p/"FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite") as db:
               assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
               assert not db.execute("PRAGMA foreign_key_check").fetchall()
-              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]==13104
+              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]==13093
+              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_conmebol_original_club_domestic_candidates").fetchone()[0]==40
+              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027 AND LOWER(TRIM(original_source_league)) IN ('isl','indian super league')").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM source_league_groups WHERE edition=2027 AND LOWER(TRIM(source_label)) IN ('isl','indian super league')").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition IS NULL").fetchone()[0]==0
               assert db.execute("SELECT COUNT(DISTINCT club_key) FROM fc27_2026_27_complete_source_competition_alignment").fetchone()[0]==659
