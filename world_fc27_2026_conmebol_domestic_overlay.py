@@ -248,6 +248,23 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
           ("Edition","Original_Source_Club_Key","Club","Domestic_Competition",
            "Season_World_Mode","Manager_Job_Market_Candidate",
            "PES_Player_Squad_Ready"),world_csv)
+    if regional_one_hop is not None:
+        with sqlite3.connect(dbfile) as regional_db:
+            regional_rows=regional_db.execute("""
+               SELECT c.edition,c.code,c.regional_group,c.real_club_name,
+                      c.reserve_or_youth,g.source_url,
+                      c.same_name_in_original_FC27_source,
+                      c.PES_player_squad_imported
+               FROM fc27_regional_feeder_2026_27_club c
+               JOIN fc27_regional_feeder_2026_27_group g ON
+                 g.edition=c.edition AND g.code=c.code AND
+                 g.regional_group=c.regional_group
+               ORDER BY c.code,c.regional_group,c.real_club_name
+            """).fetchall()
+        export(out/"FC27_2026_27_SPANISH_GERMAN_REAL_REGIONAL_FEEDERS.csv",
+          ("Edition","Lower_Competition","Regional_Group","Sourced_Club_Name",
+           "Reserve_Youth","2026_27_Source","Matches_Original_Club_Name",
+           "PES_Squad_Imported"),regional_rows)
     export(out/"FC27_CONMEBOL_REVIEWED_2026_HOME_DOMESTIC_LEAGUES.csv",
       ("Edition","Club_Key","Original_FC27_Club","Original_Continental_Source_Group",
        "Official_Country","2026_Domestic_Competition_Code","Official_Cup_Club_Name",
