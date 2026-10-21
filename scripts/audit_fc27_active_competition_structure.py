@@ -101,6 +101,19 @@ def audit(connection, *, strict=True):
     """)}
     if len(source_accepted)!=33 or sum(source_accepted.values())!=280:
         raise ValueError("FC27 user-accepted source groups missing from release")
+    staged_additional = {
+        upper: (lower,source,status)
+        for lower,upper,source,status in connection.execute("""
+            SELECT lower_code,upper_code,regulation_source_url,rule_status
+            FROM fc27_additional_movement_boundaries WHERE edition=2027
+        """)
+    }
+    if len(staged_additional)!=9:
+        raise ValueError("Expected all nine additional country movement routes")
+    named_nonplayable_feeders=connection.execute("""
+        SELECT COUNT(*) FROM fc27_extra_movement_feeder_nodes
+        WHERE edition=2027 AND club_roster_verified=0
+    """).fetchone()[0]
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
         country,tier,name,meta_scope=meta.get(code,("unregistered",None,"not registered",
@@ -109,6 +122,8 @@ def audit(connection, *, strict=True):
         rule_id=by_rule_id.get((country,tier))
         if code in closed:
             rule="verified_closed_or_no_promotion_format"
+        elif code in staged_additional:
+            rule="season_dated_source_rules_mapped_feeder_not_certified"
         elif rule_id in touched_nodes:
             rule="partial_dated_pyramid_rules_external_feeder_unverified"
         else:
@@ -134,6 +149,8 @@ def audit(connection, *, strict=True):
             reasons.append("2026_27_movement_destinations_missing")
         if rule=="partial_dated_pyramid_rules_external_feeder_unverified":
             reasons.append("movement_rules_partial_or_feeder_not_certified")
+        if rule=="season_dated_source_rules_mapped_feeder_not_certified":
+            reasons.append("published_movement_regime_mapped_but_lower_club_eligibility_pending")
         reasons.append("source_club_original_EA_identity_not_certified")
         diagnostics.append({
             "competition_code":code,"country":country,"tier":tier,
@@ -172,6 +189,12 @@ def audit(connection, *, strict=True):
             x["movement_rule_status"]=="verified_closed_or_no_promotion_format"
             for x in diagnostics),
         "known_dated_2027_pyramid_edges":len(season["promotion_edges"]),
+        "additional_source_country_movement_edges":len(staged_additional),
+        "total_staged_2027_movement_edges":len(season["promotion_edges"])+len(staged_additional),
+        "additional_one_hop_feeder_names_without_game_rosters":named_nonplayable_feeders,
+        "competitions_with_additional_season_dated_movement_rules":sum(
+            x["movement_rule_status"]=="season_dated_source_rules_mapped_feeder_not_certified"
+            for x in diagnostics),
         "complete_2027_canonical_movement_destinations":False,
         "one_hop_feeder_policy":"only tier+1 observed; never recursively generated",
         "next_task":"2026_27_promotion_relegation_and_one_hop_feeder_rules",
