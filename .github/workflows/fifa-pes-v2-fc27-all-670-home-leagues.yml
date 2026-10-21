@@ -1,0 +1,66 @@
+name: PES V2 FC27 2026-27 all 670 club source home division associations
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_fc27_2026_conmebol_domestic_overlay.py'
+      - 'data/warehouse/fc27_2026_conmebol_domestic_participation_review.json'
+      - 'data/warehouse/fc27_2026_conmebol_official_country_review.json'
+      - '.github/workflows/fifa-pes-v2-fc27-all-670-home-leagues.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download 253-club source-group edition-specific domestic competition database
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-REVIEWED-DOMESTIC-COMPETITION-GROUP-ALIGNMENT
+          run-id: 39567617440
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: prior/
+      - name: Validate every original FC27 source club against its real 2026 first division
+        run: |
+          python -u -m world_fc27_2026_conmebol_domestic_overlay \
+            --registry prior/FC27_2026_27_CLUB_COMPETITION_SOURCE_ASSOCIATION.sqlite \
+            --countries data/warehouse/fc27_2026_conmebol_official_country_review.json \
+            --domestic data/warehouse/fc27_2026_conmebol_domestic_participation_review.json \
+            --output release/
+      - name: Confirm 670 distinct edition source clubs and unchanged original career guards
+        run: |
+          python - <<'PY'
+          import sqlite3,json,csv
+          from pathlib import Path
+          p=Path("release")
+          j=json.loads((p/"FC27_ALL_670_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").read_text())
+          assert j["edition"]==2027
+          assert j["fc27_source_club_records"]==670
+          assert j["previously_domestic_source_groups"]==630
+          assert j["new_2026_country_and_domestic_participation_reviewed"]==40
+          assert j["total_starting_domestic_source_competition_associations"]==670
+          assert j["national_2026_first_division_evidence_sources"]==9
+          assert j["source_club_identity_EA_ids_not_verified"]
+          assert j["full_real_world_league_rosters_not_verified"]
+          assert not j["season_promotion_relegation_graph_complete"] and not j["career_ready"]
+          with sqlite3.connect(p/"FC27_2026_27_ALL_670_SOURCE_CLUB_HOME_COMPETITIONS.sqlite") as db:
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]==13104
+              assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition IS NULL").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(DISTINCT club_key) FROM fc27_2026_27_complete_source_competition_alignment").fetchone()[0]==670
+          print(json.dumps(j,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-ALL-670-SOURCE-CLUB-DOMESTIC-LEAGUES-STAGED
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
