@@ -156,13 +156,13 @@ def audit(connection, *, strict=True):
     if len(effective_scope)!=53:
         raise ValueError("Every active FC27 division requires an effective movement scope")
     closed_count=sum(v[0]=="closed" for v in effective_scope.values())
-    if closed_count!=41 or sum(v[0]=="open_pyramid" for v in effective_scope.values())!=12:
-        raise ValueError("Expected user-selected 41-closed 12-open FC27 world")
+    if closed_count!=37 or sum(v[0]=="open_pyramid" for v in effective_scope.values())!=16:
+        raise ValueError("Expected corrected user-selected 37-closed 16-open FC27 world")
     remaining_effective_feeders=connection.execute("""
       SELECT COUNT(*) FROM fc27_effective_named_immediate_game_feeders
     """).fetchone()[0]
-    if remaining_effective_feeders!=3:
-        raise ValueError("Only France Ligue 3, Italy Serie C and Portugal 2 named feeders remain")
+    if remaining_effective_feeders!=4:
+        raise ValueError("France Ligue 3, Italy Serie C, Netherlands Eerste Divisie and Portugal Liga 2 are named feeders")
     feeder_quality={
       code:(realnames,eligible)
       for code,realnames,eligible in connection.execute("""
@@ -170,7 +170,7 @@ def audit(connection, *, strict=True):
         FROM fc27_feeder_pool_readiness WHERE edition=2027
       """)
     }
-    if len(feeder_quality)!=3 or sorted(n for n,e in feeder_quality.values() if n>0)!=[18,60]:
+    if len(feeder_quality)!=4 or sorted(n for n,e in feeder_quality.values() if n>0)!=[18,60]:
         raise ValueError("Expected only French and Italian official club pools active; Portugal pending")
     if any(e for n,e in feeder_quality.values()):
         raise ValueError("No promotion from incomplete PES feeder squads is allowed")
@@ -178,19 +178,19 @@ def audit(connection, *, strict=True):
         SELECT competition_mode,COUNT(*)
         FROM fc27_career_world_clubs WHERE edition=2027 GROUP BY competition_mode
     """))
-    if career_clubs!={"open_league_season_candidate":240,"closed_background_world":419}:
-        raise ValueError("Expected 240 six-country career club targets and 419 background clubs")
+    if career_clubs!={"open_league_season_candidate":314,"closed_background_world":345}:
+        raise ValueError("Expected 314 eight-country career club targets and 345 background clubs")
     selectable=connection.execute("""
         SELECT COUNT(*) FROM fc27_manager_selectable_career_clubs
     """).fetchone()[0]
-    if selectable!=240:
-        raise ValueError("Only 240 original FC27 clubs can be considered for a playable manager career")
+    if selectable!=314:
+        raise ValueError("Only 314 original FC27 clubs can be considered for a playable manager career")
     core_enabled=connection.execute("""
         SELECT COUNT(*) FROM fc27_effective_core_pyramid_game_boundaries
         WHERE edition=2027 AND game_enabled=1
     """).fetchone()[0]
-    if core_enabled!=5:
-        raise ValueError("German historical pyramid must be closed in gameplay")
+    if core_enabled!=7:
+        raise ValueError("Seven historical England/Germany/Spain movement edges must be open in gameplay")
 
 
     diagnostics=[]
@@ -286,11 +286,11 @@ def audit(connection, *, strict=True):
         "new_pragmatic_gameplay_competition_decisions":len(pragmatic_game_rules),
         "gameplay_closed_leagues_across_entire_fc27":closed_count,
         "gameplay_open_leagues_across_entire_fc27":53-closed_count,
-        "manager_intended_playable_countries":6,
-        "manager_intended_playable_competition_codes":12,
+        "manager_intended_playable_countries":8,
+        "manager_intended_playable_competition_codes":16,
         "manager_intended_playable_club_candidates":selectable,
         "effective_historical_core_pyramid_edges_enabled":core_enabled,
-        "former_german_core_edges_effectively_disabled":2,
+        "former_german_core_edges_effectively_disabled":0,
         "gameplay_remaining_effective_feeders_without_club_rosters":remaining_effective_feeders,
         "feeder_divisions_with_official_real_2026_27_memberships":sum(
             n>0 for n,e in feeder_quality.values()),
