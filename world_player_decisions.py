@@ -380,13 +380,13 @@ def evaluate_player_choice_v2(*,buyer_tier,seller_tier,buyer_score,seller_score,
     if (high_level_downgrade and
             (age<30 or (overall>=79 and age<34))):
         return decision("uninterested",
-            "A high-rated Premier League player in his athletic prime "
+            "A high-rated top-flight player in his athletic prime "
             "would not normally choose a permanent move into a lower "
             "division, even if currently out of favour. Short-term loans "
             "and exceptional late-career exits require separate modelling.")
     if high_level_downgrade and not outgoing:
         return decision("uninterested",
-            "Established Premier League player is neither transfer listed "
+            "Established top-flight player is neither transfer listed "
             "nor being released. A permanent lower-division offer has no "
             "credible career or contract incentive.")
     if (high_level_downgrade and
