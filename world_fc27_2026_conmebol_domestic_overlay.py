@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse,csv,json,sqlite3
 from collections import Counter,defaultdict
 from pathlib import Path
-VERSION="fc27-one-year-all-670-domestic-competition-source-associations-v1"
+VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
 SCHEMA="""
 CREATE TABLE fc27_conmebol_2026_domestic_league_sources(
@@ -76,7 +76,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
     leagues=domestic["countries"]
     if len(leagues)!=9:
         raise ValueError("Expected exactly nine source domestic league associations for 2026")
-    dbfile=out/"FC27_2026_27_ALL_670_SOURCE_CLUB_HOME_COMPETITIONS.sqlite"
+    dbfile=out/"FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite"
     if dbfile.exists():raise FileExistsError("Do not overwrite prior source-country review database")
     with sqlite3.connect(f"file:{Path(registry).resolve()}?mode=ro",uri=True) as source,\
          sqlite3.connect(dbfile) as dest:
@@ -124,7 +124,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
         after=db.execute("""SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment
                       WHERE starting_competition IS NOT NULL""").fetchone()[0]
         total=db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment").fetchone()[0]
-        if strict and (before!=630 or after!=670 or total!=670 or len(rows)!=40):
+        if strict and (before!=619 or after!=659 or total!=659 or len(rows)!=40):
             raise ValueError("Original FC27 home league grouping coverage changed")
         if after!=before+len(rows) or total!=after:
             raise ValueError("Not all original FC27 source records have a domestic competition")
@@ -140,7 +140,9 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
        "Official_Country","2026_Domestic_Competition_Code","Official_Cup_Club_Name",
        "Official_2026_Cup_Source","Independent_2026_Domestic_Club_Source","Evidence_Status"),rows)
     report={"version":VERSION,"edition":2027,
-       "fc27_source_club_records":total,"previously_domestic_source_groups":before,
+       "fc27_active_club_records":total,
+       "excluded_original_source_clubs":11,
+       "archived_unchanged_FC27_club_records":670,"previously_domestic_source_groups":before,
        "new_2026_country_backed_domestic_league_candidates":len(rows),
        "total_staged_domestic_source_competition_associations":after,
        "national_2026_first_division_evidence_sources":len(leagues),
@@ -149,7 +151,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
        "season_promotion_relegation_graph_complete":False,
        "career_ready":False,"other_21_editions_unmodified":True,
        "original_player_data_unmodified":True}
-    (out/"FC27_ALL_670_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
+    (out/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
        json.dumps(report,indent=2),encoding="utf-8")
     return report
 if __name__=="__main__":
