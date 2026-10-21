@@ -204,7 +204,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
             raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
     if career_world is not None:
-        with sqlite3.connect(result) as release_db:
+        with sqlite3.connect(dbfile) as release_db:
             feeder_csv=release_db.execute("""
                SELECT edition,feeder_code,real_club_name,regional_group,
                       reserve_or_youth,source_url,
