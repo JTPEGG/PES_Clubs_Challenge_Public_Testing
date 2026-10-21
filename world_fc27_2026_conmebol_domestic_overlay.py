@@ -34,7 +34,7 @@ CREATE TABLE fc27_conmebol_original_club_domestic_candidates(
     official_cup_source_url TEXT NOT NULL,
     national_2026_league_source_url TEXT NOT NULL,
     evidence_status TEXT NOT NULL
-      CHECK(evidence_status='reviewed_2026_domestic_first_tier_membership_ea_id_pending'),
+      CHECK(evidence_status='official_country_plus_2026_domestic_division_candidate_membership_pending'),
     PRIMARY KEY(edition,club_key),
     FOREIGN KEY(edition,club_key)
        REFERENCES edition_club_competitions(edition,club_key),
@@ -49,7 +49,7 @@ CREATE VIEW fc27_2026_27_complete_source_competition_alignment AS
              ELSE 'unresolved' END AS evidence_origin,
         CASE WHEN o.starting_competition IS NOT NULL THEN o.registration_scope
              WHEN c.source_domestic_competition IS NOT NULL THEN
-               'source_review_complete_id_and_full_division_unverified'
+               'country_backed_home_division_candidate_no_individual_roster_certificate'
              ELSE 'home_league_missing' END AS verification_scope
  FROM fc27_one_year_club_competition_alignment o
  LEFT JOIN fc27_conmebol_original_club_domestic_candidates c
@@ -117,7 +117,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
                 raise ValueError("Official 2026 club name or primary source unavailable")
             rows.append((2027,key,name,group,country,"2027:"+info["code"],
                  reviewed_club["official_club"],official["group_sources"][group],
-                 info["source"],"reviewed_2026_domestic_first_tier_membership_ea_id_pending"))
+                 info["source"],"official_country_plus_2026_domestic_division_candidate_membership_pending"))
         db.executemany("INSERT INTO fc27_conmebol_original_club_domestic_candidates VALUES (?,?,?,?,?,?,?,?,?,?)",rows)
         before=db.execute("""SELECT COUNT(*) FROM fc27_one_year_club_competition_alignment
                       WHERE starting_competition IS NOT NULL""").fetchone()[0]
@@ -141,8 +141,8 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
        "Official_2026_Cup_Source","Independent_2026_Domestic_Club_Source","Evidence_Status"),rows)
     report={"version":VERSION,"edition":2027,
        "fc27_source_club_records":total,"previously_domestic_source_groups":before,
-       "new_2026_country_and_domestic_participation_reviewed":len(rows),
-       "total_starting_domestic_source_competition_associations":after,
+       "new_2026_country_backed_domestic_league_candidates":len(rows),
+       "total_staged_domestic_source_competition_associations":after,
        "national_2026_first_division_evidence_sources":len(leagues),
        "source_club_identity_EA_ids_not_verified":True,
        "full_real_world_league_rosters_not_verified":True,
