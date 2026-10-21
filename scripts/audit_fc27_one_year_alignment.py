@@ -96,6 +96,12 @@ def audit(source,outdir):
                        "one_to_one_source_membership_pending_game_id"
                        if source_names else "no_independent_fixture_clubs"))
     groups=[(key,label,total,code or "",exact,alias,status) for key,label,total,code,exact,alias,status in source_groups]
+    original_by_group=defaultdict(list)
+    for key,name,group,typ,confidence,code,origin in originals:
+        original_by_group[group or "<blank>"].append((key,name,code or "",origin))
+    group_examples=[(group,len(records)," | ".join(name for _,name,_,_ in records[:12]))
+                    for group,records in sorted(original_by_group.items(),
+                     key=lambda item:(-len(item[1]),item[0]))]
     export(out/"FC27_ALL_ORIGINAL_GAME_CLUBS.csv",
        ("Club_Key","Original_Club","Original_Source_League","Group_Type","Confidence",
         "Starting_Competition","Evidence_Origin"),originals)
@@ -110,6 +116,11 @@ def audit(source,outdir):
         "Original_Game_Clubs_Currently_Assigned","Unique_Source_Names",
         "Unique_Assigned_Game_Club_Names","Assignment_Origins",
         "Validation_Status"),checks)
+    export(out/"FC27_SOURCE_GROUP_CLUB_MEMBERS.csv",
+       ("Original_Source_Group","Club_Key","Club","Current_Competition","Evidence_Origin"),
+       [(group,*x) for group,records in original_by_group.items() for x in records])
+    export(out/"FC27_SOURCE_GROUP_EXAMPLES.csv",
+       ("Original_Source_Group","Original_Clubs","First_12_Game_Club_Names"),group_examples)
     export(out/"FC27_UNRESOLVED_SOURCE_GROUPS.csv",
        ("Source_Key","Source_Group","Original_Game_Clubs","Corroborated_Competition",
         "Exact_Source_Clubs","Alias_Review_Clubs","Status"),groups)
@@ -128,6 +139,9 @@ def audit(source,outdir):
       "source_league_club_observations":len(fixtures),
       "source_groups":len(source_groups),
       "unresolved_by_original_source_group":dict(bygroup.most_common()),
+      "unresolved_source_group_club_examples":{k:records[:12] for k,records in [
+          (group,[name for key,name,comp,origin in original_by_group[group]])
+          for group in bygroup]},
       "evidence_by_origin":dict(linked),
       "unique_name_candidate_review_queue":len(auto),
       "problematic_linked_continental_groups":len(reviews),
