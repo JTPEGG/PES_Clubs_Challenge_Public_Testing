@@ -41,7 +41,22 @@ def checksum(path):
 def season(year):return f"{year-1}/{year%100:02d}"
 
 def edition_options(conn):
-    return [dict(edition=y,season=s,players=p,clubs=c,
+    # Some earlier test fixtures expose editions only. A complete original
+    # game archive has leagues and clubs; subtract intentionally omitted
+    # source leagues from the manager-facing eligibility count.
+    excluded_by_edition={}
+    available={row[0] for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'")}
+    if {"leagues","clubs"}.issubset(available):
+        for edition,name,count in conn.execute("""
+            SELECT c.edition,l.league_name,COUNT(*)
+            FROM clubs c JOIN leagues l ON c.league_key=l.league_key
+            GROUP BY c.edition,l.league_name"""):
+            if excluded_competition(label=name):
+                excluded_by_edition[edition]=excluded_by_edition.get(edition,0)+count
+    return [dict(edition=y,season=s,players=p,
+        clubs=c-excluded_by_edition.get(y,0),
+        excluded_source_clubs=excluded_by_edition.get(y,0),
         ready_to_import=(y in SUPPORTED and missing==0),
         reason="source league membership incomplete" if y not in SUPPORTED or missing else "")
         for y,s,p,c,missing in conn.execute("""SELECT edition,season,
@@ -98,7 +113,8 @@ def load_new_world(conn,*,source,finances,circumstances,edition):
         budgets={k:(tb,wb) for k,tb,wb in conn.execute("""SELECT club_key,
              revised_transfer_budget_gbp,revised_total_wage_budget_weekly_gbp
              FROM policy.historical_club_circumstances WHERE edition=?""",(edition,))}
-        if any(c[0] not in budgets for c in clubs):raise ValueError("Missing active club financial profiles")
+        if len(budgets)!=len(archived_clubs) or any(c[0] not in budgets for c in clubs):
+            raise ValueError("Missing original archive club financial profiles")
         players=conn.execute("""SELECT p.player_key,p.player_name,p.date_of_birth,
              p.nationality,p.primary_position,p.source_overall,p.source_player_id,
              p.club_key,p.assignment,f.model_weekly_wage_gbp,
