@@ -12,7 +12,7 @@ from collections import Counter
 from pathlib import Path
 
 MLS="2027:us.mls"
-VERSION="fc27-mls-playable-closed-pyramid-v1"
+VERSION="fc27-mls-playable-closed-pyramid-v2"
 SCHEMA="""
 CREATE TABLE fc27_mls_playable_closed_league_approval (
   edition INTEGER NOT NULL CHECK(edition=2027),
@@ -32,9 +32,11 @@ CREATE TABLE fc27_mls_official_conference_membership (
   official_club_name TEXT NOT NULL,
   conference TEXT NOT NULL CHECK(conference IN ('Eastern','Western')),
   source_url TEXT NOT NULL,
-  mapped_original_game_club_key TEXT,
+  mapped_original_game_club_key TEXT NOT NULL,
   PRIMARY KEY(edition,official_club_name),
-  CHECK(mapped_original_game_club_key IS NULL)
+  UNIQUE(edition,mapped_original_game_club_key),
+  FOREIGN KEY(edition,mapped_original_game_club_key)
+    REFERENCES edition_club_competitions(edition,club_key)
 );
 CREATE TABLE fc27_mls_calendar_and_playoff_policy (
   edition INTEGER NOT NULL CHECK(edition=2027),
@@ -116,17 +118,36 @@ def stage_mls(db:sqlite3.Connection, path, *, strict=True):
        any(not x["name"].strip() for x in entries) or
        cfg["source"]!="https://bracket.mlssoccer.com/league-reports/competition-guidelines/"):
         raise ValueError("Expected 30 named official MLS clubs across 15/15 conferences")
+    source_clubs=dict(db.execute("""
+       SELECT club,club_key FROM fc27_2026_27_complete_source_competition_alignment
+       WHERE edition=2027 AND starting_competition=?
+    """,(MLS,)))
+    if len(source_clubs)!=30:
+        raise ValueError("MLS source club names must be one-to-one")
+    matching=[]
+    for x in entries:
+        original_name=x.get("original_FC27_club_name")
+        if original_name not in source_clubs:
+            raise ValueError(f"MLs original FC27 club name missing: {original_name}")
+        matching.append((x["name"],x["conference"],cfg["source"],source_clubs[original_name]))
+    if len({m[-1] for m in matching})!=30:
+        raise ValueError("FC27 MLS official to original game identity mapping is not one-to-one")
     db.executescript(SCHEMA)
     db.execute("""
       INSERT INTO fc27_mls_playable_closed_league_approval VALUES(2027,?,30,1,1,0,0)
     """,(MLS,))
     db.executemany("""
-      INSERT INTO fc27_mls_official_conference_membership VALUES(2027,2026,?,?,?,NULL)
-    """,[(x["name"],x["conference"],cfg["source"]) for x in entries])
+      INSERT INTO fc27_mls_official_conference_membership VALUES(2027,2026,?,?,?,?)
+    """,matching)
     db.execute("""
       INSERT INTO fc27_mls_calendar_and_playoff_policy
       VALUES(2027,?,15,30,34,17,17,28,6,9,3,1,0)
     """,(MLS,))
+    if db.execute("""
+       SELECT COUNT(DISTINCT mapped_original_game_club_key)
+       FROM fc27_mls_official_conference_membership
+    """).fetchone()[0]!=30:
+        raise ValueError("All source FC27 MLS club IDs must be uniquely crosswalked")
     if db.execute("""
        SELECT COUNT(*) FROM fc27_effective_manager_selectable_competitions
     """).fetchone()[0]!=17:
@@ -154,7 +175,7 @@ def stage_mls(db:sqlite3.Connection, path, *, strict=True):
        "mls_2026_source_members":30,
        "mls_eastern_clubs":15,"mls_western_clubs":15,
        "mls_regular_season_matches_per_club":34,
-       "real_world_source_club_name_crosswalk_certified":False,
+       "real_world_source_club_name_crosswalk_certified":True,
        "mls_matches_and_player_rosters_ready":False,
        "promotion_relegation_changes_for_mls":0
     }
