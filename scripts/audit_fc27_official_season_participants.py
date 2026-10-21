@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse,csv,json,sqlite3
 from pathlib import Path
 from world_historical_competition_registry import canonical
+from world_competition_exclusions import excluded_source_league
 
 VERSION="fc27-2026-27-official-roster-conflict-audit-v1"
 
@@ -17,6 +18,8 @@ def compare(source_db,review,outdir):
     config=json.loads(Path(review).read_text(encoding="utf-8"))
     if config.get("version")!="fc27-independent-2026-27-domestic-roster-check-v1" or config.get("edition")!=2027:
         raise ValueError("Independent official published season rosters are not for original FC27")
+    if any(excluded_source_league(x['original_group']) for x in config['competitions']):
+        raise ValueError('An excluded league cannot be audited as an active competition')
     with sqlite3.connect(f"file:{Path(source_db).resolve()}?mode=ro",uri=True) as db:
         old=db.execute("SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027").fetchone()[0]
         if old!=670:raise ValueError("Historical original FC27 source rows unexpectedly changed")
@@ -28,7 +31,7 @@ def compare(source_db,review,outdir):
         staged=db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition IS NOT NULL").fetchone()[0]
         ready=db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready!=0").fetchone()[0]
         original_rows=db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]
-    if staged!=670 or ready or original_rows!=13104:
+    if staged!=659 or ready or original_rows!=13104:
         raise ValueError("Official roster check cannot operate on incomplete or active career source DB")
     all_matches=[];exceptions=[];report=[]
     for item in config["competitions"]:
@@ -98,7 +101,9 @@ def compare(source_db,review,outdir):
         "Direct_Relegations","Official_Regulations_Source_URL",
         "Movement_Evidence_Status"),audited_rules)
     data={"version":VERSION,"edition":2027,
-        "original_FC27_game_clubs":old,"domestic_source_competitions_named":staged,
+        "original_FC27_game_clubs":old,"eligible_FC27_game_clubs":staged,
+        "excluded_original_clubs":old-staged,
+        "domestic_source_competitions_named":staged,
         "official_season_leagues_participant_lists_checked":len(report),
         "participant_lists_fully_matching_original_game":sum(x[7].startswith("published") for x in report),
         "independent_same_year_original_club_matches":len(all_matches),
