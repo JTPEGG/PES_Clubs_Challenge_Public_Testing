@@ -224,7 +224,10 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
         transfer_listed=(None if info["transfer_listed"] is None else bool(info["transfer_listed"])),
         player_wants_exit=(None if info["player_wants_exit"] is None else bool(info["player_wants_exit"])),
         financial_state=info["financial_state"],replacement=info["replacement"],
-        seller_stance=info["seller_stance"])
+        seller_stance=info["seller_stance"],
+        autonomous_market_reassessment=bool(
+            str(info.get("source_note") or "").startswith("fictional-autonomous-seller-")
+            and seller_club_id!=_check_manager(conn,career_id)))
     board_kwargs={"intervene":bool(info["board_enabled"]),
         "approval_multiple_pct":info["exceptional_offer_pct"]}
     if info["board_enabled"]:
