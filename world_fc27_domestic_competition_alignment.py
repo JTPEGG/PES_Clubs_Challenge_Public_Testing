@@ -10,6 +10,7 @@ import argparse,csv,json,sqlite3
 from collections import Counter,defaultdict
 from pathlib import Path
 from world_historical_competition_registry import canonical,cup_group
+from world_competition_exclusions import excluded_source_league
 
 VERSION="fc27-one-edition-source-association-overlay-v1"
 EDITION=2027
@@ -46,7 +47,10 @@ CREATE VIEW fc27_one_year_club_competition_alignment AS
    ON x.edition=old.edition AND x.club_key=old.club_key
  LEFT JOIN fc27_reviewed_domestic_competitions c
    ON c.edition=x.edition AND c.source_group=x.source_group
- WHERE old.edition=2027;
+ WHERE old.edition=2027 AND NOT EXISTS (
+   SELECT 1 FROM edition_club_competitions o
+   WHERE o.edition=old.edition AND o.club_key=old.club_key
+     AND o.original_source_league IN ('ISL','Indian Super League'));
 """
 
 def export(path,headers,rows):
@@ -62,7 +66,9 @@ def build(registry,config_path,outdir,strict=True):
     if len({x["source_group"] for x in entries})!=len(entries) or len(
          {x["code"] for x in entries})!=len(entries):
         raise ValueError("Multiple groups mapping to the same competition or overlapping original source label")
-    if strict and (len(entries)!=28 or sum(x["expected_original_clubs"] for x in entries)!=253):
+    if any(excluded_source_league(x['source_group']) for x in entries):
+        raise ValueError('An excluded competition was reintroduced into the playable scope')
+    if strict and (len(entries)!=27 or sum(x["expected_original_clubs"] for x in entries)!=242):
         raise ValueError("Expected original FC27 domestic labels not present")
     result=out/"FC27_2026_27_CLUB_COMPETITION_SOURCE_ASSOCIATION.sqlite"
     if result.exists():raise FileExistsError("Never mutate prior original league releases")
@@ -83,9 +89,13 @@ def build(registry,config_path,outdir,strict=True):
         if old_original_count!=13104 and strict:raise ValueError("22-edition original registry drift")
         official_code={code:(country,tier) for code,country,tier in
             db.execute("SELECT code,country,tier FROM competition_seasons WHERE edition=2027")}
+        excluded=[(key,name,label) for key,name,label,kind,code,origin in originals
+                  if excluded_source_league(label)]
+        if strict and len(excluded)!=11:
+            raise ValueError('Exclusion rule no longer covers exactly 11 original FC27 club records')
         original_groups=defaultdict(list)
         for club_key,name,label,kind,code,origin in originals:
-            if cup_group(label) or kind=="continental_cup_bucket":
+            if excluded_source_league(label) or cup_group(label) or kind=="continental_cup_bucket":
                 continue
             if code is None:
                 original_groups[label].append((club_key,name,kind))
@@ -123,13 +133,13 @@ def build(registry,config_path,outdir,strict=True):
             WHERE starting_competition IS NOT NULL""").fetchone()[0]
         unresolved=db.execute("""SELECT club_key,club FROM fc27_one_year_club_competition_alignment
             WHERE starting_competition IS NULL ORDER BY club""").fetchall()
-        if combined!=previous+len(mapped) or len(unresolved)!=len(originals)-combined:
+        if combined!=previous+len(mapped) or len(unresolved)!=len(originals)-len(excluded)-combined:
             raise ValueError("Original FC27 club evidence lost, duplicated or silently reassigned")
         for key,name in unresolved:
             group=next(x[2] for x in originals if x[0]==key)
             if not cup_group(group):
                 raise ValueError(f"Unmapped original non-cup FC27 source club {name} {group}")
-        if strict and (previous!=377 or len(mapped)!=253 or combined!=630 or len(unresolved)!=40):
+        if strict and (previous!=377 or len(mapped)!=242 or combined!=619 or len(unresolved)!=40):
             raise ValueError("FC27 source group mapping changed; audit exact clubs instead")
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok" or db.execute("PRAGMA foreign_key_check").fetchall():
             raise ValueError("Final FC27 source association has broken SQLite identity")
@@ -139,9 +149,12 @@ def build(registry,config_path,outdir,strict=True):
     export(out/"FC27_REVIEWED_SOURCE_COMPETITION_CROSSWALK.csv",
            ("Imported_Source_Group","Competition_Code","Country","Tier",
             "Source_Game_Group_Clubs","Registration_Scope","Identity_Status"),registered)
-    export(out/"FC27_253_DOMESTIC_CLUB_SOURCE_ASSOCIATIONS.csv",
+    export(out/"FC27_242_DOMESTIC_CLUB_SOURCE_ASSOCIATIONS.csv",
            ("Edition","Club_Key","Imported_Source_Club","Imported_Source_League",
             "Named_Home_Competition_Code","Source_Status"),mapped)
+    export(out/"FC27_EXCLUDED_GAME_SOURCE_CLUBS_AUDIT.csv",
+           ("Original_Club_Key","Archived_Club","Original_League","Disposition"),
+           [(key,name,label,'excluded_from_playable_game_world') for key,name,label in excluded])
     export(out/"FC27_40_CONMEBOL_HOME_LEAGUE_REVIEW.csv",
            ("Original_Club_Key","Club","Source_Group"),[
               (key,name,next(x[2] for x in originals if x[0]==key))
@@ -150,6 +163,8 @@ def build(registry,config_path,outdir,strict=True):
            ("Original_Source_League","Dated_Fixture_Competition","Warning"),warnings)
     report={"version":VERSION,"edition":2027,"original_FC27_club_records":len(originals),
       "previously_linked_to_league_evidence":previous,
+      "excluded_original_source_clubs":len(excluded),
+      "active_FC27_clubs_in_game":len(originals)-len(excluded),
       "new_source_domestic_league_associations":len(mapped),
       "new_competition_names_country_tier_scoped":len(registered),
       "total_clubs_with_stated_domestic_competition":combined,
@@ -161,7 +176,7 @@ def build(registry,config_path,outdir,strict=True):
       "historic_2027_career_ready":False,
       "other_21_editions_not_modified":True,
       "original_squads_not_modified":True,
-      "notes":"Review maps imported FC27 club-source group to a real domestic competition and country/tier, NOT independently verified official 2026/27 membership or a complete one-hop pyramid."}
+      "notes":"Excluded source groups are withheld from every game-facing FC27 view. All other mapped groups still require verified actual memberships and one-hop movement; source originals unchanged."}
     (out/"FC27_CLUB_DOMESTIC_LEAGUE_ASSOCIATION_RESULT.json").write_text(
       json.dumps(report,indent=2),encoding="utf-8")
     return report
