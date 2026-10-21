@@ -9,6 +9,12 @@ from world_fc27_mls_playable_scope import stage_mls
 MLS=Path(__file__).parent/"data/warehouse/fc27_2026_mls_playable_competition.json"
 
 def populate_existing_mls_names(db):
+    # Production source DB already has the composite unique key; this small
+    # in-memory fixture must provide it for the new identity foreign key.
+    db.execute("""
+      CREATE UNIQUE INDEX test_edition_club_pk
+      ON edition_club_competitions(edition,club_key)
+    """)
     names=[club["original_FC27_club_name"] for club in
            json.loads(MLS.read_text(encoding="utf-8"))["official_clubs"]]
     keys=[k for (k,) in db.execute("""
