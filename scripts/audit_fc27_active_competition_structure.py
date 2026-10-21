@@ -156,13 +156,13 @@ def audit(connection, *, strict=True):
     if len(effective_scope)!=53:
         raise ValueError("Every active FC27 division requires an effective movement scope")
     closed_count=sum(v[0]=="closed" for v in effective_scope.values())
-    if closed_count!=32 or sum(v[0]=="open_pyramid" for v in effective_scope.values())!=21:
-        raise ValueError("Expected broad user-approved 32-closed 21-open FC27 world")
+    if closed_count!=41 or sum(v[0]=="open_pyramid" for v in effective_scope.values())!=12:
+        raise ValueError("Expected user-selected 41-closed 12-open FC27 world")
     remaining_effective_feeders=connection.execute("""
       SELECT COUNT(*) FROM fc27_effective_named_immediate_game_feeders
     """).fetchone()[0]
-    if remaining_effective_feeders!=9:
-        raise ValueError("Nine named one-hop feeder divisions remain in the active game scope")
+    if remaining_effective_feeders!=3:
+        raise ValueError("Only France Ligue 3, Italy Serie C and Portugal 2 named feeders remain")
     feeder_quality={
       code:(realnames,eligible)
       for code,realnames,eligible in connection.execute("""
@@ -170,16 +170,28 @@ def audit(connection, *, strict=True):
         FROM fc27_feeder_pool_readiness WHERE edition=2027
       """)
     }
-    if len(feeder_quality)!=9 or sorted(n for n,e in feeder_quality.values() if n>0)!=[15,18,60]:
-        raise ValueError("Missing official feeder club sources for Belgium France Italy")
+    if len(feeder_quality)!=3 or sorted(n for n,e in feeder_quality.values() if n>0)!=[18,60]:
+        raise ValueError("Expected only French and Italian official club pools active; Portugal pending")
     if any(e for n,e in feeder_quality.values()):
         raise ValueError("No promotion from incomplete PES feeder squads is allowed")
     career_clubs=dict(connection.execute("""
         SELECT competition_mode,COUNT(*)
         FROM fc27_career_world_clubs WHERE edition=2027 GROUP BY competition_mode
     """))
-    if career_clubs!={"open_league_season_candidate":410,"closed_background_world":249}:
-        raise ValueError("Expected all 659 original club career-world roles")
+    if career_clubs!={"open_league_season_candidate":240,"closed_background_world":419}:
+        raise ValueError("Expected 240 six-country career club targets and 419 background clubs")
+    selectable=connection.execute("""
+        SELECT COUNT(*) FROM fc27_manager_selectable_career_clubs
+    """).fetchone()[0]
+    if selectable!=240:
+        raise ValueError("Only 240 original FC27 clubs can be considered for a playable manager career")
+    core_enabled=connection.execute("""
+        SELECT COUNT(*) FROM fc27_effective_core_pyramid_game_boundaries
+        WHERE edition=2027 AND game_enabled=1
+    """).fetchone()[0]
+    if core_enabled!=5:
+        raise ValueError("German historical pyramid must be closed in gameplay")
+
 
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
@@ -274,11 +286,21 @@ def audit(connection, *, strict=True):
         "new_pragmatic_gameplay_competition_decisions":len(pragmatic_game_rules),
         "gameplay_closed_leagues_across_entire_fc27":closed_count,
         "gameplay_open_leagues_across_entire_fc27":53-closed_count,
+        "manager_intended_playable_countries":6,
+        "manager_intended_playable_competition_codes":12,
+        "manager_intended_playable_club_candidates":selectable,
+        "effective_historical_core_pyramid_edges_enabled":core_enabled,
+        "former_german_core_edges_effectively_disabled":2,
         "gameplay_remaining_effective_feeders_without_club_rosters":remaining_effective_feeders,
         "feeder_divisions_with_official_real_2026_27_memberships":sum(
             n>0 for n,e in feeder_quality.values()),
-        "genuine_feeder_club_names_registered":sum(
+        "genuine_feeder_club_names_registered":connection.execute("""
+          SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs
+          WHERE edition=2027
+        """).fetchone()[0],
+        "official_real_feeder_clubs_in_current_open_league_scope":sum(
             n for n,e in feeder_quality.values()),
+        "retained_real_belgian_feeder_names_but_no_active_belgian_movement":15,
         "feeder_divisions_still_without_any_2026_27_real_club_pool":sum(
             n==0 for n,e in feeder_quality.values()),
         "original_clubs_eligible_for_open_league_schedule_after_game_import":
@@ -295,7 +317,8 @@ def audit(connection, *, strict=True):
         "no_remaining_completely_unmapped_active_movement_policy":True,
         "user_approved_explicit_gameplay_movement_simplifications":len(gameplay_decisions),
         "italian_serie_b_gameplay_uses_promotion_playoff":True,
-        "austrian_gameplay_uses_direct_one_up_one_down":True,
+        "austrian_prior_direct_exchange_retained_in_history_but_game_closed":True,
+        "austrian_gameplay_uses_direct_one_up_one_down":False,
         "game_assumptions_separated_from_historical_regulations":True,
         "total_staged_2027_movement_edges":len(season["promotion_edges"])+len(staged_additional),
         "additional_one_hop_feeder_names_without_game_rosters":named_nonplayable_feeders,
