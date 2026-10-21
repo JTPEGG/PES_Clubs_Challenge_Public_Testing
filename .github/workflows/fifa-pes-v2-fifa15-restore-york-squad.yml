@@ -24,6 +24,13 @@ jobs:
           run-id: 39556522361
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: source/
+      - name: Fetch immutable original men's club and squad catalogue separately from competition overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: squads/
       - name: Fetch original year-and-game-team-linked York real 20 source players
         uses: actions/download-artifact@v4
         with:
@@ -37,6 +44,7 @@ jobs:
             --registry source/FIFA15_ENGLAND_92_CLUB_SOURCE_STAGING.sqlite \
             --york york/FIFA15_YORK_CITY_SOURCE_ATTRIBUTES_FROM_PINNED_GAME.csv \
             --source-audit york/FIFA15_YORK_CITY_REAL_GAME_PLAYER_RECOVERY_AUDIT.json \
+            --squads squads/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
             --output release/
       - name: Audit full 92-club source rosters while maintaining game career launch block
         run: |
