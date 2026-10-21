@@ -170,7 +170,7 @@ def audit(connection, *, strict=True):
         FROM fc27_feeder_pool_readiness WHERE edition=2027
       """)
     }
-    if len(feeder_quality)!=9 or sorted(n for n,e in feeder_quality.values() if n)>0!=[15,18,60]:
+    if len(feeder_quality)!=9 or sorted(n for n,e in feeder_quality.values() if n>0)!=[15,18,60]:
         raise ValueError("Missing official feeder club sources for Belgium France Italy")
     if any(e for n,e in feeder_quality.values()):
         raise ValueError("No promotion from incomplete PES feeder squads is allowed")
