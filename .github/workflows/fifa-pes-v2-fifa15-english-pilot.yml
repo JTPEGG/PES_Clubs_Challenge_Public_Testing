@@ -24,6 +24,19 @@ jobs:
           run-id: 39554046026
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: input/
+      - name: Inspect the two remaining EFL name identities directly in original FIFA15
+        run: |
+          python - <<'PY'
+          import sqlite3
+          with sqlite3.connect('input/HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite') as db:
+              for token in ('shrews','york'):
+                  rows=db.execute("""
+                    SELECT edition,club_key,club,original_source_league,
+                           evidence_competition,confidence
+                    FROM edition_club_competitions
+                    WHERE edition=2015 AND lower(club) LIKE ?""",(f'%{token}%',)).fetchall()
+                  print('ORIGINAL_FIFA15_CLUB_ID_REVIEW',token,rows)
+          PY
       - name: Verify exact 2014-15 English 92 real club evidence and 4 dated movement edges
         run: |
           python -u -m scripts.audit_fifa15_english_career_pilot \
