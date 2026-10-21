@@ -1,0 +1,56 @@
+{
+  "version": "fc27-2026-conmebol-domestic-participation-review-v1",
+  "edition": 2027,
+  "real_world_season": "calendar_2026",
+  "purpose": "Assign a real 2026 domestic top flight to original FC27 continental source clubs using independently published same-year first-division team lists AND their official CONMEBOL country; stage only, no new EA game IDs",
+  "original_official_country_review": "data/warehouse/fc27_2026_conmebol_official_country_review.json",
+  "countries": {
+    "Bolivia": {
+      "code": "bo.1",
+      "competition": "División Profesional",
+      "source": "https://fbf.com.bo/torneos/division-profesional/"
+    },
+    "Ecuador": {
+      "code": "ec.1",
+      "competition": "LigaPro Serie A",
+      "source": "https://www.independientedelvalle.com/torneo-ligapro-ecuabet/"
+    },
+    "Peru": {
+      "code": "pe.1",
+      "competition": "Liga 1",
+      "source": "https://liga1.pe/fixture-y-resultados-del-clausura-liga1-te-apuesto-2026/"
+    },
+    "Paraguay": {
+      "code": "py.1",
+      "competition": "Primera División",
+      "source": "https://www.rsssf.org/tablesp/para2026.html"
+    },
+    "Chile": {
+      "code": "cl.1",
+      "competition": "Primera División",
+      "source": "https://www.campeonatochileno.cl/noticias/hay-fixture-de-la-liga-de-primera-2026/"
+    },
+    "Venezuela": {
+      "code": "ve.1",
+      "competition": "Primera División",
+      "source": "https://www.carabobofc.org/clasificacion.php"
+    },
+    "Colombia": {
+      "code": "co.1",
+      "competition": "Categoría Primera A",
+      "source": "https://www.rsssf.org/tablesc/col2026.html"
+    },
+    "Uruguay": {
+      "code": "uy.1",
+      "competition": "Primera División",
+      "source": "https://www.rsssf.org/tablesu/uru2026.html"
+    },
+    "Brazil": {
+      "code": "br.1",
+      "competition": "Campeonato Brasileiro Série A",
+      "source": "https://raw.githubusercontent.com/openfootball/south-america/f51b2dcf5e0fab9f0abd5206ab8c24a413e67277/brazil/2026_br1.txt"
+    }
+  },
+  "individual_membership_status": "reviewed_same_2026_calendar_domestic_top_division; not source-EA-ID certified",
+  "no_inferred_future_promotion": true
+}
