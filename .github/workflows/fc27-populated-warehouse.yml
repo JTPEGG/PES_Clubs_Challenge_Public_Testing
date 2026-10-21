@@ -9,6 +9,9 @@ on:
       - 'warehouse/fc27_reference_reader.py'
       - 'warehouse/fc27_disposable_career_overlay.sql'
       - 'warehouse/fc27_disposable_career.py'
+      - 'warehouse/fc27_decision_dimensions_v1.sql'
+      - 'warehouse/fc27_enrich_decision_dimensions.py'
+      - 'test_fc27_decision_dimensions.py'
       - 'test_fc27_reference_reader.py'
       - '.github/workflows/fc27-populated-warehouse.yml'
 permissions:
@@ -27,7 +30,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test existing architecture and populated reference constraints
-        run: python -m unittest -v test_warehouse_schema_v1 test_fc27_populated_warehouse test_fc27_reference_reader
+        run: python -m unittest -v test_warehouse_schema_v1 test_fc27_populated_warehouse test_fc27_reference_reader test_fc27_decision_dimensions
       - name: Obtain frozen tested FC27 competition world
         uses: actions/download-artifact@v4
         with:
@@ -164,6 +167,53 @@ jobs:
                  "career_event_duplicate_rejected":True,
                  "frozen_warehouse_unchanged":True,
                  "production_career_integration":False},indent=2))
+          PY
+      - name: Download original source-dated 2027 financial circumstances
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-SOURCED-FINANCIAL-CIRCUMSTANCES
+          run-id: 39429984572
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: financial-evidence/
+      - name: Enrich FC27 reference with club ambitions, financial pressure, player behaviour and manager hiring policies
+        run: |
+          python -u -m warehouse.fc27_enrich_decision_dimensions \
+            --reference fc27-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_V1.sqlite \
+            --circumstances financial-evidence/PES_V2_CLUB_FINANCIAL_CIRCUMSTANCES.sqlite \
+            --output fc27-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite
+      - name: Audit explicitly fictional modelled values versus source-backed financial facts
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          file=Path("fc27-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite")
+          report=json.loads(file.with_suffix(".decision_audit.json").read_text())
+          assert report["club_profiles"]==659
+          assert report["club_financial_circumstances"]==659
+          assert report["personality_priors"]==17593
+          assert report["fictional_manager_recruitment_policies"]==659
+          assert report["real_verified_manager_profiles"]==0
+          assert report["ai_club_joined_contexts"]==659
+          assert report["estimated_club_reputations_without_real_prestige"]==659
+          assert report["real_personality_claims"]==0
+          assert report["verified_club_cash_debt_or_owner_injection_values"]==0
+          assert report["production_careers_unchanged"]
+          with sqlite3.connect(file) as db:
+              db.execute("PRAGMA foreign_keys=ON")
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert db.execute("PRAGMA foreign_key_check").fetchall()==[]
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_clubs").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_players").fetchone()[0]==17593
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_player_game_personality WHERE observed_real_personality_json IS NOT NULL").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_manager_profiles").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_club_decision_profile WHERE institutional_prestige IS NOT NULL").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_club_financial_circumstances WHERE verified_cash_balance_gbp IS NOT NULL OR verified_net_debt_gbp IS NOT NULL OR verified_owner_capital_injection_gbp IS NOT NULL").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_manager_recruitment_policy WHERE named_manager_source_key IS NOT NULL").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_decision_model_versions").fetchone()[0]==4
+              assert db.execute("SELECT COUNT(*) FROM wh_fc27_financial_evidence_events").fetchone()[0]==report["financial_source_events_as_of_preseason"]
+              assert db.execute("SELECT COUNT(*) FROM sqlite_master WHERE name LIKE 'world_career_%'").fetchone()[0]==0
+          print(json.dumps(report,indent=2))
+          print("FC27 AI DECISION REFERENCE BUILT; REAL MANAGERS/PERSONALITY/CASH NOT INVENTED")
           PY
       - name: Publish immutable FC27 reference warehouse snapshot
         uses: actions/upload-artifact@v4
