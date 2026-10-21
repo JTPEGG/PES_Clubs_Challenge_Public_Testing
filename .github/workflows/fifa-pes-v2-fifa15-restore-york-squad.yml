@@ -1,0 +1,69 @@
+name: PES V2 FIFA15 real York squad and 92 original English club pilot
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/stage_fifa15_york_real_source_players.py'
+      - '.github/workflows/fifa-pes-v2-fifa15-restore-york-squad.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch immutable complete FIFA15 original 92 playable clubs, squads and feeder source
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FIFA15-92-ORIGINAL-GAME-TEAM-IDENTITIES-2014-15-CONFERENCE-PILOT
+          run-id: 39556522361
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Fetch original year-and-game-team-linked York real 20 source players
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FIFA15-REAL-YORK-CITY-ORIGINAL-GAME-PLAYER-ROSTER
+          run-id: 39557140558
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: york/
+      - name: Preserve York City source player attributes in non-destructive FIFA15 staging database
+        run: |
+          python -u -m scripts.stage_fifa15_york_real_source_players \
+            --registry source/FIFA15_ENGLAND_92_CLUB_SOURCE_STAGING.sqlite \
+            --york york/FIFA15_YORK_CITY_SOURCE_ATTRIBUTES_FROM_PINNED_GAME.csv \
+            --source-audit york/FIFA15_YORK_CITY_REAL_GAME_PLAYER_RECOVERY_AUDIT.json \
+            --output release/
+      - name: Audit full 92-club source rosters while maintaining game career launch block
+        run: |
+          python - <<'PY'
+          import sqlite3,json,csv
+          from pathlib import Path
+          p=Path('release')
+          x=json.loads((p/'FIFA15_ENGLISH_REAL_SOURCE_SQUAD_PILOT_AUDIT.json').read_text())
+          assert x['game_edition']==2015
+          assert x['authentic_english_game_club_placements']==92
+          assert x['source_restored_york_city_players']==20
+          assert x['original_york_fifaindex_team_list_count_other_snapshot']==28
+          assert x['incomplete_relative_to_other_snapshot']
+          assert not x['career_ready']
+          assert x['estimated_PES_player_attributes_not_yet_generated']
+          assert x['production_careers_untouched']
+          with sqlite3.connect(p/'FIFA15_ENGLAND_92_REAL_SOURCE_SQUAD_PILOT.sqlite') as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM pilot_fifa15_playable_roster_inventory').fetchone()[0]==92
+              assert db.execute('SELECT COUNT(*) FROM pilot_fifa15_real_york_source_players').fetchone()[0]==20
+              assert db.execute('SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1').fetchone()[0]==0
+          print(json.dumps(x,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FIFA15-ENGLAND-92-REAL-CLUB-SQUADS-WITH-YORK-SOURCE-ATTRIBUTES
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
