@@ -12,6 +12,7 @@ from collections import Counter,defaultdict
 from pathlib import Path
 from world_fc27_release_exclusions import sanitize_fc27_active_release
 from world_fc27_source_membership_policy import adopt_staged_memberships
+from world_fc27_additional_movement_rules import stage as stage_additional_movements
 VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
 SCHEMA="""
@@ -90,7 +91,7 @@ def export(path,head,rows):
     with path.open("w",encoding="utf-8-sig",newline="") as f:
         wr=csv.writer(f);wr.writerow(head);wr.writerows(rows)
 
-def build(registry,country_review_path,domestic_review_path,output,strict=True):
+def build(registry,country_review_path,domestic_review_path,output,strict=True,movement_rules_path=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     official=json.loads(Path(country_review_path).read_text(encoding="utf-8"))
     domestic=json.loads(Path(domestic_review_path).read_text(encoding="utf-8"))
@@ -179,6 +180,8 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
         ).fetchone()[0]!=total:
             raise ValueError("Active FC27 database club rows do not reconcile after removal")
         scope=adopt_staged_memberships(db,strict=strict)
+        movements=(stage_additional_movements(db,movement_rules_path,strict=strict)
+                   if movement_rules_path is not None else None)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
@@ -203,6 +206,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
        "season_promotion_relegation_graph_complete":False,
        "career_ready":False,"other_21_editions_unmodified":True,
        "user_approved_source_membership_scope":scope,
+       "additional_2027_movement_rules_staged":movements,
        "original_player_data_unmodified":True}
     (out/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
        json.dumps(report,indent=2),encoding="utf-8")
@@ -212,6 +216,7 @@ if __name__=="__main__":
     a.add_argument("--registry",required=True)
     a.add_argument("--countries",required=True)
     a.add_argument("--domestic",required=True)
+    a.add_argument("--movement-rules")
     a.add_argument("--output",required=True)
     x=a.parse_args()
-    print(json.dumps(build(x.registry,x.countries,x.domestic,x.output),indent=2))
+    print(json.dumps(build(x.registry,x.countries,x.domestic,x.output,movement_rules_path=x.movement_rules),indent=2))
