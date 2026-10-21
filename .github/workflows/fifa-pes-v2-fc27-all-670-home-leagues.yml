@@ -8,6 +8,7 @@ on:
       - 'world_fc27_domestic_competition_alignment.py'
       - 'test_world_fc27_2026_conmebol_membership_review.py'
       - 'test_world_fc27_release_exclusions.py'
+      - 'scripts/audit_fc27_active_competition_structure.py'
       - 'data/warehouse/fc27_2026_conmebol_domestic_participation_review.json'
       - 'data/warehouse/fc27_2026_conmebol_official_country_review.json'
       - '.github/workflows/fifa-pes-v2-fc27-all-670-home-leagues.yml'
@@ -78,6 +79,21 @@ jobs:
               assert db.execute("SELECT COUNT(DISTINCT club_key) FROM fc27_2026_27_complete_source_competition_alignment").fetchone()[0]==659
               assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition='2027:in.1'").fetchone()[0]==0
           print(json.dumps(j,indent=2))
+          PY
+      - name: Produce precise FC27 season-correct competition and immediate-feeder gap inventory
+        run: |
+          python -m scripts.audit_fc27_active_competition_structure \
+            --registry release/FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite \
+            --output release/
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads((Path("release")/"FC27_COMPETITION_STRUCTURE_READINESS.json").read_text())
+          assert data["edition"]==2027 and data["active_source_clubs"]==659
+          assert data["unknown_home_league_clubs"]==0
+          assert data["distinct_active_domestic_competitions"]>0
+          assert not data["career_ready"] and not data["FC26_allowed_to_start"]
+          assert not data["complete_2027_canonical_movement_destinations"]
           PY
       - uses: actions/upload-artifact@v4
         with:
