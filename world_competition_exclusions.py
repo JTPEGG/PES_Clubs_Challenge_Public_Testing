@@ -22,6 +22,4 @@ def excluded_competition(*, label="", country="", code=""):
         return True
     if code in {c.casefold() for c in EXCLUDED_DOMESTIC_CODES}:
         return True
-    return str(country or "").strip().casefold() in {
-        x.casefold() for x in EXCLUDED_LEAGUE_COUNTRIES
-    }
+    return False
