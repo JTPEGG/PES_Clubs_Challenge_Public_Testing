@@ -117,6 +117,7 @@ class FC27DecisionDimensionsTests(unittest.TestCase):
             self.assertEqual(result["personality_priors"],20)
             self.assertEqual(result["real_verified_manager_profiles"],0)
             self.assertEqual(result["fictional_manager_recruitment_policies"],2)
+            self.assertEqual(result["anonymous_simulated_manager_agent_profiles"],2)
             self.assertEqual(result["financial_source_events_as_of_preseason"],1)
             with sqlite3.connect(reference) as orig:
                 self.assertEqual(orig.execute("""
@@ -136,6 +137,10 @@ class FC27DecisionDimensionsTests(unittest.TestCase):
                   SELECT identity_status,named_manager_source_key
                   FROM wh_fc27_manager_recruitment_policy WHERE club_key='A'
                 """).fetchone(),("real_manager_unverified",None))
+                self.assertEqual(db.execute("""
+                  SELECT real_manager_name,real_manager_source_key,display_role
+                  FROM wh_fc27_simulated_manager_agents WHERE starting_club_key='A'
+                """).fetchone(),(None,None,"Anonymous simulated coaching agent"))
                 self.assertEqual(db.execute("""
                   SELECT COUNT(*) FROM wh_fc27_player_game_personality
                   WHERE observed_real_personality_json IS NULL
