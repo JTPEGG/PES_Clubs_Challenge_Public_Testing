@@ -1,0 +1,59 @@
+name: PES V2 FIFA15 first English professional career pilot audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_fifa15_english_career_pilot.py'
+      - '.github/workflows/fifa-pes-v2-fifa15-english-pilot.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read season-stable FIFA15 domestic clubs and historic game identity sources
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-COMPETITION-CANDIDATES-PLUS-SEGUNDA
+          run-id: 39554046026
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Verify exact 2014-15 English 92 real club evidence and 4 dated movement edges
+        run: |
+          python -u -m scripts.audit_fifa15_english_career_pilot \
+            --registry input/HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite \
+            --output release/
+      - name: Require source-backed clubs and prohibit false career launch
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          p=Path('release')
+          d=json.loads((p/'FIFA15_ENGLISH_FIRST_CAREER_PILOT_AUDIT.json').read_text())
+          assert d['edition']==2015 and d['season']=='2014-15'
+          assert d['all_original_edition_clubs']==596
+          assert d['original_edition_clubs_still_without_any_league']==47
+          assert d['professional_source_divisions']==4
+          assert d['expected_english_professional_clubs']==92
+          assert d['dated_english_promotion_movement_edges']==4
+          assert d['can_start_first_historical_career'] is False
+          assert not d['original_source_squads_modified']
+          with (p/'FIFA15_ENGLAND_92_REAL_CLUB_IDENTITY_AUDIT.csv').open(encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==d['dated_english_professional_source_clubs']
+          print(json.dumps(d,indent=2))
+          print('FIFA15_ENGLAND_OPEN_GAPS', [r for r in rows if r['Review_Status'] not in (
+              'fixture_registered','original_game_league_needs_id_crosswalk')])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FIFA15-ENGLISH-92-TEAM-READONLY-FIRST-CAREER-PILOT
+          path: release/
+          retention-days: 30
+          if-no-files-found: error
