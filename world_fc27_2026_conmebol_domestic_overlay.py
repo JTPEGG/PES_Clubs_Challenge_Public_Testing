@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse,csv,json,sqlite3
 from collections import Counter,defaultdict
 from pathlib import Path
+from world_fc27_release_exclusions import sanitize_fc27_active_release
 VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
 SCHEMA="""
@@ -166,6 +167,18 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
             raise ValueError("External 2026 source cannot unlock unverified historical careers")
         total_22=db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]
         if strict and total_22!=13104:raise ValueError("Other original edition records altered")
+        # Only the new disposable release copy is cleaned. The upstream
+        # 13,104-record historical source archive remains wholly unchanged.
+        removed=sanitize_fc27_active_release(db,expected_exclusions=11 if strict else None)
+        remaining_2027=db.execute(
+            "SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027"
+        ).fetchone()[0]
+        if remaining_2027!=total or db.execute(
+            "SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment"
+        ).fetchone()[0]!=total:
+            raise ValueError("Active FC27 database club rows do not reconcile after removal")
+        if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
+            raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
     export(out/"FC27_CONMEBOL_REVIEWED_2026_HOME_DOMESTIC_LEAGUES.csv",
       ("Edition","Club_Key","Original_FC27_Club","Original_Continental_Source_Group",
@@ -174,7 +187,9 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
        "Individual_2026_Domestic_Source","Country_Division_Source","Evidence_Status"),rows)
     report={"version":VERSION,"edition":2027,
        "fc27_active_club_records":total,
-       "excluded_original_source_clubs":11,
+       "excluded_original_source_clubs":removed,
+       "excluded_clubs_remaining_in_derived_SQLite":0,
+       "derived_SQLite_club_season_rows":total_22-removed,
        "archived_unchanged_FC27_club_records":670,"previously_domestic_source_groups":before,
        "new_2026_country_backed_domestic_league_candidates":len(rows),
        "individually_reviewed_2026_domestic_club_memberships":len(individual_members),
