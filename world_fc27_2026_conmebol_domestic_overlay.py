@@ -20,6 +20,7 @@ from world_fc27_career_world_playability import stage as stage_career_world
 from world_fc27_mls_playable_scope import stage_mls
 from world_fc27_nl_pt_feeder_review import stage as stage_nl_pt_feeders
 from world_fc27_regional_feeder_rosters import stage as stage_regional_feeders
+from world_fc27_effective_season_end_routes import stage as stage_effective_movement_routes
 from world_fc27_eight_country_playable_scope import apply_eight_country_scope
 VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
@@ -222,6 +223,8 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
             raise ValueError("Regional one-hop sources require completed existing feeder pool mapping")
         regional_one_hop=(stage_regional_feeders(db,regional_feeders_path,strict=strict)
                           if regional_feeders_path is not None else None)
+        effective_route_index=(stage_effective_movement_routes(db,strict=strict)
+                               if regional_one_hop is not None else None)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
@@ -295,6 +298,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
        "MLS_2026_closed_division_intended_playable":mls_playable,
        "Dutch_Portuguese_2026_27_real_feeder_name_registration":nl_pt_real_feeders,
        "Spain_Germany_2026_27_regional_feeder_registration":regional_one_hop,
+       "FC27_16_open_league_effective_season_end_routes":effective_route_index,
        "original_player_data_unmodified":True}
     (out/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
        json.dumps(report,indent=2),encoding="utf-8")
