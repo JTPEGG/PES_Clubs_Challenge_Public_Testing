@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Test existing PES2020 V2 converter does not permit missing numeric attributes
-        run: python -m unittest -v test_world_fifa_pes_converter_v2
+        run: python -m unittest -v test_fifa_pes_converter_v2
       - name: Retrieve actual FIFA15 original 20-player source-attribute York game roster
         uses: actions/download-artifact@v4
         with:
