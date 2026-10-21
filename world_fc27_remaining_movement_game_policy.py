@@ -48,7 +48,8 @@ CREATE TABLE fc27_remaining_34_gameplay_movement(
  source_context_not_complete_official_regulation INTEGER NOT NULL
      CHECK(source_context_not_complete_official_regulation=1),
  rule_provenance TEXT NOT NULL CHECK(rule_provenance IN
- ('game_policy_closed_league','user_delegated_simplification')),
+ ('game_policy_closed_league','user_delegated_simplification',
+  'user_delegated_closed_league')),
  calendar_scope TEXT NOT NULL,
  club_squad_pool_ready INTEGER NOT NULL CHECK(club_squad_pool_ready=0),
  career_activated INTEGER NOT NULL CHECK(career_activated=0),
