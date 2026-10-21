@@ -64,6 +64,8 @@ jobs:
           assert j["individually_reviewed_2026_domestic_club_memberships"]==40
           assert j["user_approved_source_membership_scope"]["accepted_source_as_provided_competitions"]==33
           assert j["user_approved_source_membership_scope"]["retained_source_clubs_in_accepted_groups"]==280
+          assert j["user_approved_source_membership_scope"]["source_as_provided_canonical_division_records"]==33
+          assert j["user_approved_source_membership_scope"]["combined_active_domestic_competition_catalogue_size"]==53
           assert j["user_approved_source_membership_scope"]["greece_2027_original_source_clubs_kept"]==4
           assert j["user_approved_source_membership_scope"]["german_second_division_original_source_clubs_kept"]==18
           assert j["previously_domestic_source_groups"]==619
@@ -81,6 +83,9 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM fc27_conmebol_original_club_domestic_candidates").fetchone()[0]==40
               assert db.execute("SELECT COUNT(*) FROM fc27_source_as_provided_membership_policy").fetchone()[0]==33
               assert db.execute("SELECT COUNT(*) FROM fc27_accepted_source_as_provided_clubs").fetchone()[0]==280
+              assert db.execute("SELECT COUNT(*) FROM fc27_source_as_provided_competition_seasons").fetchone()[0]==33
+              assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_active_domestic_competitions").fetchone()[0]==53
+              assert db.execute("SELECT SUM(active_source_clubs) FROM fc27_2026_27_active_domestic_competitions").fetchone()[0]==659
               assert db.execute("SELECT COUNT(*) FROM fc27_accepted_source_as_provided_clubs WHERE starting_competition='2027:gr.1'").fetchone()[0]==4
               assert db.execute("SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027 AND LOWER(TRIM(original_source_league)) IN ('isl','indian super league')").fetchone()[0]==0
               assert db.execute("SELECT COUNT(*) FROM source_league_groups WHERE edition=2027 AND LOWER(TRIM(source_label)) IN ('isl','indian super league')").fetchone()[0]==0
