@@ -154,7 +154,7 @@ def stage(db:sqlite3.Connection, config_path, *, strict=True):
         raise ValueError("Officially named feeder club count changed")
     db.executescript(SCHEMA)
     db.executemany("""
-      INSERT INTO fc27_career_world_clubs VALUES(?,?,?,?,1,1,0,0)
+      INSERT INTO fc27_career_world_clubs VALUES(?,?,?,?,?,1,1,0,0)
     """,[(2027,key,name,competition,
           "open_league_season_candidate" if mode=="open_pyramid"
           else "closed_background_world") for key,name,competition,mode in original])
