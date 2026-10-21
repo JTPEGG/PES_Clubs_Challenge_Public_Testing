@@ -105,7 +105,8 @@ def _draw(source_clubs, count, *, starting_season, key):
 
 
 def rollover(pools, *, playable_floor, starting_season,
-             relegated_from_playable, destination_regions=None):
+             relegated_from_playable, destination_regions=None,
+             edition=SUPPORTED_EDITION):
     """Return one simulated boundary, no writes and no deeper feeder chains.
 
     For the optional National League playable mode exactly two NL relegated
@@ -114,9 +115,18 @@ def rollover(pools, *, playable_floor, starting_season,
     """
     if playable_floor not in FLOOR_MODE:
         raise ValueError("Unsupported playable floor: cannot invent deeper pyramid")
-    if not isinstance(starting_season,int) or starting_season<2026:
+    if not isinstance(edition,int) or edition not in (set(range(2005,2028))-{2025}):
+        raise ValueError("Nonexistent or unsupported historical FIFA edition")
+    if not isinstance(starting_season,int) or starting_season<edition-1:
         raise ValueError("Invalid season simulation anchor")
-    spec=FLOOR_MODE[playable_floor]
+    original=FLOOR_MODE[playable_floor]
+    # Both the playable division and its ONE external feeder must carry the
+    # actual source FIFA edition. Reuse the same tested 2027 movement policy.
+    code=lambda x: f"{edition}:{x.split(':',1)[1]}"
+    spec=dict(playable=code(original["playable"]),
+              feeders=tuple(map(code,original["feeders"])),
+              incoming={code(k):v for k,v in original["incoming"].items()},
+              out=original["out"])
     if len(relegated_from_playable)!=spec["out"]:
         raise ValueError("Wrong relegation count from playable division")
     exiting=_unique(relegated_from_playable,"relegated playable clubs")
@@ -141,19 +151,19 @@ def rollover(pools, *, playable_floor, starting_season,
                              starting_season=starting_season,key=code)
     incoming=tuple(x for code in spec["feeders"] for x in selected[code])
     if playable_floor=="league_two":
-        assigned={ENGLISH_NATIONAL:exiting}
+        assigned={spec["feeders"][0]:exiting}
         if destination_regions:
             raise ValueError("North/South destinations are not used with League Two")
     else:
         if not destination_regions or set(destination_regions)!=set(exiting):
             raise ValueError("Need verified destination for every NL relegated club")
-        assigned={code:[] for code in TERMINAL_FEEDERS}
+        assigned={code:[] for code in spec["feeders"]}
         for name in exiting:
             region=destination_regions[name]
             if region not in assigned:
                 raise ValueError("Relegated club assigned outside North/South")
             assigned[region].append(name)
-        if any(len(assigned[code])!=2 for code in TERMINAL_FEEDERS):
+        if any(len(assigned[code])!=2 for code in spec["feeders"]):
             raise ValueError("Lightweight model requires two relegations per region")
     result=dict(current)
     leave={_identity(x) for x in exiting}
@@ -170,7 +180,7 @@ def rollover(pools, *, playable_floor, starting_season,
     # Fixed terminal depth: the two 6th-tier pools themselves never consume
     # any lower division, irrespective of playable floor.
     return {
-        "edition":SUPPORTED_EDITION,
+        "edition":edition,
         "starting_season":starting_season,
         "mode":playable_floor,
         "playable_division":spec["playable"],
