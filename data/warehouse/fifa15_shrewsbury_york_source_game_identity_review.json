@@ -1,0 +1,33 @@
+{
+  "version": "fifa15-original-english-division-four-supplemental-team-ids-v1",
+  "edition": 2015,
+  "season": "2014-15",
+  "league_code": "2015:en.4",
+  "game_league_id": 61,
+  "game_edition_label": "FIFA 15",
+  "source_league_url": "https://fifaindex.com/leagues/61-england-league-two-4/fifa15",
+  "source_status": "original_FIFA15_game_team_page_index_and_roster_corrob",
+  "teams": [
+    {
+      "source_english_league_name": "Shrewsbury Town",
+      "game_team_name": "Shrewsbury",
+      "game_team_id": 127,
+      "source_game_team_url": "https://fifaindex.com/teams/127-shrewsbury/fifa15",
+      "source_game_roster_count": 34,
+      "original_import_status": "present_with_abbreviated_name_and_missing_game_team_id",
+      "restoration_action": "attach_verified_FIFA15_game_team_id_to_unique_existing_club"
+    },
+    {
+      "source_english_league_name": "York City",
+      "game_team_name": "York City",
+      "game_team_id": 1948,
+      "source_game_team_url": "https://fifaindex.com/teams/1948-york-city/fifa15",
+      "source_game_roster_count": 28,
+      "original_import_status": "missing_from_immutable_original_mens_club_and_squad_catalogue",
+      "restoration_action": "stage_additional_source_verified_original_game_club_and_recover_full_game_roster_before_playable"
+    }
+  ],
+  "fifa15_original_squad_catalogue_immutable": true,
+  "approved_for_game_import": false,
+  "source_roster_update_date_uncertain": true
+}
