@@ -210,7 +210,7 @@ def build(reference_db,circumstances_db,output,*,strict=True):
                 "Anonymous club recruitment preferences inferred by explicit game policy; "
                 "zero sourced real manager identities, manager identities stay unknown.",None)
             ])
-            games=[];circ=[];board=[]
+            games=[];circ=[];board=[];sim_agents=[]
             for key,name,comp,tier in clubs:
                 r=profiles[key]
                 (fkey,edition,preseason,pay,ceiling,headroom,transfer,health,
@@ -249,6 +249,21 @@ def build(reference_db,circumstances_db,output,*,strict=True):
                 board.append((2027,key,None,"real_manager_unverified",
                     need,style,risk,rebuild,
                     "fictional_club_hiring_archetype_not_real_person",VERSION))
+                # This is an ANONYMOUS fictional game coaching agent, not the
+                # club's real-world manager or a claim about any human.
+                generated=seed_personality("synthetic-manager-agent|"+key)
+                sim_agents.append((
+                    2027,"simulation-manager:2027:"+key,key,None,None,
+                    "Anonymous simulated coaching agent",
+                    clamp(22+.68*appeal+generated[0]*.08,15,95),
+                    clamp(generated[1]+(60-appeal)*.18,15,95),
+                    clamp(generated[2]+(appeal-55)*.10,15,95),
+                    clamp(risk*.60+generated[3]*.40,15,95),
+                    clamp(30+pressure_idx*.38+generated[4]*.15,15,95),
+                    style,
+                    "fictional_game_ai_agent_not_a_real_person_or_appointment",
+                    VERSION
+                ))
             target.executemany("""
               INSERT INTO wh_fc27_club_decision_profile VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,games)
@@ -258,6 +273,10 @@ def build(reference_db,circumstances_db,output,*,strict=True):
             target.executemany("""
               INSERT INTO wh_fc27_manager_recruitment_policy VALUES(?,?,?,?,?,?,?,?,?,?)
             """,board)
+            target.executemany("""
+              INSERT INTO wh_fc27_simulated_manager_agents
+              VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,sim_agents)
             keys=[r[0] for r in target.execute("""
               SELECT player_key FROM wh_fc27_players WHERE edition=2027
               ORDER BY player_key
@@ -307,6 +326,7 @@ def build(reference_db,circumstances_db,output,*,strict=True):
                 "personality_priors":target.execute("SELECT COUNT(*) FROM wh_fc27_player_game_personality").fetchone()[0],
                 "real_verified_manager_profiles":target.execute("SELECT COUNT(*) FROM wh_fc27_manager_profiles").fetchone()[0],
                 "fictional_manager_recruitment_policies":target.execute("SELECT COUNT(*) FROM wh_fc27_manager_recruitment_policy").fetchone()[0],
+                "anonymous_simulated_manager_agent_profiles":target.execute("SELECT COUNT(*) FROM wh_fc27_simulated_manager_agents").fetchone()[0],
                 "ai_club_joined_contexts":target.execute("SELECT COUNT(*) FROM wh_fc27_ai_club_decision_context").fetchone()[0],
                 "financially_stressed_clubs":target.execute("""
                     SELECT COUNT(*) FROM wh_fc27_club_financial_circumstances
@@ -319,9 +339,10 @@ def build(reference_db,circumstances_db,output,*,strict=True):
             }
             if strict and (counts["club_profiles"],counts["personality_priors"],
                             counts["fictional_manager_recruitment_policies"],
+                            counts["anonymous_simulated_manager_agent_profiles"],
                             counts["ai_club_joined_contexts"],
                             counts["real_verified_manager_profiles"])!=(
-                                659,17593,659,659,0):
+                                659,17593,659,659,659,0):
                 raise ValueError("FC27 complete-game-dimension model coverage drift")
             target.commit()
     except Exception:
