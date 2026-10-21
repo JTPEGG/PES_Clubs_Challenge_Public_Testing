@@ -14,7 +14,11 @@ from world_historical_movement_rules import source_rules
 
 EDITION=2015
 CODES={"2015:en.1":20,"2015:en.2":24,"2015:en.3":24,"2015:en.4":24}
-VERSION="fifa15-english-four-tier-first-career-source-pilot-v1"
+VERSION="fifa15-english-four-tier-first-career-source-pilot-v2"
+# The original FIFA15 source actually calls this real League Two club simply
+# 'Shrewsbury'. A unique source-game identity is review evidence, not a newly
+# created FIFA club or proof of original EA team ID.
+CONTROLLED_GAME_LABELS={(2015,"2015:en.4",canonical("Shrewsbury Town")):canonical("Shrewsbury")}
 
 def audit(dbpath,output):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
@@ -51,9 +55,15 @@ def audit(dbpath,output):
     league_source=Counter(x[0] for x in external)
     for code,name,url in external:
         candidates=byname[canonical(name)]
+        alias_used=False
         if len(candidates)!=1:
             exact_keys=bysource[(code,canonical(name))]
             candidates=[original[k] for k in exact_keys if k in original]
+        if not candidates:
+            alias_key=CONTROLLED_GAME_LABELS.get((EDITION,code,canonical(name)))
+            if alias_key:
+                candidates=byname[alias_key]
+                alias_used=len(candidates)==1
         if len(candidates)!=1:
             reason="game_club_ambiguous" if candidates else "no_same_edition_original_game_club"
             status[reason]+=1
@@ -69,7 +79,9 @@ def audit(dbpath,output):
             status["conflicting_other_league_source"]+=1
             verified.append((code,name,key,display,url,"conflicting_other_league_source"))
             continue
-        stage=("fixture_registered" if assigned==code else
+        stage=("curated_original_source_shrewsbury_alias_needs_game_identity_review"
+               if alias_used else
+               "fixture_registered" if assigned==code else
                "original_game_league_needs_id_crosswalk" if assigned else
                "same_edition_name_only_pending_club_id_review")
         status[stage]+=1
@@ -83,7 +95,10 @@ def audit(dbpath,output):
         raise ValueError("FIFA15 dated EFL pyramid edges were not supplied")
     real_movement=[(r["lower"],r["upper"],r["direct_promotions"],
                     r["playoff_promotions"],r["direct_relegations"]) for r in rules]
-    recognized=status["fixture_registered"]+status["original_game_league_needs_id_crosswalk"]+status["same_edition_name_only_pending_club_id_review"]
+    recognized=(status["fixture_registered"]
+              +status["original_game_league_needs_id_crosswalk"]
+              +status["same_edition_name_only_pending_club_id_review"]
+              +status["curated_original_source_shrewsbury_alias_needs_game_identity_review"])
     external_team_count=len(external)
     cannot_start=bool(recognized!=92 or status.get("conflicting_other_league_source")
               or feed==0 or status["incomplete_real_league_source"])
@@ -103,6 +118,8 @@ def audit(dbpath,output):
        "expected_english_professional_clubs":92,
        "dated_english_professional_source_clubs":external_team_count,
        "same_edition_source_to_game_club_matches":recognized,
+       "controlled_historical_name_aliases_pending_review":
+           status["curated_original_source_shrewsbury_alias_needs_game_identity_review"],
        "source_game_matching_status":dict(status),
        "dating_source_clubs_per_division":dict(league_source),
        "dated_english_promotion_movement_edges":len(real_movement),
