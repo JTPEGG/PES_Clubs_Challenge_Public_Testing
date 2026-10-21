@@ -203,6 +203,29 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
+    if career_world is not None:
+        with sqlite3.connect(result) as release_db:
+            feeder_csv=release_db.execute("""
+               SELECT edition,feeder_code,real_club_name,regional_group,
+                      reserve_or_youth,source_url,
+                      PES_player_squad_imported,game_promotion_registered
+               FROM fc27_sourced_real_one_hop_feeder_clubs
+               ORDER BY feeder_code,regional_group,real_club_name
+            """).fetchall()
+            world_csv=release_db.execute("""
+               SELECT edition,club_key,original_club,competition_code,
+                      competition_mode,manager_job_market_candidate,
+                      playable_in_PES_verified
+               FROM fc27_career_world_clubs ORDER BY competition_code,original_club
+            """).fetchall()
+        export(out/"FC27_2026_27_OFFICIAL_REAL_FEEDER_CLUB_NAMES.csv",
+          ("Edition","Feeder_Code","Real_Club_Name","Group","Reserve_Youth",
+           "Official_2026_27_Member_Source","PES_Squad_Imported",
+           "Game_Promotion_Registered"),feeder_csv)
+        export(out/"FC27_2026_27_CAREER_WORLD_CLUB_ROLES.csv",
+          ("Edition","Original_Source_Club_Key","Club","Domestic_Competition",
+           "Season_World_Mode","Manager_Job_Market_Candidate",
+           "PES_Player_Squad_Ready"),world_csv)
     export(out/"FC27_CONMEBOL_REVIEWED_2026_HOME_DOMESTIC_LEAGUES.csv",
       ("Edition","Club_Key","Original_FC27_Club","Original_Continental_Source_Group",
        "Official_Country","2026_Domestic_Competition_Code","Official_Cup_Club_Name",
