@@ -41,6 +41,18 @@ class FC27AIRealismTests(unittest.TestCase):
                           existing_position_overalls=[82,75,68],
                           explicit_replacement_needed=True)
         self.assertEqual(r["decision"],"priority_replacement")
+    def test_any_country_top_flight_downgrade_is_league_neutral(self):
+        r=scenario(player={
+            "overall":80,"age":27,"seller_tier":1,"buyer_tier":2,
+            "buyer_score":68,"seller_score":84,
+            "buyer_prestige":57,"seller_prestige":83,
+            "transfer_listed":True,"renewal_status":"not_offered",
+            "offered_wage":300000
+        })
+        self.assertEqual(r["player"]["decision"],"uninterested")
+        self.assertNotIn("Premier League",r["player"]["reason"])
+        self.assertIn("top-flight",r["player"]["reason"])
+
     def test_contract_expiring_does_not_override_player_consent(self):
         r=scenario(
            player={"overall":90,"age":28,"buyer_score":46,"seller_score":92,
