@@ -115,10 +115,16 @@
         "Sint-Truidense VV": "STVV",
         "SK Beveren": "Beveren",
         "Club Brugge KV": "Club Brugge",
-        "Royal Charleroi SC": "Charleroi"
+        "Royal Charleroi SC": "Charleroi",
+        "Sp. Charleroi": "Charleroi",
+        "Waasland-Beveren": "Beveren"
       },
       "confidence": "independently_dated_official_2026_27_fixture_club_list",
-      "policy": "no_source_clubs_added_or_deleted"
+      "policy": "no_source_clubs_added_or_deleted",
+      "identity_alias_notes": {
+        "Waasland-Beveren": "Same registration number 4068 renamed SK Beveren in 2022-23 (https://www.skbeveren.be/club-2/); historical game display alias only",
+        "Sp. Charleroi": "Abbreviated Sporting Charleroi, same original club label"
+      }
     },
     {
       "original_group": "SUPERLIGA",
@@ -154,7 +160,8 @@
         "FC Universitatea Cluj": "Universitatea Cluj",
         "FC U Craiova 1948": "Universitatea Craiova",
         "Universitatea Craiova": "Universitatea Craiova",
-        "Oţelul Galaţi": "Oțelul Galați"
+        "Oţelul Galaţi": "Oțelul Galați",
+        "Univ. Craiova": "Universitatea Craiova"
       },
       "confidence": "independently_dated_2026_27_football_league_primary_fixture_list",
       "policy": "no_source_clubs_added_or_deleted"
