@@ -15,6 +15,7 @@ from world_fc27_source_membership_policy import adopt_staged_memberships
 from world_fc27_additional_movement_rules import stage as stage_additional_movements
 from world_fc27_movement_gameplay_policy import apply_gameplay_decisions
 from world_fc27_remaining_movement_game_policy import stage_game_defaults
+from world_fc27_broader_closed_league_scope import close_peripheral_leagues
 VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
 SCHEMA="""
@@ -192,6 +193,8 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
             raise ValueError("Remaining game movement rules require source and approved overrides")
         remaining_game_policy=(stage_game_defaults(db,remaining_game_rules_path,strict=strict)
                                if remaining_game_rules_path is not None else None)
+        final_game_scope=(close_peripheral_leagues(db,strict=strict)
+                          if remaining_game_rules_path is not None else None)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
@@ -219,6 +222,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
        "additional_2027_movement_rules_staged":movements,
        "user_approved_2027_gameplay_movement_assumptions":gameplay_policy,
        "remaining_2027_gameplay_movement_scope":remaining_game_policy,
+       "final_2027_open_and_closed_gameplay_scope":final_game_scope,
        "original_player_data_unmodified":True}
     (out/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
        json.dumps(report,indent=2),encoding="utf-8")
