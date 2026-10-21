@@ -32,18 +32,25 @@ An intact *minimum* positional cover is not sufficient if strong clubs systemati
 
 15 read-only hypothetical transfer scenarios, 66 automated tests and the 659-club source decision model audit passed [run 39619913093](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39619913093).
 
-## Additional policy proposed for controlled calibration
+## Revised approved design: sell first, recruit later, no numerical departure caps
 
-`world_ai_elite_balance.py` contains a pure, deliberately **not yet plugged into the live bidding engine** candidate `assess_elite_net_departure()` with dedicated unit tests `test_world_ai_elite_balance.py`.
+**The user rejected all arbitrary elite sale caps.** The proposed `world_ai_elite_balance.py` policy and its test have been deleted. Do not reinstate them.
 
-- Categorise a currently very strong first-team squad using **projected top-11 source overall >=82**, not club name.
-- Normal case: at most **one more agreed departure than agreed incoming**. Subsequent signings re-open genuine departure headroom.
-- Explicit strong exceptions—player wants exit, club cash need/distress or board-approved exceptional offer—allow at most **two net departures**, never unlimited routine stripping.
-- Transfer listing alone is insufficient to bypass the cap. Record the reason for acceptance/refusal. The seller, player, agent and board must **still independently approve**.
-- No provisional/imaginary replacement counts as an arrival: only **already agreed** transfers are used.
-- The proposed rule is intentionally conservative; a rule affecting 659 background teams and long-term transfer volume requires calibration against the full existing 92-club simulation before activation.
+The autonomous AI-world implementation now uses `world_ai_replacement_outlook.assess_future_replacement()` on the **projected squad** and possible same-specialist-position source-rated transfer-market options. This produces a **scouting outlook only**: no future sale is guaranteed, no incoming player is invented, and zero replacements are marked signed.
 
-**Awaited baseline benchmark:** The full existing isolated [20-window AI world market audit](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39621103349) evaluates 20 separate complete simulated 30-minute windows, with per-club quality/cover and buyer/seller evidence. Its result must be reviewed **before** switching the candidate to active AI buyer/seller selection.
+The decision flow is:
+1. Examine player value and role, current contract, squad strength/rotation impact and recruitment options from other clubs.
+2. Score strategic risk continuously as a **market priority**. Loss of key squad quality reduces appetite; a broad credible future candidate pool makes rebuilding more plausible.
+3. Let buyer make an actual offer; let selling club **negotiate** against its sporting/contract/financial risk. For *fictional autonomous AI-only sellers*, `retain` is no longer an eternal veto: it attracts a larger asking price, which a compelling offer can meet.
+4. Player/agent must accept personal terms, and the appropriate board retains separate oversight. Acceptance remains provisional until season-window finalisation.
+5. A sold starter may leave a real **urgent recruiting need**. Other clubs can also sell before replacing, removing any recursive sign-first deadlock.
+
+**No requirement to buy before selling, no blanket transfer quotas, no presumed signings.** Existing user-specified/manual seller retention decisions are preserved unchanged; this adjustment applies to AI-only source-labelled circumstances.
+
+The true 20-window original-policy benchmark finished [run 39621103349](https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/actions/runs/39621103349):
+1,422 completed transfers over 20 independent English 92-club windows (71.1 mean), goalkeeper share 10.7%; Arsenal 21 in/46 out, Chelsea 22/80, Man City 35/49. This establishes the need for more balanced sporting evaluation, not hard caps. One positional-cover alert, 77 starter-quality alerts, and 256 rotation-quality alerts were counted across the 20 simulated careers.
+
+**Validation:** pure tests in `test_world_ai_replacement_outlook.py`, existing seller regressions, and real two-window engine smoke. This revised model is initially development-only. Do not claim that the full 659-club FC27 warehouse has already replaced the 92-club AI engine.
 
 ## Manager database sequencing
 
