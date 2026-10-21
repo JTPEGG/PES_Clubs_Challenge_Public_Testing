@@ -11,6 +11,7 @@ import argparse,csv,json,sqlite3
 from collections import Counter,defaultdict
 from pathlib import Path
 from world_fc27_release_exclusions import sanitize_fc27_active_release
+from world_fc27_source_membership_policy import adopt_staged_memberships
 VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
 SCHEMA="""
@@ -177,6 +178,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
             "SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment"
         ).fetchone()[0]!=total:
             raise ValueError("Active FC27 database club rows do not reconcile after removal")
+        scope=adopt_staged_memberships(db,strict=strict)
         if db.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("Final FC27 release copy has invalid SQLite integrity")
         db.commit()
@@ -200,6 +202,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True):
        "individual_member_name_matches_not_EA_team_id_proof":True,
        "season_promotion_relegation_graph_complete":False,
        "career_ready":False,"other_21_editions_unmodified":True,
+       "user_approved_source_membership_scope":scope,
        "original_player_data_unmodified":True}
     (out/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
        json.dumps(report,indent=2),encoding="utf-8")
