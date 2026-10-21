@@ -162,7 +162,24 @@ def audit(connection, *, strict=True):
       SELECT COUNT(*) FROM fc27_effective_named_immediate_game_feeders
     """).fetchone()[0]
     if remaining_effective_feeders!=9:
-        raise ValueError("Nine unpopulated one-hop feeders remain in the active game scope")
+        raise ValueError("Nine named one-hop feeder divisions remain in the active game scope")
+    feeder_quality={
+      code:(realnames,eligible)
+      for code,realnames,eligible in connection.execute("""
+        SELECT feeder_code,published_real_club_names,eligible_player_squads_for_PES
+        FROM fc27_feeder_pool_readiness WHERE edition=2027
+      """)
+    }
+    if len(feeder_quality)!=9 or sorted(n for n,e in feeder_quality.values() if n)>0!=[15,18,60]:
+        raise ValueError("Missing official feeder club sources for Belgium France Italy")
+    if any(e for n,e in feeder_quality.values()):
+        raise ValueError("No promotion from incomplete PES feeder squads is allowed")
+    career_clubs=dict(connection.execute("""
+        SELECT competition_mode,COUNT(*)
+        FROM fc27_career_world_clubs WHERE edition=2027 GROUP BY competition_mode
+    """))
+    if career_clubs!={"open_league_season_candidate":410,"closed_background_world":249}:
+        raise ValueError("Expected all 659 original club career-world roles")
 
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
@@ -258,6 +275,17 @@ def audit(connection, *, strict=True):
         "gameplay_closed_leagues_across_entire_fc27":closed_count,
         "gameplay_open_leagues_across_entire_fc27":53-closed_count,
         "gameplay_remaining_effective_feeders_without_club_rosters":remaining_effective_feeders,
+        "feeder_divisions_with_official_real_2026_27_memberships":sum(
+            n>0 for n,e in feeder_quality.values()),
+        "genuine_feeder_club_names_registered":sum(
+            n for n,e in feeder_quality.values()),
+        "feeder_divisions_still_without_any_2026_27_real_club_pool":sum(
+            n==0 for n,e in feeder_quality.values()),
+        "original_clubs_eligible_for_open_league_schedule_after_game_import":
+            career_clubs["open_league_season_candidate"],
+        "original_clubs_retained_in_closed_background_job_and_transfer_market":
+            career_clubs["closed_background_world"],
+        "feeder_players_ready_for_real_PES_matches":0,
         "no_feeder_required_for_closed_leagues":True,
         "gameplay_competitions_with_closed_division_format":sum(
             x[-1]=="no_promotion_or_relegation" for x in pragmatic_game_rules.values()),
