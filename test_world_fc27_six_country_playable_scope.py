@@ -97,7 +97,7 @@ class SixCountryGameScopeTests(unittest.TestCase):
               WHERE upper_code='2027:it.1'
             """).fetchone(),(2,1,3))
             self.assertEqual(db.execute("""
-              SELECT direct_promotions,playoff_promotions,direct_relegations
+              SELECT effective_direct_promotions,effective_playoff_promotions,effective_direct_relegations
               FROM fc27_effective_additional_game_movement_rules
               WHERE upper_code='2027:at.1'
             """).fetchone(),(1,0,1))
