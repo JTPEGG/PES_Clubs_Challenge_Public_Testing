@@ -1,0 +1,37 @@
+{
+  "version": "fc27-gameplay-movement-decisions-v1",
+  "edition": 2027,
+  "season": "2026-27",
+  "policy": "game_rules_override_only_never_change_archived_real_world_regulations",
+  "default_decision_approach": "Prefer a simple season-end league exchange rule when specialised real-world eligibility/licensing/points-gap exceptions block ordinary simulation; retain exact original FC27 clubs and country/tiers; label overrides as game assumptions; do not invent promotion-qualified clubs or activate careers.",
+  "decisions": [
+    {
+      "country": "Italy",
+      "lower_code": "2027:it.2",
+      "upper_code": "2027:it.1",
+      "gameplay_direct_promotions": 2,
+      "gameplay_playoff_promotions": 1,
+      "gameplay_direct_relegations": 3,
+      "gameplay_interdivision_playoff_places": 0,
+      "game_playoff_rule": "Serie B teams finishing 3rd to 8th contest the final promotion place through a play-off. Always run the play-off, regardless of points gap. The play-off winner is promoted to Serie A alongside the top two; Serie A's bottom three are relegated.",
+      "exception_ignored": "Do not use the real-world qualifying points-gap trigger that can bypass the Serie B playoff.",
+      "decision_source": "user_approved_simplification",
+      "decision_date": "2026-10-21",
+      "rationale": "Consistent and engaging promotion play-off with exactly three up and three down."
+    },
+    {
+      "country": "Austria",
+      "lower_code": "2027:at.2",
+      "upper_code": "2027:at.1",
+      "gameplay_direct_promotions": 1,
+      "gameplay_playoff_promotions": 0,
+      "gameplay_direct_relegations": 1,
+      "gameplay_interdivision_playoff_places": 0,
+      "game_playoff_rule": "Straight exchange: the Austrian 2. Liga champion is promoted and the Austrian Bundesliga's last-placed club is relegated. No promotion/relegation match.",
+      "exception_ignored": "Ignore Austrian club licensing qualification, exceptional lower-ranked eligible promotions and any possibility of no exchange.",
+      "decision_source": "user_approved_simplification",
+      "decision_date": "2026-10-21",
+      "rationale": "One-up one-down each season is easier to simulate and explain."
+    }
+  ]
+}
