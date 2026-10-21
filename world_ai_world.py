@@ -20,6 +20,7 @@ from world_squad_planner import (projected_squads, recruitment_fit,
     sale_profile, lane_of, MIN_COVER, STARTERS)
 from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
+from world_ai_replacement_outlook import assess_future_replacement
 
 AI_WORLD_VERSION = "ai-world-v6-versatile-cover-rotation-quality"
 # Global ceiling is a safety bound, not a target. A real market may be quiet.
@@ -187,6 +188,15 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         WHERE wo.window_id=? AND o.status='agreed_future'""",
         (window_id,)).fetchall()
     signed_players={r[0] for r in previous}
+    # Real source-rated possible recruits, NOT signed replacement promises.
+    # Rebuilt after the current agreed deals alter projected registration.
+    future_options_by_lane=defaultdict(list)
+    for family,options in players.items():
+        for origin,pid,ovr in options:
+            if pid not in signed_players:
+                lane=lane_of(projected_positions.get(pid))
+                if lane:
+                    future_options_by_lane[lane].append((origin,pid,ovr))
     # Cap scanning and attempts: a world-wide market must not monopolise an
     # interactive request or manufacture activity when no credible deal exists.
     approaches=0
@@ -307,6 +317,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     player_id=pid,position=position,overall=overall)
                 if not sale["valid"]:
                     continue
+                # Sell with a plan, not with a fictitious completed purchase.
+                # Existing club/squad/contract/board approval still decides.
+                market_candidates=[
+                  source_ovr for source_club,source_player,source_ovr in
+                  future_options_by_lane.get(sale["lane"],())
+                  if source_club!=seller and source_player!=pid
+                ]
+                replacement_plan=assess_future_replacement(
+                    sale=sale,departing_overall=overall,
+                    market_options=market_candidates)
                 # Seller, player and board decide whether an uncomfortable
                 # sale proceeds. An unsigned replacement is not a veto.
                 # Rank surplus deals higher to discourage gratuitous
@@ -321,16 +341,17 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # Routine selling priorities favour genuine surplus;
                 # strong clubs resist cashing in on key rotation quality.
                 seller_fit=(22 if sale["surplus_sale"] else
-                            -28 if sale["requires_recruitment"] else
+                            -15 if sale["requires_recruitment"] else
                             8 if seller_rank>=3 else -15)
-                seller_fit-=min(60,sale["sporting_risk"]*3)
-                if sale["protected_rotation"]:
-                    seller_fit-=30
+                # A continuing club with poor cover and few plausible targets
+                # needs more compensation. This changes market PRIORITY, never
+                # forbids a sale or assumes a prospect has already agreed.
+                seller_fit-=min(100,replacement_plan["strategic_sale_risk_weight"])
                 options.append((seller,pid,overall,need,
-                                need+seller_fit,fit,sale))
+                                need+seller_fit,fit,sale,replacement_plan))
             options.sort(key=lambda v:(-v[4],
                 _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
-            for seller,pid,overall,need,_score,fit,sale in options[:10]:
+            for seller,pid,overall,need,_score,fit,sale,replacement_plan in options[:10]:
                 value,_=_player_reference(conn,dataset,pid)
                 money=budget_remaining(conn,career_id,buyer)
                 if not isinstance(value,int) or value<=0 or money<value*0.85:
@@ -365,7 +386,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 try:
                     _model_player_and_seller(conn,career_id=career_id,
                                               player_id=pid,target=target,
-                                              autonomous_club=True)
+                                              autonomous_club=True,
+                                              replacement_outlook=replacement_plan["forecast_replacement_outlook"])
                     from world_career_selling import get_seller_assumptions
                     seller_facts=get_seller_assumptions(conn,career_id,pid)
                     price=determine_offer(career_id=career_id,player_id=pid,
@@ -374,30 +396,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         seller_assumptions=seller_facts)
                     if price["fee"] is None:
                         continue
-                    # Realistic seller hierarchy: a strong club protects
-                    # its high-grade rotation options. It may STILL sell
-                    # BEFORE replacing someone for a serious player exit,
-                    # a last-year contract, financial pressure, or a board-
-                    # justifiable exceptional offer. These are modelled
-                    # circumstances, not claims about a real footballer.
-                    protected_exception=None
-                    if sale["protected_rotation"]:
-                        if bool(seller_facts.get("player_wants_exit")):
-                            protected_exception="player_exit"
-                        elif seller_facts.get("contract_years")==1 and (
-                                price["fee"]>=value*1.1):
-                            protected_exception="expiring_contract"
-                        elif seller_facts.get("financial_state") in (
-                                "cash_needed","distressed"):
-                            protected_exception="financial_pressure"
-                        elif (seller_facts.get("board_enabled") and
-                              seller_facts.get("exceptional_offer_pct")
-                              is not None and
-                              price["fee"]*100>=value*
-                              seller_facts["exceptional_offer_pct"]):
-                            protected_exception="exceptional_board_offer"
-                        if protected_exception is None:
-                            continue
+                    # No veto based on an unsigned replacement or a numerical
+                    # net-departure cap. High-quality/rotation-critical exits
+                    # face a context-sensitive seller's asking price and lower
+                    # AI market priority, but can proceed before recruitment.
+                    protected_exception=("unconfirmed_future_replacement_plan"
+                        if sale["protected_rotation"] else None)
                     if fit.get("category")=="prospect" and price["fee"]>prospect_fee_cap(
                             initial_transfer_budget=ledger[0],
                             available_budget=money):
@@ -408,7 +412,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         ai_bid_snapshot={**price,"recruitment_type":
                             fit.get("category","first_team"),
                             "recruitment_reason":fit["reason"],
-                            "scouting_evidence":fit.get("evidence")})
+                            "scouting_evidence":fit.get("evidence"),
+                            "selling_club_forward_plan":replacement_plan})
                     terms_row=conn.execute("""SELECT status,offered_fee,demanded_fee
                         FROM world_career_offers WHERE offer_id=?""",(oid,)).fetchone()
                     status=terms_row["status"]
