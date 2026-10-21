@@ -235,6 +235,22 @@ def audit(connection, *, strict=True):
     """).fetchone()[0]:
         raise ValueError("Regional players or promotion eligibility falsely certified")
 
+    routes=connection.execute("""
+      SELECT upper_code,lower_code,route_type,executable_career_movement
+      FROM fc27_effective_playable_season_end_routes WHERE edition=2027
+    """).fetchall()
+    if (len(routes)!=16 or
+        len({x[0] for x in routes})!=16 or
+        any(r[3] for r in routes) or
+        any(r[0]=="2027:us.mls" for r in routes)):
+        raise ValueError("All 16 sourced game movement routes must be indexed, with MLS excluded")
+    route_modes=dict(Counter(r[2] for r in routes))
+    if route_modes!={"dated_core_pyramid":7,
+                     "sourced_country_game_override":6,
+                     "simplified_delegated_game":1,
+                     "regional_4_up_4_down":2}:
+        raise ValueError("Unexpected source provenance in FC27 game movement routes")
+
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
         country,tier,name,meta_scope=meta.get(code,("unregistered",None,"not registered",
@@ -341,6 +357,10 @@ def audit(connection, *, strict=True):
         "dated_real_german_regional_feeder_names":dict(regional_clubs)["2027:de.4"],
         "named_regional_source_groups":len(regional_groups),
         "regional_game_4up_4down_policies_staged":len(regional_policies),
+        "fc27_effective_open_playable_season_end_routes":len(routes),
+        "fc27_career_movement_routes_actually_executable":0,
+        "fc27_effective_rule_route_provenance_counts":route_modes,
+        "fc27_MLS_separate_playable_without_relegation_route":True,
         "regional_playable_PES_squads_verified":0,
         "feeder_divisions_with_official_real_2026_27_memberships":sum(
             n>0 for n,e in feeder_quality.values()),
