@@ -82,13 +82,24 @@ def audit(connection, *, strict=True):
             country=meta[code][0]
             feeder_by_country_tier[(country,tier)]+=count
     clubs_by_code=defaultdict(list)
+    scopes_by_code=defaultdict(set)
     for key,club,code,origin,scope,label in rows:
         clubs_by_code[code].append((key,club,origin,scope))
+        scopes_by_code[code].add(scope)
+    conmebol_original_clubs=connection.execute(
+        "SELECT COUNT(*) FROM fc27_conmebol_original_club_domestic_candidates "
+        "WHERE edition=2027"
+    ).fetchone()[0]
+    partial_licensed_original_clubs=connection.execute(
+        "SELECT COALESCE(SUM(source_clubs),0) FROM fc27_reviewed_domestic_competitions "
+        "WHERE edition=2027 AND registration_scope LIKE 'partial_licensed_subset%'"
+    ).fetchone()[0]
 
     diagnostics=[]
     for code,members in sorted(clubs_by_code.items()):
-        country,tier,name,scope=meta.get(code,("unregistered",None,"not registered",
+        country,tier,name,meta_scope=meta.get(code,("unregistered",None,"not registered",
                                             "no_canonical_competition_metadata"))
+        scope="|".join(sorted(scopes_by_code[code]))
         rule_id=by_rule_id.get((country,tier))
         if code in closed:
             rule="verified_closed_or_no_promotion_format"
@@ -100,9 +111,9 @@ def audit(connection, *, strict=True):
         direct_feeder=feeder_by_country_tier.get((country,tier+1),0) if tier else 0
         reasons=[]
         if country=="unregistered":reasons.append("canonical_competition_absent")
-        if str(scope).startswith("partial_licensed_subset"):
+        if "partial_licensed_subset" in meta_scope or "partial_licensed_subset" in scope:
             reasons.append("licensed_subset_not_complete_domestic_division")
-        if str(scope)=="individual_2026_name_review_not_complete_league":
+        if "individual_2026_club_membership" in scope:
             reasons.append("individual_clubs_reviewed_but_full_domestic_roster_not_verified")
         if not fixture_count[code]:
             reasons.append("no_independent_dated_fixture_member_pool_for_this_competition")
@@ -125,12 +136,19 @@ def audit(connection, *, strict=True):
         "edition":2027,"active_source_clubs":len(rows),
         "distinct_active_domestic_competitions":len(diagnostics),
         "unknown_home_league_clubs":0,
-        "clubs_in_partial_licensed_source_competitions":sum(
-            x["source_club_count"] for x in diagnostics if
-            str(x["registration_scope"]).startswith("partial_licensed_subset")),
-        "clubs_in_continental_source_domestic_review":sum(
-            x["source_club_count"] for x in diagnostics if
-            x["registration_scope"]=="individual_2026_name_review_not_complete_league"),
+        "clubs_in_partial_licensed_source_competitions":partial_licensed_original_clubs,
+        "clubs_in_continental_source_domestic_review":conmebol_original_clubs,
+        "competitions_without_independent_dated_membership_pool":sum(
+            x["dated_fixture_member_count"]==0 for x in diagnostics),
+        "competitions_with_no_linked_season_end_movement_rule":sum(
+            x["movement_rule_status"]=="season_end_movement_rules_not_linked_or_unverified"
+            for x in diagnostics),
+        "competitions_with_partial_movement_rules":sum(
+            x["movement_rule_status"]=="partial_dated_pyramid_rules_external_feeder_unverified"
+            for x in diagnostics),
+        "competitions_with_explicit_closed_format":sum(
+            x["movement_rule_status"]=="verified_closed_or_no_promotion_format"
+            for x in diagnostics),
         "known_dated_2027_pyramid_edges":len(season["promotion_edges"]),
         "complete_2027_canonical_movement_destinations":False,
         "one_hop_feeder_policy":"only tier+1 observed; never recursively generated",
