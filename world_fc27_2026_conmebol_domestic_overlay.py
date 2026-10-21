@@ -17,6 +17,7 @@ from world_fc27_movement_gameplay_policy import apply_gameplay_decisions
 from world_fc27_remaining_movement_game_policy import stage_game_defaults
 from world_fc27_broader_closed_league_scope import close_peripheral_leagues
 from world_fc27_career_world_playability import stage as stage_career_world
+from world_fc27_six_country_playable_scope import apply_six_country_scope
 VERSION="fc27-one-year-all-659-playable-domestic-source-associations-v2"
 EDITION=2027
 SCHEMA="""
@@ -95,7 +96,7 @@ def export(path,head,rows):
     with path.open("w",encoding="utf-8-sig",newline="") as f:
         wr=csv.writer(f);wr.writerow(head);wr.writerows(rows)
 
-def build(registry,country_review_path,domestic_review_path,output,strict=True,movement_rules_path=None,gameplay_decisions_path=None,remaining_game_rules_path=None,official_feeder_rosters_path=None):
+def build(registry,country_review_path,domestic_review_path,output,strict=True,movement_rules_path=None,gameplay_decisions_path=None,remaining_game_rules_path=None,official_feeder_rosters_path=None,playable_scope_path=None):
     out=Path(output);out.mkdir(parents=True,exist_ok=True)
     official=json.loads(Path(country_review_path).read_text(encoding="utf-8"))
     domestic=json.loads(Path(domestic_review_path).read_text(encoding="utf-8"))
@@ -194,8 +195,12 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
             raise ValueError("Remaining game movement rules require source and approved overrides")
         remaining_game_policy=(stage_game_defaults(db,remaining_game_rules_path,strict=strict)
                                if remaining_game_rules_path is not None else None)
-        final_game_scope=(close_peripheral_leagues(db,strict=strict)
+        prior_game_scope=(close_peripheral_leagues(db,strict=strict)
                           if remaining_game_rules_path is not None else None)
+        if playable_scope_path is not None and prior_game_scope is None:
+            raise ValueError("Six-country playable choice requires prior source/game competition policies")
+        final_game_scope=(apply_six_country_scope(db,playable_scope_path,strict=strict)
+                          if playable_scope_path is not None else prior_game_scope)
         if official_feeder_rosters_path is not None and final_game_scope is None:
             raise ValueError("Sourced feeder clubs require completed effective FC27 game competition scope")
         career_world=(stage_career_world(db,official_feeder_rosters_path,strict=strict)
@@ -251,6 +256,7 @@ def build(registry,country_review_path,domestic_review_path,output,strict=True,m
        "user_approved_2027_gameplay_movement_assumptions":gameplay_policy,
        "remaining_2027_gameplay_movement_scope":remaining_game_policy,
        "final_2027_open_and_closed_gameplay_scope":final_game_scope,
+       "prior_2027_game_scope_before_six_country_choice":prior_game_scope,
        "source_club_career_world_and_real_2027_feeders":career_world,
        "original_player_data_unmodified":True}
     (out/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").write_text(
@@ -265,10 +271,12 @@ if __name__=="__main__":
     a.add_argument("--gameplay-decisions")
     a.add_argument("--remaining-game-rules")
     a.add_argument("--official-feeder-rosters")
+    a.add_argument("--playable-scope")
     a.add_argument("--output",required=True)
     x=a.parse_args()
     print(json.dumps(build(x.registry,x.countries,x.domestic,x.output,
        movement_rules_path=x.movement_rules,
        gameplay_decisions_path=x.gameplay_decisions,
        remaining_game_rules_path=x.remaining_game_rules,
-       official_feeder_rosters_path=x.official_feeder_rosters),indent=2))
+       official_feeder_rosters_path=x.official_feeder_rosters,
+       playable_scope_path=x.playable_scope),indent=2))
