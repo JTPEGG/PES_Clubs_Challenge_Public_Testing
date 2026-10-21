@@ -170,21 +170,33 @@ def audit(connection, *, strict=True):
         FROM fc27_feeder_pool_readiness WHERE edition=2027
       """)
     }
-    if len(feeder_quality)!=4 or sorted(n for n,e in feeder_quality.values() if n>0)!=[18,60]:
-        raise ValueError("Expected only French and Italian official club pools active; Portugal pending")
+    if len(feeder_quality)!=4 or sorted(n for n,e in feeder_quality.values() if n>0)!=[18,18,20,60]:
+        raise ValueError("Four real 2026/27 feeder identity lists required, player squads still unavailable")
     if any(e for n,e in feeder_quality.values()):
         raise ValueError("No promotion from incomplete PES feeder squads is allowed")
     career_clubs=dict(connection.execute("""
         SELECT competition_mode,COUNT(*)
         FROM fc27_career_world_clubs WHERE edition=2027 GROUP BY competition_mode
     """))
-    if career_clubs!={"open_league_season_candidate":314,"closed_background_world":345}:
-        raise ValueError("Expected 314 eight-country career club targets and 345 background clubs")
+    if career_clubs!={"open_league_season_candidate":314,
+                     "playable_closed_league_candidate":30,
+                     "closed_background_world":315}:
+        raise ValueError("Expected 314 European and 30 MLS career clubs plus 315 background clubs")
     selectable=connection.execute("""
         SELECT COUNT(*) FROM fc27_manager_selectable_career_clubs
     """).fetchone()[0]
-    if selectable!=314:
-        raise ValueError("Only 314 original FC27 clubs can be considered for a playable manager career")
+    if selectable!=344:
+        raise ValueError("Expected 314 European plus 30 MLS selectable club candidates")
+    mls_playable=connection.execute("""
+      SELECT COUNT(*) FROM fc27_mls_playable_closed_league_approval
+      WHERE edition=2027 AND no_promotion_or_relegation=1
+        AND intended_manager_selectable=1
+    """).fetchone()[0]
+    if mls_playable!=1 or connection.execute("""
+      SELECT COUNT(*) FROM fc27_mls_official_conference_membership
+      WHERE edition=2027
+    """).fetchone()[0]!=30:
+        raise ValueError("MLS two-conference 30-club playable format missing")
     core_enabled=connection.execute("""
         SELECT COUNT(*) FROM fc27_effective_core_pyramid_game_boundaries
         WHERE edition=2027 AND game_enabled=1
@@ -286,7 +298,10 @@ def audit(connection, *, strict=True):
         "new_pragmatic_gameplay_competition_decisions":len(pragmatic_game_rules),
         "gameplay_closed_leagues_across_entire_fc27":closed_count,
         "gameplay_open_leagues_across_entire_fc27":53-closed_count,
-        "manager_intended_playable_countries":8,
+        "manager_intended_playable_countries":9,
+        "manager_intended_playable_competition_codes_including_MLS":17,
+        "manager_MLS_original_clubs":career_clubs["playable_closed_league_candidate"],
+        "manager_MLS_no_promotion_relegation":True,
         "manager_intended_playable_competition_codes":16,
         "manager_intended_playable_club_candidates":selectable,
         "effective_historical_core_pyramid_edges_enabled":core_enabled,
@@ -307,6 +322,7 @@ def audit(connection, *, strict=True):
             career_clubs["open_league_season_candidate"],
         "original_clubs_retained_in_closed_background_job_and_transfer_market":
             career_clubs["closed_background_world"],
+        "original_clubs_eligible_for_any_intended_playable_competition":selectable,
         "feeder_players_ready_for_real_PES_matches":0,
         "no_feeder_required_for_closed_leagues":True,
         "gameplay_competitions_with_closed_division_format":sum(
