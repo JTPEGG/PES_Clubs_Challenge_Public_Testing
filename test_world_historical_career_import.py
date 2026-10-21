@@ -20,6 +20,26 @@ class HistoricalIntegrationTests(unittest.TestCase):
             self.assertTrue(entries[1]["ready_to_import"])
             self.assertTrue(entries[2]["ready_to_import"])
 
+    def test_manager_edition_picker_does_not_count_excluded_league_clubs(self):
+        with sqlite3.connect(":memory:") as db:
+            db.executescript("""
+              CREATE TABLE editions(edition INTEGER,season TEXT,
+                 imported_player_rows INTEGER,club_count INTEGER,
+                 missing_league_clubs INTEGER);
+              CREATE TABLE leagues(league_key TEXT,league_name TEXT);
+              CREATE TABLE clubs(edition INTEGER,club_key TEXT,league_key TEXT);
+              INSERT INTO editions VALUES(2027,'2026/27',250,3,0);
+              INSERT INTO leagues VALUES('l1','Premier League');
+              INSERT INTO leagues VALUES('l2','ISL');
+              INSERT INTO clubs VALUES(2027,'arsenal','l1');
+              INSERT INTO clubs VALUES(2027,'chelsea','l1');
+              INSERT INTO clubs VALUES(2027,'omitted','l2');
+            """)
+            entries=edition_options(db)
+            self.assertEqual(entries[0]["clubs"],2)
+            self.assertEqual(entries[0]["excluded_source_clubs"],1)
+            self.assertTrue(entries[0]["ready_to_import"])
+
     def test_older_years_fail_without_modifying_world(self):
         with sqlite3.connect(":memory:") as db:
             with self.assertRaisesRegex(ValueError,"no verified complete"):
