@@ -43,6 +43,36 @@ CREATE TABLE fc27_source_as_provided_membership_policy (
     movement_rules TEXT NOT NULL CHECK(movement_rules='independently_reviewed_later'),
     PRIMARY KEY(edition,competition_code)
 );
+
+CREATE TABLE fc27_source_as_provided_competition_seasons (
+    edition INTEGER NOT NULL CHECK(edition=2027),
+    competition_code TEXT NOT NULL,
+    country TEXT NOT NULL,
+    tier INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    calendar TEXT NOT NULL,
+    provenance_source TEXT NOT NULL,
+    source_club_count INTEGER NOT NULL CHECK(source_club_count>0),
+    full_real_world_roster_verified INTEGER NOT NULL
+      CHECK(full_real_world_roster_verified=0),
+    PRIMARY KEY(edition,competition_code),
+    FOREIGN KEY(edition,competition_code)
+      REFERENCES fc27_source_as_provided_membership_policy(edition,competition_code)
+);
+CREATE VIEW fc27_2026_27_active_domestic_competitions AS
+  SELECT s.edition,s.code AS competition_code,s.country,s.tier,s.name,
+         'independently_sourced_competition_season' AS membership_basis,
+         (SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment c
+          WHERE c.edition=s.edition AND c.starting_competition=s.code) AS active_source_clubs
+  FROM competition_seasons s
+  WHERE s.edition=2027 AND EXISTS (
+    SELECT 1 FROM fc27_2026_27_complete_source_competition_alignment c
+    WHERE c.edition=s.edition AND c.starting_competition=s.code)
+  UNION ALL
+  SELECT m.edition,m.competition_code,m.country,m.tier,m.name,
+         'staged_FC27_source_as_provided' AS membership_basis,
+         m.source_club_count AS active_source_clubs
+  FROM fc27_source_as_provided_competition_seasons m;
 CREATE VIEW fc27_accepted_source_as_provided_clubs AS
   SELECT c.edition,c.club_key,c.club,c.starting_competition,
          c.evidence_origin,c.verification_scope,
@@ -100,17 +130,63 @@ def adopt_staged_memberships(db: sqlite3.Connection, *, strict=True):
          "not_changed_by_membership_policy","independently_reviewed_later")
         for code,count in sorted(expected.items())
     ])
+    # Create a canonical, season-specific competition entry for each of the
+    # accepted source-only divisions. Do not insert them into the independent
+    # fixture evidence table: that would falsely upgrade source trust.
+    metadata={}
+    for code,country,tier,name,calendar in db.execute("""
+        SELECT canonical_code,country,tier,competition,calendar
+        FROM fc27_reviewed_domestic_competitions WHERE edition=2027
+    """):
+        metadata[code]=(country,int(tier),name,calendar,
+                        "data/warehouse/fc27_2026_27_source_league_association_review.json")
+    for code,country,tier,name,year in db.execute("""
+        SELECT league_code,country,national_competition_tier,competition,source_year
+        FROM fc27_conmebol_2026_domestic_league_sources WHERE edition=2027
+    """):
+        if code in metadata:
+            if metadata[code][:2]!=(country,int(tier)):
+                raise ValueError("FC27 domestic and continental source country/tier conflict")
+            continue
+        if int(year)!=2026:
+            raise ValueError("FC27 CONMEBOL must use calendar 2026 affiliation")
+        metadata[code]=(country,int(tier),name,"calendar_2026",
+                        "data/warehouse/fc27_2026_conmebol_domestic_participation_review.json")
+    missing=set(expected)-set(metadata)
+    if missing:
+        raise ValueError(f"Cannot register competition identities for {sorted(missing)}")
+    for code,count in sorted(expected.items()):
+        if db.execute(
+            "SELECT 1 FROM competition_seasons WHERE edition=2027 AND code=?",
+            (code,)
+        ).fetchone():
+            raise ValueError("Accepted source competition already in independent fixture registry")
+        country,tier,name,calendar,provenance=metadata[code]
+        db.execute("""
+            INSERT INTO fc27_source_as_provided_competition_seasons
+            VALUES(?,?,?,?,?,?,?,?,0)
+        """,(2027,code,country,tier,name,calendar,provenance,count))
     preserved=db.execute(
         "SELECT COUNT(*) FROM fc27_accepted_source_as_provided_clubs"
     ).fetchone()[0]
     if preserved!=280:
         raise ValueError("Approved league view did not preserve exactly 280 source clubs")
+    catalogue=db.execute("""
+       SELECT competition_code,active_source_clubs
+       FROM fc27_2026_27_active_domestic_competitions
+    """).fetchall()
+    if strict and (len(catalogue)!=53 or sum(x[1] for x in catalogue)!=659):
+        raise ValueError("Combined FC27 league catalogue is incomplete or duplicated")
+    if len({code for code,count in catalogue})!=len(catalogue):
+        raise ValueError("FC27 combined league catalogue contains duplicate codes")
     if db.execute("PRAGMA foreign_key_check").fetchall():
         raise ValueError("FC27 membership policy caused broken foreign keys")
     return {
         "policy_version":POLICY_VERSION,
         "accepted_source_as_provided_competitions":len(expected),
         "retained_source_clubs_in_accepted_groups":preserved,
+        "source_as_provided_canonical_division_records":len(expected),
+        "combined_active_domestic_competition_catalogue_size":len(catalogue),
         "membership_roster_expansion_requested":False,
         "all_existing_fc27_clubs_preserved":True,
         "original_game_EA_ids_certified":False,
