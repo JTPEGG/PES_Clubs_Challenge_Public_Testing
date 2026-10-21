@@ -106,7 +106,7 @@ class FC27OtherLeagueGameplayDefaultsTests(unittest.TestCase):
               UPDATE fc27_2026_27_active_domestic_competitions
               SET active_source_clubs=99 WHERE competition_code='2027:pl.1'
             """)
-            with self.assertRaisesRegex(ValueError,"source club group changed"):
+            with self.assertRaisesRegex(ValueError,"Original FC27 club group changed"):
                 stage_game_defaults(db,CONFIG,strict=False)
         with populated_fixture() as db:
             db.execute("UPDATE edition_readiness SET career_ready=1 WHERE edition=2027")
