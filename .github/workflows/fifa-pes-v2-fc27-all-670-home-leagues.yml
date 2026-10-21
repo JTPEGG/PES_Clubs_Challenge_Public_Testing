@@ -165,6 +165,7 @@ jobs:
               assert db.execute("SELECT COUNT(*) FROM fc27_manager_selectable_career_clubs").fetchone()[0]==344
               assert db.execute("SELECT COUNT(*) FROM fc27_mls_playable_closed_league_approval").fetchone()[0]==1
               assert db.execute("SELECT COUNT(*) FROM fc27_mls_official_conference_membership").fetchone()[0]==30
+              assert db.execute("SELECT COUNT(DISTINCT mapped_original_game_club_key) FROM fc27_mls_official_conference_membership").fetchone()[0]==30
               assert db.execute("SELECT COUNT(*) FROM fc27_effective_manager_selectable_competitions").fetchone()[0]==17
               assert db.execute("SELECT COUNT(*) FROM fc27_career_world_clubs WHERE competition_mode='playable_closed_league_candidate'").fetchone()[0]==30
               assert db.execute("SELECT COUNT(*) FROM fc27_effective_core_pyramid_game_boundaries WHERE game_enabled=1").fetchone()[0]==7
