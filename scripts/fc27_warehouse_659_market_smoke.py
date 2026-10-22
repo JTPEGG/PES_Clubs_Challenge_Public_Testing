@@ -146,7 +146,16 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                 SELECT 1 FROM world_career_offer_events
                 WHERE offer_id=? AND event_type='ai_prospect_signed' LIMIT 1
             """,(r[0],)).fetchone() for r in actual)
-            elite[name]={"arrivals":inbound[cid],"departures":outbound[cid],
+            # A zero-signing club can be ignored by candidate selection,
+            # rejected by sellers or blocked by personal terms. Preserve
+            # this evidence rather than declaring all three "no interest".
+            attempted=dict(con.execute("""SELECT status,COUNT(*)
+                FROM world_career_offers WHERE career_id=?
+                AND buying_club_id=? GROUP BY status""",
+                (career,cid)).fetchall())
+            elite[name]={"attempted_offers":sum(attempted.values()),
+                         "attempted_offer_statuses":attempted,
+                         "arrivals":inbound[cid],"departures":outbound[cid],
                          "net_arrivals":inbound[cid]-outbound[cid],
                          "senior_first_team_arrivals":senior_signings,
                          "initial_source_cb_count":len(initial[cid].get("CB",[])),
