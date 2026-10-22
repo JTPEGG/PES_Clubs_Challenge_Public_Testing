@@ -18,7 +18,11 @@ from world_live_market import (initialise_live_market,start_live_market,
 from world_preseason_window import window_snapshot
 from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of
 
-def evaluate(full_world_path,output):
+def evaluate(full_world_path,output,*,opportunity_scale=1):
+    # Extra independently-led negotiation OPPORTUNITIES are QA workload,
+    # not forced/signable transfers. The deployed core schedule is unchanged.
+    if type(opportunity_scale) is not int or opportunity_scale not in (1,3):
+        raise ValueError("Supported QA sampling is 1x or 3x")
     con=sqlite3.connect(full_world_path,isolation_level=None)
     con.row_factory=sqlite3.Row
     con.execute("PRAGMA foreign_keys=ON")
@@ -65,11 +69,28 @@ def evaluate(full_world_path,output):
         start=start_live_market(con,career_id=career,now=now)
         if start["duration_seconds"]!=1800:
             raise ValueError("Incorrect preseason duration")
-        for second in MARKET_MOMENTS:
-            response=process_live_market(con,career_id=career,
-              now=now+timedelta(seconds=second+1))
+        for index,second in enumerate(MARKET_MOMENTS):
+            due=now+timedelta(seconds=second+1)
+            response=process_live_market(con,career_id=career,now=due)
             if response["state"]!="open":
                 raise ValueError("AI window closed early")
+            if opportunity_scale>1:
+                # 92-club market has 112 independently idempotent world
+                # attempts across these 12 timepoints. In a 659-club world
+                # this under-samples clubs. Replicate the real AI negotiator
+                # with separate never-colliding slot keys for calibration.
+                # This does NOT generate or guarantee a sale/purchase.
+                from world_ai_world import consider_ai_world_deal
+                scheduled=(5 if index<4 else 10 if index<6 else
+                    13 if index==6 else 18 if index==7 else
+                    11 if index==8 else 10)
+                for extra in range((opportunity_scale-1)*scheduled):
+                    consider_ai_world_deal(con,career_id=career,
+                        window_id=start["window_id"],
+                        slot=500000+1000*index+extra,now=due)
+            print("source world AI market moment",index+1,
+                  "of",len(MARKET_MOMENTS),
+                  "QA opportunity scale",opportunity_scale,flush=True)
         finish=process_live_market(con,career_id=career,
            now=now+timedelta(seconds=1801))
         if finish["state"]!="closed":
@@ -160,6 +181,8 @@ def evaluate(full_world_path,output):
           "source_clubs":source,"source_players":rosters,
           "source_country_counts":source_countries,
           "career_id":career,"window_minutes":30,
+          "opportunity_scale_QA_only":opportunity_scale,
+          "extra_QA_opportunities_not_forced_transfers":True,
           "autonomous_moments_processed":con.execute("""SELECT COUNT(*) FROM
              world_career_ai_world_moments WHERE window_id=?""",
              (start["window_id"],)).fetchone()[0],
@@ -197,5 +220,8 @@ if __name__=="__main__":
     parser=argparse.ArgumentParser()
     parser.add_argument("--world",required=True)
     parser.add_argument("--output",required=True)
+    parser.add_argument("--opportunity-scale",type=int,default=1,
+                        choices=(1,3))
     args=parser.parse_args()
-    print(json.dumps(evaluate(args.world,args.output),indent=2),flush=True)
+    print(json.dumps(evaluate(args.world,args.output,
+       opportunity_scale=args.opportunity_scale),indent=2),flush=True)
