@@ -32,7 +32,17 @@ def evaluate(full_world_path,output):
             FROM world_dataset_entries WHERE dataset_id=?""",(DATASET,)).fetchone()[0]
         if (source,rosters,leagues)!=(659,17593,53):
             raise ValueError("Not the approved 659-club warehouse")
-        initialise_live_market(con)
+        from world_career_transfer_protocol import initialize_transfer_protocol
+        from world_career_incoming import initialize_incoming_approaches
+        from world_career_management import initialize_career_management
+        from world_career_objectives import initialize_board_objectives
+        from world_career_board_policy import initialize_career_board_policy
+        from world_career_selling import initialize_career_selling
+        for setup in (initialize_career_management,initialize_board_objectives,
+                      initialize_career_board_policy,initialize_career_selling,
+                      initialize_incoming_approaches,initialize_transfer_protocol,
+                      initialise_live_market):
+            setup(con)
         # Genuine source-bound player with a complete starting club roster.
         # Avoid determining a test club by an unsourced English-name guess.
         manager=con.execute("""SELECT e.club_id FROM world_dataset_entries e
