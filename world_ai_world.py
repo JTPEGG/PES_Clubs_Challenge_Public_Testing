@@ -149,7 +149,8 @@ def _sign_ai_deal(conn, *, career_id, offer_id, buyer, seller, fee,
     conn.commit()
 
 
-def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
+def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
+                           buying_club_id=None):
     """One independent club-led AI market opportunity per persisted attempt.
 
     Returns a completed agreement ID or None. Failed negotiations never create
@@ -180,6 +181,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
     if c is None:
         return None
     dataset,manager,lock_date=c
+    if buying_club_id is not None:
+        # Only the FC27 independent-club scheduler can provide an explicit
+        # buyer. Older careers retain their original deterministic sampling.
+        if (dataset!="fc27-warehouse-659-mens-2026-27" or
+                type(buying_club_id) is not int or buying_club_id==manager):
+            raise ValueError("Explicit AI buyer is only valid for FC27 world markets")
     squads,players=_candidates(conn,career_id,dataset,manager)
     projected=projected_squads(conn,career_id=career_id,dataset=dataset)
     # Absent on old/non-FC27 worlds: retain their legacy ordering.
@@ -299,28 +306,32 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
             previous_signings=signings_by_buyer[club],
             stable_variation=_stable(career_id,window_id,slot,club,
                 AI_WORLD_VERSION,"scout")%26) for club in buyers}
-        buyers=[club for club in buyers if scouting_desk_activation(
-            priority=scouting_priority[club],
-            draw=_stable(career_id,window_id,slot,club,
-                         AI_WORLD_VERSION,"market-desk")%1000)]
-        buyers.sort(key=lambda club:(
-            -scouting_priority[club],
-            _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
-        # A market opportunity belongs to ONE willing recruitment desk.
-        # Exhaustively retrying every club until someone signed was
-        # effectively forcing one completed transfer per scheduled tick.
-        buyer=select_recruiting_club(
-            {club:scouting_priority[club] for club in buyers},
-            draw=_stable(
-            career_id,window_id,slot,DEAL_CHOICE_VERSION,"lead-desk")%1000000)
-        if buyer is None:
-            return None
-        buyers=[buyer]
-        if not pursue_transfer(priority=scouting_priority[buyer],
-                profile=club_ai_context.get(buyer),
-                draw=_stable(career_id,window_id,slot,buyer,
-                             DEAL_CHOICE_VERSION,"commit-or-hold")%1000):
-            return None
+        if buying_club_id is not None:
+            # Independently approved AND checkpointed by the FC27 scheduler.
+            # Never choose another club after a failed negotiation, or apply
+            # the old single-desk random selection again.
+            if buying_club_id not in buyers:
+                return None
+            buyers=[buying_club_id]
+        else:
+            # Compatibility for older isolated FC27 QA callers that do not
+            # supply a planned club. Live FC27 goes through the new planner.
+            buyers=[club for club in buyers if scouting_desk_activation(
+                priority=scouting_priority[club],
+                draw=_stable(career_id,window_id,slot,club,
+                             AI_WORLD_VERSION,"market-desk")%1000)]
+            buyer=select_recruiting_club(
+                {club:scouting_priority[club] for club in buyers},
+                draw=_stable(career_id,window_id,slot,
+                    DEAL_CHOICE_VERSION,"lead-desk")%1000000)
+            if buyer is None:
+                return None
+            buyers=[buyer]
+            if not pursue_transfer(priority=scouting_priority[buyer],
+                    profile=club_ai_context.get(buyer),
+                    draw=_stable(career_id,window_id,slot,buyer,
+                                 DEAL_CHOICE_VERSION,"commit-or-hold")%1000):
+                return None
     else:
         buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
             -len(outgoing_lanes[club]),
