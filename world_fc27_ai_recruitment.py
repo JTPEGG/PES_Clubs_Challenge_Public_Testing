@@ -10,7 +10,7 @@ from world_squad_planner import MIN_COVER, STARTERS, FAMILY, effective_cover
 
 VERSION="fc27-recruitment-priority-v2-role-led-market"
 
-def read_fc27_profiles(conn, *, dataset):
+def read_fc27_profiles(conn, *, dataset, club_id=None):
     """Read independently copied FC27 game model profiles, never live source."""
     exists=conn.execute("""SELECT 1 FROM sqlite_master
         WHERE type='table' AND name='world_fc27_club_ai_context'""").fetchone()
@@ -20,8 +20,9 @@ def read_fc27_profiles(conn, *, dataset):
         pressure_to_improve,operating_approach,financial_pressure_band,
         financial_pressure_index,simulated_manager_risk,
         simulated_manager_financial_discipline,source_note
-        FROM world_fc27_club_ai_context WHERE dataset_id=?""",
-        (dataset,)).fetchall()
+        FROM world_fc27_club_ai_context WHERE dataset_id=?"""
+        + (" AND club_id=?" if club_id is not None else ""),
+        (dataset,club_id) if club_id is not None else (dataset,)).fetchall()
     names=("club_id","sporting_appeal","ambition_level",
       "pressure_to_improve","operating_approach","financial_pressure_band",
       "financial_pressure_index","simulated_manager_risk",
