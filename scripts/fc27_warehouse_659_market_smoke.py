@@ -16,7 +16,7 @@ from world_careers import start_sandbox, wage_budget_breakdown
 from world_live_market import (initialise_live_market,start_live_market,
   process_live_market,MARKET_MOMENTS)
 from world_preseason_window import window_snapshot
-from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of
+from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of,squad_standard
 
 def evaluate(full_world_path,output,*,opportunity_scale=1):
     # Extra independently-led negotiation OPPORTUNITIES are QA workload,
@@ -36,6 +36,10 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             FROM world_dataset_entries WHERE dataset_id=?""",(DATASET,)).fetchone()[0]
         if (source,rosters,leagues)!=(659,17593,53):
             raise ValueError("Not the approved 659-club warehouse")
+        ai_profiles=con.execute("""SELECT COUNT(*) FROM world_fc27_club_ai_context
+            WHERE dataset_id=?""",(DATASET,)).fetchone()[0]
+        if ai_profiles!=659:
+            raise ValueError("Missing independently copied FC27 AI decision context")
         from world_career_transfer_protocol import initialize_transfer_protocol
         from world_career_incoming import initialize_incoming_approaches
         from world_career_management import initialize_career_management
@@ -126,6 +130,10 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
         outbound=Counter(r[2] for r in actual)
         crossed_country=sum(club_country[r[2]]!=club_country[r[3]]
                             for r in actual)
+        buyer_countries=Counter(club_country[r[3]] for r in actual)
+        seller_countries=Counter(club_country[r[2]] for r in actual)
+        corridors=Counter((club_country[r[2]],club_country[r[3]])
+                          for r in actual)
         elite={}
         for name in ("Arsenal","Chelsea","Manchester City"):
             candidates=[cid for cid,display in clubs.items()
@@ -144,6 +152,10 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                          "final_source_cb_count":len(final[cid].get("CB",[]))}
         buyers_with_signings=len(inbound)
         sellers_with_sales=len(outbound)
+        active_clubs=len(set(inbound)|set(outbound))
+        buyer_quality_change={cid:round(squad_standard(final[cid])-
+                                         squad_standard(initial[cid]),2)
+                              for cid in initial}
         senior=[];prospects=[]
         for offer,pid,seller,buyer,primary,overall,fee in actual:
             if club_comp[seller]!=club_comp[buyer]:crossing+=1
@@ -179,6 +191,7 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "model":"actual_live_30_minute_autonomous_AI_on_disposable_659_clubs",
           "dataset_id":DATASET,"source_competitions":leagues,
           "source_clubs":source,"source_players":rosters,
+          "modelled_ai_club_contexts_copied":ai_profiles,
           "source_country_counts":source_countries,
           "career_id":career,"window_minutes":30,
           "opportunity_scale_QA_only":opportunity_scale,
@@ -190,6 +203,20 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "still_agreed_future":future,
           "cross_competition_moves":crossing,
           "cross_country_moves":crossed_country,
+          "domestic_same_source_country_moves":len(actual)-crossed_country,
+          "international_source_country_share":(
+              round(crossed_country/len(actual),3) if actual else None),
+          "buyer_countries_active":dict(buyer_countries),
+          "seller_countries_active":dict(seller_countries),
+          "top_source_country_corridors":[
+              {"seller_country":origin,"buyer_country":destination,"deals":n}
+              for (origin,destination),n in corridors.most_common(20)],
+          "different_clubs_buying_or_selling":active_clubs,
+          "share_clubs_active":round(active_clubs/source,3),
+          "clubs_with_source_top11_strength_gain_over_1":sum(
+              val>1 for val in buyer_quality_change.values()),
+          "clubs_with_source_top11_strength_loss_over_1":sum(
+              val< -1 for val in buyer_quality_change.values()),
           "different_buyers":buyers_with_signings,
           "different_sellers":sellers_with_sales,
           "share_clubs_with_arrivals":round(buyers_with_signings/source,3),
