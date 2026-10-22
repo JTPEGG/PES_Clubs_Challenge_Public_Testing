@@ -1,5 +1,6 @@
 """Independent regression for FC27 market choices versus protected older rules."""
 import unittest
+import sqlite3
 from world_ai_bidding import determine_offer,position_family
 from world_selling_club import evaluate_selling_club
 
@@ -21,6 +22,14 @@ class MarketDecisionTests(unittest.TestCase):
                            basic["maximum_sensible_fee"])
         with self.assertRaises(ValueError):
             determine_offer(**BASE,strategic_ceiling_uplift=.90)
+
+    def test_legacy_world_without_buying_board_table_remains_eligible(self):
+        from world_career_board_policy import get_policy,career_board_decision
+        with sqlite3.connect(":memory:") as conn:
+            self.assertIsNone(get_policy(conn,"legacy",7))
+            review=career_board_decision(conn,career_id="legacy",
+                club_id=7,offer_fee=900_000,market_value=1_000_000)
+            self.assertEqual(review["decision"],"not_configured")
 
     def test_old_buyers_keep_exact_unchanged_policy_by_default(self):
         old=determine_offer(**BASE)
