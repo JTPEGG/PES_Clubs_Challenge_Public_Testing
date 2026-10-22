@@ -112,19 +112,19 @@ LANES = {
     "DM": "DM", "DMF": "DM", "CDM": "DM",
     "CM": "CM", "CMF": "CM",
     "AM": "AM", "AMF": "AM", "CAM": "AM",
-    "LM": "LW", "LMF": "LW", "RM": "RW", "RMF": "RW",
+    "LM": "LM", "LMF": "LM", "RM": "RM", "RMF": "RM",
     "LW": "LW", "RW": "RW", "LWF": "LW", "RWF": "RW",
     "CF": "ST", "ST": "ST", "SS": "ST", "STRIKER": "ST",
 }
 FAMILY = {"GK":"GK", "CB":"DEF", "LB":"DEF", "RB":"DEF", "FB":"DEF",
-          "DM":"MID", "CM":"MID", "AM":"MID",
+          "DM":"MID", "CM":"MID", "AM":"MID", "LM":"MID", "RM":"MID",
           "LW":"FWD", "RW":"FWD", "ST":"FWD"}
 STARTERS = {"GK":1,"CB":2,"LB":1,"RB":1,"FB":1,
-            "DM":1,"CM":2,"AM":1,"LW":1,"RW":1,"ST":1}
+            "DM":1,"CM":2,"AM":1,"LM":1,"RM":1,"LW":1,"RW":1,"ST":1}
 # Conservative minimum viable positional coverage after a departure.
 # A deficit cannot be cured with unrelated players from the same broad family.
 MIN_COVER = {"GK":2,"CB":3,"LB":1,"RB":1,"FB":1,
-             "DM":1,"CM":2,"AM":0,"LW":1,"RW":1,"ST":1}
+             "DM":1,"CM":2,"AM":0,"LM":0,"RM":0,"LW":1,"RW":1,"ST":1}
 
 
 def lane_of(position):
@@ -198,7 +198,7 @@ def projected_squads(conn, *, career_id, dataset):
 
 
 def recruitment_fit(squads, *, buyer, position, overall,
-                    recent_senior_departure=False):
+                    recent_senior_departure=False, starting_roles=None):
     """Evaluate actual starter upgrade and depth need, not third-best DEF/FWD.
 
     Lack of verified potential prevents labelling an inferior target as a
@@ -216,10 +216,22 @@ def recruitment_fit(squads, *, buyer, position, overall,
                         for entry in group),reverse=True)
     if not all_ratings:
         return {"eligible":False,"score":0,"reason":"No rated buyer squad"}
-    starter_n=STARTERS[slot]
-    baseline=peers[min(starter_n-1,len(peers)-1)][1] if peers else None
+    if starting_roles is not None and (
+            not isinstance(starting_roles,dict) or
+            any(type(n) is not int or not 0<=n<=11
+                for n in starting_roles.values())):
+        raise ValueError("Invalid manager tactical roles")
+    starter_n=(STARTERS[slot] if starting_roles is None
+               else starting_roles.get(slot,0))
+    # Do not treat specialist wide midfield and wing-forward as equivalent.
+    # An unused tactical lane can still be developed for future seasons,
+    # but it is not a *present XI* improvement.
+    baseline=(peers[min(starter_n-1,len(peers)-1)][1]
+              if peers and starter_n>0 else None)
     team_baseline=all_ratings[min(10,len(all_ratings)-1)]
-    thin=len(peers)<max(MIN_COVER[slot],STARTERS[slot])
+    minimum=(max(MIN_COVER[slot],STARTERS[slot]) if starting_roles is None
+             else starter_n+(1 if starter_n>0 else 0))
+    thin=starter_n>0 and len(peers)<minimum
     # First-team upgrades require meaningful improvement to the actual
     # starter; an 83-rated attacker is not a first-team upgrade to a 90+ XI.
     improvement=(overall-baseline) if baseline is not None else 0
@@ -232,7 +244,7 @@ def recruitment_fit(squads, *, buyer, position, overall,
     # rationally buy a comparable senior replacement. Requiring a 3+ OVR
     # upgrade after a departure forces even elite clubs into youth-only
     # recruitment. This does NOT require a purchase before the sale.
-    credible_replacement=(recent_senior_departure and
+    credible_replacement=(starter_n>0 and recent_senior_departure and
          overall>=team_baseline-5 and
          (baseline is None or overall>=baseline-4))
     if not (credible_depth or credible_upgrade or credible_replacement):
@@ -253,7 +265,8 @@ def recruitment_fit(squads, *, buyer, position, overall,
 
 
 
-def sale_profile(squads, *, seller, player_id, position, overall):
+def sale_profile(squads, *, seller, player_id, position, overall,
+                 starting_roles=None):
     """Sporting cost of selling, considering genuine alternative positions.
 
     No advance signing is REQUIRED. Elite rotation quality is protected via a
@@ -284,17 +297,23 @@ def sale_profile(squads, *, seller, player_id, position, overall):
     for lane in sorted(affected):
         before=effective_cover(squads,seller,lane)
         after=effective_cover(squads,seller,lane,exclude_player=player_id)
-        n=STARTERS[lane]
-        minimum=max(n,MIN_COVER[lane])
-        old_floor=before[min(n-1,len(before)-1)][1] if before else None
-        new_floor=after[min(n-1,len(after)-1)][1] if after else None
+        used=(starting_roles is None or starting_roles.get(lane,0)>0)
+        n=(STARTERS[lane] if starting_roles is None
+           else starting_roles.get(lane,0))
+        minimum=(max(n,MIN_COVER[lane]) if starting_roles is None
+                 else n+1 if n else 0)
+        old_floor=(before[min(n-1,len(before)-1)][1]
+                   if before and n else None)
+        new_floor=(after[min(n-1,len(after)-1)][1]
+                   if after and n else None)
         # First two rotation places, not just the strongest starters.
         old_backup=[p[1] for p in before[n:n+2]]
         new_backup=[p[1] for p in after[n:n+2]]
-        first_backup_drop=sum(
+        first_backup_drop=(sum(
             max(0,old_backup[i]-(new_backup[i] if i<len(new_backup) else 0))
-            for i in range(len(old_backup)))
-        starter_drop=max(0,(old_floor or 0)-(new_floor or 0))
+            for i in range(len(old_backup))) if used else 0)
+        starter_drop=(max(0,(old_floor or 0)-(new_floor or 0))
+                      if used else 0)
         short=len(after)<minimum
         reports.append({
             "lane":lane,"before_depth":len(before),"after_depth":len(after),
@@ -304,8 +323,10 @@ def sale_profile(squads, *, seller, player_id, position, overall):
             "recruitment_needed":short or starter_drop>=4 or
                                 first_backup_drop>=4,
         })
-    demands={lane:max(STARTERS[lane],MIN_COVER[lane])
-             for lane in affected}
+    demands={lane:(max(STARTERS[lane],MIN_COVER[lane])
+             if starting_roles is None else starting_roles.get(lane,0))
+             for lane in affected
+             if starting_roles is None or starting_roles.get(lane,0)>0}
     whole_before=assign_available_players(squads,seller,demands)
     whole_after=assign_available_players(squads,seller,demands,
                                          exclude_player=player_id)
@@ -327,7 +348,8 @@ def sale_profile(squads, *, seller, player_id, position, overall):
     main=next(r for r in reports if r["lane"]==slot)
     return {
         "valid":True,"lane":slot,"rank":rank,
-        "first_choice":rank<STARTERS[slot],
+        "first_choice":rank<(STARTERS[slot] if starting_roles is None
+                            else starting_roles.get(slot,0)),
         "before_depth":main["before_depth"],
         "after_depth":main["after_depth"],
         "starter_rating_drop":main["starter_rating_drop"],
@@ -337,7 +359,9 @@ def sale_profile(squads, *, seller, player_id, position, overall):
            else "improve_rotation" if protected_rotation
            else "improve_starter" if needs else "none"),
         "requires_recruitment":needs,
-        "surplus_sale":not needs and rank>=STARTERS[slot],
+        "surplus_sale":not needs and rank>=(
+            STARTERS[slot] if starting_roles is None
+            else starting_roles.get(slot,0)),
         "protected_rotation":protected_rotation,
         "sporting_risk":seriousness,
         "simultaneous_cover_loss":simultaneous_loss,
