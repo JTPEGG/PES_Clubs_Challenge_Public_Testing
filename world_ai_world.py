@@ -22,7 +22,7 @@ from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
 from world_ai_replacement_outlook import assess_future_replacement
 
-AI_WORLD_VERSION = "ai-world-v7-senior-need-first"
+AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # Global ceiling is a safety bound, not a target. A real market may be quiet.
 # Multiple independent clubs may agree moves during one market interval.
 MAX_AI_DEALS = 90  # upper safety bound, not a minimum or forced sales
@@ -251,6 +251,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                    if len(projected.get(club,{}).get(lane,())) <
                    max(MIN_COVER[lane],STARTERS[lane]))
     buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
+        -len(outgoing_lanes[club]),
         signings_by_buyer[club],
         _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
     for buyer in buyers[:32]:
@@ -303,7 +304,9 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # only the player's actual specialist slot can justify demand.
                 position=projected_positions.get(pid)
                 fit=recruitment_fit(projected,buyer=buyer,
-                                    position=position,overall=overall)
+                                    position=position,overall=overall,
+                                    recent_senior_departure=(
+                                        lane_of(position) in outgoing_lanes[buyer]))
                 # Future recruitment is separate from a starting-XI upgrade.
                 # Never manufacture a potential rating or guarantee a deal:
                 # agent and seller can still independently refuse.
@@ -332,8 +335,9 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # Rank surplus deals higher to discourage gratuitous
                 # starter churn; don't forbid an attractive late offer.
                 need=fit["score"]
-                if club_ratings and overall>max(club_ratings)+14:
-                    continue
+                # A major quality jump is not automatically implausible.
+                # Source player motivation, seller valuation, wages and board
+                # policy decide whether an exceptional transfer can occur.
                 lane=lane_of(position)
                 seller_depth=projected.get(seller,{}).get(lane,[])
                 seller_rank=next((i for i,item in enumerate(seller_depth)
