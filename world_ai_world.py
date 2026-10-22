@@ -189,6 +189,29 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                          for pid,_overall,pos in group}
     buyers=sorted((club for club in squads if club!=manager),
                   key=lambda club:_stable(career_id,window_id,slot,club,AI_WORLD_VERSION))
+    if club_ai_context:
+        # Recruitment shortlists must not be filled by clubs that already
+        # lack funds for ANY fee or ANY salary. Use the same reserved funds
+        # as career affordability, but grouped instead of a per-club query.
+        ledger={club:(money-committed,wage-payroll) for
+            club,money,committed,wage,payroll in conn.execute(
+            """SELECT club_id,transfer_budget,committed_fees,
+                weekly_wage_budget,committed_wages
+                FROM world_career_club_ledger WHERE career_id=?""",
+            (career_id,)).fetchall()}
+        commitments=dict(conn.execute("""SELECT buying_club_id,
+            SUM(COALESCE(demanded_fee,offered_fee)) FROM world_career_offers
+            WHERE career_id=? AND status IN
+             ('proposed','countered','accepted_pending_contract','agreed_future')
+            GROUP BY buying_club_id""",(career_id,)).fetchall())
+        future_wages=dict(conn.execute("""SELECT buying_club_id,
+            SUM(COALESCE(offered_wage_weekly,0)) FROM world_career_offers
+            WHERE career_id=? AND status='agreed_future'
+            GROUP BY buying_club_id""",(career_id,)).fetchall())
+        buyers=[club for club in buyers if
+            club in ledger and
+            ledger[club][0]-commitments.get(club,0)>0 and
+            ledger[club][1]-future_wages.get(club,0)>0]
     game_date=(date.fromisoformat(lock_date)-timedelta(days=1)).isoformat()
     previous=conn.execute("""SELECT o.player_id FROM world_career_offers o
         JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
