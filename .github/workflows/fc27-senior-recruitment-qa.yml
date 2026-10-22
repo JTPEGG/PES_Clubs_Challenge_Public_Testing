@@ -26,7 +26,8 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           p=Path("world_ai_world.py").read_text()
-          assert "recent_senior_departure=(" in p
+          assert "recent_senior_departure=new_recruit" in p
+          assert "if existing>=MAX_AI_DEALS" not in p
           assert "MAX_SIGNINGS_PER_AI_CLUB" not in p
           assert "MAX_OUTGOING_PER_AI_CLUB" not in p
           assert "protected_exception is None:" not in p
