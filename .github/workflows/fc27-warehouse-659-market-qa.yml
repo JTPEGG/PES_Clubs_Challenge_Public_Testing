@@ -16,6 +16,10 @@ jobs:
   real-world-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 95
+    strategy:
+      fail-fast: false
+      matrix:
+        opportunity_scale: [1,3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,18 +56,22 @@ jobs:
         run: |
           python -u -m scripts.fc27_warehouse_659_market_smoke \
             --world qa659/FC27_659_SOURCE_DISPOSABLE_WORLD.sqlite \
-            --output qa659/FC27_659_ACTUAL_AI_WINDOW_AUDIT.json
+            --opportunity-scale ${{ matrix.opportunity_scale }} \
+            --output qa659/FC27_659_ACTUAL_AI_WINDOW_AUDIT_${{ matrix.opportunity_scale }}x.json
       - name: Verify exact source counts, final window and no fake registration
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          p=Path("qa659/FC27_659_ACTUAL_AI_WINDOW_AUDIT.json")
+          p=Path("qa659/FC27_659_ACTUAL_AI_WINDOW_AUDIT_${{ matrix.opportunity_scale }}x.json")
           a=json.loads(p.read_text())
           assert a["source_clubs"]==659
           assert a["source_competitions"]==53
           assert a["source_players"]==17593
           assert a["window_minutes"]==30
+          assert a["opportunity_scale_QA_only"]==${{ matrix.opportunity_scale }}
+          assert a["extra_QA_opportunities_not_forced_transfers"]
+          assert a["senior_first_team_deals"]+a["prospect_deals"]==a["in_game_final_registrations"]
           assert a["player_registration_reconciled"] is True
           assert a["no_production_career_modified"] is True
           assert a["no_PES_export"] is True
@@ -74,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: FC27-659-CLUB-SOURCE-IDENTITY-AUTONOMOUS-AUDIT
+          name: FC27-659-CLUB-AUTONOMOUS-AUDIT-${{ matrix.opportunity_scale }}X
           path: |
             qa659/*.json
           retention-days: 30
