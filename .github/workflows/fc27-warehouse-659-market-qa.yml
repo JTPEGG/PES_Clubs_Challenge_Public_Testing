@@ -6,6 +6,12 @@ on:
       - '.github/workflows/fc27-warehouse-659-market-qa.yml'
       - 'scripts/fc27_warehouse_world_bridge.py'
       - 'scripts/fc27_warehouse_659_market_smoke.py'
+      - 'world_ai_world.py'
+      - 'world_fc27_ai_recruitment.py'
+      - 'world_recruitment_strategy.py'
+      - 'world_live_buying.py'
+      - 'world_ai_replacement_outlook.py'
+      - 'world_squad_planner.py'
 permissions:
   contents: read
   actions: read
@@ -69,6 +75,8 @@ jobs:
           assert a["source_competitions"]==53
           assert a["source_players"]==17593
           assert a["window_minutes"]==30
+          assert a["modelled_ai_club_contexts_copied"]==659
+          assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
           assert a["opportunity_scale_QA_only"]==${{ matrix.opportunity_scale }}
           assert a["extra_QA_opportunities_not_forced_transfers"]
           assert a["senior_first_team_deals"]+a["prospect_deals"]==a["in_game_final_registrations"]
