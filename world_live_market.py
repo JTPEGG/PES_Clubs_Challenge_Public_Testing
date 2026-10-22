@@ -82,6 +82,8 @@ CREATE INDEX IF NOT EXISTS world_career_market_inbox_time
 
 def initialise_live_market(conn):
     conn.executescript(SCHEMA)
+    from world_fc27_market_schedule import initialise_fc27_market_schedule
+    initialise_fc27_market_schedule(conn)
     from world_offer_deadlines import initialise_confirmation_deadlines
     initialise_confirmation_deadlines(conn)
     from world_player_morale import initialise_player_morale
@@ -561,7 +563,8 @@ def _respond_to_counter(conn,*,career_id,offer_id,window_id,t):
     conn.commit()
     return True
 
-def process_live_market(conn,*,career_id,now=None):
+def process_live_market(conn,*,career_id,now=None,
+                        fc27_activity_scale_qa=1):
     """Reconcile due market moments, then close at 30 min; safe on rerun.
 
     Each moment's row is unique and each AI proposal has an immutable request
@@ -575,6 +578,13 @@ def process_live_market(conn,*,career_id,now=None):
     if snap["state"]=="closed":
         return {"state":"closed","changed":False,"new_offers":0}
     win=snap["window_id"]
+    if fc27_activity_scale_qa not in (1,3):
+        raise ValueError("Unsupported isolated FC27 activity scenario")
+    from world_fc27_market_schedule import (
+        is_fc27_market,process_fc27_market_interval)
+    fc27_club_led=is_fc27_market(conn,career_id=career_id)
+    if fc27_activity_scale_qa!=1 and not fc27_club_led:
+        raise ValueError("QA scaling cannot apply to existing non-FC27 careers")
     if snap["state"]=="deadline_reached":
         from world_player_morale import reconcile_player_morale
         reconcile_player_morale(conn,career_id=career_id,
@@ -598,7 +608,13 @@ def process_live_market(conn,*,career_id,now=None):
         if elapsed<offset:break
         seen=conn.execute("""SELECT 1 FROM world_career_market_moments
             WHERE window_id=? AND moment_index=?""",(win,index)).fetchone()
-        if seen:continue
+        if seen:
+            if fc27_club_led:
+                # Recovery if a process died after recording the real-time
+                # interval but before clearing the durable club activity plan.
+                process_fc27_market_interval(conn,career_id=career_id,
+                    window_id=win,interval_index=index,when=t,activity_scale_qa=fc27_activity_scale_qa)
+            continue
         # Deal with accepted human fee decisions and manager counters on
         # each market moment, not on each page refresh.
         unresolved=conn.execute("""SELECT o.offer_id,o.status FROM
@@ -640,33 +656,30 @@ def process_live_market(conn,*,career_id,now=None):
         except ValueError as exc:
             # Failed eligibility never manufactures an offer.
             offer_id,outcome=None,"No eligible offer: "+str(exc)[:220]
-        # Independent world deals use the same persisted market moment and
-        # deadline registration batch. They never mutate the human roster
-        # before a fully approved deadline registration.
-        from world_ai_world import consider_ai_world_deal
-        # Multiple independent buyer/seller pairs can reach agreement during
-        # each real-time market interval. Late windows give clubs additional
-        # attempts, but the seller, player, agent and budget can still veto.
-        # The 92-club world has its own timetable beyond the manager's
-        # inbox. Build transfer activity progressively through the second
-        # half of the 30-minute window, rather than filling the market at
-        # 09:00 or having an implausible rush in its final 60 seconds.
-        # 112 opportunities are independent recruitment CHECKS, never 112
-        # guaranteed transfers: the buyer, seller, player and agent can veto.
-        attempts=(5 if index<4 else
-                  10 if index<6 else
-                  13 if index==6 else
-                  18 if index==7 else
-                  11 if index==8 else 10)
-        for round_index in range(attempts):
-            # Never renumber old checkpoints: in-progress careers created by
-            # prior releases must remain replay-safe and immutable.
-            world_slot=(index if round_index==0 else
-                len(MARKET_MOMENTS)+index*3+round_index-1
-                if round_index<4 else
-                len(MARKET_MOMENTS)*4+index*16+round_index-4)
-            consider_ai_world_deal(conn,career_id=career_id,window_id=win,
-                                   slot=world_slot,now=t)
+        if fc27_club_led:
+            # All solvent source-rated clubs make their own activity choice.
+            # The count of interested clubs changes with current tactical
+            # needs, club ambitions, budgets, recent sales, and the interval.
+            # There is no "112 opportunities" formula for FC27 worlds.
+            process_fc27_market_interval(conn,career_id=career_id,
+                window_id=win,interval_index=index,when=t,
+                activity_scale_qa=fc27_activity_scale_qa)
+        else:
+            # IMMUTABLE older careers use their original replay-safe moment
+            # keys and original 112 checks. Do not renumber historical slots.
+            from world_ai_world import consider_ai_world_deal
+            attempts=(5 if index<4 else
+                      10 if index<6 else
+                      13 if index==6 else
+                      18 if index==7 else
+                      11 if index==8 else 10)
+            for round_index in range(attempts):
+                world_slot=(index if round_index==0 else
+                    len(MARKET_MOMENTS)+index*3+round_index-1
+                    if round_index<4 else
+                    len(MARKET_MOMENTS)*4+index*16+round_index-4)
+                consider_ai_world_deal(conn,career_id=career_id,
+                                       window_id=win,slot=world_slot,now=t)
         from world_player_morale import reconcile_player_morale
         reconcile_player_morale(conn,career_id=career_id,now=t)
         conn.execute("""INSERT OR IGNORE INTO world_career_market_moments
