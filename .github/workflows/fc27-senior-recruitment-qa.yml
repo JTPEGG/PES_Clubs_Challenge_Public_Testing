@@ -9,6 +9,8 @@ on:
       - 'scripts/fc27_warehouse_world_bridge.py'
       - 'test_world_fc27_ai_recruitment.py'
       - 'world_squad_planner.py'
+      - 'world_recruitment_strategy.py'
+      - 'test_world_recruitment_strategy.py'
       - 'test_world_squad_planner.py'
       - '.github/workflows/fc27-senior-recruitment-qa.yml'
 permissions:
@@ -33,6 +35,10 @@ jobs:
           assert "recent_senior_departure=new_recruit" in p
           assert "buyer_recruitment_priority" in p
           assert "domestic_market_preference" in p
+          assert "positional_family_priorities" in p
+          assert "contextual_policy=bool(club_ai_context)" in p
+          assert "not club_ai_context and family==\"GK\"" in p
+          assert "not club_ai_context and family==\"FWD\"" in p
           assert "if existing>=MAX_AI_DEALS" not in p
           assert "MAX_SIGNINGS_PER_AI_CLUB" not in p
           assert "MAX_OUTGOING_PER_AI_CLUB" not in p
