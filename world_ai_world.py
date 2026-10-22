@@ -28,7 +28,7 @@ from world_fc27_ai_recruitment import (read_fc27_profiles,
 from world_ai_tactics import preferred_formation,tactical_needs
 from world_fc27_market_choices import (select_recruiting_club,
     select_tactical_family,choose_development_focus,pursue_transfer,
-    POLICY_VERSION as DEAL_CHOICE_VERSION)
+    player_market_opportunity,POLICY_VERSION as DEAL_CHOICE_VERSION)
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -371,8 +371,11 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                 draw=_stable(career_id,window_id,slot,buyer,
                              DEAL_CHOICE_VERSION,"tactical-brief")%1000000)
             priorities=[targeted_family]
+            profile=club_ai_context.get(buyer)
+            senior_need=min(100,max(lane_scores.values())*.65+
+                           max(0,profile["ambition_level"]-72)*1.35)
             development_focus=choose_development_focus(
-                profile=club_ai_context.get(buyer),
+                profile=profile,senior_upgrade_pressure=senior_need,
                 draw=_stable(career_id,window_id,slot,buyer,
                              DEAL_CHOICE_VERSION,"development-or-XI")%1000)
         else:
@@ -490,8 +493,20 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     fit=fit,departed_lanes=outgoing_lanes[buyer],
                     starting_roles=club_tactics.get(buyer))
                     if club_ai_context else 0)
+                # Player career trajectory matters in an actual global
+                # market. This never examines home country, nationality,
+                # distance, borders, or a domestic quota: an international
+                # move is perfectly attractive when the sporting step and
+                # first-team opportunity justify it.
+                sporting_appeal=(player_market_opportunity(
+                    buyer_appeal=club_ai_context[buyer]["sporting_appeal"],
+                    seller_appeal=club_ai_context[seller]["sporting_appeal"],
+                    overall=overall,sporting_upgrade=fit.get("upgrade",0),
+                    prospect=fit.get("category")=="prospect",
+                    buyer_ambition=club_ai_context[buyer]["ambition_level"])
+                    if club_ai_context and seller in club_ai_context else 0)
                 options.append((seller,pid,overall,need,
-                                need+seller_fit+sporting_gain,
+                                need+seller_fit+sporting_gain+sporting_appeal,
                                 fit,sale,replacement_plan))
             if club_ai_context:
                 # A manager has chosen whether this is a development search
