@@ -22,8 +22,9 @@ from world_ai_tactics import preferred_formation,tactical_needs,TACTIC_VERSION
 from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of,squad_standard,assign_available_players
 
 def evaluate(full_world_path,output,*,opportunity_scale=1):
-    # Extra independently-led negotiation OPPORTUNITIES are QA workload,
-    # not forced/signable transfers. The deployed core schedule is unchanged.
+    # Scale 1 is the real source club behaviour; scale 3 amplifies every
+    # individual club's propensity to scout for comparative QA, but never
+    # multiplies any preset number of global transfer opportunities.
     if type(opportunity_scale) is not int or opportunity_scale not in (1,3):
         raise ValueError("Supported QA sampling is 1x or 3x")
     con=sqlite3.connect(full_world_path,isolation_level=None)
@@ -78,23 +79,10 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             raise ValueError("Incorrect preseason duration")
         for index,second in enumerate(MARKET_MOMENTS):
             due=now+timedelta(seconds=second+1)
-            response=process_live_market(con,career_id=career,now=due)
+            response=process_live_market(con,career_id=career,now=due,
+                fc27_activity_scale_qa=opportunity_scale)
             if response["state"]!="open":
                 raise ValueError("AI window closed early")
-            if opportunity_scale>1:
-                # 92-club market has 112 independently idempotent world
-                # attempts across these 12 timepoints. In a 659-club world
-                # this under-samples clubs. Replicate the real AI negotiator
-                # with separate never-colliding slot keys for calibration.
-                # This does NOT generate or guarantee a sale/purchase.
-                from world_ai_world import consider_ai_world_deal
-                scheduled=(5 if index<4 else 10 if index<6 else
-                    13 if index==6 else 18 if index==7 else
-                    11 if index==8 else 10)
-                for extra in range((opportunity_scale-1)*scheduled):
-                    consider_ai_world_deal(con,career_id=career,
-                        window_id=start["window_id"],
-                        slot=500000+1000*index+extra,now=due)
             print("source world AI market moment",index+1,
                   "of",len(MARKET_MOMENTS),
                   "QA opportunity scale",opportunity_scale,flush=True)
@@ -210,6 +198,16 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                     "source_tactical_xi_slots":11})
         future=con.execute("""SELECT COUNT(*) FROM world_career_offers
           WHERE career_id=? AND status='agreed_future'""",(career,)).fetchone()[0]
+        activity=con.execute("""SELECT COALESCE(SUM(eligible_clubs),0),
+            COALESCE(SUM(active_clubs),0),COUNT(*) FROM
+            world_fc27_market_intervals WHERE window_id=?""",
+            (start["window_id"],)).fetchone()
+        club_activity=con.execute("""SELECT COUNT(DISTINCT club_id) FROM
+            world_fc27_market_club_intents WHERE window_id=?""",
+            (start["window_id"],)).fetchone()[0]
+        recorded_activities=con.execute("""SELECT COUNT(*) FROM
+            world_fc27_market_club_intents WHERE window_id=? AND
+            processed=1""",(start["window_id"],)).fetchone()[0]
         events=con.execute("""SELECT event_type,COUNT(*)
           FROM world_career_offer_events ev JOIN world_career_offers o
             ON o.offer_id=ev.offer_id WHERE o.career_id=?
@@ -265,6 +263,12 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "career_id":career,"window_minutes":30,
           "opportunity_scale_QA_only":opportunity_scale,
           "extra_QA_opportunities_not_forced_transfers":True,
+          "fc27_independent_club_market":True,
+          "eligible_independent_club_decisions":activity[0],
+          "club_led_negotiation_intents":activity[1],
+          "independent_intervals_reconciled":activity[2],
+          "distinct_clubs_with_negotiation_intent":club_activity,
+          "persisted_club_intents_processed":recorded_activities,
           "autonomous_moments_processed":con.execute("""SELECT COUNT(*) FROM
              world_career_ai_world_moments WHERE window_id=?""",
              (start["window_id"],)).fetchone()[0],
