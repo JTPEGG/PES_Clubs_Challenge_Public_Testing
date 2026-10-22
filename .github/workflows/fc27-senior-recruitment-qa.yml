@@ -4,6 +4,10 @@ on:
   push:
     paths:
       - 'world_ai_world.py'
+      - 'world_fc27_ai_recruitment.py'
+      - 'world_live_buying.py'
+      - 'scripts/fc27_warehouse_world_bridge.py'
+      - 'test_world_fc27_ai_recruitment.py'
       - 'world_squad_planner.py'
       - 'test_world_squad_planner.py'
       - '.github/workflows/fc27-senior-recruitment-qa.yml'
@@ -20,13 +24,15 @@ jobs:
           python-version: '3.12'
       - name: Check source-backed projected-squad and autonomous AI decision tests
         run: |
-          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook
+          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment
       - name: Verify AI does not require purchasing a replacement before sale
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path("world_ai_world.py").read_text()
           assert "recent_senior_departure=new_recruit" in p
+          assert "buyer_recruitment_priority" in p
+          assert "domestic_market_preference" in p
           assert "if existing>=MAX_AI_DEALS" not in p
           assert "MAX_SIGNINGS_PER_AI_CLUB" not in p
           assert "MAX_OUTGOING_PER_AI_CLUB" not in p
