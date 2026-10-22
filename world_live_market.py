@@ -30,8 +30,6 @@ VERSION="inbox-autonomous-market-v2-projected-squads"
 # Irregular spacing is deliberate: a market does not mechanically bid once
 # every minute. Each slot can also produce NO offer.
 MARKET_MOMENTS=(35,175,355,545,735,945,1165,1385,1580,1720,1740,1765)
-MAX_NEW_BIDS=8
-MAX_GK_BIDS=2
 
 SCHEMA="""
 CREATE TABLE IF NOT EXISTS world_career_live_market_access(
@@ -283,6 +281,12 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
         FROM world_career_saves WHERE career_id=?""",(career_id,)).fetchone()
     dataset,managed_club=save
     projected=projected_squads(conn,career_id=career_id,dataset=dataset)
+    from world_fc27_ai_recruitment import read_fc27_profiles
+    from world_ai_tactics import preferred_formation,tactical_needs
+    club_context=read_fc27_profiles(conn,dataset=dataset)
+    tactical_starters={club:tactical_needs(preferred_formation(
+        club_id=club,profile=profile))["starting_roles"]
+        for club,profile in club_context.items()}
     scouting=development_signals(conn,dataset=dataset)
     squads=defaultdict(lambda: {"all":[]})
     for club_id,lanes in projected.items():
@@ -350,19 +354,22 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
             if budget<context["value_gbp"]*0.85:
                 continue
             need=recruitment_fit(projected,buyer=club_id,
-                                 position=position,overall=overall)
+                                 position=position,overall=overall,
+                                 starting_roles=tactical_starters.get(club_id))
             if not need["eligible"]:
                 existing=previous_prospects[club_id]
                 need=prospect_fit(projected,buyer=club_id,player_id=player_id,
                     position=position,overall=overall,signals=scouting,
-                    existing_prospects=0 if player_id in existing else len(existing))
+                    existing_prospects=0 if player_id in existing else len(existing),
+                    contextual_policy=club_id in club_context)
                 if need["eligible"]:
                     finances=conn.execute("""SELECT transfer_budget FROM
                         world_career_club_ledger WHERE career_id=? AND club_id=?""",
                         (career_id,club_id)).fetchone()
-                    if finances is None or context["value_gbp"]*0.85>prospect_fee_cap(
+                    if (club_id not in club_context and
+                        (finances is None or context["value_gbp"]*0.85>prospect_fee_cap(
                             initial_transfer_budget=finances[0],
-                            available_budget=budget):
+                            available_budget=budget))):
                         continue
             if not need["eligible"]:
                 continue
@@ -381,7 +388,7 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
             _stable(career_id,window_id,slot,club_id,x[2],VERSION)))
         # Clubs shortlist a few prospects and favour a genuine improvement,
         # while leaving later slots free to target another position/player.
-        for priority,need_score,player_id,need in targets[:4]:
+        for priority,need_score,player_id,need in targets:
             opportunities.append(({
                 "club_id":club_id,"club_name":club_name,
                 "need_score":need_score,"priority_score":priority,
@@ -403,30 +410,12 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
 def _consider_bid(conn,*,career_id,window_id,slot,t):
     """Exactly one plausible proposal opportunity per due market moment."""
     from world_recruitment_strategy import prospect_fee_cap
+    from world_fc27_ai_recruitment import read_fc27_profiles
     row=conn.execute("""SELECT c.dataset_id,c.manager_club_id,c.pes_lock_date
         FROM world_career_saves c WHERE c.career_id=?""",(career_id,)).fetchone()
     dataset,manager,pes_lock=row
-    # Later offers are not forced. Eight successful bids per market is a cap,
-    # not a guaranteed number.
-    count=conn.execute("""SELECT COUNT(*) FROM world_career_market_inbox
-        WHERE career_id=? AND window_id=? AND message_key LIKE 'offer:%'""",
-        (career_id,window_id)).fetchone()[0]
-    # Reserve room for credible late interest instead of exhausting the
-    # human inbox in the opening half-hour. No bids are forced if clubs have
-    # no genuine need or cannot afford the target.
-    phase_limit=(3 if slot<6 else 5 if slot<9 else MAX_NEW_BIDS)
-    if count>=phase_limit:
-        return None,"No further credible bids this phase; clubs may revisit as deadline approaches"
-    # Goalkeepers were repeatedly consuming the finite six-bid inbox cap.
-    # Preserve organic positional interest without letting one position
-    # monopolise all opportunities in a short transfer window.
-    gk_count=conn.execute("""SELECT COUNT(*) FROM world_career_offers o
-        JOIN world_career_preseason_window_offers wt ON wt.offer_id=o.offer_id
-        JOIN world_players p ON p.player_id=o.player_id
-        WHERE wt.window_id=? AND o.career_id=?
-          AND o.request_key LIKE 'live-v1-%'
-          AND UPPER(COALESCE(p.primary_position,'')) IN ('GK','G')""",
-        (window_id,career_id)).fetchone()[0]
+    # Every generated bid must stand on its sporting and financial merit.
+    # The managed club's inbox has no artificial total or GK-specific quota.
     candidates=conn.execute("""SELECT player_id,overall
         FROM world_career_live_player_context
         WHERE career_id=? AND window_id=?
@@ -448,8 +437,6 @@ def _consider_bid(conn,*,career_id,window_id,slot,t):
         if buyer_id==manager:continue
         pos=conn.execute("SELECT primary_position FROM world_players WHERE player_id=?",
                          (player_id,)).fetchone()
-        if pos and position_family(pos[0])=="GK" and gk_count>=MAX_GK_BIDS:
-            continue
         history=conn.execute("""SELECT offer_id,offered_fee,status FROM
             world_career_offers WHERE career_id=? AND player_id=?
             AND buying_club_id=? AND request_key LIKE 'live-v1-%'
@@ -482,7 +469,8 @@ def _consider_bid(conn,*,career_id,window_id,slot,t):
             eligible_clubs=rivals,active_rival_clubs=active,
             seller_assumptions=seller,prior_fee=prev,round_number=rnd)
         if price["fee"] is None:continue
-        if buyer["recruitment_type"]=="prospect":
+        if (buyer["recruitment_type"]=="prospect" and not
+                read_fc27_profiles(conn,dataset=dataset,club_id=buyer_id)):
             initial=conn.execute("""SELECT transfer_budget FROM
                 world_career_club_ledger WHERE career_id=? AND club_id=?""",
                 (career_id,buyer_id)).fetchone()
