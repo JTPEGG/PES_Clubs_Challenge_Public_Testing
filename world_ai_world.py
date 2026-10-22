@@ -23,7 +23,8 @@ from world_recruitment_strategy import (development_signals, prospect_fit,
 from world_ai_replacement_outlook import assess_future_replacement
 from world_fc27_ai_recruitment import (read_fc27_profiles,
     buyer_recruitment_priority,domestic_market_preference,
-    positional_family_priorities,prospect_budget_penalty)
+    positional_family_priorities,prospect_budget_penalty,
+    candidate_sporting_priority)
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -407,13 +408,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         same_source_country=(
                             club_countries.get(buyer)==club_countries.get(seller)),
                         profile=club_ai_context[buyer])
-                # Contextual FC27 scouts give genuine starter improvements
-                # greater weight, even where the seller will demand a premium.
-                # Seller/board/agent can still reject the proposed fee.
-                upgrade_bonus=(min(42,max(0,fit.get("upgrade",0))*4)
-                               if club_ai_context else 0)
+                # Compare each potential purchase's actual positional impact.
+                # The global keeper share, unrelated forwards and club names
+                # are NOT recruitment constraints. Seller/board/agent still
+                # have independent authority to reject the suggested deal.
+                sporting_gain=(candidate_sporting_priority(
+                    projected,club=buyer,position=position,overall=overall,
+                    fit=fit,departed_lanes=outgoing_lanes[buyer])
+                    if club_ai_context else 0)
                 options.append((seller,pid,overall,need,
-                                need+seller_fit+upgrade_bonus,
+                                need+seller_fit+sporting_gain,
                                 fit,sale,replacement_plan))
             options.sort(key=lambda v:(-v[4],
                 _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
@@ -507,6 +511,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                                 asking>price["maximum_sensible_fee"]
                                 or asking>money or asking<=final_fee or
                                 (fit.get("category")=="prospect" and
+                                 not club_ai_context and
                                  asking>prospect_fee_cap(
                                      initial_transfer_budget=ledger[0],
                                      available_budget=money))):
