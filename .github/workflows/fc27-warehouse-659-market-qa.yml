@@ -12,6 +12,11 @@ on:
       - 'world_live_buying.py'
       - 'world_ai_replacement_outlook.py'
       - 'world_squad_planner.py'
+      - 'world_ai_tactics.py'
+      - 'world_ai_bidding.py'
+      - 'world_selling_club.py'
+      - 'world_career_board_policy.py'
+      - 'world_live_market.py'
 permissions:
   contents: read
   actions: read
@@ -76,6 +81,9 @@ jobs:
           assert a["source_players"]==17593
           assert a["window_minutes"]==30
           assert a["modelled_ai_club_contexts_copied"]==659
+          assert sum(a["modelled_tactical_formation_distribution"].values())==659
+          assert all("modelled_preferred_formation" in c
+                     for c in a["elite_club_transfer_decisions"].values())
           assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
           assert a["opportunity_scale_QA_only"]==${{ matrix.opportunity_scale }}
           assert a["extra_QA_opportunities_not_forced_transfers"]
