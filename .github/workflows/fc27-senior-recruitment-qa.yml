@@ -9,6 +9,11 @@ on:
       - 'scripts/fc27_warehouse_world_bridge.py'
       - 'test_world_fc27_ai_recruitment.py'
       - 'world_squad_planner.py'
+      - 'world_ai_tactics.py'
+      - 'world_ai_bidding.py'
+      - 'world_selling_club.py'
+      - 'world_career_board_policy.py'
+      - 'world_live_market.py'
       - 'world_recruitment_strategy.py'
       - 'test_world_recruitment_strategy.py'
       - 'test_world_squad_planner.py'
@@ -34,7 +39,12 @@ jobs:
           p=Path("world_ai_world.py").read_text()
           assert "recent_senior_departure=new_recruit" in p
           assert "buyer_recruitment_priority" in p
-          assert "domestic_market_preference" in p
+          assert "domestic_market_preference" not in p
+          assert "preferred_formation" in p
+          assert "starting_roles=club_tactics.get(buyer)" in p
+          assert "for buyer in buyers:" in p
+          assert "for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:" in p
+          assert "if approaches>=AI_APPROACHES_PER_ATTEMPT" not in p
           assert "candidate_sporting_priority" in p
           assert "ledger[club][0]-commitments.get(club,0)>0" in p
           assert "ledger[club][1]-future_wages.get(club,0)>0" in p
