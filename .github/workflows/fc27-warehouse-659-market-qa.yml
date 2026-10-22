@@ -13,6 +13,8 @@ on:
       - 'world_ai_replacement_outlook.py'
       - 'world_squad_planner.py'
       - 'world_fc27_market_choices.py'
+      - 'world_fc27_market_schedule.py'
+      - 'test_world_fc27_market_schedule.py'
       - 'world_careers.py'
       - 'world_valuation.py'
       - 'world_career_selling.py'
@@ -86,6 +88,11 @@ jobs:
           assert a["source_players"]==17593
           assert a["window_minutes"]==30
           assert a["modelled_ai_club_contexts_copied"]==659
+          assert a["fc27_independent_club_market"] is True
+          assert a["independent_intervals_reconciled"]==12
+          assert a["eligible_independent_club_decisions"]>a["club_led_negotiation_intents"]
+          assert a["club_led_negotiation_intents"]==a["autonomous_moments_processed"]
+          assert a["persisted_club_intents_processed"]==a["club_led_negotiation_intents"]
           assert sum(a["modelled_tactical_formation_distribution"].values())==659
           assert all("modelled_preferred_formation" in c
                      for c in a["elite_club_transfer_decisions"].values())
