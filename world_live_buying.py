@@ -54,20 +54,43 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
     Recorded historical circumstances always win. We cannot retroactively
     alter frozen seller assumptions, even if they predate the timed window.
     """
-    rows=conn.execute("""SELECT r.player_id,x.overall
+    rows=conn.execute("""SELECT r.player_id,x.overall,p.primary_position
         FROM world_career_registrations r
         JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
+        JOIN world_players p ON p.player_id=r.player_id
         WHERE r.career_id=? AND r.club_id=? AND x.overall IS NOT NULL
         ORDER BY x.overall DESC,r.player_id""",
         (target["dataset"],career_id,target["seller"])).fetchall()
-    ranked=[(int(pid),int(rating)) for pid,rating in rows if
+    ranked=[(int(pid),int(rating),pos) for pid,rating,pos in rows if
             type(rating) is int and 1<=rating<=99]
     if len(ranked)<8:
         raise ValueError("Selling club has insufficient rated squad depth for a reliable response")
-    order=[pid for pid,rating in ranked]
+    order=[pid for pid,rating,pos in ranked]
     rank=order.index(player_id)
-    role=("key_player" if rank<3 else "regular_starter" if rank<11
-          else "rotation" if rank<18 else "fringe")
+    # The FC27 AI uses the *specialist role within its manager's tactic*:
+    # the first-choice keeper or important wide midfielder must not be
+    # misclassified as fringe merely because 11 outfielders have higher OVR.
+    # Existing careers preserve their original global-role classification.
+    fc27_seller=(read_fc27_profiles(conn,dataset=target["dataset"],
+        club_id=target["seller"]).get(target["seller"])
+        if autonomous_club else None)
+    if fc27_seller:
+        from world_squad_planner import lane_of
+        from world_ai_tactics import preferred_formation,tactical_needs
+        formation=preferred_formation(club_id=target["seller"],
+                                      profile=fc27_seller)
+        starters=tactical_needs(formation)["starting_roles"]
+        lane=lane_of(next(pos for pid,rating,pos in ranked if pid==player_id))
+        same_lane=[pid for pid,rating,pos in ranked if lane_of(pos)==lane]
+        local_rank=same_lane.index(player_id)
+        starting_count=starters.get(lane,0)
+        role=("key_player" if local_rank==0 and
+              local_rank<starting_count and rank<3 else
+              "regular_starter" if local_rank<starting_count else
+              "rotation" if local_rank<starting_count+2 else "fringe")
+    else:
+        role=("key_player" if rank<3 else "regular_starter" if rank<11
+              else "rotation" if rank<18 else "fringe")
     term=1+_stable(career_id,player_id,VERSION)%4
     listed=role=="fringe" and term<=2
     # In AI-only club dealings, a small, explicitly FICTIONAL subset of
@@ -99,9 +122,6 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
     existing=get_seller_assumptions(conn,career_id,player_id)
     # Existing manager-specified assumptions win; the FC27 model is only
     # consulted for independently simulated autonomous AI sellers.
-    fc27_seller=(read_fc27_profiles(conn,dataset=target["dataset"],
-        club_id=target["seller"]).get(target["seller"])
-        if autonomous_club else None)
     if existing is None:
         record_seller_assumptions(
             conn,career_id=career_id,player_id=player_id,
@@ -111,8 +131,9 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             financial_state=modelled_seller_finances(fc27_seller),
             replacement=(replacement_outlook if replacement_outlook is not None
                          else "difficult" if rank<11 else "available"),
-            seller_stance=("retain" if rank<3 else
-                           "neutral" if rank<18 else "sell"),
+            seller_stance=("retain" if role=="key_player" else
+                           "neutral" if role in ("regular_starter","rotation")
+                           else "sell"),
             # Only AI-vs-AI uses an automatically modelled board override.
             # Normal user-specified seller policies remain unchanged.
             board_enabled=bool(autonomous_club),
