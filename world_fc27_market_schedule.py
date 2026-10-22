@@ -14,7 +14,7 @@ from world_fc27_ai_recruitment import (
 from world_fc27_market_choices import pursue_transfer
 from world_squad_planner import projected_squads,lane_of
 
-VERSION="fc27-independent-club-market-v1"
+VERSION="fc27-independent-club-market-v2-performance-led"
 # Separates FC27 AI club IDs/ticks from the immutable legacy 112 slot keys.
 FC27_SLOT_BASE=100000000
 FC27_SLOT_INTERVAL=1000000
@@ -69,12 +69,19 @@ def club_market_interest(*,priority,profile,draw,activity_scale_qa=1):
             activity_scale_qa not in (1,3)):
         raise ValueError("Invalid independent club market draw")
     ambition=profile.get("ambition_level",50) if profile else 50
+    board_pressure=profile.get("pressure_to_improve",50) if profile else 50
+    financial_stress=profile.get("financial_pressure_index",50) if profile else 50
     urgency=max(-35,min(120,priority))
-    # A scouting cycle can lead to zero, one or many independent clubs
-    # starting negotiations; neither count is prescribed in advance.
-    base=max(.035,min(.24,.105+urgency*.00067+
-                      (ambition-50)*.00035))
-    return draw/1000000<min(.75,base*activity_scale_qa)
+    # Board ambition and performance pressure make an already strong club
+    # proactively search for genuine XI improvements; a full starting XI
+    # does not mean recruitment stops. Financially stretched teams still
+    # have some ability to scout but become more selective.
+    # This is a per-club *decision*, not a quota or an elite club exception.
+    base=(.082+urgency*.00069+(ambition-50)*.00055+
+          max(0,ambition-73)*.0046+
+          max(0,board_pressure-65)*.0019-
+          max(0,financial_stress-60)*.0015)
+    return draw/1000000<min(.70,max(.035,base)*activity_scale_qa)
 
 def fc27_market_slot(interval_index,club_id):
     if not (type(interval_index) is int and 0<=interval_index<30
