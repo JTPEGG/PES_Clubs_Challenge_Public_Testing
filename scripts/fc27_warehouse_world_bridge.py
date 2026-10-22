@@ -211,4 +211,4 @@ if __name__=="__main__":
     pa.add_argument("--warehouse",required=True)
     pa.add_argument("--target",required=True)
     args=pa.parse_args()
-    print(json.dumps(build_world(args.warehouse,args.target),indent=2),flush=True))
+    print(json.dumps(build_world(args.warehouse,args.target),indent=2),flush=True)
