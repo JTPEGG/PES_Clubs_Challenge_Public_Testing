@@ -4,7 +4,7 @@ import unittest
 from world_ai_tactics import FORMATION_STARTERS
 from world_fc27_market_choices import (
     select_recruiting_club,select_tactical_family,choose_development_focus,
-    pursue_transfer,disruption_sale_premium)
+    pursue_transfer,disruption_sale_premium,player_market_opportunity)
 from world_valuation import model_value,fc27_game_reference_value
 from scripts.fc27_warehouse_world_bridge import explicit_source_alternative_positions
 
@@ -56,6 +56,54 @@ class AutonomousChoicesTests(unittest.TestCase):
             seller_pressure=92,player_wants_exit=True),
             disruption_sale_premium(damage))
         self.assertLess(disruption_sale_premium(damage),1)
+
+    def test_seller_retains_credible_bench_quality_without_absolute_veto(self):
+        good={"valid":True,"formation_lineup_loss":0,
+              "after_depth":5,"before_depth":6,
+              "tactically_required":True,"starter_rating_drop":0,
+              "backup_quality_drop":0,"rotation_quality_drop":0,
+              "protected_rotation":False,"below_target_cover":False}
+        thin={**good,"before_depth":3,"after_depth":2,
+              "below_target_cover":True,
+              "backup_quality_drop":8,"rotation_quality_drop":6}
+        stable=disruption_sale_premium(good)
+        urgent=disruption_sale_premium(thin)
+        self.assertEqual(stable,0)
+        self.assertGreater(urgent,.2)
+        self.assertLess(urgent,.78)
+        self.assertGreater(urgent,disruption_sale_premium(
+            thin,seller_pressure=88,player_wants_exit=True))
+
+    def test_career_fit_not_passport_or_cross_border_quota(self):
+        args={"overall":84,"sporting_upgrade":6,
+              "prospect":False,"buyer_ambition":86}
+        step_up=player_market_opportunity(
+            buyer_appeal=92,seller_appeal=78,**args)
+        low_appeal=player_market_opportunity(
+            buyer_appeal=57,seller_appeal=88,**args)
+        self.assertGreater(step_up,low_appeal)
+        self.assertGreater(player_market_opportunity(
+            buyer_appeal=78,seller_appeal=75,**args),
+            player_market_opportunity(
+                buyer_appeal=78,seller_appeal=75,
+                **{**args,"sporting_upgrade":0}))
+        self.assertGreater(player_market_opportunity(
+            buyer_appeal=60,seller_appeal=90,
+            overall=70,sporting_upgrade=0,prospect=True,
+            buyer_ambition=86),low_appeal-15)
+        with self.assertRaises(ValueError):
+            player_market_opportunity(buyer_appeal=110,
+                seller_appeal=78,**args)
+
+    def test_stronger_tactical_need_dominates_generic_formation_weight(self):
+        formation={"GK":1,"CB":2,"LB":1,"RB":1,"CM":2,
+                   "LW":1,"RW":1,"ST":2}
+        ordinary={f:0 for f in ("GK","DEF","MID","FWD")}
+        weak_defense={**ordinary,"DEF":80}
+        counts=lambda needs:sum(select_tactical_family(
+            family_needs=needs,starting_roles=formation,draw=i)
+            =="DEF" for i in range(5000,1000000,5000))
+        self.assertGreater(counts(weak_defense),counts(ordinary))
 
     def test_fc27_ability_and_source_wage_fix_extremely_low_elite_values(self):
         old=model_value(84,26,"DMF")
