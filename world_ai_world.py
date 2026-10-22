@@ -227,6 +227,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
             club in ledger and
             ledger[club][0]-commitments.get(club,0)>0 and
             ledger[club][1]-future_wages.get(club,0)>0]
+    if buying_club_id is not None:
+        # Avoid re-scoring all 659 clubs for a desk already independently
+        # selected by the FC27 interval planner.
+        if buying_club_id not in buyers:
+            return None
+        buyers=[buying_club_id]
     game_date=(date.fromisoformat(lock_date)-timedelta(days=1)).isoformat()
     previous=conn.execute("""SELECT o.player_id FROM world_career_offers o
         JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
