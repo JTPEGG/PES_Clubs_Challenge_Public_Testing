@@ -35,6 +35,10 @@ jobs:
           assert "recent_senior_departure=new_recruit" in p
           assert "buyer_recruitment_priority" in p
           assert "domestic_market_preference" in p
+          assert "candidate_sporting_priority" in p
+          assert "ledger[club][0]-commitments.get(club,0)>0" in p
+          assert "ledger[club][1]-future_wages.get(club,0)>0" in p
+          assert "not club_ai_context and" in p
           assert "positional_family_priorities" in p
           assert "contextual_policy=bool(club_ai_context)" in p
           assert "not club_ai_context and family==\"GK\"" in p
