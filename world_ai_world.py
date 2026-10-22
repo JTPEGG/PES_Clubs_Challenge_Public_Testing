@@ -22,7 +22,8 @@ from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
 from world_ai_replacement_outlook import assess_future_replacement
 from world_fc27_ai_recruitment import (read_fc27_profiles,
-    buyer_recruitment_priority,domestic_market_preference)
+    buyer_recruitment_priority,domestic_market_preference,
+    positional_family_priorities,prospect_budget_penalty)
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -289,7 +290,14 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         # of sorting on absolute count. An average squad might carry 3 GKs
         # but 7-9 defenders/midfielders; 3 keepers are NOT the largest need.
         expected={"GK":3,"DEF":8,"MID":9,"FWD":6}
-        priorities=sorted(profiles,key=lambda group:(
+        if club_ai_context:
+            lane_scores=positional_family_priorities(projected,club=buyer,
+                departed_lanes=outgoing_lanes[buyer])
+            priorities=sorted(profiles,key=lambda group:(
+                -lane_scores.get(group,0),
+                _stable(slot,buyer,group,AI_WORLD_VERSION)))
+        else:
+            priorities=sorted(profiles,key=lambda group:(
             (-0.4 if any(
                 lane in outgoing_lanes[buyer] and
                 len(projected.get(buyer,{}).get(lane,())) <
@@ -301,10 +309,10 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
             (0.36 if group=="GK" else -0.12 if group=="DEF" else 0),
             _stable(slot,buyer,group,AI_WORLD_VERSION)))
         for family in priorities:
-            if family=="GK" and not _keeper_slot_open(
+            if not club_ai_context and family=="GK" and not _keeper_slot_open(
                     family_counts["GK"],non_keeper):
                 continue
-            if family=="FWD":
+            if not club_ai_context and family=="FWD":
                 # A 92-club world has a far larger need for defenders and
                 # midfielders than for permanent forward replacements.
                 # Avoid replacing keeper saturation with striker saturation.
@@ -340,7 +348,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 if not fit["eligible"]:
                     fit=prospect_fit(projected,buyer=buyer,player_id=pid,
                         position=position,overall=overall,signals=scouting,
-                        existing_prospects=youth_signings[buyer])
+                        existing_prospects=youth_signings[buyer],
+                        contextual_policy=bool(club_ai_context))
                 if not fit["eligible"]:
                     continue
                 sale_key=(seller,pid)
@@ -398,8 +407,14 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         same_source_country=(
                             club_countries.get(buyer)==club_countries.get(seller)),
                         profile=club_ai_context[buyer])
+                # Contextual FC27 scouts give genuine starter improvements
+                # greater weight, even where the seller will demand a premium.
+                # Seller/board/agent can still reject the proposed fee.
+                upgrade_bonus=(min(42,max(0,fit.get("upgrade",0))*4)
+                               if club_ai_context else 0)
                 options.append((seller,pid,overall,need,
-                                need+seller_fit,fit,sale,replacement_plan))
+                                need+seller_fit+upgrade_bonus,
+                                fit,sale,replacement_plan))
             options.sort(key=lambda v:(-v[4],
                 _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
             for seller,pid,overall,need,_score,fit,sale,replacement_plan in options[:10]:
@@ -407,7 +422,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 money=budget_remaining(conn,career_id,buyer)
                 if not isinstance(value,int) or value<=0 or money<value*0.85:
                     continue
-                if fit.get("category")=="prospect":
+                if fit.get("category")=="prospect" and not club_ai_context:
                     ledger=conn.execute("""SELECT transfer_budget FROM
                         world_career_club_ledger WHERE career_id=? AND club_id=?""",
                         (career_id,buyer)).fetchone()
@@ -415,6 +430,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                             initial_transfer_budget=ledger[0],
                             available_budget=money):
                         continue
+                if fit.get("category")=="prospect" and club_ai_context:
+                    # Financial opportunity cost reduces enthusiasm and bid,
+                    # but neither blocks the player nor imposes a youth quota.
+                    ledger=conn.execute("""SELECT transfer_budget FROM
+                        world_career_club_ledger WHERE career_id=? AND club_id=?""",
+                        (career_id,buyer)).fetchone()
+                    if ledger:
+                        need=max(15,need-round(prospect_budget_penalty(
+                            fee=value,available_budget=money,
+                            opening_budget=ledger[0])))
                 # Existing manager offers or future commitments have precedence.
                 conflict=conn.execute("""SELECT 1 FROM world_career_offers
                     WHERE career_id=? AND player_id=?
@@ -453,9 +478,10 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     # AI market priority, but can proceed before recruitment.
                     protected_exception=("unconfirmed_future_replacement_plan"
                         if sale["protected_rotation"] else None)
-                    if fit.get("category")=="prospect" and price["fee"]>prospect_fee_cap(
+                    if (fit.get("category")=="prospect" and not club_ai_context
+                            and price["fee"]>prospect_fee_cap(
                             initial_transfer_budget=ledger[0],
-                            available_budget=money):
+                            available_budget=money)):
                         continue
                     oid=propose_offer(conn,career_id=career_id,request_key=key,
                         player_id=pid,buying_club_id=buyer,offered_fee=price["fee"],
