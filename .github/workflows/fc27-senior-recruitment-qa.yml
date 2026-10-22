@@ -17,6 +17,8 @@ on:
       - 'world_recruitment_strategy.py'
       - 'test_world_recruitment_strategy.py'
       - 'test_world_squad_planner.py'
+      - 'test_world_ai_replacement_outlook.py'
+      - 'test_world_market_decision_policy.py'
       - '.github/workflows/fc27-senior-recruitment-qa.yml'
 permissions:
   contents: read
@@ -31,7 +33,7 @@ jobs:
           python-version: '3.12'
       - name: Check source-backed projected-squad and autonomous AI decision tests
         run: |
-          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment
+          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment test_world_market_decision_policy
       - name: Verify AI does not require purchasing a replacement before sale
         run: |
           python - <<'PY'
@@ -45,6 +47,11 @@ jobs:
           assert "for buyer in buyers:" in p
           assert "for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:" in p
           assert "if approaches>=AI_APPROACHES_PER_ATTEMPT" not in p
+          inbox=Path("world_live_market.py").read_text()
+          assert "MAX_NEW_BIDS" not in inbox
+          assert "MAX_GK_BIDS" not in inbox
+          from world_ai_tactics import FORMATION_STARTERS
+          assert all(sum(shape.values())==11 for shape in FORMATION_STARTERS.values())
           assert "candidate_sporting_priority" in p
           assert "ledger[club][0]-commitments.get(club,0)>0" in p
           assert "ledger[club][1]-future_wages.get(club,0)>0" in p
