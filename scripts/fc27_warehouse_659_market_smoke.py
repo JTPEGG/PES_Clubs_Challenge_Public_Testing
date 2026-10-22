@@ -18,8 +18,8 @@ from world_live_market import (initialise_live_market,start_live_market,
 from world_preseason_window import window_snapshot
 from world_fc27_ai_recruitment import (VERSION as FC27_RECRUITMENT_VERSION,
     read_fc27_profiles)
-from world_ai_tactics import preferred_formation,TACTIC_VERSION
-from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of,squad_standard
+from world_ai_tactics import preferred_formation,tactical_needs,TACTIC_VERSION
+from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of,squad_standard,assign_available_players
 
 def evaluate(full_world_path,output,*,opportunity_scale=1):
     # Extra independently-led negotiation OPPORTUNITIES are QA workload,
@@ -181,6 +181,7 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
              LIMIT 1""",(offer,)).fetchone()
             (prospects if young else senior).append(overall)
         quality_warnings=[]
+        formation_warnings=[]
         for club in initial:
             for lane in MIN_COVER:
                 before=effective_cover(initial,club,lane)
@@ -194,6 +195,19 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                        "starter_quality_old":old,"starter_quality_new":new,
                        "source_rated_cover_before":len(before),
                        "source_rated_cover_after":len(after)})
+        # Source roster may have positions that this modelled coach does
+        # not use. An LM leaving a 4-3-3 team is not automatically a hole in
+        # its starting XI. Audit the ENTIRE tactical assignment separately.
+        for club in initial:
+            requested=tactical_needs(tactics[club])["starting_roles"]
+            original=assign_available_players(initial,club,requested)
+            updated=assign_available_players(final,club,requested)
+            if updated["filled"]<original["filled"]:
+                formation_warnings.append({
+                    "club":clubs[club],"formation":tactics[club],
+                    "source_tactical_xi_covered_before":original["filled"],
+                    "source_tactical_xi_covered_after":updated["filled"],
+                    "source_tactical_xi_slots":11})
         future=con.execute("""SELECT COUNT(*) FROM world_career_offers
           WHERE career_id=? AND status='agreed_future'""",(career,)).fetchone()[0]
         events=con.execute("""SELECT event_type,COUNT(*)
@@ -286,6 +300,8 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "senior_overall_mean":round(sum(senior)/len(senior),2) if senior else None,
           "first_team_or_cover_alerts":len(quality_warnings),
           "alerts_sample":quality_warnings[:40],
+          "tactical_xi_coverage_alerts":len(formation_warnings),
+          "tactical_xi_coverage_samples":formation_warnings[:40],
           "event_type_counts":dict(events),
           "actual_transfer_details":transfers,
           "player_registration_reconciled":True,
