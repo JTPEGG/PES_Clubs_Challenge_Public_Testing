@@ -88,6 +88,34 @@ class PlannerTests(unittest.TestCase):
         self.assertTrue(fit["eligible"])
         self.assertGreaterEqual(fit["score"],60)
 
+    def test_signed_senior_sale_unlocks_comparable_replacement_without_prior_purchase(self):
+        # Elite club with two 88/86 CBs and a strong 87+ squad:
+        # 85-rated CB is not a +3 improvement, but is sensible after
+        # accepting a CB departure. He is NOT presumed already signed.
+        cb=self.player(1,"CB",88)
+        self.player(1,"CB",86)
+        for position in ("GK","LB","RB","CM","CM","AM","LW","RW",
+                         "ST","DM","ST","CM"):
+            self.player(1,position,87)
+        initial=self.squads()
+        not_needed=recruitment_fit(initial,buyer=1,position="CB",overall=85)
+        self.assertFalse(not_needed["eligible"])
+        self.db.execute("""INSERT INTO world_career_offers
+            VALUES('test',?,?,?,'agreed_future',77)""",(cb,1,3))
+        projected=self.squads()
+        wanted=recruitment_fit(projected,buyer=1,position="CB",overall=85,
+                              recent_senior_departure=True)
+        self.assertTrue(wanted["eligible"])
+        self.assertTrue(wanted["senior_replacement"])
+        self.assertIn("after agreed departure",wanted["reason"])
+        ordinary=recruitment_fit(projected,buyer=1,position="CB",overall=85)
+        self.assertFalse(ordinary["eligible"])
+        # Comparable recruitment happens AFTER the accepted exit.
+        self.assertNotIn("signed_replacement",wanted)
+        with self.assertRaises(ValueError):
+            recruitment_fit(projected,buyer=1,position="CB",overall=85,
+                            recent_senior_departure="yes")
+
     def test_excess_centre_back_sales_blocked(self):
         pids=[self.player(2,"CB",r) for r in (90,88,80,74)]
         plan=self.squads()
