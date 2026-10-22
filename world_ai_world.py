@@ -24,7 +24,7 @@ from world_ai_replacement_outlook import assess_future_replacement
 from world_fc27_ai_recruitment import (read_fc27_profiles,
     buyer_recruitment_priority,domestic_market_preference)
 
-AI_WORLD_VERSION = "ai-world-v9-fc27-contextual-recruitment"
+AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
 # Do not impose an arbitrary global signing count: a 659-club market reached
 # the old 90-deal ceiling exactly and was artificially truncated.
