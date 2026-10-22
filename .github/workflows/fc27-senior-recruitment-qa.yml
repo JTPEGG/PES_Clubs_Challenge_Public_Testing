@@ -23,7 +23,7 @@ on:
       - 'test_world_recruitment_strategy.py'
       - 'test_world_squad_planner.py'
       - 'test_world_ai_replacement_outlook.py'
-      - 'test_world_market_decision_policy test_world_fc27_market_choices.py'
+      - 'test_world_market_decision_policy.py'
       - '.github/workflows/fc27-senior-recruitment-qa.yml'
 permissions:
   contents: read
@@ -38,7 +38,7 @@ jobs:
           python-version: '3.12'
       - name: Check source-backed projected-squad and autonomous AI decision tests
         run: |
-          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment test_world_market_decision_policy
+          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment test_world_market_decision_policy test_world_fc27_market_choices
       - name: Verify AI does not require purchasing a replacement before sale
         run: |
           python - <<'PY'
