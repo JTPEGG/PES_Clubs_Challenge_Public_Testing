@@ -5,7 +5,7 @@ club/position/player transfer counts. All randomness is stable across reloads.
 """
 from world_ai_bidding import position_family
 
-POLICY_VERSION="fc27-voluntary-deal-intent-v1"
+POLICY_VERSION="fc27-sporting-economics-v2"
 FAMILIES=("GK","DEF","MID","FWD")
 
 def _pick(items,weights,draw):
@@ -41,18 +41,25 @@ def select_tactical_family(*,family_needs,starting_roles,draw):
         family=position_family(role)
         if family not in slots:raise ValueError("Unknown tactical specialist")
         slots[family]+=count
-    return _pick(FAMILIES,[2+slots[f]*3+
-        max(0,min(60,round(family_needs[f]))) for f in FAMILIES],draw)
+    # The manager's actual tactical weakness must matter more than the
+    # number of players in each broad family. Every family retains positive
+    # probability and goalkeeper transfers remain possible organically.
+    return _pick(FAMILIES,[2+slots[f]*2+
+        2*max(0,min(90,round(family_needs[f]))) for f in FAMILIES],draw)
 
-def choose_development_focus(*,profile,draw):
+def choose_development_focus(*,profile,draw,senior_upgrade_pressure=0):
     """Development is an independent ambition-based strategy, not a quota."""
     if type(draw) is not int or not 0<=draw<1000:
         raise ValueError("Need stable prospect draw")
+    if (type(senior_upgrade_pressure) not in (int,float) or
+            not 0<=senior_upgrade_pressure<=100):
+        raise ValueError("Invalid evidence-based senior recruitment pressure")
     ambition=profile.get("ambition_level",50) if profile else 50
     risk=profile.get("simulated_manager_risk",50) if profile else 50
     financial=profile.get("financial_pressure_index",50) if profile else 50
-    likelihood=max(45,min(285,round(145+(ambition-50)*1.3+
-                                     (risk-50)*.45-(financial-50)*.65)))
+    likelihood=max(30,min(285,round(145+(ambition-50)*1.3+
+                        (risk-50)*.45-(financial-50)*.65-
+                        senior_upgrade_pressure*1.05)))
     return draw<likelihood
 
 def pursue_transfer(*,priority,profile,draw):
@@ -68,6 +75,37 @@ def pursue_transfer(*,priority,profile,draw):
     likelihood=max(120,min(840,round(330+priority*4.2-
                                       max(0,discipline-50)*1.2)))
     return draw<likelihood
+
+def player_market_opportunity(*,buyer_appeal,seller_appeal,
+                              overall,sporting_upgrade,prospect,
+                              buyer_ambition):
+    """Sporting merit of a potential move, independent of nationality.
+
+    Modelled sporting appeal is the same game-context used to assess
+    player interests. A first-team player moving to a less attractive
+    club needs a clearer route into its XI; youth can rationally trade
+    prestige for development. No country, border, league or quota inputs.
+    """
+    if any(type(x) is not int or not 0<=x<=100 for x in
+           (buyer_appeal,seller_appeal,buyer_ambition)):
+        raise ValueError("Source-labelled 0-100 club appeal is required")
+    if type(overall) is not int or not 1<=overall<=99:
+        raise ValueError("Source-rated ability is required")
+    if type(sporting_upgrade) not in (int,float) or type(prospect) is not bool:
+        raise ValueError("Valid player fit and intent required")
+    gap=buyer_appeal-seller_appeal
+    # Prestige alone should not compel a club to spend. Buying an actual
+    # stronger starter is meaningful even from a weaker seller.
+    quality=min(18,max(-8,sporting_upgrade)*2.2)
+    ambition=max(0,buyer_ambition-70)*.22 if not prospect else 0
+    if prospect:
+        career=max(-17,min(11,gap*.24))
+    else:
+        career=max(-29,min(15,gap*.55))
+        if gap<0 and sporting_upgrade>=5:
+            career+=min(9,sporting_upgrade*1.3)
+    return round(quality+career+ambition,2)
+
 
 def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
     """Additional *asking-price* share for destroying tactical XI/cover.
@@ -86,10 +124,14 @@ def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
     percent=(.34 if coverage_gap else .0)+min(.22,starter_drop*.025)
     if sale.get("protected_rotation"):
         percent+=.07
+    # Losing the last credible bench option is meaningful even when the
+    # manager can still field eleven starters. Not an absolute veto.
     if sale.get("below_target_cover") and not coverage_gap:
-        percent+=.045
+        percent+=.16
+    percent+=min(.17,max(0,sale.get("backup_quality_drop",0))*.0035)
+    percent+=min(.10,max(0,sale.get("rotation_quality_drop",0))*.008)
     # Financial distress and player pressure change the risk the club
     # can tolerate without hard-coding a permanent sale refusal.
     percent*=max(.4,1-min(.45,max(0,seller_pressure)/180))
     if player_wants_exit:percent*=.72
-    return round(min(.72,percent),3)
+    return round(min(.78,percent),3)
