@@ -2,7 +2,7 @@
 import sqlite3
 import unittest
 from world_fc27_ai_recruitment import (
-    buyer_recruitment_priority,domestic_market_preference,
+    buyer_recruitment_priority,
     modelled_seller_finances,modelled_financial_objective,read_fc27_profiles,
     positional_family_priorities,prospect_budget_penalty,
     candidate_sporting_priority,
@@ -141,12 +141,35 @@ class ClubAIContextTests(unittest.TestCase):
             prospect_budget_penalty(fee=-1,
                 available_budget=45_000_000,opening_budget=50_000_000)
 
-    def test_international_moves_remain_possible_under_soft_home_preference(self):
-        self.assertGreater(domestic_market_preference(
-            same_source_country=True,profile=self.profile),
-            domestic_market_preference(same_source_country=False,profile=self.profile)+15)
-        self.assertIsInstance(domestic_market_preference(
-            same_source_country=False,profile=self.profile),float)
+    def test_manager_tactics_choose_different_roles_without_position_loss(self):
+        from world_ai_tactics import FORMATION_STARTERS,preferred_formation,tactical_needs
+        self.assertEqual(sum(FORMATION_STARTERS["4-4-2"].values()),11)
+        self.assertEqual(FORMATION_STARTERS["4-4-2"]["LM"],1)
+        self.assertEqual(FORMATION_STARTERS["4-4-2"]["RM"],1)
+        self.assertEqual(FORMATION_STARTERS["4-3-3"]["LW"],1)
+        self.assertNotIn("LM",FORMATION_STARTERS["4-3-3"])
+        self.assertEqual(preferred_formation(club_id=73),
+                         preferred_formation(club_id=73))
+        self.assertEqual(tactical_needs("4-4-2")["starting_roles"]["ST"],2)
+        with self.assertRaises(ValueError):
+            preferred_formation(club_id=73,profile={"preferred_formation":"9-1"})
+
+    def test_sporting_priority_obeys_tactical_shape(self):
+        from world_squad_planner import recruitment_fit
+        from world_ai_tactics import FORMATION_STARTERS
+        traditional=FORMATION_STARTERS["4-4-2"]
+        modern=FORMATION_STARTERS["4-3-3"]
+        squad={1:{**self.squad[1],
+            "LM":[(31,72,"LM")],"RM":[(32,74,"RM")],
+            "LW":[(33,76,"LW")],"RW":[(34,78,"RW")]}}
+        wide_mid=recruitment_fit(squad,buyer=1,position="LM",
+                                overall=87,starting_roles=traditional)
+        winger=recruitment_fit(squad,buyer=1,position="LM",
+                              overall=87,starting_roles=modern)
+        self.assertTrue(wide_mid["eligible"])
+        self.assertFalse(winger["eligible"])
+
+    def test_invalid_market_variation_is_still_rejected(self):
         with self.assertRaises(ValueError):
             buyer_recruitment_priority(self.squad,club=1,stable_variation=28)
 
