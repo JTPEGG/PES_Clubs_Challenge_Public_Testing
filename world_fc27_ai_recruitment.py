@@ -109,6 +109,28 @@ def buyer_recruitment_priority(squads, *, club, departed_lanes=(),
                  +competitive_refresh
                  -previous_signings*5+stable_variation,2)
 
+def scouting_desk_activation(*,priority,draw):
+    """Per-moment decision to enter the market, never a club/deal quota.
+
+    659 clubs cannot all conduct full-squad scouting every few seconds in
+    one server tick. Each club's measured need and ambition determine how
+    frequently its desk becomes active; deterministic drawing avoids
+    reshuffling interest every time a page is reloaded. Every club remains
+    eligible to scout at any moment.
+    """
+    if type(priority) not in (int,float) or type(draw) is not int or not 0<=draw<1000:
+        raise ValueError("Invalid autonomous scouting interest")
+    chance=max(12,min(90,round(24+max(-20,priority)*0.62)))
+    return draw<chance
+
+
+def expected_scouting_activity(priority):
+    """Auditable share of market ticks for each independent buying desk."""
+    if type(priority) not in (int,float):
+        raise ValueError("Invalid club recruitment priority")
+    return round(max(12,min(90,round(24+max(-20,priority)*0.62)))/1000,3)
+
+
 def positional_family_priorities(squads, *, club, departed_lanes=(),
                                  starting_roles=None):
     """Sporting recruitment need by specialist lane, NOT arbitrary GK/ST ratios.
