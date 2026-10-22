@@ -23,7 +23,8 @@ from world_recruitment_strategy import (development_signals, prospect_fit,
 from world_ai_replacement_outlook import assess_future_replacement
 from world_fc27_ai_recruitment import (read_fc27_profiles,
     buyer_recruitment_priority,positional_family_priorities,
-    prospect_budget_penalty,candidate_sporting_priority)
+    prospect_budget_penalty,candidate_sporting_priority,
+    scouting_desk_activation)
 from world_ai_tactics import preferred_formation,tactical_needs
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
@@ -284,17 +285,23 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                    if len(projected.get(club,{}).get(lane,())) <
                    max(MIN_COVER[lane],STARTERS[lane]))
     if club_ai_context:
-        # No signing quota: sporting gaps, own departure plans, ambition,
-        # finances and the simulated coaching agent determine who scouts.
-        # Stable per-moment variation lets other credible clubs participate.
+        # All 659 clubs are eligible each moment. Opening an active
+        # recruitment desk is a weighted, idempotent game decision based
+        # on tactical/squad urgency and simulated club ambition, NOT the
+        # old artificial first-32 shortlist or a per-club transfer quota.
+        scouting_priority={club:buyer_recruitment_priority(
+            projected,club=club,departed_lanes=outgoing_lanes[club],
+            profile=club_ai_context.get(club),
+            starting_roles=club_tactics.get(club),
+            previous_signings=signings_by_buyer[club],
+            stable_variation=_stable(career_id,window_id,slot,club,
+                AI_WORLD_VERSION,"scout")%26) for club in buyers}
+        buyers=[club for club in buyers if scouting_desk_activation(
+            priority=scouting_priority[club],
+            draw=_stable(career_id,window_id,slot,club,
+                         AI_WORLD_VERSION,"market-desk")%1000)]
         buyers.sort(key=lambda club:(
-            -buyer_recruitment_priority(projected,club=club,
-                departed_lanes=outgoing_lanes[club],
-                profile=club_ai_context.get(club),
-                starting_roles=club_tactics.get(club),
-                previous_signings=signings_by_buyer[club],
-                stable_variation=_stable(career_id,window_id,slot,club,
-                    AI_WORLD_VERSION,"scout")%26),
+            -scouting_priority[club],
             _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
     else:
         buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
