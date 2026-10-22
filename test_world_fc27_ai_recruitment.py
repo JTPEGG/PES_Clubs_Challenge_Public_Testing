@@ -5,6 +5,7 @@ from world_fc27_ai_recruitment import (
     buyer_recruitment_priority,domestic_market_preference,
     modelled_seller_finances,modelled_financial_objective,read_fc27_profiles,
     positional_family_priorities,prospect_budget_penalty,
+    candidate_sporting_priority,
 )
 
 class ClubAIContextTests(unittest.TestCase):
@@ -95,6 +96,39 @@ class ClubAIContextTests(unittest.TestCase):
         self.assertGreater(urgent["FWD"],base["FWD"])
         self.assertEqual(set(base),{"GK","DEF","MID","FWD"})
 
+    def test_ambitious_strong_squad_continues_scouting(self):
+        # A settled first XI can still be ambitious enough to consider
+        # upgrading; an identifiable shortage remains urgent for any club.
+        very_strong={1:{lane:[(pid,rating+10,position)
+                for pid,rating,position in group]
+                for lane,group in self.squad[1].items()}}
+        same=buyer_recruitment_priority(self.squad,club=1,
+            profile=self.profile,stable_variation=12)
+        stronger=buyer_recruitment_priority(very_strong,club=1,
+            profile=self.profile,stable_variation=12)
+        self.assertGreater(stronger,same)
+
+    def test_goalkeeper_market_priority_reflects_current_need(self):
+        credible={"eligible":True,"score":70,"category":"first_team"}
+        routine=candidate_sporting_priority(self.squad,club=1,
+            position="GK",overall=90,fit=credible)
+        strong_upgrade=candidate_sporting_priority(self.squad,club=1,
+            position="GK",overall=95,fit=credible)
+        depleted={1:{**self.squad[1],"GK":[(11,86,"GK")]}}
+        urgency=candidate_sporting_priority(depleted,club=1,
+            position="GK",overall=90,fit=credible,
+            departed_lanes={"GK"})
+        self.assertGreater(strong_upgrade,routine)
+        self.assertGreater(urgency,routine)
+        # An equivalent outfield starter improvement should generally
+        # rank ahead of a discretionary second keeper improvement.
+        midfield=candidate_sporting_priority(self.squad,club=1,
+            position="CM",overall=90,fit=credible)
+        self.assertGreater(midfield,routine)
+        prospect={**credible,"category":"prospect"}
+        self.assertLess(candidate_sporting_priority(self.squad,club=1,
+            position="GK",overall=90,fit=prospect),routine)
+
     def test_soft_development_opportunity_cost_is_not_a_veto(self):
         low=prospect_budget_penalty(fee=2_000_000,
             available_budget=45_000_000,opening_budget=50_000_000)
@@ -110,7 +144,7 @@ class ClubAIContextTests(unittest.TestCase):
     def test_international_moves_remain_possible_under_soft_home_preference(self):
         self.assertGreater(domestic_market_preference(
             same_source_country=True,profile=self.profile),
-            domestic_market_preference(same_source_country=False,profile=self.profile))
+            domestic_market_preference(same_source_country=False,profile=self.profile)+15)
         self.assertIsInstance(domestic_market_preference(
             same_source_country=False,profile=self.profile),float)
         with self.assertRaises(ValueError):
