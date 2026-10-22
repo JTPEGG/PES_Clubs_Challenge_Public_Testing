@@ -197,13 +197,16 @@ def projected_squads(conn, *, career_id, dataset):
     return squads
 
 
-def recruitment_fit(squads, *, buyer, position, overall):
+def recruitment_fit(squads, *, buyer, position, overall,
+                    recent_senior_departure=False):
     """Evaluate actual starter upgrade and depth need, not third-best DEF/FWD.
 
     Lack of verified potential prevents labelling an inferior target as a
     wonderkid. Such targets can be recruited later with a licensed potential
     signal, but not by an ungrounded 'young and promising' guess.
     """
+    if type(recent_senior_departure) is not bool:
+        raise ValueError("Recent signed departure must be explicit")
     slot=lane_of(position)
     if not slot or not 1<=overall<=99:
         return {"eligible":False,"score":0,"reason":"Unknown position or rating"}
@@ -225,16 +228,27 @@ def recruitment_fit(squads, *, buyer, position, overall):
     credible_depth=thin and overall>=team_baseline-8
     credible_upgrade=(baseline is not None and improvement>=3 and
                       overall>=team_baseline-3)
-    if not (credible_depth or credible_upgrade):
+    # A club that has already agreed to sell an established player may
+    # rationally buy a comparable senior replacement. Requiring a 3+ OVR
+    # upgrade after a departure forces even elite clubs into youth-only
+    # recruitment. This does NOT require a purchase before the sale.
+    credible_replacement=(recent_senior_departure and
+         overall>=team_baseline-5 and
+         (baseline is None or overall>=baseline-4))
+    if not (credible_depth or credible_upgrade or credible_replacement):
         return {"eligible":False,"score":0,"lane":slot,
                 "reason":"Not a credible starter upgrade or necessary depth"}
     score=min(98,max(50,52+max(0,improvement)*5+
                      (20 if credible_depth else 0)+
-                     (8 if credible_upgrade else 0)))
+                     (8 if credible_upgrade else 0)+
+                     (23 if credible_replacement else 0)))
     return {"eligible":True,"score":score,"lane":slot,
             "upgrade":improvement,"depth_shortage":thin,
             "reason":("Required positional cover" if credible_depth else
-                      "Meaningful first-team positional upgrade")}
+                      "Senior squad-quality replacement after agreed departure"
+                      if credible_replacement else
+                      "Meaningful first-team positional upgrade"),
+            "senior_replacement":credible_replacement}
 
 
 
