@@ -58,7 +58,7 @@ jobs:
           live=Path("world_live_market.py").read_text()
           assert "if fc27_club_led:" in live
           assert "process_fc27_market_interval" in live
-          assert "else:\\n            # IMMUTABLE older careers" in live
+          assert "# IMMUTABLE older careers use their original replay-safe moment" in live
           assert "pursue_transfer" in p
           assert "options=[o for o in options" in p
           assert "for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:" in p
