@@ -184,6 +184,41 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           FROM world_career_offer_events ev JOIN world_career_offers o
             ON o.offer_id=ev.offer_id WHERE o.career_id=?
           GROUP BY event_type""",(career,)).fetchall()
+        # Full audit of actual completed registrations, never unsourced
+        # expected business or fictional contracts presented as source facts.
+        deal_cases={offer:category for offer,category in con.execute("""
+            SELECT o.offer_id,e.event_type FROM world_career_offer_events e
+            JOIN world_career_offers o ON o.offer_id=e.offer_id
+            WHERE o.career_id=? AND e.event_type IN
+              ('ai_seller_covered_sale','ai_seller_recruitment_required',
+               'ai_seller_surplus_sale')""",(career,))}
+        prospect_ids={r[0] for r in con.execute("""
+            SELECT o.offer_id FROM world_career_offer_events e
+            JOIN world_career_offers o ON o.offer_id=e.offer_id
+            WHERE o.career_id=? AND e.event_type='ai_prospect_signed'
+            """,(career,))}
+        player_names=dict(con.execute("SELECT player_id,full_name FROM world_players"))
+        ai_club_rows={row[0]:{"financial_pressure_band":row[1],
+                             "ambition_level":row[2]}
+            for row in con.execute("""SELECT club_id,financial_pressure_band,
+                ambition_level FROM world_fc27_club_ai_context
+                WHERE dataset_id=?""",(DATASET,))}
+        transfers=[{
+            "player":player_names[pid],
+            "source_overall":overall,"source_position":primary,
+            "source_seller":clubs[seller],"source_buyer":clubs[buyer],
+            "source_seller_country":club_country[seller],
+            "source_buyer_country":club_country[buyer],
+            "agreed_fee_gbp":fee,
+            "simulated_recruitment_type":(
+                "prospect" if offer in prospect_ids else "senior_first_team"),
+            "simulated_seller_squad_case":deal_cases.get(offer,"unclassified"),
+            "modelled_buyer_context":ai_club_rows.get(buyer),
+            "modelled_seller_context":ai_club_rows.get(seller),
+            "source_top11_strength_change_buyer":buyer_quality_change[buyer],
+            "source_top11_strength_change_seller":buyer_quality_change[seller],
+            "provenance":"Source FC27 player/club/OVR; fee, interests, club pressure and transfer are GAME SIMULATION, not historical facts"
+        } for offer,pid,seller,buyer,primary,overall,fee in actual]
         if con.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("SQLite integrity failed")
         if con.execute("PRAGMA foreign_key_check").fetchall():
@@ -234,6 +269,7 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "first_team_or_cover_alerts":len(quality_warnings),
           "alerts_sample":quality_warnings[:40],
           "event_type_counts":dict(events),
+          "actual_transfer_details":transfers,
           "player_registration_reconciled":True,
           "no_PES_export":True,"no_production_career_modified":True,
           "actual_complete_20_window_comparison_not_yet_run":True
