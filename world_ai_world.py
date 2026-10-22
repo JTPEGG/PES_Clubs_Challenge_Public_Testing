@@ -309,7 +309,9 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         # A market opportunity belongs to ONE willing recruitment desk.
         # Exhaustively retrying every club until someone signed was
         # effectively forcing one completed transfer per scheduled tick.
-        buyer=select_recruiting_club(scouting_priority,draw=_stable(
+        buyer=select_recruiting_club(
+            {club:scouting_priority[club] for club in buyers},
+            draw=_stable(
             career_id,window_id,slot,AI_WORLD_VERSION,"lead-desk")%1000000)
         if buyer is None:
             return None
