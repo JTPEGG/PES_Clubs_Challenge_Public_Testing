@@ -17,6 +17,8 @@ from world_career_selling import (
     get_seller_assumptions,record_seller_assumptions,
 )
 from world_live_market import _stable,_modelled_europe,_message,VERSION
+from world_fc27_ai_recruitment import (read_fc27_profiles,
+    modelled_seller_finances,modelled_financial_objective)
 
 POLICY_VERSION="human-buying-autonomous-seller-v1"
 
@@ -95,13 +97,17 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             not autonomous_club or replacement_outlook not in ("available","difficult")):
         raise ValueError("Only autonomous AI may supply a modelled future replacement outlook")
     existing=get_seller_assumptions(conn,career_id,player_id)
+    # Existing manager-specified assumptions win; the FC27 model is only
+    # consulted for independently simulated autonomous AI sellers.
+    fc27_seller=(read_fc27_profiles(conn,dataset=target["dataset"])
+        .get(target["seller"]) if autonomous_club else None)
     if existing is None:
         record_seller_assumptions(
             conn,career_id=career_id,player_id=player_id,
             market_value=target["value"],contract_years=term,
             squad_role=role,transfer_listed=listed,
             player_wants_exit=bool(exit_pressure),
-            financial_state="stable",
+            financial_state=modelled_seller_finances(fc27_seller),
             replacement=(replacement_outlook if replacement_outlook is not None
                          else "difficult" if rank<11 else "available"),
             seller_stance=("retain" if rank<3 else
@@ -112,7 +118,8 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             exceptional_offer_pct=(165 if role=="key_player" else 150
                                    if role=="regular_starter" else 140)
                                    if autonomous_club else None,
-            financial_objective=("balanced" if autonomous_club else "unknown"),
+            financial_objective=(modelled_financial_objective(fc27_seller)
+                                 if autonomous_club else "unknown"),
             ambition=("consolidation" if autonomous_club else "unknown"),
             ownership_priority=("balanced" if autonomous_club else "unknown"),
             assumed_manager_trust=("medium" if autonomous_club else "unknown"),
@@ -121,6 +128,7 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
                 "deterministic contract and rare exit pressure; "
                 "board exceptional sale only for autonomous AI clubs; "
                 "plausible future replacements are unagreed scouting prospects. "
+                "FC27 financial pressure is a labelled game proxy, not actual cash. "
                 "Not a verified wage, player intention or contract."))
     known=conn.execute("""SELECT 1 FROM world_career_player_circumstances
         WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
