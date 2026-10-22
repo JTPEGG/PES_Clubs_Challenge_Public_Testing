@@ -23,12 +23,11 @@ from world_recruitment_strategy import (development_signals, prospect_fit,
 from world_ai_replacement_outlook import assess_future_replacement
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
-# Global ceiling is a safety bound, not a target. A real market may be quiet.
-# Multiple independent clubs may agree moves during one market interval.
-MAX_AI_DEALS = 90  # upper safety bound, not a minimum or forced sales
-# No arbitrary per-club incoming/outgoing count limits: actual budget,
-# projected football needs, seller pricing, player consent and risk prioritise
-# deals. MAX_AI_DEALS above is only a global computation safety ceiling.
+# The bounded, idempotent market-moment ledger already controls processing.
+# Do not impose an arbitrary global signing count: a 659-club market reached
+# the old 90-deal ceiling exactly and was artificially truncated.
+# No arbitrary incoming/outgoing count limits; only sporting decisions,
+# fees, source budgets, player consent and board oversight determine deals.
 AI_APPROACHES_PER_ATTEMPT = 5
 
 
@@ -163,13 +162,9 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
     except __import__("sqlite3").IntegrityError:
         conn.rollback()
         return None
-    existing=conn.execute("""SELECT COUNT(*) FROM world_career_offer_events e
-        JOIN world_career_offers o ON o.offer_id=e.offer_id
-        JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
-        WHERE wo.window_id=? AND e.event_type='ai_world_signed'""",
-        (window_id,)).fetchone()[0]
-    if existing>=MAX_AI_DEALS:
-        return None
+    # The current market slot has already been persisted as an idempotent
+    # processing attempt; negotiated transfers still require all approvals.
+    # The finite scheduled market moments bound CPU and transactions.
     c=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=?""",(career_id,)).fetchone()
     if c is None:
