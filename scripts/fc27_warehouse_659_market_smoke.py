@@ -16,7 +16,9 @@ from world_careers import start_sandbox, wage_budget_breakdown
 from world_live_market import (initialise_live_market,start_live_market,
   process_live_market,MARKET_MOMENTS)
 from world_preseason_window import window_snapshot
-from world_fc27_ai_recruitment import VERSION as FC27_RECRUITMENT_VERSION
+from world_fc27_ai_recruitment import (VERSION as FC27_RECRUITMENT_VERSION,
+    read_fc27_profiles)
+from world_ai_tactics import preferred_formation,TACTIC_VERSION
 from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of,squad_standard
 
 def evaluate(full_world_path,output,*,opportunity_scale=1):
@@ -135,6 +137,10 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
         seller_countries=Counter(club_country[r[2]] for r in actual)
         corridors=Counter((club_country[r[2]],club_country[r[3]])
                           for r in actual)
+        profiles=read_fc27_profiles(con,dataset=DATASET)
+        tactics={cid:preferred_formation(club_id=cid,profile=profile)
+                 for cid,profile in profiles.items()}
+        formation_counts=dict(Counter(tactics.values()))
         elite={}
         for name in ("Arsenal","Chelsea","Manchester City"):
             candidates=[cid for cid,display in clubs.items()
@@ -153,7 +159,8 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                 FROM world_career_offers WHERE career_id=?
                 AND buying_club_id=? GROUP BY status""",
                 (career,cid)).fetchall())
-            elite[name]={"attempted_offers":sum(attempted.values()),
+            elite[name]={"modelled_preferred_formation":tactics[cid],
+                         "attempted_offers":sum(attempted.values()),
                          "attempted_offer_statuses":attempted,
                          "arrivals":inbound[cid],"departures":outbound[cid],
                          "net_arrivals":inbound[cid]-outbound[cid],
@@ -238,6 +245,8 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "dataset_id":DATASET,"source_competitions":leagues,
           "source_clubs":source,"source_players":rosters,
           "modelled_ai_club_contexts_copied":ai_profiles,
+          "modelled_manager_tactics_version":TACTIC_VERSION,
+          "modelled_tactical_formation_distribution":formation_counts,
           "source_country_counts":source_countries,
           "career_id":career,"window_minutes":30,
           "opportunity_scale_QA_only":opportunity_scale,
