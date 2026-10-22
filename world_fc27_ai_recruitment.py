@@ -6,9 +6,9 @@ no anonymous simulated coach is misrepresented as a real manager.
 """
 from __future__ import annotations
 
-from world_squad_planner import MIN_COVER, STARTERS, effective_cover
+from world_squad_planner import MIN_COVER, STARTERS, FAMILY, effective_cover
 
-VERSION="fc27-recruitment-priority-v1"
+VERSION="fc27-recruitment-priority-v2-role-led-market"
 
 def read_fc27_profiles(conn, *, dataset):
     """Read independently copied FC27 game model profiles, never live source."""
@@ -93,6 +93,57 @@ def buyer_recruitment_priority(squads, *, club, departed_lanes=(),
     # Marginal benefit diminishes with arrivals, but no purchase is forbidden.
     return round(need_score+ambition+pressure+coaching-financial
                  -previous_signings*5+stable_variation,2)
+
+def positional_family_priorities(squads, *, club, departed_lanes=()):
+    """Sporting recruitment need by specialist lane, NOT arbitrary GK/ST ratios.
+
+    Consider only actual rated squad roles and positions with an agreed
+    departure. We do not infer a manager's formation from a FIFA primary
+    position list, nor reward buying a third goalkeeper unnecessarily.
+    Returns four continuous priorities, so any family can be considered.
+    """
+    roster=squads.get(club,{})
+    rated=sorted((overall for members in roster.values()
+                  for _pid,overall,_pos in members),reverse=True)
+    if not rated:
+        return {group:0.0 for group in ("GK","DEF","MID","FWD")}
+    team_floor=rated[min(10,len(rated)-1)]
+    by_family={group:[] for group in ("GK","DEF","MID","FWD")}
+    for lane in set(roster)|set(departed_lanes):
+        if lane not in FAMILY:
+            continue
+        peers=effective_cover(squads,club,lane)
+        if not peers and lane not in departed_lanes:
+            continue
+        group=FAMILY[lane]
+        minimum=max(STARTERS[lane],MIN_COVER[lane])
+        depth_gap=max(0,minimum-len(peers))
+        starter_floor=(peers[min(STARTERS[lane]-1,len(peers)-1)][1]
+                       if peers else team_floor-12)
+        quality_gap=max(0,team_floor-3-starter_floor)
+        # A recently sold starter is a *reason to scout*, not proof
+        # another club will sell or an obligation to complete a deal.
+        urgency=11 if lane in departed_lanes else 0
+        need=(min(3,depth_gap)*11 + min(12,quality_gap)*2.0 + urgency)
+        by_family[group].append(need)
+    # Strongest specialist shortage matters most, with weaker aggregate
+    # contribution for additional issues within the same family.
+    return {group:round(max(values,default=0)+
+                        .25*sum(sorted(values,reverse=True)[1:]),2)
+            for group,values in by_family.items()}
+
+
+def prospect_budget_penalty(*,fee,available_budget,opening_budget):
+    """Soft opportunity-cost signal only; never a prospective purchase veto."""
+    if any(type(v) is not int or v<0 for v in
+           (fee,available_budget,opening_budget)):
+        raise ValueError("Prospect budget inputs must be nonnegative integers")
+    if available_budget==0 or opening_budget==0:
+        return 0.0  # normal transfer affordability determines viability
+    # Rising budget opportunity cost lowers priority but doesn't ban a deal.
+    return round(min(30,12*fee/available_budget+
+                     8*fee/opening_budget),2)
+
 
 def domestic_market_preference(*,same_source_country,profile=None):
     """Soft scouting familiarity, not a restriction on international sales."""
