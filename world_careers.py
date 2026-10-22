@@ -492,7 +492,19 @@ def _player_reference(conn,ds,pid):
         WHERE r.dataset_id=? AND r.player_id=?""",(ds,pid))
     if not row:return None,None
     overall,birth,position,when=row
-    return model_value(overall,age_on(birth,when),position),overall
+    baseline=model_value(overall,age_on(birth,when),position)
+    # Only the approved FC27 disposable edition has this provenance-
+    # labelled game salary and ability market calibration. Never reprice
+    # existing PES careers or older historic editions.
+    if ds=="fc27-warehouse-659-mens-2026-27" and baseline is not None:
+        from world_valuation import fc27_game_reference_value
+        wages=_one(conn,"""SELECT weekly_wage_gbp FROM
+            world_dataset_contract_snapshots WHERE dataset_id=? AND player_id=?
+        """,(ds,pid))
+        baseline=fc27_game_reference_value(
+            baseline=baseline,overall=overall,
+            weekly_wage=wages[0] if wages else None)
+    return baseline,overall
 
 
 def propose_offer(conn, *, career_id, request_key, player_id, buying_club_id,
