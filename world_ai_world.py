@@ -21,8 +21,10 @@ from world_squad_planner import (projected_squads, recruitment_fit,
 from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
 from world_ai_replacement_outlook import assess_future_replacement
+from world_fc27_ai_recruitment import (read_fc27_profiles,
+    buyer_recruitment_priority,domestic_market_preference)
 
-AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
+AI_WORLD_VERSION = "ai-world-v9-fc27-contextual-recruitment"
 # The bounded, idempotent market-moment ledger already controls processing.
 # Do not impose an arbitrary global signing count: a 659-club market reached
 # the old 90-deal ceiling exactly and was artificially truncated.
@@ -172,6 +174,13 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
     dataset,manager,lock_date=c
     squads,players=_candidates(conn,career_id,dataset,manager)
     projected=projected_squads(conn,career_id=career_id,dataset=dataset)
+    # Absent on old/non-FC27 worlds: retain their legacy ordering.
+    # These are labelled board/finance/anonymous manager GAME estimates,
+    # copied at disposable-world creation, not real-world appointments.
+    club_ai_context=read_fc27_profiles(conn,dataset=dataset)
+    club_countries=dict(conn.execute("""SELECT club_id,nation FROM world_clubs
+        WHERE club_id IN (SELECT club_id FROM world_dataset_entries
+                          WHERE dataset_id=?)""",(dataset,)).fetchall())
     # Age is measured at the HISTORICAL dataset snapshot, not today's date.
     scouting=development_signals(conn,dataset=dataset)
     projected_positions={pid:pos for lanes in projected.values() for group in lanes.values()
@@ -245,10 +254,23 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         return sum(1 for lane in outgoing_lanes[club]
                    if len(projected.get(club,{}).get(lane,())) <
                    max(MIN_COVER[lane],STARTERS[lane]))
-    buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
-        -len(outgoing_lanes[club]),
-        signings_by_buyer[club],
-        _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
+    if club_ai_context:
+        # No signing quota: sporting gaps, own departure plans, ambition,
+        # finances and the simulated coaching agent determine who scouts.
+        # Stable per-moment variation lets other credible clubs participate.
+        buyers.sort(key=lambda club:(
+            -buyer_recruitment_priority(projected,club=club,
+                departed_lanes=outgoing_lanes[club],
+                profile=club_ai_context.get(club),
+                previous_signings=signings_by_buyer[club],
+                stable_variation=_stable(career_id,window_id,slot,club,
+                    AI_WORLD_VERSION,"scout")%26),
+            _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
+    else:
+        buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
+            -len(outgoing_lanes[club]),
+            signings_by_buyer[club],
+            _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
     # During a single market moment, no squad moves until a successful deal
     # returns. Cache repeated source-rated fits and seller risk calculations,
     # not final accept/reject/agent/board approvals. This matters at 659 clubs.
@@ -369,6 +391,13 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # cost, without setting a numerical quota or guaranteeing
                 # a replacement. Financial/player/board decisions still stand.
                 seller_fit-=min(75,12*signings_by_seller[seller])
+                if buyer in club_ai_context:
+                    # A modest domestic scouting advantage, not a border or
+                    # international-transfer cap. Suitability remains decisive.
+                    seller_fit+=domestic_market_preference(
+                        same_source_country=(
+                            club_countries.get(buyer)==club_countries.get(seller)),
+                        profile=club_ai_context[buyer])
                 options.append((seller,pid,overall,need,
                                 need+seller_fit,fit,sale,replacement_plan))
             options.sort(key=lambda v:(-v[4],
