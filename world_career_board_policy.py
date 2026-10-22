@@ -29,6 +29,11 @@ def initialize_career_board_policy(conn):
     conn.commit()
 
 def get_policy(conn,career_id,club_id):
+    # Historical/legacy worlds can predate this opt-in schema. The absence
+    # of a board-policy table is not consent to invent a board policy.
+    if conn.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='world_career_buying_board_policies'""").fetchone() is None:
+        return None
     r=conn.execute("""SELECT max_fee_pct,max_headroom_use_pct,
         financial_objective,ambition,ownership_priority,source_note,version
         FROM world_career_buying_board_policies WHERE career_id=? AND club_id=?""",
