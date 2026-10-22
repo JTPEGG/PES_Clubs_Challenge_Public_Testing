@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from world_squad_planner import MIN_COVER, STARTERS, FAMILY, effective_cover
 
-VERSION="fc27-recruitment-priority-v3-ambition-and-sporting-fit"
+VERSION="fc27-recruitment-priority-v4-tactical-market"
 
 def read_fc27_profiles(conn, *, dataset, club_id=None):
     """Read independently copied FC27 game model profiles, never live source."""
@@ -54,7 +54,7 @@ def modelled_financial_objective(profile):
 
 def buyer_recruitment_priority(squads, *, club, departed_lanes=(),
                                profile=None, previous_signings=0,
-                               stable_variation=0):
+                               stable_variation=0,starting_roles=None):
     """Relative chance of a club entering negotiations, never a transfer cap.
 
     Needs are positional and source-rated. A simulated manager's inclination,
@@ -72,14 +72,19 @@ def buyer_recruitment_priority(squads, *, club, departed_lanes=(),
     shortage=0
     quality_gap=0
     urgent=0
-    for lane in set(roster)|set(departed_lanes):
+    for lane in set(roster)|set(departed_lanes)|set(starting_roles or {}):
+        required=(STARTERS[lane] if starting_roles is None
+                  else starting_roles.get(lane,0))
+        if not required:
+            continue
         covered=effective_cover(squads,club,lane)
-        if not covered and lane not in departed_lanes:
-            continue  # no verified formation requirement for a never-used role
-        minimum=max(STARTERS[lane],MIN_COVER[lane])
+        if not covered and lane not in departed_lanes and starting_roles is None:
+            continue  # no implied formation on older worlds
+        minimum=(max(STARTERS[lane],MIN_COVER[lane])
+                 if starting_roles is None else required+1)
         shortage+=min(2,max(0,minimum-len(covered)))
         if covered:
-            starter=covered[min(STARTERS[lane]-1,len(covered)-1)][1]
+            starter=covered[min(required-1,len(covered)-1)][1]
             quality_gap+=min(7,max(0,team_floor-starter-3))
         if lane in departed_lanes:
             urgent+=max(0,minimum-len(covered))
@@ -104,7 +109,8 @@ def buyer_recruitment_priority(squads, *, club, departed_lanes=(),
                  +competitive_refresh
                  -previous_signings*5+stable_variation,2)
 
-def positional_family_priorities(squads, *, club, departed_lanes=()):
+def positional_family_priorities(squads, *, club, departed_lanes=(),
+                                 starting_roles=None):
     """Sporting recruitment need by specialist lane, NOT arbitrary GK/ST ratios.
 
     Consider only actual rated squad roles and positions with an agreed
@@ -119,16 +125,21 @@ def positional_family_priorities(squads, *, club, departed_lanes=()):
         return {group:0.0 for group in ("GK","DEF","MID","FWD")}
     team_floor=rated[min(10,len(rated)-1)]
     by_family={group:[] for group in ("GK","DEF","MID","FWD")}
-    for lane in set(roster)|set(departed_lanes):
+    for lane in set(roster)|set(departed_lanes)|set(starting_roles or {}):
         if lane not in FAMILY:
             continue
+        required=(STARTERS[lane] if starting_roles is None
+                  else starting_roles.get(lane,0))
+        if not required:
+            continue
         peers=effective_cover(squads,club,lane)
-        if not peers and lane not in departed_lanes:
+        if not peers and lane not in departed_lanes and starting_roles is None:
             continue
         group=FAMILY[lane]
-        minimum=max(STARTERS[lane],MIN_COVER[lane])
+        minimum=(max(STARTERS[lane],MIN_COVER[lane])
+                 if starting_roles is None else required+1)
         depth_gap=max(0,minimum-len(peers))
-        starter_floor=(peers[min(STARTERS[lane]-1,len(peers)-1)][1]
+        starter_floor=(peers[min(required-1,len(peers)-1)][1]
                        if peers else team_floor-12)
         quality_gap=max(0,team_floor-3-starter_floor)
         # A recently sold starter is a *reason to scout*, not proof
@@ -144,7 +155,7 @@ def positional_family_priorities(squads, *, club, departed_lanes=()):
 
 
 def candidate_sporting_priority(squads, *, club, position, overall,
-                                fit, departed_lanes=()):
+                                fit, departed_lanes=(),starting_roles=None):
     """Score marginal sporting gain without a global positional trade ratio.
 
     A starting goalkeeper is a single-specialist job: buying another one
@@ -157,10 +168,14 @@ def candidate_sporting_priority(squads, *, club, position, overall,
     if lane is None or fit.get("eligible") is not True:
         return -100
     peers=effective_cover(squads,club,lane)
-    starter_count=STARTERS[lane]
+    starter_count=(STARTERS[lane] if starting_roles is None
+                   else starting_roles.get(lane,0))
+    if not starter_count:
+        return -40  # role unused by this manager; not a present XI upgrade
     starter=(peers[min(starter_count-1,len(peers)-1)][1]
              if peers else None)
-    shortage=len(peers)<max(STARTERS[lane],MIN_COVER[lane])
+    shortage=len(peers)<(max(STARTERS[lane],MIN_COVER[lane])
+                         if starting_roles is None else starter_count+1)
     gain=max(0,overall-starter) if starter is not None else 0
     agreed_exit=lane in departed_lanes
     # Priority for better starting XI and resolved vacancy. A lower-rated
@@ -189,15 +204,3 @@ def prospect_budget_penalty(*,fee,available_budget,opening_budget):
                      8*fee/opening_budget),2)
 
 
-def domestic_market_preference(*,same_source_country,profile=None):
-    """Soft scouting familiarity, not a restriction on international sales."""
-    if same_source_country:
-        # Domestic knowledge, integration and travel simplicity matter
-        # when similarly suitable targets exist. It is not a passport ban.
-        discipline=(profile["simulated_manager_financial_discipline"]
-                    if profile else 50)
-        return round(19+min(9,max(-4,(discipline-50)*.16)),2)
-    # Financial discipline moderates distant scouting, without a nationality
-    # rule, a ban, a regional guess, or any claim about the real manager.
-    discipline=profile["simulated_manager_financial_discipline"] if profile else 50
-    return -round((discipline-50)/15,2)
