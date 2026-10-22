@@ -1,0 +1,64 @@
+name: PES V2 pinned openfootball historical competition memberships
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/collect_openfootball_historical_competitions.py'
+      - 'test_collect_openfootball_historical_competitions.py'
+      - '.github/workflows/fifa-pes-v2-openfootball-memberships.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: historical-openfootball-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  source-membership-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check source license pin and non-fuzzy membership matching
+        run: python -m unittest -v test_collect_openfootball_historical_competitions
+      - name: Retrieve unchanged selected FIFA 22-year club identity archive
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Retrieve 2010-11 through 2026-27 multi-country historical domestic division participants from pinned CC0 fixture sources
+        run: |
+          python -u -m scripts.collect_openfootball_historical_competitions \
+             --catalog source/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+             --from-edition 2011 --through-edition 2027 \
+             --output release/
+      - name: Verify that only corroborated competitions were linked
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          p=Path('release')
+          j=json.loads((p/'OPENFOOTBALL_HISTORICAL_MEMBERSHIP_AUDIT.json').read_text())
+          with (p/'EXACT_HISTORICAL_CLUB_LEAGUE_MATCHES.csv').open(
+              newline='',encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+          assert not j['global_career_ready']
+          assert j['pinned_commit']=='e6744429ee395bc86f247348c6184bb08d4eb361'
+          assert j['source_leagues_available']>=200
+          assert len(rows)>1800
+          assert all(r['Verification_Status']=='exact_unique_name_provisional'
+                     for r in rows)
+          assert not any('FC25' in r['Starting_Season'] for r in rows)
+          print('HISTORICAL DIVISION MEMBERSHIP EVIDENCE GENERATED:',len(rows))
+          print(json.dumps(j,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-DOMESTIC-LEAGUE-MEMBERSHIP-EVIDENCE-2011-2027
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

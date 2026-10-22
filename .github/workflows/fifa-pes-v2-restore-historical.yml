@@ -1,0 +1,46 @@
+name: PES V2 isolated FIFA15-20 source restoration
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/build_fifa_fc_restored_2015_2020.py'
+      - 'test_fifa_pes_v2_restoration.py'
+      - '.github/workflows/fifa-pes-v2-restore-historical.yml'
+permissions:
+  contents: read
+concurrency:
+  group: fifa-pes-v2-source-restoration-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  restore-candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline source validation, immutable archive and FC25-exclusion tests
+        run: python -m unittest -v test_fifa_pes_v2_restoration test_fifa_pes_export_v2
+      - name: Download original, unchanged 23-file source archive for baseline comparison
+        run: python -u scripts/build_fifa_fc_archive.py --output qa-v2-input/fifa_original_23.zip --workers 5
+      - name: Fetch pinned six-year SoFIFA restoration candidates and preserve source bytes
+        run: |
+          python -u -m scripts.build_fifa_fc_restored_2015_2020 \
+            --original-source qa-v2-input/fifa_original_23.zip \
+            --output qa-v2-restoration/FIFA15_to_FIFA20_SoFIFA_candidate_sources.zip
+      - name: Test small PES2020 conversion subset against all six restored source schemas
+        run: |
+          python -u -m scripts.export_fifa_pes_v2 \
+            --source qa-v2-restoration/FIFA15_to_FIFA20_SoFIFA_candidate_sources.zip \
+            --output qa-v2-restoration/FIFA15_to_FIFA20_250_each_conversion_smoke.zip \
+            --limit-per-edition 250
+      - name: Archive restored candidate source and sample conversion evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FIFA15-FIFA20-restored-candidate-unapproved
+          path: qa-v2-restoration/
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error

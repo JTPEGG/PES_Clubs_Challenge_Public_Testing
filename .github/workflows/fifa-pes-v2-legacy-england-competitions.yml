@@ -1,0 +1,59 @@
+name: PES V2 2004-2010 English league historical club membership
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/collect_openfootball_legacy_england.py'
+      - 'test_collect_openfootball_legacy_england.py'
+      - '.github/workflows/fifa-pes-v2-legacy-england-competitions.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: historic-england-competitions-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate historical Football.TXT fixtures and team separation
+        run: python -m unittest -v test_collect_openfootball_legacy_england
+      - uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Reconstruct six earliest England league seasons from pinned CC0 records
+        run: |
+          python -u -m scripts.collect_openfootball_legacy_england \
+            --catalog source/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --output release/
+      - name: Verify six actual season-year league graphs without invented clubs
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          p=Path('release')
+          x=json.loads((p/'ENGLAND_2005_2010_SOURCE_MEMBERSHIP_AUDIT.json').read_text())
+          assert x['source_files']==24
+          assert x['checked_source_teams']>=500
+          assert x['exact_source_club_matches']>=50
+          assert not x['full_world_ready']
+          with (p/'ENGLAND_2005_2010_PROVISIONAL_CLUB_COMPETITIONS.csv').open(encoding='utf-8-sig') as f:
+             rows=list(csv.DictReader(f))
+          assert len(rows)==x['exact_source_club_matches']
+          assert all(x['Match_Status']=='exact_unique_name_provisional' for x in rows)
+          print(json.dumps(x,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-ENGLAND-2005-2010-HISTORICAL-DOMESTIC-COMPETITION-MEMBERSHIPS
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

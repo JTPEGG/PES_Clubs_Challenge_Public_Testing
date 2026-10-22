@@ -1,0 +1,82 @@
+name: PES V2 FIFA15 England 92-club offline complete source player pilot
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/build_fifa15_english_offline_gameplay_pilot.py'
+      - '.github/workflows/fifa-pes-v2-fifa15-offline-career-pilot.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read original 22-edition men's-only game club roster source
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original/
+      - name: Read 92 authenticated FIFA15 professional club identities and nonplayable Conference
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FIFA15-92-ORIGINAL-GAME-TEAM-IDENTITIES-2014-15-CONFERENCE-PILOT
+          run-id: 39556522361
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: clubs/
+      - name: Read converted actual original York 20 source-player PES2020 V2 estimates
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FIFA15-YORK-20-AUTHENTIC-SOURCE-PLAYERS-ESTIMATED-PES20-25-PLUS-4
+          run-id: 39557849729
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: york/
+      - name: Materialise self-contained FIFA15 English 92-club 2,586-real-source-player PES20 test database
+        run: |
+          python -u -m scripts.build_fifa15_english_offline_gameplay_pilot \
+            --squads original/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --club-staging clubs/FIFA15_ENGLAND_92_CLUB_SOURCE_STAGING.sqlite \
+            --york-estimates york/FIFA15_YORK_REAL_SOURCE_PES2020_25_PLUS_4_ESTIMATED.csv \
+            --output release/
+      - name: Validate all original game 92 team players with 25+4 estimated PES ratings
+        run: |
+          python - <<'PY'
+          import json,sqlite3,csv
+          from pathlib import Path
+          p=Path('release')
+          a=json.loads((p/'FIFA15_92_CLUB_OFFLINE_PES_SOURCE_PILOT_AUDIT.json').read_text())
+          assert a['original_fifa_edition']==2015
+          assert a['real_historical_english_professional_clubs']==92
+          assert a['playable_clubs_with_at_least_one_real_source_player']==92
+          assert a['source_original_professional_players']==2566
+          assert a['restored_original_fifa15_york_players']==20
+          assert a['all_92_club_source_players']==2586
+          assert a['complete_estimated_pes_core_rating_values']==2586*25
+          assert a['complete_estimated_pes_auxiliary_rating_values']==2586*4
+          assert a['nonplayable_real_conference_clubs']==24
+          assert a['additional_nonplayable_lower_tiers_used']==0
+          assert not a['career_ready']
+          assert not a['production_careers_unmodified'] is False
+          with sqlite3.connect(p/'FIFA15_ENGLISH_92_ORIGINAL_CLUB_AND_PLAYER_GAMEPLAY_TEST.sqlite') as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM source_real_game_clubs').fetchone()[0]==92
+              assert db.execute('SELECT COUNT(*) FROM real_game_source_players').fetchone()[0]==2586
+              assert db.execute('SELECT COUNT(*) FROM external_nonplayable_feeder_clubs').fetchone()[0]==24
+              assert db.execute('SELECT MIN(source_players_with_numeric_PES_estimates) FROM real_club_roster_counts').fetchone()[0]>0
+              assert db.execute('SELECT career_ready FROM edition_metadata').fetchone()[0]==0
+          print(json.dumps(a,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FIFA15-ENGLISH-92-TEAMS-2586-AUTHENTIC-SOURCE-PLAYER-PES20-OFFLINE-PILOT
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

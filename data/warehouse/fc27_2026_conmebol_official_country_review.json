@@ -1,0 +1,253 @@
+{
+  "version": "fc27-conmebol-official-2026-team-country-reviewed-v1",
+  "edition": 2027,
+  "actual_competition_year": 2026,
+  "source_type": "human-reviewed club display-name and national association extracted from official 2026 CONMEBOL teams directory; no domestic league implied",
+  "group_sources": {
+    "CONMEBOL Libertadores": "https://gol.conmebol.com/libertadores/en/teams",
+    "CONMEBOL Sudamericana": "https://gol.conmebol.com/sudamericana/en/teams"
+  },
+  "verification_limit": "2026 tournament team national association only; does not demonstrate a club's domestic league tier or its continued membership in its association's highest division",
+  "entries": [
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Always Ready",
+      "official_club": "Always Ready",
+      "country": "Bolivia"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Barcelona SC",
+      "official_club": "Barcelona",
+      "country": "Ecuador"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Bolívar",
+      "official_club": "Bolívar",
+      "country": "Bolivia"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Cerro Porteño",
+      "official_club": "Cerro Porteño",
+      "country": "Paraguay"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Coquimbo Unido",
+      "official_club": "Coquimbo Unido",
+      "country": "Chile"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Cusco FC",
+      "official_club": "Cusco",
+      "country": "Peru"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Dep. La Guaira",
+      "official_club": "Deportivo La Guaira",
+      "country": "Venezuela"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Deportes Tolima",
+      "official_club": "Deportes Tolima",
+      "country": "Colombia"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "IDV",
+      "official_club": "Independiente Valle",
+      "country": "Ecuador"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Indep. Medellín",
+      "official_club": "Independiente Medellín",
+      "country": "Colombia"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Indep. Santa Fe",
+      "official_club": "Independiente Santa Fe",
+      "country": "Colombia"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Junior",
+      "official_club": "Junior",
+      "country": "Colombia"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "LDU Quito",
+      "official_club": "LDU Quito",
+      "country": "Ecuador"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Libertad",
+      "official_club": "Libertad",
+      "country": "Paraguay"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Nacional",
+      "official_club": "Nacional",
+      "country": "Uruguay"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Peñarol",
+      "official_club": "Peñarol",
+      "country": "Uruguay"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Sporting Cristal",
+      "official_club": "Sporting Cristal",
+      "country": "Peru"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "UCV FC",
+      "official_club": "UCV",
+      "country": "Venezuela"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Uni. Católica",
+      "official_club": "Universidad Católica",
+      "country": "Chile"
+    },
+    {
+      "source_group": "CONMEBOL Libertadores",
+      "source_club": "Universitario",
+      "official_club": "Universitario",
+      "country": "Peru"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Alianza Atltico",
+      "official_club": "Alianza Atlético",
+      "country": "Peru"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "América de Cali",
+      "official_club": "América de Cali",
+      "country": "Colombia"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Audax Italiano",
+      "official_club": "Audax Italiano",
+      "country": "Chile"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Blooming",
+      "official_club": "Blooming",
+      "country": "Bolivia"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Boston River",
+      "official_club": "Boston River",
+      "country": "Uruguay"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Botafogo",
+      "official_club": "Botafogo",
+      "country": "Brazil"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Carabobo FC",
+      "official_club": "Carabobo",
+      "country": "Venezuela"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Caracas FC",
+      "official_club": "Caracas",
+      "country": "Venezuela"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Cienciano",
+      "official_club": "Cienciano",
+      "country": "Peru"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "City Torque",
+      "official_club": "City Torque",
+      "country": "Uruguay"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Dep. Cuenca",
+      "official_club": "Deportivo Cuenca",
+      "country": "Ecuador"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Ind. Petrolero",
+      "official_club": "Independiente",
+      "country": "Bolivia"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Juventud",
+      "official_club": "Juventud",
+      "country": "Uruguay"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Macar",
+      "official_club": "Macará",
+      "country": "Ecuador"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Millonarios",
+      "official_club": "Millonarios",
+      "country": "Colombia"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "O'Higgins",
+      "official_club": "O'Higgins",
+      "country": "Chile"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Olimpia",
+      "official_club": "Olimpia",
+      "country": "Paraguay"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Palestino",
+      "official_club": "Palestino",
+      "country": "Chile"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Puerto Cabello",
+      "official_club": "Academia Puerto Cabello",
+      "country": "Venezuela"
+    },
+    {
+      "source_group": "CONMEBOL Sudamericana",
+      "source_club": "Recoleta",
+      "official_club": "Recoleta",
+      "country": "Paraguay"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+name: PES V2 dated historical finance evidence and stress-aware club budgets
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_financial_circumstances.py'
+      - 'test_world_historical_financial_circumstances.py'
+      - 'data/warehouse/historical_club_financial_events_v1.json'
+      - '.github/workflows/fifa-pes-v2-historical-financial-circumstances.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: v2-circumstances-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit test provenance, effective dates, negative headroom and no invented takeover funds
+        run: python -m unittest -v test_world_historical_financial_circumstances
+      - name: Download approved immutable starting club budgets
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-MENS-22-SEASON-CLUB-FINANCIALS-REVIEW
+          run-id: 39427144648
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: originals/
+      - name: Build second-layer financial circumstances from dated source evidence
+        run: |
+          python -u -m world_historical_financial_circumstances \
+            --finances originals/PES_V2_HISTORICAL_CLUB_FINANCIALS.sqlite \
+            --evidence data/warehouse/historical_club_financial_events_v1.json \
+            --output release/
+      - name: Verify 13104 immutable company profiles and dated evidence mapping
+        run: |
+          python - <<'PY'
+          import sqlite3,json
+          from pathlib import Path
+          a=json.loads(Path('release/FINANCIAL_CIRCUMSTANCES_AUDIT.json').read_text())
+          with sqlite3.connect('release/PES_V2_CLUB_FINANCIAL_CIRCUMSTANCES.sqlite') as db, sqlite3.connect('originals/PES_V2_HISTORICAL_CLUB_FINANCIALS.sqlite') as old:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert db.execute('SELECT COUNT(*) FROM historical_club_circumstances').fetchone()[0]==13104
+              assert db.execute('SELECT COUNT(DISTINCT edition) FROM historical_club_circumstances').fetchone()[0]==22
+              assert db.execute('SELECT COUNT(*) FROM historical_club_circumstances WHERE edition=2025').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM observed_historical_events').fetchone()[0]>=40
+              assert db.execute('SELECT COUNT(*) FROM historical_club_circumstances WHERE signed_wage_headroom_weekly_gbp < 0').fetchone()[0]>0
+              assert db.execute('SELECT COUNT(*) FROM historical_club_circumstances WHERE verified_cash_balance_gbp IS NOT NULL OR verified_net_debt_gbp IS NOT NULL OR verified_owner_capital_injection_gbp IS NOT NULL OR revenue_reported_gbp IS NOT NULL').fetchone()[0]==0
+              oldpay=dict(old.execute('SELECT club_key,starting_payroll_weekly_gbp FROM club_financial_profiles'))
+              newpay=dict(db.execute('SELECT club_key,source_annual_payroll_gbp FROM historical_club_circumstances'))
+              assert oldpay==newpay
+              assert db.execute("SELECT active_at_preseason FROM observed_historical_events WHERE event_id='reading-2023-wages'").fetchone()[0]==0
+              assert db.execute("SELECT active_at_preseason FROM observed_historical_events WHERE event_id='wigan-unpaid-wages-2023'").fetchone()[0] in (0,1)
+              print('ALL 13104 CLUB FINANCIAL CIRCUMSTANCES PASS, SIGNED WAGE OVERSPEND SUPPORTED')
+              print(json.dumps(a,indent=2))
+          PY
+      - name: Publish dated official event audit and separate V2 game financial policy
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-SOURCED-FINANCIAL-CIRCUMSTANCES
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

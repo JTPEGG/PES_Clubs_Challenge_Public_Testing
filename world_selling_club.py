@@ -23,13 +23,16 @@ def evaluate_selling_club(*,market_value=None,offer_fee=None,
                           contract_years=None, squad_role="unknown",
                           transfer_listed=None, financial_state="unknown",
                           replacement="unknown", seller_stance="unknown",
-                          player_wants_exit=None, age=None):
+                          player_wants_exit=None, age=None,
+                          autonomous_market_reassessment=False):
     """Return an auditable, non-binding decision with optional fee benchmark.
 
     All prices are scenario inputs in pounds, never generated from OVR.
     Values 'review', 'reject', 'negotiate', 'accept' distinguish missing data,
     unsellable circumstances, a counteroffer, and an acceptable proposed bid.
     """
+    if type(autonomous_market_reassessment) is not bool:
+        raise ValueError("Autonomous sale reassessment must be explicitly enabled")
     if squad_role not in (*SQUAD_ROLES, "unknown"):
         raise ValueError("Unrecognised squad role")
     if financial_state not in FINANCIAL_STATES:
@@ -55,7 +58,8 @@ def evaluate_selling_club(*,market_value=None,offer_fee=None,
                   transfer_listed=transfer_listed,
                   financial_state=financial_state,replacement=replacement,
                   seller_stance=seller_stance,player_wants_exit=player_wants_exit,
-                  age=age)
+                  age=age,
+                  autonomous_market_reassessment=autonomous_market_reassessment)
     def outcome(status, reason, asking_price=None):
         return {**shared, "decision":status, "reason":reason,
                 "asking_price":asking_price,
@@ -76,20 +80,36 @@ def evaluate_selling_club(*,market_value=None,offer_fee=None,
     if missing:
         return outcome("review", "Unverified scenario inputs: "+", ".join(missing)+
                        ". No willingness to sell or fee is inferred.")
-    if seller_stance=="retain" and not transfer_listed and not player_wants_exit:
+    if (not autonomous_market_reassessment and
+            seller_stance=="retain" and not transfer_listed and not player_wants_exit):
         return outcome("reject","Club intends to retain this player and has no recorded exit pressure. An arbitrary premium does not force a sale.")
-    if (squad_role=="key_player" and contract_years>=3
+    if (not autonomous_market_reassessment and
+            squad_role=="key_player" and contract_years>=3
             and not transfer_listed and not player_wants_exit
             and financial_state=="stable" and replacement=="difficult"):
         return outcome("reject","Essential player, lengthy contract, no exit request, stable finances and no practical replacement: not for sale.")
     # Market value is only the *user's* hypothetical input, not inferred from
     # rating, wages, historical prestige, or modern club transfer rumours.
     premium = ROLE_MULTIPLIER[squad_role]
+    if autonomous_market_reassessment:
+        # Every player can have a negotiable price: avoiding a sale
+        # increases the seller's reservation fee, not an absolute veto.
+        # The earlier independent additive protections compounded to nearly
+        # three times market value and made elite recruitment impossible.
+        premium={"key_player":1.23,"regular_starter":1.13,
+                 "rotation":1.03,"fringe":0.90}[squad_role]
+        if (squad_role=="key_player" and contract_years>=3
+                and not (transfer_listed or player_wants_exit)
+                and financial_state=="stable" and replacement=="difficult"
+                and seller_stance=="retain"):
+            # Truly exceptional resistance: rare aligned circumstances,
+            # not a routine starting-XI player's default price.
+            premium+=0.27
     premium += 0.08 * max(0,contract_years-2)
     if replacement=="difficult":
-        premium+=0.22
+        premium+=0.12 if autonomous_market_reassessment else 0.22
     if seller_stance=="retain":
-        premium+=0.18
+        premium+=0.16 if autonomous_market_reassessment else 0.18
     if player_wants_exit:
         premium-=0.15
     if transfer_listed:

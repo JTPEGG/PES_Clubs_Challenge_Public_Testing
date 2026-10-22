@@ -1,0 +1,56 @@
+name: PES V2 FIFA15 genuine 2014-15 Conference feeder rollover QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_fifa15_conference_one_hop.py'
+      - 'data/warehouse/england_2014_15_conference_premier_feeder.json'
+      - '.github/workflows/fifa-pes-v2-fifa15-conference-boundary.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regress original 2027 and new 2015 sourced one-hop transition tests
+        run: python -m unittest -v test_world_lightweight_feeder
+      - name: Read latest fully source-validated FIFA15 League Two competition
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-COMPETITION-CANDIDATES-PLUS-SEGUNDA
+          run-id: 39554046026
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: game/
+      - name: Simulate two virtual seasons with actual FIFA15 historical Conference 24-club pool
+        run: |
+          python -u -m scripts.audit_fifa15_conference_one_hop \
+            --registry game/HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite \
+            --conference data/warehouse/england_2014_15_conference_premier_feeder.json \
+            --output release/
+      - name: Verify 24+24 real squads-free feeder pool and zero deeper pyramid
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('release/FIFA15_CONFERENCE_ONE_HOP_QA.json').read_text())
+          assert d['fifa_edition']==2015
+          assert d['real_source_league_two_clubs']==24
+          assert d['real_historical_conference_feeder_clubs']==24
+          assert d['reproducible_rollovers_checked']==2
+          assert len(d['illustrative_first_virtual_season_promotions'])==2
+          assert d['one_hop_feeder_uses_real_clubs'] and not d['regional_lower_tiers_required']
+          assert not d['actual_career_mode_enabled'] and not d['original_saves_modified']
+          print(json.dumps(d,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FIFA15-SOURCE-VERIFIED-CONFERENCE-PROMOTION-BOUNDARY
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

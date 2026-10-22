@@ -198,7 +198,8 @@ def _transaction(conn, fn):
 
 def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lock_date,
                   next_summer_date, economy_version="prototype-v1", scale=1.0,
-                  player_decision_version="legacy-sporting-v2"):
+                  player_decision_version="legacy-sporting-v2",
+                  competition_qa_override=False):
     """Create a new sandbox; never change source snapshot budgets or rosters."""
     from world_player_decisions import LEGACY_VERSION,DECISION_VERSION,DECISION_V2_VERSION
     if player_decision_version not in (LEGACY_VERSION,DECISION_VERSION,DECISION_V2_VERSION):
@@ -217,6 +218,25 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
     def action():
         dataset=_one(conn,"SELECT 1 FROM world_datasets WHERE dataset_id=?",(dataset_id,))
         if dataset is None:raise ValueError("Unknown source dataset")
+        # A FIFA/PES source league label is NOT a valid multi-season national
+        # football pyramid. The verified graph must know every domestic
+        # competition, level, promotion/relegation boundary, and feeder pool.
+        # This gate is separate from and earlier than any save mutation.
+        schema={row[0] for row in conn.execute(
+             "SELECT name FROM sqlite_master WHERE type='table'")}
+        historical=(("world_dataset_pes_v2_metadata" in schema) and
+            conn.execute("SELECT 1 FROM world_dataset_pes_v2_metadata "
+                         "WHERE dataset_id=?",(dataset_id,)).fetchone() is not None)
+        if historical and not competition_qa_override:
+            readiness=(conn.execute("""SELECT status FROM
+                world_dataset_pes_v2_verified_competitions
+                WHERE dataset_id=?""",(dataset_id,)).fetchone()
+                if "world_dataset_pes_v2_verified_competitions" in schema
+                else None)
+            if readiness is None or readiness[0]!="ready":
+                raise ValueError("Historical competition hierarchy incomplete: "
+                  "verify every domestic league, tier, promotion/relegation "
+                  "destination, and nonplayable feeder pool before career launch")
         teams=conn.execute("""SELECT e.club_id,c.tier FROM world_dataset_entries e
             JOIN world_competitions c ON c.competition_id=e.competition_id
             WHERE e.dataset_id=?""",(dataset_id,)).fetchall()
@@ -243,6 +263,12 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
             (career_id,dataset_id))
         from world_career_lifecycle import seed_career_contracts
         seed_career_contracts(conn,career_id=career_id,dataset_id=dataset_id)
+        # The historical finance policy is opt-in on a newly created dataset.
+        # Existing careers and non-historical saves retain their prior economy.
+        from world_historical_career_finances import seed_existing_loans_and_payroll
+        seed_existing_loans_and_payroll(conn,career_id=career_id,
+             dataset_id=dataset_id,pes_lock_date=pes_lock_date,
+             next_summer_date=next_summer_date)
         # Each opt-in new career receives its own frozen prestige inputs.
         # Subsequent global rebalancing cannot retroactively alter offers.
         if player_decision_version in (DECISION_VERSION,DECISION_V2_VERSION):
@@ -466,7 +492,19 @@ def _player_reference(conn,ds,pid):
         WHERE r.dataset_id=? AND r.player_id=?""",(ds,pid))
     if not row:return None,None
     overall,birth,position,when=row
-    return model_value(overall,age_on(birth,when),position),overall
+    baseline=model_value(overall,age_on(birth,when),position)
+    # Only the approved FC27 disposable edition has this provenance-
+    # labelled game salary and ability market calibration. Never reprice
+    # existing PES careers or older historic editions.
+    if ds=="fc27-warehouse-659-mens-2026-27" and baseline is not None:
+        from world_valuation import fc27_game_reference_value
+        wages=_one(conn,"""SELECT weekly_wage_gbp FROM
+            world_dataset_contract_snapshots WHERE dataset_id=? AND player_id=?
+        """,(ds,pid))
+        baseline=fc27_game_reference_value(
+            baseline=baseline,overall=overall,
+            weekly_wage=wages[0] if wages else None)
+    return baseline,overall
 
 
 def propose_offer(conn, *, career_id, request_key, player_id, buying_club_id,
@@ -507,6 +545,18 @@ def propose_offer(conn, *, career_id, request_key, player_id, buying_club_id,
         if not reg:raise ValueError("Player not registered in this career")
         seller=reg[0]
         if seller==buying_club_id:raise ValueError("Player is already at buying club")
+        # A borrower holds playing registration but never sale ownership.
+        # Until parent-owned permanent transfers can cancel/settle active loan
+        # obligations atomically, block rather than let the borrower sell him.
+        from world_historical_career_finances import is_historical_finance_career
+        if is_historical_finance_career(conn,career_id):
+            on_loan=_one(conn,"""SELECT parent_club_id FROM
+              world_career_loan_agreements WHERE career_id=? AND player_id=?
+              AND status='active'""",(career_id,player_id))
+            if on_loan:
+                raise ValueError("Player is on loan. Permanent transfers must be "
+                    "negotiated with the parent club; owner-aware loan-sale "
+                    "settlement is not enabled in this career version.")
         active=_one(conn,"""SELECT offer_id FROM world_career_offers WHERE career_id=?
             AND player_id=? AND status IN ('proposed','countered','accepted_pending_contract','agreed_future')
             AND buying_club_id=?""",(career_id,player_id,buying_club_id))
@@ -1015,6 +1065,24 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
     initialize_progression(conn)
     buyer_profile=current_career_appeal(conn,career_id,row[1])
     seller_profile=current_career_appeal(conn,career_id,row[2])
+    # The pre-existing English-only sporting model has no entries for FIFA26
+    # or FC27 historical source competition codes. Without an explicit
+    # historical fallback it vetoes every AI player-agent conversation.
+    # Apply only to historical opt-in worlds, not existing live careers.
+    from world_historical_career_finances import is_historical_finance_career
+    game_historical_appeal=False
+    if is_historical_finance_career(conn,career_id):
+        from world_historical_career_appeal import historical_club_appeal
+        historical_buyer=historical_club_appeal(
+            conn,career_id=career_id,club_id=row[1])
+        historical_seller=historical_club_appeal(
+            conn,career_id=career_id,club_id=row[2])
+        buyer_profile=buyer_profile or historical_buyer
+        seller_profile=seller_profile or historical_seller
+        # Applies only when a REAL PES-V2 historical squad source exists.
+        # In FC27 the source tier is unknown; strength-only fallback must
+        # not assign the club a fictional division level.
+        game_historical_appeal=bool(historical_buyer or historical_seller)
     tiers=dict(conn.execute("SELECT competition_id,tier FROM world_competitions").fetchall())
     buyer=tiers.get(buyer_profile["competition_id"]) if buyer_profile else None
     seller=tiers.get(seller_profile["competition_id"]) if seller_profile else None
@@ -1071,11 +1139,18 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
                 "prestige_source_version":policy["prestige_version"],
                 "prestige_review_status":(
                     buyer_prestige["review_status"] if buyer_prestige else "unknown")}
-    outcome=assess_player_interest(
-        buyer_tier=buyer,seller_tier=seller,
-        buyer_score=buyer_profile["score"] if buyer_profile else None,
-        seller_score=seller_profile["score"] if seller_profile else None,
-        player_overall=overall)
+    if game_historical_appeal:
+        from world_historical_career_appeal import assess_historical_player_interest
+        outcome=assess_historical_player_interest(
+            buyer_tier=buyer,seller_tier=seller,
+            buyer_score=buyer_profile["score"] if buyer_profile else None,
+            seller_score=seller_profile["score"] if seller_profile else None)
+    else:
+        outcome=assess_player_interest(
+            buyer_tier=buyer,seller_tier=seller,
+            buyer_score=buyer_profile["score"] if buyer_profile else None,
+            seller_score=seller_profile["score"] if seller_profile else None,
+            player_overall=overall)
     descriptions={
         "uninterested":"Not interested in this move",
         "needs_assurances":"Requires career assurances",

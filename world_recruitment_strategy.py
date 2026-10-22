@@ -61,7 +61,7 @@ def development_signals(conn, *, dataset):
             "calibrated_potential":explicit,"source_date":as_of}
 
 def prospect_fit(squads, *, buyer, player_id, overall, position,
-                 signals, existing_prospects=0):
+                 signals, existing_prospects=0, contextual_policy=False):
     """Distinguish a youth investment from a claimed starting-XI improvement.
 
     A high same-age percentile is evidence of high *current* achievement;
@@ -72,7 +72,12 @@ def prospect_fit(squads, *, buyer, player_id, overall, position,
     youth=signals["players"].get(player_id)
     if not slot or youth is None or youth[1]!=slot or youth[2]!=overall:
         return {"eligible":False,"reason":"No supported age and position evidence"}
-    if existing_prospects>=MAX_PROSPECTS_PER_WINDOW:
+    if type(contextual_policy) is not bool or (
+            type(existing_prospects) is not int or existing_prospects<0):
+        raise ValueError("Invalid recruitment mode or development history")
+    # Preserve historic policy for existing careers; new FC27 scouting never
+    # rejects a purchase solely because an arbitrary transaction count was met.
+    if not contextual_policy and existing_prospects>=MAX_PROSPECTS_PER_WINDOW:
         return {"eligible":False,"reason":"Development signing limit reached"}
     roster=squads.get(buyer,{})
     all_ratings=sorted((p[1] for group in roster.values() for p in group),
@@ -90,7 +95,7 @@ def prospect_fit(squads, *, buyer, player_id, overall, position,
         1 for pid,rating,_ in colleagues
         if pid in signals["players"] and
         signals["players"][pid][0]<=MAX_PROSPECT_AGE)
-    if existing_high_potential>=2:
+    if existing_high_potential>=2 and not contextual_policy:
         return {"eligible":False,"reason":"Development depth already exists here"}
     age,_,_=youth
     known=signals["calibrated_potential"].get(player_id)
@@ -114,7 +119,12 @@ def prospect_fit(squads, *, buyer, player_id, overall, position,
             return {"eligible":False,"reason":"Youth is not among the strongest age peers"}
         evidence="age-relative present rating; future ability unknown"
         score=58+round((percent-.88)*70)+max(0,20-age)
-    return {"eligible":True,"score":min(80,score),
+    if contextual_policy:
+        # Existing youth competition and recent acquisitions diminish
+        # the relative sporting appeal of the next prospect, not eligibility.
+        score-=min(30,existing_prospects*7+
+                   max(0,existing_high_potential-1)*6)
+    return {"eligible":True,"score":max(15,min(80,score)),
             "category":"prospect","lane":slot,"age":age,
             "cohort_percentile":None if percent is None else round(percent,3),
             "evidence":evidence,

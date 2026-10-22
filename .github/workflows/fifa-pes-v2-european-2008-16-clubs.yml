@@ -1,0 +1,70 @@
+name: PES V2 historic European 11-league 2008-16 club memberships
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/collect_european_soccer_archive_memberships.py'
+      - 'test_collect_european_soccer_archive_memberships.py'
+      - '.github/workflows/fifa-pes-v2-european-2008-16-clubs.yml'
+permissions:
+  contents: read
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test archival match season to real club identities
+        run: python -m unittest -v test_collect_european_soccer_archive_memberships
+      - name: Fetch 11 European country leagues from pinned Kaggle database mirror
+        run: |
+          python - <<'PY'
+          import hashlib,urllib.request,zipfile
+          from pathlib import Path
+          from scripts.collect_european_soccer_archive_memberships import SOURCE_URL
+          h=hashlib.sha256()
+          with urllib.request.urlopen(SOURCE_URL,timeout=150) as response, open("source.zip","wb") as dest:
+              for chunk in iter(lambda:response.read(1048576),b""):
+                  h.update(chunk);dest.write(chunk)
+          sha=h.hexdigest();Path("source.sha256").write_text(sha)
+          with zipfile.ZipFile("source.zip") as archive:
+              parts=[x for x in archive.infolist() if x.filename.lower().endswith(".sqlite")]
+              assert len(parts)==1
+              assert parts[0].file_size<450000000
+              with archive.open(parts[0]) as inp,open("matches.sqlite","wb") as dest:
+                  while True:
+                      chunk=inp.read(1048576)
+                      if not chunk:break
+                      dest.write(chunk)
+          print("Read pinned historical match database, checksum",sha)
+          PY
+      - name: Recover historical league clubs from match team identifiers
+        run: |
+          python -u -m scripts.collect_european_soccer_archive_memberships \
+            --source matches.sqlite --output release/ \
+            --sha256 "$(cat source.sha256)"
+      - name: Validate sufficient original source countries and time periods
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          p=Path("release")
+          d=json.loads((p/"EUROPEAN_MATCH_SOURCE_AUDIT.json").read_text())
+          with (p/"EUROPEAN_MATCH_DOMESTIC_LEAGUE_SEASONS.csv").open(encoding="utf-8-sig") as f:
+              rows=list(csv.DictReader(f))
+          assert d["complete_season_divisions"]>=60
+          assert d["independent_season_club_memberships"]>=900
+          assert all(x["Edition"] in [str(v) for v in range(2009,2017)] for x in rows)
+          assert all(int(x["Match_Rows"])>=int(x["Source_Clubs"])*5 for x in rows)
+          assert not d["historical_careers_ready"] and not d["player_data_modified"]
+          print(json.dumps(d,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-PINNED-EUROPEAN-2008-2016-REAL-LEAGUE-CLUB-SEASONS
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

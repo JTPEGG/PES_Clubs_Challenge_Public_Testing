@@ -1,0 +1,30 @@
+name: Historical PES career starting loans and payroll lifecycle QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_career_finances.py'
+      - 'world_career_lifecycle.py'
+      - 'world_careers.py'
+      - 'test_world_historical_career_finances.py'
+      - '.github/workflows/historical-source-loan-lifecycle.yml'
+permissions:
+  contents: read
+jobs:
+  test-historical-salaries-loans:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install web dependency used by existing transfer engine
+        run: python -m pip install Flask==3.0.3
+      - name: Test starting loans payroll and end-of-season returns
+        run: |
+          python -m unittest -v \
+            test_world_historical_career_finances \
+            test_world_historical_wages_loans
+      - name: Regression-check existing source loan lifecycle
+        run: python -m unittest -v test_world_career_lifecycle

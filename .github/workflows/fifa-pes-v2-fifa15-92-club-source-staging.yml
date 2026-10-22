@@ -1,0 +1,66 @@
+name: PES V2 FIFA15 92 club game team identities and one-hop career source staging
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/stage_fifa15_english_game_club_restoration.py'
+      - 'data/warehouse/fifa15_shrewsbury_york_source_game_identity_review.json'
+      - '.github/workflows/fifa-pes-v2-fifa15-92-club-source-staging.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download original 22-edition immutable player and historic competition staging
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-COMPETITION-CANDIDATES-PLUS-SEGUNDA
+          run-id: 39554046026
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Stage true original FIFA15 92 English game club membership and Conference one-hop
+        run: |
+          python -u -m scripts.stage_fifa15_english_game_club_restoration \
+            --registry source/HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite \
+            --original-game-evidence data/warehouse/fifa15_shrewsbury_york_source_game_identity_review.json \
+            --conference data/warehouse/england_2014_15_conference_premier_feeder.json \
+            --output release/
+      - name: Validate 92 team identities while explicitly blocking missing York City roster
+        run: |
+          python - <<'PY'
+          import sqlite3,json
+          from pathlib import Path
+          p=Path('release')
+          d=json.loads((p/'FIFA15_92_CLUB_HISTORICAL_PILOT_SOURCE_RESTORATION_AUDIT.json').read_text())
+          assert d['original_catalogue_game_clubs_unchanged']==596
+          assert d['verified_real_game_club_identities_in_english_tiers_1_to_4']==92
+          assert d['original_imported_english_club_identities']==91
+          assert d['missing_original_game_team_recovered_from_external_game_source']==1
+          assert d['source_game_team_id']==1948
+          assert d['external_original_game_roster_players_requiring_source_restore']==28
+          assert d['real_2014_15_nonplayable_conference_club_pool']==24
+          assert d['valid_one_level_league_two_conference_promotion_boundary']
+          assert not d['all_92_gameplay_rosters_certified']
+          assert not d['career_ready']
+          f=p/'FIFA15_ENGLAND_92_CLUB_SOURCE_STAGING.sqlite'
+          with sqlite3.connect(f) as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM pilot_fifa15_playable_club_placements').fetchone()[0]==92
+              assert db.execute('SELECT COUNT(*) FROM pilot_fifa15_conference_external_feeders').fetchone()[0]==24
+              assert db.execute('SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1').fetchone()[0]==0
+          print(json.dumps(d,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FIFA15-92-ORIGINAL-GAME-TEAM-IDENTITIES-2014-15-CONFERENCE-PILOT
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

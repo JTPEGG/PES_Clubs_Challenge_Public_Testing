@@ -1,0 +1,50 @@
+name: PES V2 men's National League historical feeder-club sources
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/collect_historical_national_league_feeders.py'
+      - 'test_collect_historical_national_league_feeders.py'
+      - '.github/workflows/fifa-pes-v2-national-league-feeders.yml'
+permissions:
+  contents: read
+concurrency:
+  group: v2-historical-national-league-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  verified-feeders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test both historic and current schedule formats
+        run: python -m unittest -v test_collect_historical_national_league_feeders
+      - name: Collect pinned season-year National League club memberships
+        run: |
+          python -u -m scripts.collect_historical_national_league_feeders \
+            --output release/
+      - name: Ensure no unproven lower-tier club pool is certified
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          d=Path('release')
+          r=json.loads((d/'NATIONAL_LEAGUE_FEEDER_SOURCE_AUDIT.json').read_text())
+          with (d/'NATIONAL_LEAGUE_HISTORICAL_FEEDER_CLUBS.csv').open(
+            encoding='utf-8-sig',newline='') as f:
+             a=list(csv.DictReader(f))
+          assert len(a)==r['recorded_season_club_memberships']
+          assert r['complete_feeder_seasons']>=7
+          assert all(x['Competition_Code']=='ENG:NL' and x['Tier']=='5' for x in a)
+          assert r['global_career_ready'] is False
+          print(json.dumps(r,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-NATIONAL-LEAGUE-TIER5-FEEDER-CLUBS
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

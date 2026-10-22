@@ -1,0 +1,123 @@
+name: PES V2 historical edition to career and 30-minute window integration
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_career_import.py'
+      - 'world_historical_career_setup_ui.py'
+      - 'test_world_historical_career_setup_ui.py'
+      - 'test_world_historical_career_import.py'
+      - '.github/workflows/fifa-pes-v2-historical-career-integration.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: v2-historical-career-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  test-season-import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [2026, 2027]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing sandbox web dependencies
+        run: python -m pip install Flask==3.0.3
+      - name: Test unsupported early years and dataset setup invariants
+        run: python -m unittest -v test_world_historical_career_import test_world_historical_career_setup_ui
+      - name: Download approved original 22-season mens' wages/loans
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-MENS-22-EDITION-STARTING-WAGES-CONTRACTS-LOANS
+          run-id: 39423495384
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Download approved first-pass club budgets
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-MENS-22-SEASON-CLUB-FINANCIALS-REVIEW
+          run-id: 39427144648
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Download verified dated club-financial circumstances
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-SOURCED-FINANCIAL-CIRCUMSTANCES
+          run-id: 39429984572
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Build isolated historical world for FIFA ${{ matrix.edition }}
+        run: |
+          python -u -m world_historical_career_import \
+            --edition ${{ matrix.edition }} \
+            --source input/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite \
+            --finances input/PES_V2_HISTORICAL_CLUB_FINANCIALS.sqlite \
+            --circumstances input/PES_V2_CLUB_FINANCIAL_CIRCUMSTANCES.sqlite \
+            --target release/historical_world_${{ matrix.edition }}.sqlite
+      - name: Smoke test a NEW career with entire squad finance and first 30-minute window
+        run: |
+          python - <<'PY'
+          import sqlite3,json,sys
+          from datetime import datetime, timezone
+          from world_careers import start_sandbox,wage_budget_breakdown
+          from world_preseason_window import start_preseason_window,window_snapshot
+          y=${{ matrix.edition }}
+          with sqlite3.connect(f'release/historical_world_{y}.sqlite') as db:
+              db.execute('PRAGMA foreign_keys=ON')
+              ds=f'pes-v2-{y}-mens-01'
+              row=db.execute('SELECT club_id FROM world_dataset_entries WHERE dataset_id=? ORDER BY club_id LIMIT 1',(ds,)).fetchone()
+              assert row
+              club_id=row[0]
+              career=f'historical_{y}_smoke'
+              # The player/source data is a QA-only snapshot until the
+              # full domestic competition graph and feeder pools are verified.
+              try:
+                  start_sandbox(db,career_id=career,dataset_id=ds,title='Historical career smoke',
+                      manager_club_id=club_id,pes_lock_date=f'{y-1}-08-01',
+                      next_summer_date=f'{y}-07-01')
+              except ValueError as e:
+                  assert 'Historical competition hierarchy incomplete' in str(e)
+              else:
+                  raise AssertionError('Unverified historical world was incorrectly playable')
+              assert db.execute('SELECT COUNT(*) FROM world_career_saves WHERE career_id=?',(career,)).fetchone()[0]==0
+              count=start_sandbox(db,career_id=career,dataset_id=ds,title='Historical career smoke',
+                   manager_club_id=club_id,pes_lock_date=f'{y-1}-08-01',
+                   next_summer_date=f'{y}-07-01',competition_qa_override=True)
+              assert count>=600
+              registered=db.execute('SELECT COUNT(*) FROM world_career_registrations WHERE career_id=?',(career,)).fetchone()[0]
+              expected=db.execute('SELECT COUNT(*) FROM world_dataset_rosters WHERE dataset_id=?',(ds,)).fetchone()[0]
+              assert registered==expected
+              snapshots=db.execute('SELECT COUNT(*) FROM world_career_contract_snapshots WHERE career_id=?',(career,)).fetchone()[0]
+              assert snapshots==registered
+              loans=db.execute("SELECT COUNT(*) FROM world_career_loan_agreements WHERE career_id=? AND status='active'",(career,)).fetchone()[0]
+              source_loans=db.execute('SELECT COUNT(*) FROM world_dataset_initial_loans WHERE dataset_id=?',(ds,)).fetchone()[0]
+              assert loans==source_loans
+              pes=db.execute('SELECT COUNT(*) FROM world_dataset_extended_attributes WHERE dataset_id=?',(ds,)).fetchone()[0]
+              assert pes==registered*29, 'Must retain all 25 PES ability and four auxiliary attributes per player'
+              detail=db.execute('SELECT COUNT(*) FROM world_dataset_pes_v2_player_details WHERE dataset_id=?',(ds,)).fetchone()[0]
+              assert detail==registered
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              now=datetime(2026,10,20,12,0,tzinfo=timezone.utc)
+              win=start_preseason_window(db,career_id=career,now=now)
+              assert win['state']=='open' and win['duration_seconds']==1800
+              assert window_snapshot(db,career_id=career,now=now)['state']=='open'
+              finance=wage_budget_breakdown(db,career,club_id)
+              print('SMOKE',json.dumps({'edition':y,'clubs':count,'players':registered,
+                    'loans':loans,'window_minutes':win['duration_seconds']/60,
+                    'example_club_budget':finance},indent=2))
+          PY
+      - name: Upload nonproduction import and smoke-test database
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-CAREER-SANDBOX-${{ matrix.edition }}
+          path: release/historical_world_${{ matrix.edition }}.sqlite
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 6

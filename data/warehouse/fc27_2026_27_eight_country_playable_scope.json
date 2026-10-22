@@ -1,0 +1,79 @@
+{
+  "version": "fc27-eight-country-open-playable-career-scope-v1",
+  "edition": 2027,
+  "season": "2026-27",
+  "approved_on": "2026-10-21",
+  "open_and_intended_playable_countries": [
+    {
+      "country": "England",
+      "competition_codes": [
+        "2027:en.1",
+        "2027:en.2",
+        "2027:en.3",
+        "2027:en.4"
+      ]
+    },
+    {
+      "country": "Germany",
+      "competition_codes": [
+        "2027:de.1",
+        "2027:de.2",
+        "2027:de.3"
+      ]
+    },
+    {
+      "country": "Spain",
+      "competition_codes": [
+        "2027:es.1",
+        "2027:es.2"
+      ]
+    },
+    {
+      "country": "France",
+      "competition_codes": [
+        "2027:fr.1",
+        "2027:fr.2"
+      ]
+    },
+    {
+      "country": "Italy",
+      "competition_codes": [
+        "2027:it.1",
+        "2027:it.2"
+      ]
+    },
+    {
+      "country": "Scotland",
+      "competition_codes": [
+        "2027:sco.1"
+      ]
+    },
+    {
+      "country": "Netherlands",
+      "competition_codes": [
+        "2027:nl.1"
+      ]
+    },
+    {
+      "country": "Portugal",
+      "competition_codes": [
+        "2027:pt.1"
+      ]
+    }
+  ],
+  "all_other_fc27_active_domestic_competitions": "closed_to_sporting_promotion_relegation_and_not_manager_selectable",
+  "recorded_new_closure_countries": [
+    "Poland",
+    "Turkey",
+    "Austria",
+    "Belgium",
+    "Argentina"
+  ],
+  "retains_source_clubs_transfer_world": true,
+  "original_published_season_rules_unchanged": true,
+  "feeder_policy": "only_immediately_below_an_open_playable_league",
+  "career_playable_intent_not_runtime_verification": true,
+  "supersedes_prior_austrian_direct_exchange_in_effective_gameplay": true,
+  "italy_mandatory_serie_b_playoff_remains_active": true,
+  "notes": "Latest user correction: eight open intended playable countries, including Germany and Netherlands. Poland Turkey Austria Belgium Argentina closed; original teams, market and published regulatory evidence unchanged. Prior six-country scope superseded in release build."
+}

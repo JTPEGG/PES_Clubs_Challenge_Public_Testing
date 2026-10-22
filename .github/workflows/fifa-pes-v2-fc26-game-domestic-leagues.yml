@@ -1,0 +1,89 @@
+name: PES V2 FC26 actual original game team league assignments
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/match_fc26_original_game_leagues.py'
+      - '.github/workflows/fifa-pes-v2-fc26-game-domestic-leagues.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read bundled original FC26 team, league and club membership tables
+        run: |
+          git clone --quiet --filter=blob:none https://github.com/ViniMacacari/api-eafc-files.git archived-game
+          cd archived-game
+          git checkout --quiet 7592f1734afff43d7dbc7161565732e9ba3d28bc
+          npm ci --ignore-scripts --quiet
+          npm run build
+      - name: Export small factual FC26 team league membership source only
+        run: |
+          cd archived-game
+          node --input-type=module - <<'JS'
+          import {readTemplateDatabase} from './dist/index.js';
+          import {writeFileSync} from 'node:fs';
+          const source=await readTemplateDatabase({version:'FC 26',
+              tables:['teams','leagues','leagueteamlinks']});
+          const byName=Object.fromEntries(source.databases.flatMap(d=>d.tables)
+             .map(t=>[t.name,t.records]));
+          const teams=new Map(byName.teams.map(t=>[t.teamid,t]));
+          const leagues=new Map(byName.leagues.map(l=>[l.leagueid,l]));
+          const csv=(s)=>'"'+String(s??'').replaceAll('"','""')+'"';
+          const lines=[['Edition','Team_ID','Team','League_ID','League',
+             'Tier','Gender','Is_Women_League','Is_International_League'].map(csv).join(',')];
+          for(const link of byName.leagueteamlinks){
+              const t=teams.get(link.teamid),l=leagues.get(link.leagueid);
+              if(!t||!l)continue;
+              lines.push([2026,t.teamid,t.teamname,l.leagueid,l.leaguename,
+                 l.level,t.gender,l.iswomencompetition,l.isinternationalleague].map(csv).join(','));
+          }
+          writeFileSync('../FC26_EXTRACTED_GAME_TEAM_LEAGUES.csv',lines.join('\n')+'\n');
+          console.log('FC26 extracted teams',teams.size,'leagues',leagues.size,
+             'links',lines.length-1);
+          if(teams.size<500||leagues.size<25||lines.length<450)
+              throw Error('Missing authentic FC26 game team league source');
+          JS
+      - name: Read latest 22-edition independently verified original and source league overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-GAME-AND-11-EUROPEAN-2009-16-LEAGUE-EVIDENCE
+          run-id: 39506787823
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: baseline/
+      - name: Cross-match game team league IDs only against original 2026 club names
+        run: |
+          python -u -m scripts.match_fc26_original_game_leagues \
+            --source FC26_EXTRACTED_GAME_TEAM_LEAGUES.csv \
+            --registry baseline/HISTORICAL_COMPETITION_REGISTER_WITH_EUROPEAN_SOURCE_LEAGUES.sqlite \
+            --output release/
+      - name: Validate authentic identity and source date, no invented club leagues
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          p=Path('release')
+          j=json.loads((p/'FC26_ORIGINAL_TEAM_LEAGUE_MATCH_AUDIT.json').read_text())
+          with (p/'FC26_ORIGINAL_GAME_CLUB_LEAGUES.csv').open(encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==j['same_game_unique_club_identity_league_links']
+          assert j['new_club_seasons_with_original_game_league']+j['already_sourced_club_seasons_corroborated']==len(rows)
+          assert len(set(r['Original_Club_Key'] for r in rows))==len(rows)
+          assert all(r['Edition']=='2026' and r['Game_Team_ID'].isdigit() for r in rows)
+          assert j['no_cross_edition_reuse'] and j['no_career_activation']
+          assert not j['squads_modified']
+          print(json.dumps(j,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-2026-GAME-BINARY-TEAM-LEAGUE-MEMBERSHIPS-CROSSWALK
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

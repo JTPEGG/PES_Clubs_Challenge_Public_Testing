@@ -1,0 +1,45 @@
+name: PES V2 restored FIFA15-20 position QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_fifa_fc_restored_2015_2020.py'
+      - 'test_fifa_pes_v2_restored_roles.py'
+      - '.github/workflows/fifa-pes-v2-restored-position-qa.yml'
+permissions:
+  contents: read
+concurrency:
+  group: fifa-pes-v2-restored-position-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  position-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Offline role sampling tests
+        run: python -m unittest -v test_fifa_pes_v2_restored_roles test_fifa_pes_v2_restoration
+      - name: Fetch original, immutable FIFA archive for source comparison
+        run: python -u scripts/build_fifa_fc_archive.py --output qa-v2-input/fifa_original_23.zip --workers 5
+      - name: Download pinned restored FIFA15 to FIFA20 source candidates
+        run: |
+          python -u -m scripts.build_fifa_fc_restored_2015_2020 \
+            --original-source qa-v2-input/fifa_original_23.zip \
+            --output qa-v2-restoration/restored-candidate-source.zip
+      - name: Test evenly spread GK DEF MID ATT samples in all six years
+        run: |
+          python -u -m scripts.audit_fifa_fc_restored_2015_2020 \
+            --source qa-v2-restoration/restored-candidate-source.zip \
+            --output qa-v2-restoration-role-audit/position-evidence.json \
+            --per-family 20
+      - name: Upload position-aware source QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-restored-GK-DEF-MID-ATT-validation
+          path: qa-v2-restoration-role-audit/
+          retention-days: 30
+          if-no-files-found: warn

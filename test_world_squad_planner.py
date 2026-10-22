@@ -42,6 +42,41 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(lane_of("LW"),"LW")
         self.assertEqual(lane_of("RWF"),"RW")
 
+    def test_distinct_wide_midfielders_and_wide_forwards(self):
+        self.assertEqual(lane_of("LM"),"LM")
+        self.assertEqual(lane_of("LMF"),"LM")
+        self.assertEqual(lane_of("RM"),"RM")
+        self.assertEqual(lane_of("RMF"),"RM")
+        self.assertEqual(lane_of("LW"),"LW")
+        self.assertEqual(lane_of("RW"),"RW")
+        self.assertNotEqual(lane_of("LMF"),lane_of("LWF"))
+        self.assertNotEqual(lane_of("RMF"),lane_of("RWF"))
+        self.player(1,"LMF",79)
+        self.player(1,"LWF",83)
+        self.player(1,"RMF",75)
+        self.player(1,"RWF",85)
+        self.assertEqual(len(self.squads()[1]["LM"]),1)
+        self.assertEqual(len(self.squads()[1]["LW"]),1)
+        self.assertEqual(len(self.squads()[1]["RM"]),1)
+        self.assertEqual(len(self.squads()[1]["RW"]),1)
+
+    def test_tactical_sale_uses_manager_starting_roles(self):
+        from world_ai_tactics import FORMATION_STARTERS
+        a=self.player(1,"LM",88)
+        self.player(1,"LM",80)
+        for pos in ("GK","CB","CB","LB","RB","CM","CM","RM","ST","ST"):
+            self.player(1,pos,84)
+        squad=self.squads()
+        active=sale_profile(squad,seller=1,player_id=a,
+            position="LM",overall=88,
+            starting_roles=FORMATION_STARTERS["4-4-2"])
+        inactive=sale_profile(squad,seller=1,player_id=a,
+            position="LM",overall=88,
+            starting_roles=FORMATION_STARTERS["4-3-3"])
+        self.assertTrue(active["first_choice"])
+        self.assertFalse(inactive["first_choice"])
+        self.assertGreater(active["sporting_risk"],inactive["sporting_risk"])
+
     def test_elite_club_does_not_buy_ordinary_backup_as_upgrade(self):
         # Three strong starters and a solid XI; the third-best forward
         # is not evidence that an 83-rated player improves a 91-rated side.
@@ -87,6 +122,36 @@ class PlannerTests(unittest.TestCase):
         fit=recruitment_fit(self.squads(),buyer=1,position="CF",overall=85)
         self.assertTrue(fit["eligible"])
         self.assertGreaterEqual(fit["score"],60)
+
+    def test_signed_senior_sale_unlocks_comparable_replacement_without_prior_purchase(self):
+        # An elite club with sufficient existing CB depth sells a 92 OVR
+        # starter. An 85-rated CB is NOT a +3 upgrade before or after sale,
+        # and depth remains sufficient, but a comparable senior addition
+        # can still be strategically sensible after the agreed departure.
+        cb=self.player(1,"CB",92)
+        for rating in (88,86,83):
+            self.player(1,"CB",rating)
+        for position in ("GK","LB","RB","CM","CM","AM","LW","RW",
+                         "ST","DM","ST","CM"):
+            self.player(1,position,87)
+        initial=self.squads()
+        not_needed=recruitment_fit(initial,buyer=1,position="CB",overall=85)
+        self.assertFalse(not_needed["eligible"])
+        self.db.execute("""INSERT INTO world_career_offers
+            VALUES('test',?,?,?,'agreed_future',77)""",(cb,1,3))
+        projected=self.squads()
+        wanted=recruitment_fit(projected,buyer=1,position="CB",overall=85,
+                              recent_senior_departure=True)
+        self.assertTrue(wanted["eligible"])
+        self.assertTrue(wanted["senior_replacement"])
+        self.assertIn("after agreed departure",wanted["reason"])
+        ordinary=recruitment_fit(projected,buyer=1,position="CB",overall=85)
+        self.assertFalse(ordinary["eligible"])
+        # Comparable recruitment happens AFTER the accepted exit.
+        self.assertNotIn("signed_replacement",wanted)
+        with self.assertRaises(ValueError):
+            recruitment_fit(projected,buyer=1,position="CB",overall=85,
+                            recent_senior_departure="yes")
 
     def test_excess_centre_back_sales_blocked(self):
         pids=[self.player(2,"CB",r) for r in (90,88,80,74)]

@@ -1,0 +1,67 @@
+name: PES V2 one-hop simulated nonplayable feeder QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_lightweight_feeder.py'
+      - 'test_world_lightweight_feeder.py'
+      - '.github/workflows/fifa-pes-v2-lightweight-nonplayable-feeders.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: v2-one-hop-feeder-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  verify-one-hop-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test one-hop depth, realistic club eligibility and repeatability
+        run: python -m unittest -v test_world_lightweight_feeder
+      - name: Download independently verified English FA National League source
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
+          run-id: 39467266710
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Simulate both optional playable floors using sourced clubs only
+        run: |
+          python -u -m world_lightweight_feeder \
+            --registry input/HISTORICAL_COMPETITION_REGISTER.sqlite \
+            --output release/
+      - name: Validate no overdeep tiers and no live careers modified
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          d=Path("release")
+          result=json.loads((d/"LIGHTWEIGHT_FEEDER_ROLLOVER_QA.json").read_text())
+          assert result["edition"]==2027
+          assert result["source_playable_league_two_clubs"]==24
+          assert result["official_fa_national_league_clubs"]==24
+          assert result["official_fa_north_clubs"]==24
+          assert result["official_fa_south_clubs"]==24
+          assert result["nonplayable_rollovers_validated"]==2
+          assert not result["lower_steps_required"]
+          assert result["invented_nonplayable_squads"]==0
+          assert not result["career_activation_approved"]
+          assert not result["actual_career_results_modified"]
+          assert len(result["example_league_two_promotion"])==2
+          assert len(result["example_national_league_promotion"])==4
+          with sqlite3.connect("input/HISTORICAL_COMPETITION_REGISTER.sqlite") as db:
+              assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1").fetchone()[0]==0
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-ENGLAND-ONE-HOP-NONPLAYABLE-FEEDER-QA
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

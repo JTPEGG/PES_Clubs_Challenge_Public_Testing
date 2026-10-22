@@ -1,0 +1,87 @@
+name: Historical PES V2 men's-only club and squad catalogue
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_club_squads.py'
+      - 'test_world_historical_club_squads.py'
+      - '.github/workflows/fifa-pes-v2-club-squad-map.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: pes-v2-club-squads-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  map-clubs-and-squads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 19
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test men's-only club mapping, source integrity, IDs and no invented leagues
+        run: python -m unittest -v test_world_historical_club_squads
+      - name: Retrieve exact finished 22-year V2 release (do not rebuild or change sources)
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-COMPLETE-22-YEAR-PLAYER-DATABASES-STARTER
+          run-id: 39397460464
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: original-release/
+      - name: Assemble 22 edition-specific men's-only club and squad snapshots
+        run: |
+          python -u -m world_historical_club_squads \
+            --sources original-release/FIFA_SOURCE_DATABASES_22_YEARS_VERSIONED.zip \
+            --ratings original-release/PES2020_V2_COMPLETE_ESTIMATED_PLAYER_DATABASE_22_YEARS.zip \
+            --output club-squad-release/
+      - name: Verify database integrity and immutable roster/club counts
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          db=Path('club-squad-release/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite')
+          with sqlite3.connect(db) as c:
+              assert c.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert c.execute('PRAGMA foreign_key_check').fetchall()==[]
+              assert c.execute('SELECT COUNT(*) FROM editions').fetchone()[0]==22
+              source_count=c.execute('SELECT SUM(source_player_rows) FROM editions').fetchone()[0]
+              excluded=c.execute('SELECT SUM(excluded_womens_rows) FROM editions').fetchone()[0]
+              players=c.execute('SELECT COUNT(*) FROM players').fetchone()[0]
+              assert source_count==319389
+              assert excluded==1940, 'Expected 1940 explicitly identified non-career source rows in FC27'
+              assert players==source_count-excluded
+              for table in ('players','clubs','leagues'):
+                  assert 'gender' not in {row[1] for row in c.execute(f'PRAGMA table_info({table})')}
+              assert c.execute("SELECT COUNT(*) FROM players WHERE assignment='at_club' AND club_key IS NULL").fetchone()[0]==0
+              assert c.execute("SELECT COUNT(*) FROM players WHERE assignment!='at_club' AND club_key IS NOT NULL").fetchone()[0]==0
+              assert c.execute('SELECT COUNT(*) FROM players WHERE edition=2025').fetchone()[0]==0
+              assert c.execute('SELECT COUNT(*) FROM clubs WHERE edition=2025').fetchone()[0]==0
+              assert c.execute('SELECT COUNT(*) FROM leagues WHERE edition=2025').fetchone()[0]==0
+              from world_historical_club_squads import available_editions,select_edition,club_squad
+              for item in available_editions(c):
+                  y=c.execute('SELECT source_player_rows,excluded_womens_rows FROM editions WHERE edition=?',(item['edition'],)).fetchone()
+                  assert item['players']==y[0]-y[1]
+                  assert item['players']==item['assigned']+item['free_agents']+item['unknown_club']
+                  preview=select_edition(c,item['edition'],limit=1)
+                  if preview['club_preview']:
+                      club=preview['club_preview'][0]
+                      sample=club_squad(c,item['edition'],club['club_key'])
+                      assert sample['squad_size']==len(sample['players'])
+              print('ALL 22 MEN ONLY EDITIONS PASSED CLUB/SQUAD DATABASE INTEGRITY QA')
+          data=json.loads(Path('club-squad-release/CLUB_SQUAD_MAPPING_MANIFEST.json').read_text())
+          print(json.dumps({key:data[key] for key in
+            ['players','clubs','leagues_with_known_source_name',
+             'players_with_club','free_agents','unknown_club',
+             'source_players','excluded_womens_rows',
+             'duplicate_source_id_extras']},indent=2))
+          PY
+      - name: Upload finished men's-only club, league and squad catalogue for all 22 editions
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          path: club-squad-release/
+          retention-days: 30
+          compression-level: 6
+          if-no-files-found: error

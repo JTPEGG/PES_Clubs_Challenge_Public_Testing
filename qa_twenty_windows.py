@@ -42,6 +42,8 @@ ELITE=("Arsenal","Chelsea","Manchester City")
 # would make those API calls see an already-expired 30-minute window, causing
 # zero transfers for the wrong reason.
 FIXED_START=datetime.now(timezone.utc).replace(microsecond=0)
+# Reset the QA clock for each isolated run; avoid elapsed wall-clock time
+# making later simulations appear expired to legacy internal API calls.
 INITIALIZERS=(
     initialize_world,initialize_catalog,initialize_market,
     initialize_career_engine,initialize_career_management,
@@ -240,7 +242,12 @@ def score_window(conn,career,initial,final,index,market_outcome):
           WHERE career_id=? AND season_index=1)""",(career,)).fetchone()[0]
     considered=conn.execute("""SELECT COUNT(*) FROM world_career_offers
         WHERE career_id=?""",(career,)).fetchone()[0]
+    signed=conn.execute("""SELECT COUNT(*) FROM world_career_offer_events e JOIN world_career_offers o ON o.offer_id=e.offer_id WHERE o.career_id=? AND e.event_type='ai_world_signed'""",(career,)).fetchone()[0]
     return dict(index=index,completed_transfers=len(moves),offer_count=considered,
+        ai_signed_agreements=signed,
+        ai_global_cap=None,ai_cap_reached=False,
+        ai_global_transfer_quota_configured=False,
+        offers_per_attempt=round(considered/max(1,attempts),3),
         ai_attempts=attempts,goalkeeper_transfers=keepers,
         prospect_signings=sum(m[0] in prospects for m in moves),
         elite=by_elite,defensive_coverage_flags=quality_risks,
@@ -256,6 +263,8 @@ def one_window(template,workdir,index):
     with connect(template) as base,connect(path) as conn:
         base.backup(conn)
     with connect(path) as conn:
+        global FIXED_START
+        FIXED_START=datetime.now(timezone.utc).replace(microsecond=0)
         career=f"market-qa-{index:02d}"
         manager=conn.execute("""SELECT club_id FROM world_clubs
             WHERE name='Nottingham Forest'""").fetchone()[0]
@@ -335,7 +344,7 @@ def run(windows):
                 "total_cb_losses":sum(max(0,
                     x["original_cb_depth"]-x["final_cb_depth"]) for x in entries),
             }
-        return dict(version="market-qa-v1",source_dataset=DATASET,
+        return dict(version="market-qa-v2-no-false-transfer-ceiling",source_dataset=DATASET,
             fixture="isolated seeded 92-club development world",
             simulated_windows=windows,
             elite_totals=elite_totals,
@@ -361,6 +370,9 @@ def run(windows):
                    max(1,sum(x["completed_transfers"] for x in results)),3),
                "coverage_flag_count":sum(len(x["defensive_coverage_flags"])
                                           for x in results)},
+            diagnostic_windows=[{"window":w["index"],"attempts":w["ai_attempts"],"offers":w["offer_count"],"signed":w["ai_signed_agreements"],"cap_reached":w["ai_cap_reached"],
+                "global_transfer_quota_configured":w["ai_global_transfer_quota_configured"],
+                "transfers":w["completed_transfers"]} for w in results],
             windows=results)
 
 

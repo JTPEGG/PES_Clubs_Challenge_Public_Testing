@@ -1,0 +1,911 @@
+{
+  "version": "fc27-2026-27-real-regional-one-hop-feeders-v1",
+  "edition": 2027,
+  "game_rule_scope": "only_one_feeder_level_below_2027_es.2_and_de.3",
+  "original_game_clubs_altered": false,
+  "real_club_names_not_new_game_player_squads": true,
+  "groups": [
+    {
+      "group": "1",
+      "country": "Spain",
+      "competition_code": "2027:es.3",
+      "competition_name": "Primera Federación",
+      "season": "2026-27",
+      "source_url": "https://rfef.es/es/noticias/aprobados-los-grupos-de-primera-federacion-para-la-temporada-202627",
+      "source_note": "Official football federation published dated 2026/27 participants",
+      "expected_member_count": 20,
+      "clubs": [
+        {
+          "name": "AD Mérida",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Arenas Club",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Athletic Club B",
+          "group": "1",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Barakaldo CF",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CD Coria",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CD Extremadura",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CD Lugo",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CD Mirandés",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CP Cacereño",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CyD Leonesa",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Pontevedra CF",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Racing Club Ferrol",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "RC Deportivo Fabril",
+          "group": "1",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Real Avilés Industrial",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Real Unión Club",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SD Ponferradina",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "UD Logroñés",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "UD Ourense",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Unionistas de Salamanca CF",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Zamora CF",
+          "group": "1",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        }
+      ]
+    },
+    {
+      "group": "2",
+      "country": "Spain",
+      "competition_code": "2027:es.3",
+      "competition_name": "Primera Federación",
+      "season": "2026-27",
+      "source_url": "https://rfef.es/es/noticias/aprobados-los-grupos-de-primera-federacion-para-la-temporada-202627",
+      "source_note": "Official football federation published dated 2026/27 participants",
+      "expected_member_count": 20,
+      "clubs": [
+        {
+          "name": "AD Alcorcón",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Águilas FC",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Algeciras CF",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Antequera CCF",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Atlético Madrileño",
+          "group": "2",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CD Teruel",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CE Europa",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "CF Rayo Majadahonda",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Cartagena",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Gimnàstic de Tarragona",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Hércules de Alicante CF",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Juventud de Torremolinos CF",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Real Jaén CF",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Real Madrid Castilla",
+          "group": "2",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Real Murcia CF",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Real Zaragoza",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SD Huesca",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "UD Ibiza",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "UE Sant Andreu",
+          "group": "2",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Villarreal CF B",
+          "group": "2",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        }
+      ]
+    },
+    {
+      "group": "Nord",
+      "country": "Germany",
+      "competition_code": "2027:de.4",
+      "competition_name": "Regionalliga",
+      "season": "2026-27",
+      "source_url": "https://datencenter.dfb.de/en/data-center/107/current/fair-play",
+      "source_note": "DFB 2026/27 league table, B-team suffixes normalised from DFB shortened first-team names",
+      "expected_member_count": 18,
+      "clubs": [
+        {
+          "name": "SC Weiche Flensburg 08",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Hannover 96 II",
+          "group": "Nord",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Drochtersen/Assel",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfB Oldenburg",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Phönix Lübeck",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FSV Schöningen",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Atlas Delmenhorst",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Kickers Emden",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfB Lübeck",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "HSC Hannover",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Eimsbütteler TV",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Eintracht Norderstedt",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Hamburger SV II",
+          "group": "Nord",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SSV Jeddeloh II",
+          "group": "Nord",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Werder Bremen II",
+          "group": "Nord",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Todesfelde",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC St. Pauli II",
+          "group": "Nord",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Bremer SV",
+          "group": "Nord",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        }
+      ]
+    },
+    {
+      "group": "Nordost",
+      "country": "Germany",
+      "competition_code": "2027:de.4",
+      "competition_name": "Regionalliga",
+      "season": "2026-27",
+      "source_url": "https://www.nofv-online.de/index.php/nofv-vereine.html",
+      "source_note": "Regional federation 2026/27 league and DFB table",
+      "expected_member_count": 18,
+      "clubs": [
+        {
+          "name": "Chemnitzer FC",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Rot-Weiß Erfurt",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Hallescher FC",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Carl Zeiss Jena",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "BFC Dynamo",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VSG Altglienicke",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Greifswalder FC",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Erzgebirge Aue",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FSV Zwickau",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Lokomotive Leipzig",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Magdeburg II",
+          "group": "Nordost",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Babelsberg 03",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "BFC Preussen 1894",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "BSG Chemie Leipzig",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Hertha BSC II",
+          "group": "Nordost",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "RSV Eintracht 1949",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Tasmania Berlin",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FSV 63 Luckenwalde",
+          "group": "Nordost",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        }
+      ]
+    },
+    {
+      "group": "West",
+      "country": "Germany",
+      "competition_code": "2027:de.4",
+      "competition_name": "Regionalliga",
+      "season": "2026-27",
+      "source_url": "https://wdfv.de/spielbetrieb/herren-regionalliga-west",
+      "source_note": "Official football federation published dated 2026/27 participants",
+      "expected_member_count": 18,
+      "clubs": [
+        {
+          "name": "SV Bergisch Gladbach 09",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Bocholt",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfL Bochum U23",
+          "group": "West",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Bonner SC",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Borussia Dortmund U23",
+          "group": "West",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Gütersloh",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfB 03 Hilden",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Köln U23",
+          "group": "West",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfL Sportfreunde Lotte",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Borussia Mönchengladbach U23",
+          "group": "West",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SC Rot-Weiß Oberhausen",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SC Paderborn 07 U23",
+          "group": "West",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Westfalia Rhynern",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Rödinghausen",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Schalke 04 U23",
+          "group": "West",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Sportfreunde Siegen",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SG Wattenscheid 09",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SC Wiedenbrück",
+          "group": "West",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        }
+      ]
+    },
+    {
+      "group": "Südwest",
+      "country": "Germany",
+      "competition_code": "2027:de.4",
+      "competition_name": "Regionalliga",
+      "season": "2026-27",
+      "source_url": "https://www.regionalliga-suedwest.de/Spielbetrieb/Vereine/",
+      "source_note": "Official football federation published dated 2026/27 participants",
+      "expected_member_count": 18,
+      "clubs": [
+        {
+          "name": "1. FSV Mainz II",
+          "group": "Südwest",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SSV Ulm 1846 Fußball",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Kaiserslautern II",
+          "group": "Südwest",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfR Aalen",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC 08 Homburg",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Sandhausen",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfR Mannheim",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC-Astoria Walldorf",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FSV Frankfurt",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "KSV Hessen Kassel",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Kickers Offenbach",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SC Freiburg II",
+          "group": "Südwest",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SG Barockstadt Fulda-Lehnerz",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SGV Heilbronn-Freiberg",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Eintracht-Trier",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SV Stuttgarter Kickers",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Eintracht Frankfurt II",
+          "group": "Südwest",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "TSV Steinbach Haiger",
+          "group": "Südwest",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        }
+      ]
+    },
+    {
+      "group": "Bayern",
+      "country": "Germany",
+      "competition_code": "2027:de.4",
+      "competition_name": "Regionalliga",
+      "season": "2026-27",
+      "source_url": "https://datencenter.dfb.de/en/competitions/2257/seasons/current/current_matchweek?datacenter_name=data-center",
+      "source_note": "DFB 2026/27 regional table has 19 members; accepted actual 19 instead of forcing 18",
+      "expected_member_count": 19,
+      "clubs": [
+        {
+          "name": "FC Memmingen",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "TSV Buchbach",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SpVgg Unterhaching",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "TSV 1860 München II",
+          "group": "Bayern",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FV Illertissen",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SpVgg Oberfranken Bayreuth",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "DJK Vilzing",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Augsburg II",
+          "group": "Bayern",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "VfB Eichstätt",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "Wacker Burghausen",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Nürnberg II",
+          "group": "Bayern",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "FC Bayern München II",
+          "group": "Bayern",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SC Eltersdorf",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "TSV Schwaben Augsburg",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "1. FC Schweinfurt 05",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SpVgg Greuther Fürth II",
+          "group": "Bayern",
+          "reserve_or_youth": true,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "SpVgg Ansbach",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "TSV Aubstadt",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        },
+        {
+          "name": "TSV Landsberg",
+          "group": "Bayern",
+          "reserve_or_youth": false,
+          "game_ready_PES_player_roster": false
+        }
+      ]
+    }
+  ],
+  "gameplay_promotions": [
+    {
+      "lower_competition": "2027:es.3",
+      "upper_competition": "2027:es.2",
+      "automatic_from_group_winners": [
+        "1",
+        "2"
+      ],
+      "regional_playoff_winners": 2,
+      "up": 4,
+      "down": 4,
+      "special": "Second-tier relegates four. One group champion from each group and two winners of recorded playoff finals, never invented results; no reserve promoted."
+    },
+    {
+      "lower_competition": "2027:de.4",
+      "upper_competition": "2027:de.3",
+      "automatic_from_group_winners": [
+        "West",
+        "Südwest",
+        "Nordost"
+      ],
+      "regional_playoff_winners": 1,
+      "playoff_finalists": [
+        "Nord",
+        "Bayern"
+      ],
+      "up": 4,
+      "down": 4,
+      "special": "2026/27 North and Bavaria champions contest last place; three other regional champions direct. Regional reserve sides excluded for game; only real verified clubs."
+    }
+  ],
+  "no_lower_of_lower_divisions": true
+}

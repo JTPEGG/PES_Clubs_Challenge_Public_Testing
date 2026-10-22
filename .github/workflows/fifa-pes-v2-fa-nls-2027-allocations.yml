@@ -1,0 +1,63 @@
+name: PES V2 FA official 2026-27 National League regional allocations review
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'data/warehouse/england_nls_2027_official_step_1_2_allocations.json'
+      - 'scripts/audit_fa_2027_feeder_allocations.py'
+      - 'test_audit_fa_2027_feeder_allocations.py'
+      - '.github/workflows/fifa-pes-v2-fa-nls-2027-allocations.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  official-allocation-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check source-faithful country and division uniqueness
+        run: python -m unittest -v test_audit_fa_2027_feeder_allocations
+      - name: Download pinned FC27 fixture membership review
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-2027-PINNED-DOMESTIC-AND-NONPLAYABLE-FEEDER-MEMBERSHIPS
+          run-id: 39464401437
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: snapshot/
+      - name: Audit official May FA allocations against season fixture teams
+        run: |
+          python -m scripts.audit_fa_2027_feeder_allocations \
+            --official data/warehouse/england_nls_2027_official_step_1_2_allocations.json \
+            --fixtures snapshot/FC27_PINNED_CURRENT_SOURCE_CLUBS.csv \
+            --output release/
+          cat release/FA_NLS_2027_MISSING_OR_CONFLICTING.csv
+          cat release/FA_NLS_2027_EXTRA_SNAPSHOT_NAMES.csv
+      - name: Require full official roster and preserve differences
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          d=Path("release")
+          j=json.loads((d/"FA_NLS_2027_ALLOCATION_AUDIT.json").read_text())
+          assert j["official_divisions"]==3 and j["original_FA_allocations"]==72
+          assert j["snapshot_corroborated"]>=55
+          assert j["all_careers_blocked"] and j["nonplayable_feeder_only"]
+          with (d/"FA_NLS_2027_OFFICIAL_ALLOCATION_CROSSCHECK.csv").open(
+              encoding="utf-8-sig",newline="") as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==72
+          assert all(row["FA_Source_URL"].startswith("https://www.thefa.com/") for row in rows)
+          assert {row["Competition_Code"] for row in rows}=={
+              "2027:en.5","2027:en.6n","2027:en.6s"}
+          print(json.dumps(j,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FA-OFFICIAL-2027-NATIONAL-LEAGUE-NORTH-SOUTH-MEMBERSHIPS
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

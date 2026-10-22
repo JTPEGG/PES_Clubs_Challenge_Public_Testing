@@ -1,0 +1,59 @@
+name: PES V2 FC27 first-year club competition alignment audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_fc27_one_year_alignment.py'
+      - '.github/workflows/fifa-pes-v2-fc27-year-one-alignment.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read latest original 22-edition club-to-competition candidate register
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-COMPETITION-CANDIDATES-PLUS-SEGUNDA
+          run-id: 39554046026
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: baseline/
+      - name: One year only 2026/27 all original FC27 club identities and movement graph
+        run: |
+          python -u -m scripts.audit_fc27_one_year_alignment \
+            --registry baseline/HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite \
+            --output release/
+      - name: Verify edition correct and preserve uncertain identities
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          p=Path('release')
+          j=json.loads((p/'FC27_ONE_YEAR_ALIGNMENT_DIAGNOSTIC.json').read_text())
+          with (p/'FC27_ALL_ORIGINAL_GAME_CLUBS.csv').open(encoding='utf-8-sig') as f:
+              game=list(csv.DictReader(f))
+          with (p/'FC27_UNRESOLVED_ORIGINAL_CLUBS.csv').open(encoding='utf-8-sig') as f:
+              issues=list(csv.DictReader(f))
+          with (p/'FC27_PROVISIONAL_UNIQUE_NAME_RECOVERY_QUEUE.csv').open(encoding='utf-8-sig') as f:
+              review=list(csv.DictReader(f))
+          assert j['edition']==2027 and j['season']=='2026/27'
+          assert len(game)==j['original_edition_clubs'] and len(issues)==j['clubs_without_home_competition']
+          assert len(game)==len({r['Club_Key'] for r in game})
+          assert j['original_edition_clubs']==j['clubs_with_any_starting_competition']+len(issues)
+          assert len(review)==j['unique_name_candidate_review_queue']
+          assert not j['edition_career_ready'] and not j['game_club_identity_certified']
+          print(json.dumps(j,indent=2))
+          print('TOP_MISSING_CLUBS',issues[:35])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-ONE-YEAR-CLUB-COMPETITION-BASELINE
+          path: release/
+          if-no-files-found: error
+          retention-days: 30

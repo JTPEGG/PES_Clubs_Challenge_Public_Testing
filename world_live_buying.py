@@ -17,6 +17,8 @@ from world_career_selling import (
     get_seller_assumptions,record_seller_assumptions,
 )
 from world_live_market import _stable,_modelled_europe,_message,VERSION
+from world_fc27_ai_recruitment import (read_fc27_profiles,
+    modelled_seller_finances,modelled_financial_objective)
 
 POLICY_VERSION="human-buying-autonomous-seller-v1"
 
@@ -46,26 +48,51 @@ def _buyer_target(conn,*,career_id,player_id):
 
 
 def _model_player_and_seller(conn,*,career_id,player_id,target,
-                             autonomous_club=False):
+                             autonomous_club=False,replacement_outlook=None):
     """Fill missing facts from a documented fictional policy, never user forms.
 
     Recorded historical circumstances always win. We cannot retroactively
     alter frozen seller assumptions, even if they predate the timed window.
     """
-    rows=conn.execute("""SELECT r.player_id,x.overall
+    rows=conn.execute("""SELECT r.player_id,x.overall,p.primary_position
         FROM world_career_registrations r
         JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
+        JOIN world_players p ON p.player_id=r.player_id
         WHERE r.career_id=? AND r.club_id=? AND x.overall IS NOT NULL
         ORDER BY x.overall DESC,r.player_id""",
         (target["dataset"],career_id,target["seller"])).fetchall()
-    ranked=[(int(pid),int(rating)) for pid,rating in rows if
+    ranked=[(int(pid),int(rating),pos) for pid,rating,pos in rows if
             type(rating) is int and 1<=rating<=99]
     if len(ranked)<8:
         raise ValueError("Selling club has insufficient rated squad depth for a reliable response")
-    order=[pid for pid,rating in ranked]
+    order=[pid for pid,rating,pos in ranked]
     rank=order.index(player_id)
-    role=("key_player" if rank<3 else "regular_starter" if rank<11
-          else "rotation" if rank<18 else "fringe")
+    # The FC27 AI uses the *specialist role within its manager's tactic*:
+    # the first-choice keeper or important wide midfielder must not be
+    # misclassified as fringe merely because 11 outfielders have higher OVR.
+    # Existing careers preserve their original global-role classification.
+    # The SELLER is autonomous both in AI-vs-AI and when a human manager
+    # bids for one of its players. The buying caller must not affect the
+    # seller's position-based squad-role assessment.
+    fc27_seller=read_fc27_profiles(conn,dataset=target["dataset"],
+        club_id=target["seller"]).get(target["seller"])
+    if fc27_seller:
+        from world_squad_planner import lane_of
+        from world_ai_tactics import preferred_formation,tactical_needs
+        formation=preferred_formation(club_id=target["seller"],
+                                      profile=fc27_seller)
+        starters=tactical_needs(formation)["starting_roles"]
+        lane=lane_of(next(pos for pid,rating,pos in ranked if pid==player_id))
+        same_lane=[pid for pid,rating,pos in ranked if lane_of(pos)==lane]
+        local_rank=same_lane.index(player_id)
+        starting_count=starters.get(lane,0)
+        role=("key_player" if local_rank==0 and
+              local_rank<starting_count and rank<3 else
+              "regular_starter" if local_rank<starting_count else
+              "rotation" if local_rank<starting_count+2 else "fringe")
+    else:
+        role=("key_player" if rank<3 else "regular_starter" if rank<11
+              else "rotation" if rank<18 else "fringe")
     term=1+_stable(career_id,player_id,VERSION)%4
     listed=role=="fringe" and term<=2
     # In AI-only club dealings, a small, explicitly FICTIONAL subset of
@@ -76,31 +103,56 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
         _stable(career_id,player_id,VERSION,"exit-pressure")%13==0))
     estimated=min(350000,max(1000,round(
         1000*2**((target["overall"]-55)/8)/500)*500))
+    historical_source=False
+    from world_historical_career_finances import is_historical_finance_career
+    if is_historical_finance_career(conn,career_id):
+        frozen=conn.execute("""SELECT weekly_wage_gbp,expires_on,source_kind
+            FROM world_career_contract_snapshots
+            WHERE career_id=? AND player_id=?""",
+            (career_id,player_id)).fetchone()
+        if frozen is None or frozen[0] is None:
+            raise ValueError("Historical AI seller has no starting contract salary")
+        estimated=int(frozen[0])
+        if frozen[1]:
+            today=conn.execute("""SELECT pes_lock_date FROM world_career_saves
+                WHERE career_id=?""",(career_id,)).fetchone()[0]
+            term=max(1,min(6,int(frozen[1][:4])-int(today[:4])))
+        historical_source=True
+    if replacement_outlook is not None and (
+            not autonomous_club or replacement_outlook not in ("available","difficult")):
+        raise ValueError("Only autonomous AI may supply a modelled future replacement outlook")
     existing=get_seller_assumptions(conn,career_id,player_id)
+    # Existing manager-specified assumptions win; the FC27 model is only
+    # consulted for independently simulated autonomous AI sellers.
     if existing is None:
         record_seller_assumptions(
             conn,career_id=career_id,player_id=player_id,
             market_value=target["value"],contract_years=term,
             squad_role=role,transfer_listed=listed,
             player_wants_exit=bool(exit_pressure),
-            financial_state="stable",
-            replacement="difficult" if rank<11 else "available",
-            seller_stance=("retain" if rank<3 else
-                           "neutral" if rank<18 else "sell"),
+            financial_state=modelled_seller_finances(fc27_seller),
+            replacement=(replacement_outlook if replacement_outlook is not None
+                         else "difficult" if rank<11 else "available"),
+            seller_stance=("retain" if role=="key_player" else
+                           "neutral" if role in ("regular_starter","rotation")
+                           else "sell"),
             # Only AI-vs-AI uses an automatically modelled board override.
             # Normal user-specified seller policies remain unchanged.
             board_enabled=bool(autonomous_club),
             exceptional_offer_pct=(165 if role=="key_player" else 150
                                    if role=="regular_starter" else 140)
                                    if autonomous_club else None,
-            financial_objective=("balanced" if autonomous_club else "unknown"),
+            financial_objective=(modelled_financial_objective(fc27_seller)
+                                 if autonomous_club else "unknown"),
             ambition=("consolidation" if autonomous_club else "unknown"),
             ownership_priority=("balanced" if autonomous_club else "unknown"),
             assumed_manager_trust=("medium" if autonomous_club else "unknown"),
             source_note=(
                 "fictional-autonomous-seller-v2: squad-ranked role, "
                 "deterministic contract and rare exit pressure; "
-                "board exceptional sale only for autonomous AI clubs. "
+                "board exceptional sale only for autonomous AI clubs; "
+                "plausible future replacements are unagreed scouting prospects. "
+                "FC27 financial pressure is a labelled game proxy, not actual cash. "
                 "Not a verified wage, player intention or contract."))
     known=conn.execute("""SELECT 1 FROM world_career_player_circumstances
         WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
@@ -111,7 +163,8 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             VALUES(?,?,?,?,?,?,?)""",
             (career_id,player_id,estimated,role,int(listed),
              "not_offered" if term==1 else "renewal_offered",
-             "fictional-autonomous-seller-v1"))
+             "historical-contract-and-modelled-role-v1" if historical_source
+             else "fictional-autonomous-seller-v1"))
         conn.commit()
     return dict(role=role,contract_years=term,listed=listed,rank=rank+1,
                 modelled_wage=estimated)

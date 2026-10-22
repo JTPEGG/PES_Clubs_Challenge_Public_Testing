@@ -1,0 +1,40 @@
+name: Historical V2 league appeal and player-interest regression
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_career_appeal.py'
+      - 'scripts/historical_career_player_choice_smoke.py'
+      - 'world_careers.py'
+      - '.github/workflows/fifa-pes-v2-historical-player-appeal.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: historical-appeal-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  historical-player-interest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [2026,2027]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Flask==3.0.3
+      - uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-CAREER-SANDBOX-${{ matrix.edition }}
+          run-id: 39437011805
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: workspace/
+      - name: Verify historical source-squad appeal and actual player-interest decision gate
+        run: |
+          python -m scripts.historical_career_player_choice_smoke \
+            --db workspace/historical_world_${{ matrix.edition }}.sqlite \
+            --edition ${{ matrix.edition }}

@@ -1,0 +1,182 @@
+{
+  "version": "fc27-mls-playable-closed-pyramid-v2",
+  "edition": 2027,
+  "calendar_season": 2026,
+  "game_competition_code": "2027:us.mls",
+  "playable_country": "United States / Canada (MLS)",
+  "source": "https://bracket.mlssoccer.com/league-reports/competition-guidelines/",
+  "manager_selectable": true,
+  "sporting_promotion_or_relegation": false,
+  "competition_format": {
+    "conference_team_count": 15,
+    "team_count": 30,
+    "regular_season_games_per_team": 34,
+    "home_games": 17,
+    "away_games": 17,
+    "conference_matches": 28,
+    "cross_conference_matches": 6,
+    "conference_playoff_qualifiers": 9,
+    "direct_first_round_seeds": "1-7",
+    "wild_card_seeds": "8-9",
+    "wild_card_single_leg": true,
+    "round_one_best_of": 3,
+    "conference_semifinal_one_leg": true,
+    "conference_final_one_leg": true,
+    "mls_cup_final_one_leg": true
+  },
+  "official_clubs": [
+    {
+      "name": "Atlanta United",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Atlanta United"
+    },
+    {
+      "name": "Charlotte FC",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Charlotte FC"
+    },
+    {
+      "name": "Chicago Fire FC",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Chicago Fire FC"
+    },
+    {
+      "name": "FC Cincinnati",
+      "conference": "Eastern",
+      "original_FC27_club_name": "FC Cincinnati"
+    },
+    {
+      "name": "Columbus Crew",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Columbus Crew"
+    },
+    {
+      "name": "D.C. United",
+      "conference": "Eastern",
+      "original_FC27_club_name": "D.C. United"
+    },
+    {
+      "name": "Inter Miami CF",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Inter Miami CF"
+    },
+    {
+      "name": "CF Montréal",
+      "conference": "Eastern",
+      "original_FC27_club_name": "CF Montréal"
+    },
+    {
+      "name": "Nashville SC",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Nashville SC"
+    },
+    {
+      "name": "New England Revolution",
+      "conference": "Eastern",
+      "original_FC27_club_name": "New England"
+    },
+    {
+      "name": "New York City FC",
+      "conference": "Eastern",
+      "original_FC27_club_name": "New York City FC"
+    },
+    {
+      "name": "Orlando City SC",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Orlando City"
+    },
+    {
+      "name": "Philadelphia Union",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Philadelphia"
+    },
+    {
+      "name": "Red Bull New York",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Red Bulls"
+    },
+    {
+      "name": "Toronto FC",
+      "conference": "Eastern",
+      "original_FC27_club_name": "Toronto FC"
+    },
+    {
+      "name": "Austin FC",
+      "conference": "Western",
+      "original_FC27_club_name": "Austin FC"
+    },
+    {
+      "name": "Colorado Rapids",
+      "conference": "Western",
+      "original_FC27_club_name": "Colorado Rapids"
+    },
+    {
+      "name": "FC Dallas",
+      "conference": "Western",
+      "original_FC27_club_name": "FC Dallas"
+    },
+    {
+      "name": "Houston Dynamo FC",
+      "conference": "Western",
+      "original_FC27_club_name": "Houston Dynamo"
+    },
+    {
+      "name": "Los Angeles Football Club",
+      "conference": "Western",
+      "original_FC27_club_name": "LAFC"
+    },
+    {
+      "name": "LA Galaxy",
+      "conference": "Western",
+      "original_FC27_club_name": "LA Galaxy"
+    },
+    {
+      "name": "Minnesota United FC",
+      "conference": "Western",
+      "original_FC27_club_name": "Minnesota United"
+    },
+    {
+      "name": "Portland Timbers",
+      "conference": "Western",
+      "original_FC27_club_name": "Portland Timbers"
+    },
+    {
+      "name": "Real Salt Lake",
+      "conference": "Western",
+      "original_FC27_club_name": "Real Salt Lake"
+    },
+    {
+      "name": "St. Louis CITY SC",
+      "conference": "Western",
+      "original_FC27_club_name": "St. Louis CITY SC"
+    },
+    {
+      "name": "San Diego FC",
+      "conference": "Western",
+      "original_FC27_club_name": "San Diego FC"
+    },
+    {
+      "name": "San Jose Earthquakes",
+      "conference": "Western",
+      "original_FC27_club_name": "SJ Earthquakes"
+    },
+    {
+      "name": "Seattle Sounders FC",
+      "conference": "Western",
+      "original_FC27_club_name": "Sounders FC"
+    },
+    {
+      "name": "Sporting Kansas City",
+      "conference": "Western",
+      "original_FC27_club_name": "Sporting KC"
+    },
+    {
+      "name": "Vancouver Whitecaps FC",
+      "conference": "Western",
+      "original_FC27_club_name": "Whitecaps FC"
+    }
+  ],
+  "real_world_club_identity_mapping_to_FC27": "explicit_verified_source_name_to_existing_2027_FC27_club_key_at_build_time; 30 unique IDs and 15/15 conference checks; PES player files still unverified",
+  "league_fixture_engine_activated": false,
+  "PES_gameplay_player_squads_validated": false
+}

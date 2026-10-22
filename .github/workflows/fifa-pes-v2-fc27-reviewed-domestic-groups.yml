@@ -1,0 +1,69 @@
+name: PES V2 FC27 2026-27 domestic club competition group alignment
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'data/warehouse/fc27_2026_27_source_league_association_review.json'
+      - 'world_fc27_domestic_competition_alignment.py'
+      - 'test_world_fc27_domestic_competition_alignment.py'
+      - '.github/workflows/fifa-pes-v2-fc27-reviewed-domestic-groups.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  align:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test domestic league country, season, source group uniqueness and cup quarantine
+        run: python -m unittest -v test_world_fc27_domestic_competition_alignment
+      - name: Download unmodified 22-edition source club and competition evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-COMPETITION-CANDIDATES-PLUS-SEGUNDA
+          run-id: 39554046026
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous/
+      - name: Map 27 active FC27 source league groups and exclude the unwanted original league
+        run: |
+          python -u -m world_fc27_domestic_competition_alignment \
+            --registry previous/HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite \
+            --associations data/warehouse/fc27_2026_27_source_league_association_review.json \
+            --output release/
+      - name: Assert FC27 group assignment does not overclaim real club roster certification
+        run: |
+          python - <<'PY'
+          import json,sqlite3,csv
+          from pathlib import Path
+          d=Path('release')
+          j=json.loads((d/'FC27_CLUB_DOMESTIC_LEAGUE_ASSOCIATION_RESULT.json').read_text())
+          assert j['original_FC27_club_records']==670
+          assert j['previously_linked_to_league_evidence']==377
+          assert j['new_source_domestic_league_associations']==242
+          assert j['new_competition_names_country_tier_scoped']==27
+          assert j['total_clubs_with_stated_domestic_competition']==619
+          assert j['still_unresolved_continental_competition_bucket']==40
+          assert j['source_only_leagues_missing_2026_27_roster_validation']==27
+          assert j['excluded_original_source_clubs']==11
+          assert j['active_FC27_clubs_in_game']==659
+          assert j['original_EA_team_ids_not_verified']
+          assert not j['historic_2027_career_ready'] and j['other_21_editions_not_modified']
+          with sqlite3.connect(d/'FC27_2026_27_CLUB_COMPETITION_SOURCE_ASSOCIATION.sqlite') as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM edition_club_competitions').fetchone()[0]==13104
+              assert db.execute('SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM fc27_one_year_club_competition_alignment').fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_one_year_club_competition_alignment WHERE starting_competition='2027:in.1'").fetchone()[0]==0
+          print(json.dumps(j,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-659-ACTIVE-DOMESTIC-COMPETITION-GROUPS
+          path: release/
+          if-no-files-found: error
+          retention-days: 30

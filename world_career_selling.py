@@ -224,7 +224,10 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
         transfer_listed=(None if info["transfer_listed"] is None else bool(info["transfer_listed"])),
         player_wants_exit=(None if info["player_wants_exit"] is None else bool(info["player_wants_exit"])),
         financial_state=info["financial_state"],replacement=info["replacement"],
-        seller_stance=info["seller_stance"])
+        seller_stance=info["seller_stance"],
+        autonomous_market_reassessment=bool(
+            str(info.get("source_note") or "").startswith("fictional-autonomous-seller-")
+            and seller_club_id!=_check_manager(conn,career_id)))
     board_kwargs={"intervene":bool(info["board_enabled"]),
         "approval_multiple_pct":info["exceptional_offer_pct"]}
     if info["board_enabled"]:
@@ -297,12 +300,75 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
                     "pre_competition_asking_price":seller["asking_price"],
                     "pre_competition_reason":seller["reason"],
                     "decision":effective,"asking_price":asking,"reason":reason}
+    # FC27 autonomous sellers re-assess the *current projected squad* at
+    # the moment of this offer. Earlier departures cannot be ignored merely
+    # because another offer for the same player froze contextual facts.
+    # A severely disruptive deal remains available at an exceptional price;
+    # no signing a replacement before selling and no position-count veto.
+    tactical_review=None
+    if (seller_club_id!=_check_manager(conn,career_id) and
+        str(info.get("source_note") or "").startswith("fictional-autonomous-seller-")):
+        ds=conn.execute("""SELECT dataset_id FROM world_career_saves
+            WHERE career_id=?""",(career_id,)).fetchone()[0]
+        if ds=="fc27-warehouse-659-mens-2026-27":
+            from world_squad_planner import projected_squads,sale_profile
+            from world_ai_tactics import preferred_formation,tactical_needs
+            from world_fc27_ai_recruitment import read_fc27_profiles
+            from world_fc27_market_choices import disruption_sale_premium
+            profile=read_fc27_profiles(conn,dataset=ds,
+                club_id=seller_club_id).get(seller_club_id)
+            if profile:
+                pid_row=conn.execute("""SELECT p.primary_position,r.overall
+                    FROM world_players p JOIN world_dataset_ratings r
+                      ON r.player_id=p.player_id AND r.dataset_id=?
+                    WHERE p.player_id=?""",(ds,player_id)).fetchone()
+                if pid_row:
+                    tactics=tactical_needs(preferred_formation(
+                        club_id=seller_club_id,profile=profile))
+                    sale=sale_profile(projected_squads(
+                        conn,career_id=career_id,dataset=ds),
+                        seller=seller_club_id,player_id=player_id,
+                        position=pid_row[0],overall=pid_row[1],
+                        starting_roles=tactics["starting_roles"])
+                    if sale["valid"]:
+                        uplift=disruption_sale_premium(
+                            sale,seller_pressure=profile["financial_pressure_index"],
+                            player_wants_exit=bool(info["player_wants_exit"]))
+                        tactical_review={
+                            "formation":tactics["formation"],
+                            "lineup_loss":sale["formation_lineup_loss"],
+                            "tactical_sale_premium_pct":round(100*uplift,1),
+                            "first_choice":sale["first_choice"],
+                            "after_specialist_depth":sale["after_depth"]}
+                        if board["decision"]!="direct_sale" and uplift>0:
+                            reference_floor=int((info["market_value"]*(1+uplift)+49999)
+                                //50000)*50000
+                            # A seller may already be demanding a premium
+                            # for its key player's status. Bench disruption
+                            # adds a smaller *incremental* cost to that
+                            # existing reservation quote rather than vanishing
+                            # whenever that quote exceeds the reference floor.
+                            elevated_asking=(int((asking*(1+uplift*.36)+49999)//50000)
+                                *50000 if asking is not None else 0)
+                            risk_floor=max(reference_floor,elevated_asking)
+                            if asking is not None and risk_floor>asking:
+                                asking=risk_floor
+                                effective=("accept" if offer_fee>=asking
+                                           else "negotiate")
+                                reason+=(" Tactical squad disruption requires "
+                                    f"£{asking:,} without a signed replacement.")
+    if tactical_review is not None:
+        seller={**seller,"decision":effective,
+                "asking_price":asking,"reason":reason,
+                "current_tactical_squad_review":tactical_review}
     return {
         "decision":effective,
         "board_decision":board["decision"],
         "reason":reason,"asking_price":asking,"seller":seller,"board":board,
         "market_competition":competition,
+        "tactical_squad_review":tactical_review,
         "snapshot":json.dumps({"seller":seller,"board":board,
+            "tactical_squad_review":tactical_review,
             "market_competition":competition,
             "effective_reason":reason,"effective_asking_price":asking,
             "recorded_context":{k:v for k,v in info.items() if k not in (
