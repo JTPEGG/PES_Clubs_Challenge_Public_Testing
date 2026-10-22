@@ -254,6 +254,13 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         -len(outgoing_lanes[club]),
         signings_by_buyer[club],
         _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
+    # During a single market moment, no squad moves until a successful deal
+    # returns. Cache repeated source-rated fits and seller risk calculations,
+    # not final accept/reject/agent/board approvals. This matters at 659 clubs.
+    cached_fit={}
+    cached_sale={}
+    cached_replacement={}
+    cached_market_lanes={}
     for buyer in buyers[:32]:
         if budget_remaining(conn,career_id,buyer)<=0:
             continue
@@ -303,10 +310,13 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # Do not mistake an extra average defender for a needed CB:
                 # only the player's actual specialist slot can justify demand.
                 position=projected_positions.get(pid)
-                fit=recruitment_fit(projected,buyer=buyer,
-                                    position=position,overall=overall,
-                                    recent_senior_departure=(
-                                        lane_of(position) in outgoing_lanes[buyer]))
+                new_recruit=lane_of(position) in outgoing_lanes[buyer]
+                fit_key=(buyer,position,overall,new_recruit)
+                if fit_key not in cached_fit:
+                    cached_fit[fit_key]=recruitment_fit(
+                        projected,buyer=buyer,position=position,overall=overall,
+                        recent_senior_departure=new_recruit)
+                fit=cached_fit[fit_key]
                 # Future recruitment is separate from a starting-XI upgrade.
                 # Never manufacture a potential rating or guarantee a deal:
                 # agent and seller can still independently refuse.
@@ -316,20 +326,29 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         existing_prospects=youth_signings[buyer])
                 if not fit["eligible"]:
                     continue
-                sale=sale_profile(projected,seller=seller,
-                    player_id=pid,position=position,overall=overall)
+                sale_key=(seller,pid)
+                if sale_key not in cached_sale:
+                    cached_sale[sale_key]=sale_profile(
+                        projected,seller=seller,player_id=pid,
+                        position=position,overall=overall)
+                sale=cached_sale[sale_key]
                 if not sale["valid"]:
                     continue
-                # Sell with a plan, not with a fictitious completed purchase.
-                # Existing club/squad/contract/board approval still decides.
-                market_candidates=[
-                  source_ovr for source_club,source_player,source_ovr in
-                  future_options_by_lane.get(sale["lane"],())
-                  if source_club!=seller and source_player!=pid
-                ]
-                replacement_plan=assess_future_replacement(
-                    sale=sale,departing_overall=overall,
-                    market_options=market_candidates)
+                # Scan the entire source-rated candidate pool, but build
+                # other-club alternatives once per specialist lane and seller.
+                # No replacement is assumed to have signed.
+                market_key=(sale["lane"],seller)
+                if market_key not in cached_market_lanes:
+                    cached_market_lanes[market_key]=[
+                      source_ovr for source_club,source_player,source_ovr
+                      in future_options_by_lane.get(sale["lane"],())
+                      if source_club!=seller
+                    ]
+                if sale_key not in cached_replacement:
+                    cached_replacement[sale_key]=assess_future_replacement(
+                        sale=sale,departing_overall=overall,
+                        market_options=cached_market_lanes[market_key])
+                replacement_plan=cached_replacement[sale_key]
                 # Seller, player and board decide whether an uncomfortable
                 # sale proceeds. An unsigned replacement is not a veto.
                 # Rank surplus deals higher to discourage gratuitous
