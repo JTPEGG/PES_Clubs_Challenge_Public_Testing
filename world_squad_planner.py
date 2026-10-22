@@ -334,6 +334,17 @@ def sale_profile(squads, *, seller, player_id, position, overall,
     # instead counts simultaneous cover: the same person cannot fulfil
     # centre-back AND defensive-midfield during one match.
     simultaneous_loss=max(0,whole_before["filled"]-whole_after["filled"])
+    # A full tactical XI is a coupled assignment problem: two players
+    # covering three potential positions are still only two people.
+    # Compare the manager's whole preferred starting formation, rather
+    # than only the departing footballer's primary role.
+    if starting_roles is not None:
+        match_before=assign_available_players(squads,seller,starting_roles)
+        match_after=assign_available_players(
+            squads,seller,starting_roles,exclude_player=player_id)
+        formation_lineup_loss=max(0,match_before["filled"]-match_after["filled"])
+    else:
+        formation_lineup_loss=0
     seriousness=max((r["starter_rating_drop"]*2+
                      r["backup_quality_drop"]+
                      (15 if r["depth_shortage"] else 0)
@@ -341,10 +352,12 @@ def sale_profile(squads, *, seller, player_id, position, overall,
     # Strong clubs ought to retain *competition-quality* reserves instead of
     # preserving only their top two starters and replacing depth with 70s.
     # This only makes a routine sale harder; does not bar genuine exceptions.
-    protected_rotation=quality>=82 and (simultaneous_loss>0 or any(
+    protected_rotation=(formation_lineup_loss>0 or
+        quality>=82 and (simultaneous_loss>0 or any(
         r["backup_quality_drop"]>=4 or r["starter_rating_drop"]>=4
-        for r in reports))
-    needs=simultaneous_loss>0 or any(r["recruitment_needed"] for r in reports)
+        for r in reports)))
+    needs=formation_lineup_loss>0 or simultaneous_loss>0 or any(
+        r["recruitment_needed"] for r in reports)
     main=next(r for r in reports if r["lane"]==slot)
     return {
         "valid":True,"lane":slot,"rank":rank,
@@ -363,8 +376,11 @@ def sale_profile(squads, *, seller, player_id, position, overall,
             STARTERS[slot] if starting_roles is None
             else starting_roles.get(slot,0)),
         "protected_rotation":protected_rotation,
-        "sporting_risk":seriousness,
+        "sporting_risk":seriousness+formation_lineup_loss*35,
         "simultaneous_cover_loss":simultaneous_loss,
+        "formation_lineup_loss":formation_lineup_loss,
+        "tactically_required":(starting_roles is None or
+                               starting_roles.get(slot,0)>0),
         "affected_positions":reports,
         "source_standard_top11":round(quality,2),
         "reason":("Routine sale would materially weaken elite rotation"
