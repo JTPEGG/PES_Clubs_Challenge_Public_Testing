@@ -12,6 +12,11 @@ on:
       - 'world_live_buying.py'
       - 'world_ai_replacement_outlook.py'
       - 'world_squad_planner.py'
+      - 'world_fc27_market_choices.py'
+      - 'world_careers.py'
+      - 'world_valuation.py'
+      - 'world_career_selling.py'
+      - 'test_world_fc27_market_choices.py'
       - 'world_ai_tactics.py'
       - 'world_ai_bidding.py'
       - 'world_selling_club.py'
@@ -85,6 +90,9 @@ jobs:
           assert all("modelled_preferred_formation" in c
                      for c in a["elite_club_transfer_decisions"].values())
           assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
+          assert "tactical_xi_coverage_alerts" in a
+          assert a["in_game_final_registrations"]<a["autonomous_moments_processed"], (
+              "Every market tick became a forced signing: autonomous declines broken")
           assert a["opportunity_scale_QA_only"]==${{ matrix.opportunity_scale }}
           assert a["extra_QA_opportunities_not_forced_transfers"]
           assert a["senior_first_team_deals"]+a["prospect_deals"]==a["in_game_final_registrations"]
