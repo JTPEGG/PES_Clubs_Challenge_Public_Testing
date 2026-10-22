@@ -4,6 +4,7 @@ import unittest
 from world_fc27_ai_recruitment import (
     buyer_recruitment_priority,domestic_market_preference,
     modelled_seller_finances,modelled_financial_objective,read_fc27_profiles,
+    positional_family_priorities,prospect_budget_penalty,
 )
 
 class ClubAIContextTests(unittest.TestCase):
@@ -73,6 +74,30 @@ class ClubAIContextTests(unittest.TestCase):
         b=buyer_recruitment_priority(self.squad,club=1,profile=distressed)
         self.assertLess(b,a)
         self.assertGreater(b,-100)
+
+    def test_specialist_need_not_global_goalkeeper_or_striker_market_quota(self):
+        base=positional_family_priorities(self.squad,club=1)
+        less_gk={1:{**self.squad[1],"GK":[(11,86,"GK")]}}
+        thin=positional_family_priorities(less_gk,club=1)
+        self.assertGreater(thin["GK"],base["GK"])
+        # A forward recruitment need is unrelated to other clubs' deals.
+        sold_starter={1:{**self.squad[1],"ST":[]}}
+        urgent=positional_family_priorities(sold_starter,club=1,
+                                            departed_lanes={"ST"})
+        self.assertGreater(urgent["FWD"],base["FWD"])
+        self.assertEqual(set(base),{"GK","DEF","MID","FWD"})
+
+    def test_soft_development_opportunity_cost_is_not_a_veto(self):
+        low=prospect_budget_penalty(fee=2_000_000,
+            available_budget=45_000_000,opening_budget=50_000_000)
+        high=prospect_budget_penalty(fee=18_000_000,
+            available_budget=45_000_000,opening_budget=50_000_000)
+        self.assertGreater(high,low)
+        self.assertIsInstance(high,float)
+        self.assertLess(high,30)
+        with self.assertRaises(ValueError):
+            prospect_budget_penalty(fee=-1,
+                available_budget=45_000_000,opening_budget=50_000_000)
 
     def test_international_moves_remain_possible_under_soft_home_preference(self):
         self.assertGreater(domestic_market_preference(
