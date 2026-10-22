@@ -99,8 +99,9 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
     existing=get_seller_assumptions(conn,career_id,player_id)
     # Existing manager-specified assumptions win; the FC27 model is only
     # consulted for independently simulated autonomous AI sellers.
-    fc27_seller=(read_fc27_profiles(conn,dataset=target["dataset"])
-        .get(target["seller"]) if autonomous_club else None)
+    fc27_seller=(read_fc27_profiles(conn,dataset=target["dataset"],
+        club_id=target["seller"]).get(target["seller"])
+        if autonomous_club else None)
     if existing is None:
         record_seller_assumptions(
             conn,career_id=career_id,player_id=player_id,
