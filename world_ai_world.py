@@ -30,7 +30,7 @@ from world_fc27_market_choices import (select_recruiting_club,
     select_tactical_family,choose_development_focus,pursue_transfer,
     POLICY_VERSION as DEAL_CHOICE_VERSION)
 
-AI_WORLD_VERSION = "ai-world-v9-voluntary-targeted-recruitment"
+AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
 # Do not impose an arbitrary global signing count: a 659-club market reached
 # the old 90-deal ceiling exactly and was artificially truncated.
@@ -312,14 +312,14 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         buyer=select_recruiting_club(
             {club:scouting_priority[club] for club in buyers},
             draw=_stable(
-            career_id,window_id,slot,AI_WORLD_VERSION,"lead-desk")%1000000)
+            career_id,window_id,slot,DEAL_CHOICE_VERSION,"lead-desk")%1000000)
         if buyer is None:
             return None
         buyers=[buyer]
         if not pursue_transfer(priority=scouting_priority[buyer],
                 profile=club_ai_context.get(buyer),
                 draw=_stable(career_id,window_id,slot,buyer,
-                             AI_WORLD_VERSION,"commit-or-hold")%1000):
+                             DEAL_CHOICE_VERSION,"commit-or-hold")%1000):
             return None
     else:
         buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
@@ -352,12 +352,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 family_needs=lane_scores,
                 starting_roles=club_tactics[buyer],
                 draw=_stable(career_id,window_id,slot,buyer,
-                             AI_WORLD_VERSION,"tactical-brief")%1000000)
+                             DEAL_CHOICE_VERSION,"tactical-brief")%1000000)
             priorities=[targeted_family]
             development_focus=choose_development_focus(
                 profile=club_ai_context.get(buyer),
                 draw=_stable(career_id,window_id,slot,buyer,
-                             AI_WORLD_VERSION,"development-or-XI")%1000)
+                             DEAL_CHOICE_VERSION,"development-or-XI")%1000)
         else:
             priorities=sorted(profiles,key=lambda group:(
             (-0.4 if any(
