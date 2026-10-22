@@ -496,7 +496,10 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     price=determine_offer(career_id=career_id,player_id=pid,
                         club_id=buyer,valuation=value,available_budget=money,
                         need_score=need,eligible_clubs=1,
-                        seller_assumptions=seller_facts)
+                        seller_assumptions=seller_facts,
+                        strategic_ceiling_uplift=(
+                            min(0.40,max(0,(need-55)*0.012))
+                            if club_ai_context else 0.0))
                     if price["fee"] is None:
                         continue
                     # No veto based on an unsigned replacement or a numerical
