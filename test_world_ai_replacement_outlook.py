@@ -38,6 +38,23 @@ class AIForwardReplacementTests(unittest.TestCase):
         self.assertEqual(huge["decision"],"accept")
         self.assertTrue(huge["autonomous_market_reassessment"])
         self.assertGreater(huge["asking_price"],CONTEXT["market_value"])
+    def test_only_an_exceptional_ai_key_player_reaches_extreme_pricing(self):
+        extreme=evaluate_selling_club(**CONTEXT,
+            autonomous_market_reassessment=True)
+        ordinary={**CONTEXT,"squad_role":"regular_starter",
+                  "seller_stance":"neutral","contract_years":3,
+                  "replacement":"available"}
+        normal=evaluate_selling_club(**ordinary,
+            autonomous_market_reassessment=True)
+        self.assertGreater(extreme["asking_price"],normal["asking_price"])
+        self.assertLess(extreme["asking_price"],CONTEXT["market_value"]*2.20)
+        self.assertLess(normal["asking_price"],CONTEXT["market_value"]*1.55)
+        self.assertEqual(normal["decision"],"negotiate" if
+            ordinary["offer_fee"]<normal["asking_price"] else "accept")
+        self.assertEqual(evaluate_selling_club(**{
+            **ordinary,"offer_fee":normal["asking_price"]},
+            autonomous_market_reassessment=True)["decision"],"accept")
+
     def test_existing_user_recorded_retain_policy_is_not_changed(self):
         old=evaluate_selling_club(**CONTEXT)
         self.assertEqual(old["decision"],"reject")
