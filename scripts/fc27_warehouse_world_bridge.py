@@ -107,6 +107,42 @@ def build_world(reference_path,target_path):
                 ((DATASET,mapping[key],transfer,wage,
                  "GAME_MODEL:FC27_659_source_financial_capacity")
                  for key,transfer,wage in finances))
+            # Copy only labelled GAME decisions from the frozen reference.
+            # Never turn simulated manager scores into factual appointments,
+            # and never mutate the approved warehouse or an existing career.
+            db.execute("""CREATE TABLE world_fc27_club_ai_context(
+              dataset_id TEXT NOT NULL,
+              club_id INTEGER NOT NULL,
+              sporting_appeal INTEGER NOT NULL,
+              ambition_level INTEGER NOT NULL,
+              pressure_to_improve INTEGER NOT NULL,
+              operating_approach TEXT NOT NULL,
+              financial_pressure_band TEXT NOT NULL,
+              financial_pressure_index INTEGER NOT NULL,
+              simulated_manager_risk INTEGER NOT NULL,
+              simulated_manager_financial_discipline INTEGER NOT NULL,
+              source_note TEXT NOT NULL,
+              PRIMARY KEY(dataset_id,club_id))""")
+            ai_profiles=list(db.execute("""SELECT d.club_key,d.sporting_appeal,
+              d.ambition_level,d.pressure_to_improve,d.operating_approach,
+              f.pressure_band,f.pressure_index,a.recruitment_risk_appetite,
+              a.financial_discipline
+              FROM frozen.wh_fc27_club_decision_profile d
+              JOIN frozen.wh_fc27_club_financial_circumstances f
+                ON f.edition=d.edition AND f.club_key=d.club_key
+              JOIN frozen.wh_fc27_simulated_manager_agents a
+                ON a.edition=d.edition AND a.starting_club_key=d.club_key
+              WHERE d.edition=2027"""))
+            if len(ai_profiles)!=659 or len({x[0] for x in ai_profiles})!=659:
+                raise ValueError("Incomplete source-labelled club AI decision profiles")
+            db.executemany("""INSERT INTO world_fc27_club_ai_context
+              VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+              ((DATASET,mapping[key],appeal,ambition,pressure,approach,
+                band,financial_pressure,manager_risk,discipline,
+                "GAME_MODEL:FC27_warehouse; anonymous simulated coach; "
+                "not real board, finances or manager evidence")
+                for key,appeal,ambition,pressure,approach,band,
+                    financial_pressure,manager_risk,discipline in ai_profiles))
             player_ids={}
             for (key,club,name,dob,nation,pos,srcid,overall,other,fit,
                  foot,height,weight,wage,expires,wage_origin) in registrations:
@@ -191,6 +227,7 @@ def build_world(reference_path,target_path):
                 "source_clubs":len(clubs),"source_competitions":len(leagues),
                 "source_registered_players":len(registrations),
                 "modelled_financial_profiles":len(finances),
+                "source_labelled_ai_club_profiles":len(ai_profiles),
                 "pes_attribute_values":attr_count,
                 "source_loans":loan_count,
                 "source_sha256":sha,
