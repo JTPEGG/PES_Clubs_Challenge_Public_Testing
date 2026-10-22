@@ -1,0 +1,35 @@
+name: FC27 senior first-team replacement logic regressions
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_ai_world.py'
+      - 'world_squad_planner.py'
+      - 'test_world_squad_planner.py'
+      - '.github/workflows/fc27-senior-recruitment-qa.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check source-backed projected-squad and autonomous AI decision tests
+        run: |
+          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook
+      - name: Verify AI does not require purchasing a replacement before sale
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("world_ai_world.py").read_text()
+          assert "recent_senior_departure=(" in p
+          assert "MAX_SIGNINGS_PER_AI_CLUB" not in p
+          assert "MAX_OUTGOING_PER_AI_CLUB" not in p
+          assert "protected_exception is None:" not in p
+          assert "club_ratings and overall>max(club_ratings)+14" not in p
+          print("SENIOR SOURCE-RATED REPLACEMENTS ELIGIBLE; NO PRE-SALE SIGNING OR PER-CLUB QUOTA")
+          PY
