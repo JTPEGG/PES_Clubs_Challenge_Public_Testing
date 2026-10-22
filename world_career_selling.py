@@ -341,8 +341,16 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
                             "first_choice":sale["first_choice"],
                             "after_specialist_depth":sale["after_depth"]}
                         if board["decision"]!="direct_sale" and uplift>0:
-                            risk_floor=int((info["market_value"]*(1+uplift)+49999)
+                            reference_floor=int((info["market_value"]*(1+uplift)+49999)
                                 //50000)*50000
+                            # A seller may already be demanding a premium
+                            # for its key player's status. Bench disruption
+                            # adds a smaller *incremental* cost to that
+                            # existing reservation quote rather than vanishing
+                            # whenever that quote exceeds the reference floor.
+                            elevated_asking=(int((asking*(1+uplift*.36)+49999)//50000)
+                                *50000 if asking is not None else 0)
+                            risk_floor=max(reference_floor,elevated_asking)
                             if asking is not None and risk_floor>asking:
                                 asking=risk_floor
                                 effective=("accept" if offer_fee>=asking
