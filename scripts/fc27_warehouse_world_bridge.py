@@ -26,6 +26,26 @@ def digest(path):
             h.update(chunk)
     return h.hexdigest()
 
+def explicit_source_alternative_positions(raw):
+    """Only actual documented FC source alt positions; never infer from role."""
+    from world_squad_planner import lane_of
+    if raw is None or raw=="":
+        return []
+    try:
+        values=json.loads(raw) if isinstance(raw,str) else raw
+    except (ValueError,TypeError):
+        return []  # unknown encoding stays unknown
+    if not isinstance(values,list):
+        return []
+    alternatives=[]
+    for item in values:
+        pos=(item if isinstance(item,str) else
+             item.get("position") if isinstance(item,dict) else None)
+        if isinstance(pos,str) and lane_of(pos):
+            alternatives.append(pos)
+    return sorted(set(alternatives))
+
+
 def build_world(reference_path,target_path):
     from world_historical_career_import import initialize_target
     reference=Path(reference_path).resolve()
@@ -143,6 +163,12 @@ def build_world(reference_path,target_path):
                 "not real board, finances or manager evidence")
                 for key,appeal,ambition,pressure,approach,band,
                     financial_pressure,manager_risk,discipline in ai_profiles))
+            db.execute("""CREATE TABLE IF NOT EXISTS
+                 world_player_alternative_positions(
+                 dataset_id TEXT NOT NULL,player_id INTEGER NOT NULL,
+                 position TEXT NOT NULL,source_note TEXT NOT NULL,
+                 PRIMARY KEY(dataset_id,player_id,position))""")
+            imported_alternatives=0
             player_ids={}
             for (key,club,name,dob,nation,pos,srcid,overall,other,fit,
                  foot,height,weight,wage,expires,wage_origin) in registrations:
@@ -151,6 +177,16 @@ def build_world(reference_path,target_path):
                   VALUES(?,?,?,?,?)""",(name,dob,nation,pos,
                   "FC27 edition-source, immutable warehouse reference")).lastrowid
                 player_ids[key]=pid
+                from world_squad_planner import lane_of
+                for alternate in explicit_source_alternative_positions(other):
+                    if lane_of(alternate)==lane_of(pos):
+                        continue
+                    db.execute("""INSERT OR IGNORE INTO
+                         world_player_alternative_positions
+                         (dataset_id,player_id,position,source_note)
+                         VALUES(?,?,?,?)""",(DATASET,pid,alternate,
+                          "Verified FC27 source alternative position; no inferred versatility"))
+                    imported_alternatives+=1
                 db.execute("""INSERT INTO world_player_source_refs
                  (player_id,source_name,external_id,source_url,identity_status)
                  VALUES(?,?,?,?,?)""",
@@ -230,6 +266,7 @@ def build_world(reference_path,target_path):
                 "source_labelled_ai_club_profiles":len(ai_profiles),
                 "pes_attribute_values":attr_count,
                 "source_loans":loan_count,
+                "fc27_explicit_source_alternative_positions":imported_alternatives,
                 "source_sha256":sha,
                 "dataset_id":DATASET,
                 "production_deployment":False,
