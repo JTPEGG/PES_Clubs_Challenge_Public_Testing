@@ -16,6 +16,7 @@ from world_careers import start_sandbox, wage_budget_breakdown
 from world_live_market import (initialise_live_market,start_live_market,
   process_live_market,MARKET_MOMENTS)
 from world_preseason_window import window_snapshot
+from world_fc27_ai_recruitment import VERSION as FC27_RECRUITMENT_VERSION
 from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of,squad_standard
 
 def evaluate(full_world_path,output,*,opportunity_scale=1):
@@ -189,6 +190,7 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             raise ValueError("Career foreign keys failed")
         report={
           "model":"actual_live_30_minute_autonomous_AI_on_disposable_659_clubs",
+          "fc27_context_recruitment_version":FC27_RECRUITMENT_VERSION,
           "dataset_id":DATASET,"source_competitions":leagues,
           "source_clubs":source,"source_players":rosters,
           "modelled_ai_club_contexts_copied":ai_profiles,
