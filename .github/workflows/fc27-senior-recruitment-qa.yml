@@ -11,6 +11,8 @@ on:
       - 'world_squad_planner.py'
       - 'world_ai_tactics.py'
       - 'world_fc27_market_choices.py'
+      - 'world_fc27_market_schedule.py'
+      - 'test_world_fc27_market_schedule.py'
       - 'world_careers.py'
       - 'world_valuation.py'
       - 'world_career_selling.py'
@@ -38,7 +40,7 @@ jobs:
           python-version: '3.12'
       - name: Check source-backed projected-squad and autonomous AI decision tests
         run: |
-          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment test_world_market_decision_policy test_world_fc27_market_choices
+          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment test_world_market_decision_policy test_world_fc27_market_choices test_world_fc27_market_schedule
       - name: Verify AI does not require purchasing a replacement before sale
         run: |
           python - <<'PY'
@@ -51,6 +53,12 @@ jobs:
           assert "starting_roles=club_tactics.get(buyer)" in p
           assert "for buyer in buyers:" in p
           assert "select_recruiting_club" in p
+          assert "buying_club_id=None" in p
+          assert "Explicit AI buyer is only valid for FC27" in p
+          live=Path("world_live_market.py").read_text()
+          assert "if fc27_club_led:" in live
+          assert "process_fc27_market_interval" in live
+          assert "else:\\n            # IMMUTABLE older careers" in live
           assert "pursue_transfer" in p
           assert "options=[o for o in options" in p
           assert "for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:" in p
