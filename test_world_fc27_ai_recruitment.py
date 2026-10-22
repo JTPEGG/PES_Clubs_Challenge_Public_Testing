@@ -44,6 +44,14 @@ class ClubAIContextTests(unittest.TestCase):
            "fictional-game-model"))
         self.assertEqual(read_fc27_profiles(self.db,dataset="old"),{})
         self.assertEqual(read_fc27_profiles(self.db,dataset="fc27")[1]["ambition_level"],83)
+        self.db.execute("INSERT INTO world_fc27_club_ai_context VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+          ("fc27",2,72,64,45,"balanced","tight",55,48,76,
+           "fictional-game-model"))
+        self.assertEqual(set(read_fc27_profiles(
+            self.db,dataset="fc27",club_id=1)),{1})
+        self.assertEqual(read_fc27_profiles(
+            self.db,dataset="fc27",club_id=99),{})
+
 
     def test_ambitious_club_is_more_active_without_guaranteed_signings(self):
         baseline=buyer_recruitment_priority(self.squad,club=1,stable_variation=8)
