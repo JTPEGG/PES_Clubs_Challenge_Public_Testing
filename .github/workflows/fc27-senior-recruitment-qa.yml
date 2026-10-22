@@ -10,6 +10,11 @@ on:
       - 'test_world_fc27_ai_recruitment.py'
       - 'world_squad_planner.py'
       - 'world_ai_tactics.py'
+      - 'world_fc27_market_choices.py'
+      - 'world_careers.py'
+      - 'world_valuation.py'
+      - 'world_career_selling.py'
+      - 'test_world_fc27_market_choices.py'
       - 'world_ai_bidding.py'
       - 'world_selling_club.py'
       - 'world_career_board_policy.py'
@@ -18,7 +23,7 @@ on:
       - 'test_world_recruitment_strategy.py'
       - 'test_world_squad_planner.py'
       - 'test_world_ai_replacement_outlook.py'
-      - 'test_world_market_decision_policy.py'
+      - 'test_world_market_decision_policy test_world_fc27_market_choices.py'
       - '.github/workflows/fc27-senior-recruitment-qa.yml'
 permissions:
   contents: read
@@ -45,6 +50,9 @@ jobs:
           assert "preferred_formation" in p
           assert "starting_roles=club_tactics.get(buyer)" in p
           assert "for buyer in buyers:" in p
+          assert "select_recruiting_club" in p
+          assert "pursue_transfer" in p
+          assert "options=[o for o in options" in p
           assert "for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:" in p
           assert "if approaches>=AI_APPROACHES_PER_ATTEMPT" not in p
           inbox=Path("world_live_market.py").read_text()
