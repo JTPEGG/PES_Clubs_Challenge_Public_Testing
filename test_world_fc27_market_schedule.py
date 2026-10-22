@@ -44,6 +44,20 @@ class ClubLedMarketTests(unittest.TestCase):
         self.assertGreater(strong,weak)
         self.assertLess(strong,1000)
 
+    def test_high_ambition_enters_market_more_without_mandated_deals(self):
+        ordinary={"ambition_level":58,"pressure_to_improve":58,
+                  "financial_pressure_index":30}
+        aggressive={**ordinary,"ambition_level":92,
+                    "pressure_to_improve":85}
+        probability=lambda profile:sum(club_market_interest(
+            priority=50,profile=profile,draw=draw)
+            for draw in range(0,1000000,1000))
+        self.assertGreater(probability(aggressive),probability(ordinary))
+        self.assertGreater(probability(aggressive),0)
+        self.assertLess(probability(aggressive),1000)
+        strained={**aggressive,"financial_pressure_index":96}
+        self.assertLess(probability(strained),probability(aggressive))
+
     def test_each_club_and_interval_has_stable_non_colliding_checkpoint(self):
         slots={fc27_market_slot(index,club) for index in range(12)
                for club in range(1,660)}
