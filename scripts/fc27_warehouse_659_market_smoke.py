@@ -97,6 +97,32 @@ def evaluate(full_world_path,output):
           FROM world_dataset_entries e JOIN world_competitions c
             ON c.competition_id=e.competition_id WHERE e.dataset_id=?""",
             (DATASET,)))
+        club_country=dict(con.execute("""SELECT e.club_id,c.country
+          FROM world_dataset_entries e JOIN world_competitions c
+            ON c.competition_id=e.competition_id WHERE e.dataset_id=?""",
+            (DATASET,)))
+        inbound=Counter(r[3] for r in actual)
+        outbound=Counter(r[2] for r in actual)
+        crossed_country=sum(club_country[r[2]]!=club_country[r[3]]
+                            for r in actual)
+        elite={}
+        for name in ("Arsenal","Chelsea","Manchester City"):
+            candidates=[cid for cid,display in clubs.items()
+                        if display.startswith(name+" [WH27:")]
+            if len(candidates)!=1:
+                raise ValueError("FC27 reviewed elite source club key is ambiguous: "+name)
+            cid=candidates[0]
+            senior_signings=sum(r[3]==cid and not con.execute("""
+                SELECT 1 FROM world_career_offer_events
+                WHERE offer_id=? AND event_type='ai_prospect_signed' LIMIT 1
+            """,(r[0],)).fetchone() for r in actual)
+            elite[name]={"arrivals":inbound[cid],"departures":outbound[cid],
+                         "net_arrivals":inbound[cid]-outbound[cid],
+                         "senior_first_team_arrivals":senior_signings,
+                         "initial_source_cb_count":len(initial[cid].get("CB",[])),
+                         "final_source_cb_count":len(final[cid].get("CB",[]))}
+        buyers_with_signings=len(inbound)
+        sellers_with_sales=len(outbound)
         senior=[];prospects=[]
         for offer,pid,seller,buyer,primary,overall,fee in actual:
             if club_comp[seller]!=club_comp[buyer]:crossing+=1
@@ -140,6 +166,15 @@ def evaluate(full_world_path,output):
           "in_game_final_registrations":len(actual),
           "still_agreed_future":future,
           "cross_competition_moves":crossing,
+          "cross_country_moves":crossed_country,
+          "different_buyers":buyers_with_signings,
+          "different_sellers":sellers_with_sales,
+          "share_clubs_with_arrivals":round(buyers_with_signings/source,3),
+          "elite_club_transfer_decisions":elite,
+          "top_buyers":[{"club":clubs[cid],"arrivals":n}
+              for cid,n in inbound.most_common(10)],
+          "top_sellers":[{"club":clubs[cid],"departures":n}
+              for cid,n in outbound.most_common(10)],
           "source_ability_position_counts":dict(position),
           "senior_first_team_deals":len(senior),
           "prospect_deals":len(prospects),
