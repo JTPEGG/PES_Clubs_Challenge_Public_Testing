@@ -26,8 +26,11 @@ from world_fc27_ai_recruitment import (read_fc27_profiles,
     prospect_budget_penalty,candidate_sporting_priority,
     scouting_desk_activation)
 from world_ai_tactics import preferred_formation,tactical_needs
+from world_fc27_market_choices import (select_recruiting_club,
+    select_tactical_family,choose_development_focus,pursue_transfer,
+    POLICY_VERSION as DEAL_CHOICE_VERSION)
 
-AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
+AI_WORLD_VERSION = "ai-world-v9-voluntary-targeted-recruitment"
 # The bounded, idempotent market-moment ledger already controls processing.
 # Do not impose an arbitrary global signing count: a 659-club market reached
 # the old 90-deal ceiling exactly and was artificially truncated.
@@ -303,6 +306,19 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         buyers.sort(key=lambda club:(
             -scouting_priority[club],
             _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
+        # A market opportunity belongs to ONE willing recruitment desk.
+        # Exhaustively retrying every club until someone signed was
+        # effectively forcing one completed transfer per scheduled tick.
+        buyer=select_recruiting_club(scouting_priority,draw=_stable(
+            career_id,window_id,slot,AI_WORLD_VERSION,"lead-desk")%1000000)
+        if buyer is None:
+            return None
+        buyers=[buyer]
+        if not pursue_transfer(priority=scouting_priority[buyer],
+                profile=club_ai_context.get(buyer),
+                draw=_stable(career_id,window_id,slot,buyer,
+                             AI_WORLD_VERSION,"commit-or-hold")%1000):
+            return None
     else:
         buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
             -len(outgoing_lanes[club]),
@@ -330,9 +346,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
             lane_scores=positional_family_priorities(projected,club=buyer,
                 departed_lanes=outgoing_lanes[buyer],
                 starting_roles=club_tactics.get(buyer))
-            priorities=sorted(profiles,key=lambda group:(
-                -lane_scores.get(group,0),
-                _stable(slot,buyer,group,AI_WORLD_VERSION)))
+            targeted_family=select_tactical_family(
+                family_needs=lane_scores,
+                starting_roles=club_tactics[buyer],
+                draw=_stable(career_id,window_id,slot,buyer,
+                             AI_WORLD_VERSION,"tactical-brief")%1000000)
+            priorities=[targeted_family]
+            development_focus=choose_development_focus(
+                profile=club_ai_context.get(buyer),
+                draw=_stable(career_id,window_id,slot,buyer,
+                             AI_WORLD_VERSION,"development-or-XI")%1000)
         else:
             priorities=sorted(profiles,key=lambda group:(
             (-0.4 if any(
@@ -451,6 +474,13 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 options.append((seller,pid,overall,need,
                                 need+seller_fit+sporting_gain,
                                 fit,sale,replacement_plan))
+            if club_ai_context:
+                # A manager has chosen whether this is a development search
+                # or a senior-tactics search. A lack of targets is a
+                # legitimate no-deal result; don't switch clubs and keep
+                # searching until a transaction is manufactured.
+                options=[o for o in options if (
+                    (o[5].get("category")=="prospect")==development_focus)]
             options.sort(key=lambda v:(-v[4],
                 _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
             for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:
@@ -508,6 +538,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                             min(0.40,max(0,(need-55)*0.012))
                             if club_ai_context else 0.0))
                     if price["fee"] is None:
+                        if club_ai_context:
+                            return None
                         continue
                     # No veto based on an unsigned replacement or a numerical
                     # net-departure cap. High-quality/rotation-critical exits
@@ -519,6 +551,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                             and price["fee"]>prospect_fee_cap(
                             initial_transfer_budget=ledger[0],
                             available_budget=money)):
+                        if club_ai_context:
+                            return None
                         continue
                     oid=propose_offer(conn,career_id=career_id,request_key=key,
                         player_id=pid,buying_club_id=buyer,offered_fee=price["fee"],
@@ -548,12 +582,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                                  asking>prospect_fee_cap(
                                      initial_transfer_budget=ledger[0],
                                      available_budget=money))):
+                            if club_ai_context:
+                                return None
                             continue
                         from world_careers import accept_counter
                         accept_counter(conn,career_id=career_id,offer_id=oid)
                         status="accepted_pending_contract"
                         final_fee=asking
                     if status!="accepted_pending_contract":
+                        if club_ai_context:
+                            return None
                         continue
                     from world_live_market import _modelled_europe
                     conn.execute("""INSERT OR IGNORE INTO world_career_offer_europe
@@ -569,10 +607,14 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     interest=player_move_interest(conn,career_id=career_id,
                         offer_id=oid,role_promise=promise)
                     if not interest["can_negotiate"]:
+                        if club_ai_context:
+                            return None
                         continue
                     terms=agent_terms(conn,career_id=career_id,offer_id=oid)
                     demand=terms["demanded_wage_weekly"]
                     if demand>wage_budget_breakdown(conn,career_id,buyer)["remaining"]:
+                        if club_ai_context:
+                            return None
                         continue
                     first_wage,style=_ai_wage_opening(
                         demand=demand,career_id=career_id,buyer=buyer,
@@ -586,12 +628,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         # compromise. Some clubs walk away after the counter;
                         # others will match the updated demand if affordable.
                         if style%9==0 or style>=93:
+                            if club_ai_context:
+                                return None
                             continue
                         demand=conn.execute("""SELECT demanded_wage_weekly
                             FROM world_career_agent_terms
                             WHERE offer_id=?""",(oid,)).fetchone()[0]
                         if demand>wage_budget_breakdown(
                                 conn,career_id,buyer)["remaining"]:
+                            if club_ai_context:
+                                return None
                             continue
                         final_wage=demand
                         response=negotiate_agent(conn,career_id=career_id,
@@ -599,6 +645,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                             contract_years=3,role_promise=promise,
                             agreement_date=game_date)
                     if response!="accepted":
+                        if club_ai_context:
+                            return None
                         continue
                     _sign_ai_deal(conn,career_id=career_id,offer_id=oid,buyer=buyer,
                         seller=seller,fee=final_fee,wage=final_wage,
@@ -659,6 +707,9 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     conn.commit()
                     return oid
                 except (ValueError, TypeError):
-                    # Unsupported or refused terms do not invent player consent.
+                    # A chosen recruiting desk may fail. FC27 must not
+                    # try another footballer/club until one finally signs.
+                    if club_ai_context:
+                        return None
                     continue
     return None
