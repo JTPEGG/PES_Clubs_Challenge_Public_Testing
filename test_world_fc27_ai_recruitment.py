@@ -5,7 +5,8 @@ from world_fc27_ai_recruitment import (
     buyer_recruitment_priority,
     modelled_seller_finances,modelled_financial_objective,read_fc27_profiles,
     positional_family_priorities,prospect_budget_penalty,
-    candidate_sporting_priority,
+    candidate_sporting_priority,scouting_desk_activation,
+    expected_scouting_activity,
 )
 
 class ClubAIContextTests(unittest.TestCase):
@@ -168,6 +169,18 @@ class ClubAIContextTests(unittest.TestCase):
                               overall=87,starting_roles=modern)
         self.assertTrue(wide_mid["eligible"])
         self.assertFalse(winger["eligible"])
+
+    def test_all_clubs_can_recruit_without_a_first_32_scouting_veto(self):
+        low=expected_scouting_activity(0)
+        high=expected_scouting_activity(80)
+        self.assertLess(low,high)
+        self.assertGreater(low,0)
+        self.assertLess(high,1)
+        self.assertTrue(scouting_desk_activation(priority=0,draw=0))
+        self.assertTrue(scouting_desk_activation(priority=80,draw=0))
+        self.assertFalse(scouting_desk_activation(priority=80,draw=999))
+        with self.assertRaises(ValueError):
+            scouting_desk_activation(priority=30,draw=-1)
 
     def test_invalid_market_variation_is_still_rejected(self):
         with self.assertRaises(ValueError):
