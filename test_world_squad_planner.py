@@ -89,11 +89,13 @@ class PlannerTests(unittest.TestCase):
         self.assertGreaterEqual(fit["score"],60)
 
     def test_signed_senior_sale_unlocks_comparable_replacement_without_prior_purchase(self):
-        # Elite club with two 88/86 CBs and a strong 87+ squad:
-        # 85-rated CB is not a +3 improvement, but is sensible after
-        # accepting a CB departure. He is NOT presumed already signed.
-        cb=self.player(1,"CB",88)
-        self.player(1,"CB",86)
+        # An elite club with sufficient existing CB depth sells a 92 OVR
+        # starter. An 85-rated CB is NOT a +3 upgrade before or after sale,
+        # and depth remains sufficient, but a comparable senior addition
+        # can still be strategically sensible after the agreed departure.
+        cb=self.player(1,"CB",92)
+        for rating in (88,86,83):
+            self.player(1,"CB",rating)
         for position in ("GK","LB","RB","CM","CM","AM","LW","RW",
                          "ST","DM","ST","CM"):
             self.player(1,position,87)
