@@ -42,6 +42,41 @@ class PlannerTests(unittest.TestCase):
         self.assertEqual(lane_of("LW"),"LW")
         self.assertEqual(lane_of("RWF"),"RW")
 
+    def test_distinct_wide_midfielders_and_wide_forwards(self):
+        self.assertEqual(lane_of("LM"),"LM")
+        self.assertEqual(lane_of("LMF"),"LM")
+        self.assertEqual(lane_of("RM"),"RM")
+        self.assertEqual(lane_of("RMF"),"RM")
+        self.assertEqual(lane_of("LW"),"LW")
+        self.assertEqual(lane_of("RW"),"RW")
+        self.assertNotEqual(lane_of("LMF"),lane_of("LWF"))
+        self.assertNotEqual(lane_of("RMF"),lane_of("RWF"))
+        self.player(1,"LMF",79)
+        self.player(1,"LWF",83)
+        self.player(1,"RMF",75)
+        self.player(1,"RWF",85)
+        self.assertEqual(len(self.squads()[1]["LM"]),1)
+        self.assertEqual(len(self.squads()[1]["LW"]),1)
+        self.assertEqual(len(self.squads()[1]["RM"]),1)
+        self.assertEqual(len(self.squads()[1]["RW"]),1)
+
+    def test_tactical_sale_uses_manager_starting_roles(self):
+        from world_ai_tactics import FORMATION_STARTERS
+        a=self.player(1,"LM",88)
+        self.player(1,"LM",80)
+        for pos in ("GK","CB","CB","LB","RB","CM","CM","RM","ST","ST"):
+            self.player(1,pos,84)
+        squad=self.squads()
+        active=sale_profile(squad,seller=1,player_id=a,
+            position="LM",overall=88,
+            starting_roles=FORMATION_STARTERS["4-4-2"])
+        inactive=sale_profile(squad,seller=1,player_id=a,
+            position="LM",overall=88,
+            starting_roles=FORMATION_STARTERS["4-3-3"])
+        self.assertTrue(active["first_choice"])
+        self.assertFalse(inactive["first_choice"])
+        self.assertGreater(active["sporting_risk"],inactive["sporting_risk"])
+
     def test_elite_club_does_not_buy_ordinary_backup_as_upgrade(self):
         # Three strong starters and a solid XI; the third-best forward
         # is not evidence that an 83-rated player improves a 91-rated side.
