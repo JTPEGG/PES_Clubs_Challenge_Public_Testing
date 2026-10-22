@@ -312,6 +312,17 @@ def sale_profile(squads, *, seller, player_id, position, overall,
         first_backup_drop=(sum(
             max(0,old_backup[i]-(new_backup[i] if i<len(new_backup) else 0))
             for i in range(len(old_backup))) if used else 0)
+        # A numerically adequate bench can still get much weaker. Keep the
+        # QUALITY of the first remaining substitute separate from the
+        # number of missing specialists: otherwise a single absent bench
+        # place is measured as a spurious seventy-point rating decline.
+        before_backup=before[n][1] if n and len(before)>n else None
+        after_backup=after[n][1] if n and len(after)>n else None
+        rotation_drop=(max(0,before_backup-after_backup)
+                       if before_backup is not None and
+                          after_backup is not None else
+                       max(0,(before_backup or 0)-max(0,quality-15))
+                       if before_backup is not None else 0)
         starter_drop=(max(0,(old_floor or 0)-(new_floor or 0))
                       if used else 0)
         short=len(after)<minimum
@@ -319,6 +330,7 @@ def sale_profile(squads, *, seller, player_id, position, overall,
             "lane":lane,"before_depth":len(before),"after_depth":len(after),
             "starter_rating_drop":starter_drop,
             "backup_quality_drop":first_backup_drop,
+            "rotation_quality_drop":rotation_drop,
             "depth_shortage":short,
             "recruitment_needed":short or starter_drop>=4 or
                                 first_backup_drop>=4,
@@ -367,6 +379,7 @@ def sale_profile(squads, *, seller, player_id, position, overall,
         "after_depth":main["after_depth"],
         "starter_rating_drop":main["starter_rating_drop"],
         "backup_quality_drop":main["backup_quality_drop"],
+        "rotation_quality_drop":main["rotation_quality_drop"],
         "below_target_cover":main["depth_shortage"],
         "replacement_priority":("urgent" if any(r["depth_shortage"] for r in reports)
            else "improve_rotation" if protected_rotation
