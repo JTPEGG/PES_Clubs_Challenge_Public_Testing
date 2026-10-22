@@ -71,9 +71,11 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
     # the first-choice keeper or important wide midfielder must not be
     # misclassified as fringe merely because 11 outfielders have higher OVR.
     # Existing careers preserve their original global-role classification.
-    fc27_seller=(read_fc27_profiles(conn,dataset=target["dataset"],
+    # The SELLER is autonomous both in AI-vs-AI and when a human manager
+    # bids for one of its players. The buying caller must not affect the
+    # seller's position-based squad-role assessment.
+    fc27_seller=read_fc27_profiles(conn,dataset=target["dataset"],
         club_id=target["seller"]).get(target["seller"])
-        if autonomous_club else None)
     if fc27_seller:
         from world_squad_planner import lane_of
         from world_ai_tactics import preferred_formation,tactical_needs
