@@ -22,9 +22,9 @@ from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
 from world_ai_replacement_outlook import assess_future_replacement
 from world_fc27_ai_recruitment import (read_fc27_profiles,
-    buyer_recruitment_priority,domestic_market_preference,
-    positional_family_priorities,prospect_budget_penalty,
-    candidate_sporting_priority)
+    buyer_recruitment_priority,positional_family_priorities,
+    prospect_budget_penalty,candidate_sporting_priority)
+from world_ai_tactics import preferred_formation,tactical_needs
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -32,7 +32,9 @@ AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # the old 90-deal ceiling exactly and was artificially truncated.
 # No arbitrary incoming/outgoing count limits; only sporting decisions,
 # fees, source budgets, player consent and board oversight determine deals.
-AI_APPROACHES_PER_ATTEMPT = 5
+# No per-moment offer-count veto or first-32-buyers/first-10-targets shortcut.
+# An idempotent scheduled market opportunity ends after the first concluded deal,
+# and the 30-minute clock bounds the entire market. No transfer is guaranteed.
 
 
 def _need_for_family(*,family,overall,ratings):
@@ -180,9 +182,11 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
     # These are labelled board/finance/anonymous manager GAME estimates,
     # copied at disposable-world creation, not real-world appointments.
     club_ai_context=read_fc27_profiles(conn,dataset=dataset)
-    club_countries=dict(conn.execute("""SELECT club_id,nation FROM world_clubs
-        WHERE club_id IN (SELECT club_id FROM world_dataset_entries
-                          WHERE dataset_id=?)""",(dataset,)).fetchall())
+    # A tactical plan is a labelled game-generated anonymous-manager
+    # preference, not an inferred real coaching appointment or tactic.
+    club_tactics={club:tactical_needs(preferred_formation(
+        club_id=club,profile=profile))["starting_roles"]
+        for club,profile in club_ai_context.items()}
     # Age is measured at the HISTORICAL dataset snapshot, not today's date.
     scouting=development_signals(conn,dataset=dataset)
     projected_positions={pid:pos for lanes in projected.values() for group in lanes.values()
@@ -287,6 +291,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
             -buyer_recruitment_priority(projected,club=club,
                 departed_lanes=outgoing_lanes[club],
                 profile=club_ai_context.get(club),
+                starting_roles=club_tactics.get(club),
                 previous_signings=signings_by_buyer[club],
                 stable_variation=_stable(career_id,window_id,slot,club,
                     AI_WORLD_VERSION,"scout")%26),
@@ -303,7 +308,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
     cached_sale={}
     cached_replacement={}
     cached_market_lanes={}
-    for buyer in buyers[:32]:
+    for buyer in buyers:
         if budget_remaining(conn,career_id,buyer)<=0:
             continue
         profiles=squads[buyer]
@@ -316,7 +321,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         expected={"GK":3,"DEF":8,"MID":9,"FWD":6}
         if club_ai_context:
             lane_scores=positional_family_priorities(projected,club=buyer,
-                departed_lanes=outgoing_lanes[buyer])
+                departed_lanes=outgoing_lanes[buyer],
+                starting_roles=club_tactics.get(buyer))
             priorities=sorted(profiles,key=lambda group:(
                 -lane_scores.get(group,0),
                 _stable(slot,buyer,group,AI_WORLD_VERSION)))
@@ -364,7 +370,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 if fit_key not in cached_fit:
                     cached_fit[fit_key]=recruitment_fit(
                         projected,buyer=buyer,position=position,overall=overall,
-                        recent_senior_departure=new_recruit)
+                        recent_senior_departure=new_recruit,
+                        starting_roles=club_tactics.get(buyer))
                 fit=cached_fit[fit_key]
                 # Future recruitment is separate from a starting-XI upgrade.
                 # Never manufacture a potential rating or guarantee a deal:
@@ -380,7 +387,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 if sale_key not in cached_sale:
                     cached_sale[sale_key]=sale_profile(
                         projected,seller=seller,player_id=pid,
-                        position=position,overall=overall)
+                        position=position,overall=overall,
+                        starting_roles=club_tactics.get(seller))
                 sale=cached_sale[sale_key]
                 if not sale["valid"]:
                     continue
@@ -424,27 +432,21 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # cost, without setting a numerical quota or guaranteeing
                 # a replacement. Financial/player/board decisions still stand.
                 seller_fit-=min(75,12*signings_by_seller[seller])
-                if buyer in club_ai_context:
-                    # A modest domestic scouting advantage, not a border or
-                    # international-transfer cap. Suitability remains decisive.
-                    seller_fit+=domestic_market_preference(
-                        same_source_country=(
-                            club_countries.get(buyer)==club_countries.get(seller)),
-                        profile=club_ai_context[buyer])
                 # Compare each potential purchase's actual positional impact.
                 # The global keeper share, unrelated forwards and club names
                 # are NOT recruitment constraints. Seller/board/agent still
                 # have independent authority to reject the suggested deal.
                 sporting_gain=(candidate_sporting_priority(
                     projected,club=buyer,position=position,overall=overall,
-                    fit=fit,departed_lanes=outgoing_lanes[buyer])
+                    fit=fit,departed_lanes=outgoing_lanes[buyer],
+                    starting_roles=club_tactics.get(buyer))
                     if club_ai_context else 0)
                 options.append((seller,pid,overall,need,
                                 need+seller_fit+sporting_gain,
                                 fit,sale,replacement_plan))
             options.sort(key=lambda v:(-v[4],
                 _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
-            for seller,pid,overall,need,_score,fit,sale,replacement_plan in options[:10]:
+            for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:
                 value,_=_player_reference(conn,dataset,pid)
                 money=budget_remaining(conn,career_id,buyer)
                 if not isinstance(value,int) or value<=0 or money<value*0.85:
@@ -483,8 +485,6 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # authoritative; no unilateral movement of another squad.
                 target=dict(dataset=dataset,seller=seller,overall=overall,
                             value=value)
-                if approaches>=AI_APPROACHES_PER_ATTEMPT:
-                    return None
                 approaches+=1
                 try:
                     _model_player_and_seller(conn,career_id=career_id,
