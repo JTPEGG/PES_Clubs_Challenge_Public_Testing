@@ -92,21 +92,24 @@ def evaluate_selling_club(*,market_value=None,offer_fee=None,
     # rating, wages, historical prestige, or modern club transfer rumours.
     premium = ROLE_MULTIPLIER[squad_role]
     if autonomous_market_reassessment:
-        # In a fictional autonomous market, 'retain' means an increasingly
-        # costly sporting choice, not permanent immunity from bidding.
-        # Financing a future replacement can make a huge offer rational
-        # BEFORE an actual target agrees. There is no global sale quota.
-        if seller_stance=="retain" and not (transfer_listed or player_wants_exit):
-            premium+=0.35 if squad_role!="key_player" else 0.70
+        # Every player can have a negotiable price: avoiding a sale
+        # increases the seller's reservation fee, not an absolute veto.
+        # The earlier independent additive protections compounded to nearly
+        # three times market value and made elite recruitment impossible.
+        premium={"key_player":1.23,"regular_starter":1.13,
+                 "rotation":1.03,"fringe":0.90}[squad_role]
         if (squad_role=="key_player" and contract_years>=3
-                and not (transfer_listed or player_wants_exit) and
-                financial_state=="stable" and replacement=="difficult"):
-            premium+=0.35
+                and not (transfer_listed or player_wants_exit)
+                and financial_state=="stable" and replacement=="difficult"
+                and seller_stance=="retain"):
+            # Truly exceptional resistance: rare aligned circumstances,
+            # not a routine starting-XI player's default price.
+            premium+=0.27
     premium += 0.08 * max(0,contract_years-2)
     if replacement=="difficult":
-        premium+=0.22
+        premium+=0.12 if autonomous_market_reassessment else 0.22
     if seller_stance=="retain":
-        premium+=0.18
+        premium+=0.16 if autonomous_market_reassessment else 0.18
     if player_wants_exit:
         premium-=0.15
     if transfer_listed:
