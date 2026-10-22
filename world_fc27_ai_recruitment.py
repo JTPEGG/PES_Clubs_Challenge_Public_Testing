@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from world_squad_planner import MIN_COVER, STARTERS, FAMILY, effective_cover
 
-VERSION="fc27-recruitment-priority-v2-role-led-market"
+VERSION="fc27-recruitment-priority-v3-ambition-and-sporting-fit"
 
 def read_fc27_profiles(conn, *, dataset, club_id=None):
     """Read independently copied FC27 game model profiles, never live source."""
@@ -91,8 +91,17 @@ def buyer_recruitment_priority(squads, *, club, departed_lanes=(),
         financial=profile["financial_pressure_index"]*.18
     else:
         ambition=pressure=coaching=financial=0
+    # Source-rated established clubs have a continuing incentive to refresh
+    # their XI even when every specialist role is currently occupied. This
+    # is their own ambition/competitive standard, not a club-name exception.
+    # Lower-tier clubs still receive urgency from genuine missing cover.
+    ambition_pressure=(profile["ambition_level"]+
+                      profile["pressure_to_improve"])/2 if profile else 50
+    competitive_refresh=(max(0,team_floor-72)*1.65
+                         *max(0.4,min(1.2,ambition_pressure/82)))
     # Marginal benefit diminishes with arrivals, but no purchase is forbidden.
     return round(need_score+ambition+pressure+coaching-financial
+                 +competitive_refresh
                  -previous_signings*5+stable_variation,2)
 
 def positional_family_priorities(squads, *, club, departed_lanes=()):
@@ -134,6 +143,40 @@ def positional_family_priorities(squads, *, club, departed_lanes=()):
             for group,values in by_family.items()}
 
 
+def candidate_sporting_priority(squads, *, club, position, overall,
+                                fit, departed_lanes=()):
+    """Score marginal sporting gain without a global positional trade ratio.
+
+    A starting goalkeeper is a single-specialist job: buying another one
+    when already sufficiently covered requires a materially better target
+    to take priority over credible upgrades elsewhere. Goalkeeper moves
+    remain possible at every sporting score; none is vetoed by this ranking.
+    """
+    from world_squad_planner import lane_of
+    lane=lane_of(position)
+    if lane is None or fit.get("eligible") is not True:
+        return -100
+    peers=effective_cover(squads,club,lane)
+    starter_count=STARTERS[lane]
+    starter=(peers[min(starter_count-1,len(peers)-1)][1]
+             if peers else None)
+    shortage=len(peers)<max(STARTERS[lane],MIN_COVER[lane])
+    gain=max(0,overall-starter) if starter is not None else 0
+    agreed_exit=lane in departed_lanes
+    # Priority for better starting XI and resolved vacancy. A lower-rated
+    # long-term prospect cannot masquerade as a senior first-team upgrade.
+    if fit.get("category")=="prospect":
+        return -7
+    gain_score=min(55,5.0*gain)
+    depth_score=20 if shortage else 0
+    departure_score=16 if agreed_exit else 0
+    if lane=="GK" and not shortage and not agreed_exit:
+        # Existing keeper quality/cover, not league-wide keeper transfers,
+        # determines the relative urgency of another goalkeeper.
+        gain_score-=max(0,20-min(20,gain*2.0))
+    return round(gain_score+depth_score+departure_score,2)
+
+
 def prospect_budget_penalty(*,fee,available_budget,opening_budget):
     """Soft opportunity-cost signal only; never a prospective purchase veto."""
     if any(type(v) is not int or v<0 for v in
@@ -149,7 +192,11 @@ def prospect_budget_penalty(*,fee,available_budget,opening_budget):
 def domestic_market_preference(*,same_source_country,profile=None):
     """Soft scouting familiarity, not a restriction on international sales."""
     if same_source_country:
-        return 9
+        # Domestic knowledge, integration and travel simplicity matter
+        # when similarly suitable targets exist. It is not a passport ban.
+        discipline=(profile["simulated_manager_financial_discipline"]
+                    if profile else 50)
+        return round(19+min(9,max(-4,(discipline-50)*.16)),2)
     # Financial discipline moderates distant scouting, without a nationality
     # rule, a ban, a regional guess, or any claim about the real manager.
     discipline=profile["simulated_manager_financial_discipline"] if profile else 50
