@@ -17,7 +17,7 @@ from world_careers import (
 from world_preseason_window import window_snapshot
 from world_career_board_policy import career_board_decision, require_board_approval
 from world_squad_planner import (projected_squads, recruitment_fit,
-    sale_profile, lane_of, MIN_COVER, STARTERS)
+    sale_profile, lane_of, MIN_COVER, STARTERS, FAMILY)
 from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
 from world_ai_replacement_outlook import assess_future_replacement
@@ -484,8 +484,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
             successor_ages={}
             if (club_ai_context and not development_focus and
                     any(lane in horizon_plan["succession_pressure"]
-                        for lane,group in __import__(
-                            "world_squad_planner").FAMILY.items()
+                        for lane,group in FAMILY.items()
                         if group==family)):
                 successor_ages=source_ages(conn,dataset=dataset,
                     player_ids=[pid for _,pid,_ in players[family]])
