@@ -170,6 +170,7 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             (prospects if young else senior).append(overall)
         quality_warnings=[]
         formation_warnings=[]
+        tactical_quality_warnings=[]
         for club in initial:
             for lane in MIN_COVER:
                 before=effective_cover(initial,club,lane)
@@ -196,6 +197,25 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                     "source_tactical_xi_covered_before":original["filled"],
                     "source_tactical_xi_covered_after":updated["filled"],
                     "source_tactical_xi_slots":11})
+            old_ratings={pid:ovr for lane in initial[club].values()
+                         for pid,ovr,_pos in lane}
+            new_ratings={pid:ovr for lane in final[club].values()
+                         for pid,ovr,_pos in lane}
+            # Do not confuse "eleven places filled" with a strong eleven.
+            # Rates are from actual source overall and the matching
+            # assignments; the same footballer cannot fill two positions.
+            old_strength=sum(old_ratings[a["player_id"]]
+                             for a in original["assignments"])/11
+            new_strength=sum(new_ratings[a["player_id"]]
+                             for a in updated["assignments"])/11
+            if old_strength-new_strength>=1.5:
+                tactical_quality_warnings.append({
+                    "club":clubs[club],"formation":tactics[club],
+                    "initial_tactical_xi_avg_rating":round(old_strength,2),
+                    "final_tactical_xi_avg_rating":round(new_strength,2),
+                    "avg_rating_loss":round(old_strength-new_strength,2),
+                    "initial_filled":original["filled"],
+                    "final_filled":updated["filled"]})
         future=con.execute("""SELECT COUNT(*) FROM world_career_offers
           WHERE career_id=? AND status='agreed_future'""",(career,)).fetchone()[0]
         activity=con.execute("""SELECT COALESCE(SUM(eligible_clubs),0),
@@ -306,6 +326,8 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "alerts_sample":quality_warnings[:40],
           "tactical_xi_coverage_alerts":len(formation_warnings),
           "tactical_xi_coverage_samples":formation_warnings[:40],
+          "tactical_xi_quality_alerts":len(tactical_quality_warnings),
+          "tactical_xi_quality_samples":tactical_quality_warnings[:40],
           "event_type_counts":dict(events),
           "actual_transfer_details":transfers,
           "player_registration_reconciled":True,
