@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from world_squad_planner import MIN_COVER, STARTERS, FAMILY, effective_cover
 
-VERSION="fc27-recruitment-priority-v4-tactical-market"
+VERSION="fc27-recruitment-priority-v5-elite-quality-needs"
 
 def read_fc27_profiles(conn, *, dataset, club_id=None):
     """Read independently copied FC27 game model profiles, never live source."""
@@ -146,6 +146,12 @@ def positional_family_priorities(squads, *, club, departed_lanes=(),
     if not rated:
         return {group:0.0 for group in ("GK","DEF","MID","FWD")}
     team_floor=rated[min(10,len(rated)-1)]
+    # Compare tactical starters with the elite *core* as well as the
+    # eleventh player. Otherwise a high-end squad can appear to have
+    # no weakness to improve even with one clearly inferior specialist.
+    # Top-five evidence is a relative source-rating measure; no global
+    # signing quota or invented target quality.
+    core=sum(rated[:min(5,len(rated))])/min(5,len(rated))
     by_family={group:[] for group in ("GK","DEF","MID","FWD")}
     for lane in set(roster)|set(departed_lanes)|set(starting_roles or {}):
         if lane not in FAMILY:
@@ -164,10 +170,17 @@ def positional_family_priorities(squads, *, club, departed_lanes=(),
         starter_floor=(peers[min(required-1,len(peers)-1)][1]
                        if peers else team_floor-12)
         quality_gap=max(0,team_floor-3-starter_floor)
+        core_gap=max(0,core-3-starter_floor)
+        # A truly weaker tactical starter invites upgrade offers at
+        # ambitious/strong clubs, but reserves are assessed separately.
+        # For lower-quality squads, the best-player spread should not
+        # force selling and replacing half the starting team.
+        structural_upgrade=max(0,core_gap-3) if core>=80 else 0
         # A recently sold starter is a *reason to scout*, not proof
         # another club will sell or an obligation to complete a deal.
         urgency=11 if lane in departed_lanes else 0
-        need=(min(3,depth_gap)*11 + min(12,quality_gap)*2.0 + urgency)
+        need=(min(3,depth_gap)*11 + min(12,quality_gap)*2.0 + urgency
+              +min(16,structural_upgrade*1.65))
         by_family[group].append(need)
     # Strongest specialist shortage matters most, with weaker aggregate
     # contribution for additional issues within the same family.
