@@ -327,6 +327,13 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
         source_game_wages=dict(con.execute("""SELECT player_id,weekly_wage_gbp
             FROM world_dataset_contract_snapshots WHERE dataset_id=?""",
             (DATASET,)).fetchall())
+        three_season_cases={
+            oid:json.loads(detail) for oid,detail in con.execute("""
+                SELECT o.offer_id,e.detail FROM world_career_offer_events e
+                JOIN world_career_offers o ON o.offer_id=e.offer_id
+                WHERE o.career_id=?
+                AND e.event_type='ai_fc27_three_season_recruitment'""",
+                (career,)).fetchall()}
         final_seller_cases={
             oid:json.loads(detail) for oid,detail in con.execute("""
                 SELECT o.offer_id,e.detail FROM world_career_offer_events e
@@ -363,6 +370,10 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                 "senior_rotation_or_replacement"
                 if offer in senior_rotation_offers else "senior_first_team_upgrade"),
             "simulated_seller_squad_case":deal_cases.get(offer,"unclassified"),
+            "three_season_recruitment_plan":three_season_cases.get(offer),
+            "selling_club_three_season_strategy":(
+                (final_seller_cases.get(offer,{}).get("tactical_impact") or
+                 {}).get("three_season_strategy")),
             "seller_final_board_decision":(
                 final_seller_cases.get(offer,{ }).get("board_decision")),
             "seller_modelled_financial_state":(
@@ -386,6 +397,14 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                 item["accepted_simulated_weekly_wage_gbp"] is not None and
                 item["accepted_simulated_weekly_wage_gbp"]<
                     .9*item["source_game_weekly_wage_gbp"])]
+        # Original prospect_fit classification remains authoritative.
+        # Three-season strategy must not turn youth into current XI signings.
+        strategy_prospect_mismatches=[
+            item["player"] for item in transfers
+            if item["three_season_recruitment_plan"] is None or
+               (item["three_season_recruitment_plan"]["recruitment_category"]
+                == "prospect") != (
+                 item["simulated_recruitment_type"]=="prospect")]
         # Full reason chain for outcomes with meaningful final squad loss.
         # One completed deal is NOT necessarily solely responsible for a
         # whole-window club result: show both its recorded individual cost
@@ -470,6 +489,16 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
               for cid,n in outbound.most_common(10)],
           "source_ability_position_counts":dict(position),
           "important_seller_case_studies":significant_seller_cases[:50],
+          "three_season_recruitment_cases_audited":len(three_season_cases),
+          "three_season_prospect_classification_errors":
+              strategy_prospect_mismatches,
+          "three_season_prospects_signed_unchanged":sum(
+              t["simulated_recruitment_type"]=="prospect"
+              and t["three_season_recruitment_plan"] is not None
+              for t in transfers),
+          "three_season_seller_cases_with_source_context":sum(
+              t["selling_club_three_season_strategy"] is not None
+              for t in transfers),
           "seller_approval_rationales_recorded":len(final_seller_cases),
           "senior_first_team_deals":len(senior),
           "senior_confirmed_xi_upgrades":len(senior)-len(senior_rotation_offers),
