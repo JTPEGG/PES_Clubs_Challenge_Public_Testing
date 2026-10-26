@@ -5,7 +5,19 @@ FC27 value and wage context, plus a seller's current projected squad impact.
 This ranks chances of completing a deal; it does NOT assume an asking price,
 invent contract terms, ban expensive players or make a seller accept.
 """
-from world_explorer import age_on
+from datetime import date
+
+def _source_age_on(birth_date,when):
+    """Same ISO-date logic as the offer reference, without Flask imports."""
+    if not birth_date or not when:
+        return None
+    try:
+        birthday=date.fromisoformat(birth_date)
+        reference=date.fromisoformat(when)
+        return (reference.year-birthday.year-
+                ((reference.month,reference.day)<(birthday.month,birthday.day)))
+    except ValueError:
+        return None
 from world_valuation import model_value,fc27_game_reference_value
 
 VERSION="fc27-context-financial-shortlist-v1"
@@ -37,7 +49,7 @@ def shortlist_reference_values(conn,*,dataset,player_ids):
           WHERE r.dataset_id=? AND r.player_id IN ("""+",".join("?" for _ in chunk)+")"
         for pid,ovr,birth,position,when,wage in conn.execute(
                 query,(dataset,*chunk)).fetchall():
-            baseline=model_value(ovr,age_on(birth,when),position)
+            baseline=model_value(ovr,_source_age_on(birth,when),position)
             if baseline is not None:
                 result[pid]=(fc27_game_reference_value(
                     baseline=baseline,overall=ovr,weekly_wage=wage),wage)
