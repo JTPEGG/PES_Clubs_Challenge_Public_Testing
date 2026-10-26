@@ -76,6 +76,9 @@ class PlannerTests(unittest.TestCase):
         self.assertTrue(active["first_choice"])
         self.assertFalse(inactive["first_choice"])
         self.assertGreater(active["sporting_risk"],inactive["sporting_risk"])
+        self.assertGreater(active["formation_quality_loss"],0)
+        self.assertEqual(active["formation_lineup_loss"],0)
+        self.assertEqual(inactive["formation_quality_loss"],0)
 
     def test_elite_club_does_not_buy_ordinary_backup_as_upgrade(self):
         # Three strong starters and a solid XI; the third-best forward
