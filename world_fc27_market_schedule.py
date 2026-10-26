@@ -14,7 +14,7 @@ from world_fc27_ai_recruitment import (
 from world_fc27_market_choices import pursue_transfer
 from world_squad_planner import projected_squads,lane_of
 
-VERSION="fc27-independent-club-market-v2-performance-led"
+VERSION="fc27-independent-club-market-v3-unmet-needs"
 # Separates FC27 AI club IDs/ticks from the immutable legacy 112 slot keys.
 FC27_SLOT_BASE=100000000
 FC27_SLOT_INTERVAL=1000000
@@ -60,7 +60,8 @@ def is_fc27_market(conn,*,career_id):
     return bool(conn.execute("""SELECT 1 FROM world_fc27_club_ai_context
        WHERE dataset_id=? LIMIT 1""",(row[0],)).fetchone())
 
-def club_market_interest(*,priority,profile,draw,activity_scale_qa=1):
+def club_market_interest(*,priority,profile,draw,activity_scale_qa=1,
+                         unattended_intervals=0):
     """Model probability of scouting activity, not a deal count.
 
     All clubs have a nonzero chance; need/ambition drive participation.
@@ -68,7 +69,9 @@ def club_market_interest(*,priority,profile,draw,activity_scale_qa=1):
     A club still separately decides whether to proceed to negotiations.
     """
     if (type(draw) is not int or not 0<=draw<1000000 or
-            activity_scale_qa not in (1,3)):
+            activity_scale_qa not in (1,3) or
+            type(unattended_intervals) is not int or
+            not 0<=unattended_intervals<=30):
         raise ValueError("Invalid independent club market draw")
     ambition=profile.get("ambition_level",50) if profile else 50
     board_pressure=profile.get("pressure_to_improve",50) if profile else 50
@@ -83,7 +86,14 @@ def club_market_interest(*,priority,profile,draw,activity_scale_qa=1):
           max(0,ambition-73)*.0046+
           max(0,board_pressure-65)*.0019-
           max(0,financial_stress-60)*.0015)
-    return draw/1000000<min(.70,max(.035,base)*activity_scale_qa)
+    # A genuine unresolved recruitment objective persists across the window.
+    # Repeated inaction gradually raises consideration, without a mandated
+    # transfer (or even a guaranteed search) and without club-name overrides.
+    # Reset after any actual search; previous deals/roster changes already
+    # affect the live priority above.
+    unresolved=max(0,min(115,priority-15))
+    persistence=min(.22,unattended_intervals*(.011+unresolved*.00042))
+    return draw/1000000<min(.82,max(.035,base+persistence)*activity_scale_qa)
 
 def fc27_market_slot(interval_index,club_id):
     if not (type(interval_index) is int and 0<=interval_index<30
@@ -138,6 +148,25 @@ def plan_fc27_market_interval(conn,*,career_id,window_id,interval_index,
          FROM world_career_club_ledger WHERE career_id=?""",(career_id,))
        if trans>fees and wages>wage_use}
     from world_fc27_decision_audit import save_evaluations
+    # Read earlier checks in one indexed query, rather than N*12 queries.
+    # Only a real search resets unaddressed market interest: not scouting or
+    # scouting and holding cash both leave the need under consideration.
+    prior_evaluations=conn.execute("""SELECT club_id,stage FROM
+        world_fc27_market_club_evaluations WHERE window_id=?
+        AND interval_index<? ORDER BY club_id,interval_index DESC""",
+        (window_id,interval_index)).fetchall()
+    # Count consecutive earlier inaction only until the last real search.
+    unattended={}
+    closed=set()
+    for club,stage in prior_evaluations:
+        if club in closed:
+            continue
+        if stage=="proceeded_to_search":
+            closed.add(club)
+        elif stage in ("did_not_scout","scouted_but_held"):
+            unattended[club]=unattended.get(club,0)+1
+        else:
+            closed.add(club)
     possibilities=0
     plans=[]
     evaluation_rows=[]
@@ -163,7 +192,8 @@ def plan_fc27_market_interval(conn,*,career_id,window_id,interval_index,
         commitment_draw=_stable(career_id,window_id,interval_index,
                                 club,VERSION,"commit")%1000
         if not club_market_interest(priority=priority,profile=profile,
-                draw=scout_draw,activity_scale_qa=activity_scale_qa):
+                draw=scout_draw,activity_scale_qa=activity_scale_qa,
+                unattended_intervals=unattended.get(club,0)):
             evaluation_rows.append((window_id,interval_index,club,
                 priority,scout_draw,commitment_draw,"did_not_scout"))
             continue
