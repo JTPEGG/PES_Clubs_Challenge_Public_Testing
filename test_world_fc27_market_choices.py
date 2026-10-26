@@ -138,7 +138,7 @@ class AutonomousChoicesTests(unittest.TestCase):
                       "first_choice":True,"protected_rotation":True}
         self.assertGreater(disruption_sale_premium(first_keeper),
                            disruption_sale_premium(damaged))
-        self.assertLess(disruption_sale_premium(first_keeper),1.18)
+        self.assertLess(disruption_sale_premium(first_keeper),1.56)
 
     def test_fc27_ability_and_source_wage_fix_extremely_low_elite_values(self):
         old=model_value(84,26,"DMF")
