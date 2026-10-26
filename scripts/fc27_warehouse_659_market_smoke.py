@@ -327,6 +327,13 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
         source_game_wages=dict(con.execute("""SELECT player_id,weekly_wage_gbp
             FROM world_dataset_contract_snapshots WHERE dataset_id=?""",
             (DATASET,)).fetchall())
+        final_seller_cases={
+            oid:json.loads(detail) for oid,detail in con.execute("""
+                SELECT o.offer_id,e.detail FROM world_career_offer_events e
+                JOIN world_career_offers o ON o.offer_id=e.offer_id
+                WHERE o.career_id=?
+                AND e.event_type='ai_fc27_final_seller_rationale'""",
+                (career,)).fetchall()}
         signed_contract_wages=dict(con.execute("""SELECT offer_id,
             offered_wage_weekly FROM world_career_offers
             WHERE career_id=? AND status='completed'""",
@@ -356,6 +363,13 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                 "senior_rotation_or_replacement"
                 if offer in senior_rotation_offers else "senior_first_team_upgrade"),
             "simulated_seller_squad_case":deal_cases.get(offer,"unclassified"),
+            "seller_final_board_decision":(
+                final_seller_cases.get(offer,{ }).get("board_decision")),
+            "seller_modelled_financial_state":(
+                final_seller_cases.get(offer,{ }).get("seller_financial_state")),
+            "seller_tactical_quality_loss_at_approval":(
+                (final_seller_cases.get(offer,{ }).get("tactical_impact") or
+                  {}).get("formation_quality_loss")),
             "modelled_buyer_context":ai_club_rows.get(buyer),
             "modelled_seller_context":ai_club_rows.get(seller),
             "source_top11_strength_change_buyer":buyer_quality_change[buyer],
@@ -372,6 +386,24 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                 item["accepted_simulated_weekly_wage_gbp"] is not None and
                 item["accepted_simulated_weekly_wage_gbp"]<
                     .9*item["source_game_weekly_wage_gbp"])]
+        # Full reason chain for outcomes with meaningful final squad loss.
+        # One completed deal is NOT necessarily solely responsible for a
+        # whole-window club result: show both its recorded individual cost
+        # and the final source-rated aggregate.
+        significant_seller_cases=[
+            {"player":t["player"],"seller":t["source_seller"],
+             "buyer":t["source_buyer"],
+             "fee_gbp":t["agreed_fee_gbp"],
+             "final_club_top11_rating_change":
+                 t["source_top11_strength_change_seller"],
+             "seller_decision":final_seller_cases.get(
+                 next(oid for oid,pid,se,bu,pos,ov,fee in actual
+                      if player_names[pid]==t["player"] and
+                         clubs[se]==t["source_seller"] and
+                         clubs[bu]==t["source_buyer"]),{} )}
+            for t in transfers
+            if t["source_top11_strength_change_seller"]<=-.75
+        ]
         if con.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("SQLite integrity failed")
         if con.execute("PRAGMA foreign_key_check").fetchall():
@@ -437,6 +469,8 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "top_sellers":[{"club":clubs[cid],"departures":n}
               for cid,n in outbound.most_common(10)],
           "source_ability_position_counts":dict(position),
+          "important_seller_case_studies":significant_seller_cases[:50],
+          "seller_approval_rationales_recorded":len(final_seller_cases),
           "senior_first_team_deals":len(senior),
           "senior_confirmed_xi_upgrades":len(senior)-len(senior_rotation_offers),
           "senior_rotation_or_replacement_deals":len(senior_rotation_offers),
