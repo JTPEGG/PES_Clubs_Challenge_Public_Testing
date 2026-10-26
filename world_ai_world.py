@@ -503,7 +503,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     seller_appeal=club_ai_context[seller]["sporting_appeal"],
                     overall=overall,sporting_upgrade=fit.get("upgrade",0),
                     prospect=fit.get("category")=="prospect",
-                    buyer_ambition=club_ai_context[buyer]["ambition_level"])
+                    buyer_ambition=club_ai_context[buyer]["ambition_level"],
+                    seller_first_choice=bool(sale["first_choice"]),
+                    seller_rotation_critical=bool(sale["protected_rotation"]),
+                    starting_upgrade=bool(fit.get("upgrade",0)>=3 or
+                        fit.get("depth_shortage",False) or
+                        fit.get("senior_replacement",False)))
                     if club_ai_context and seller in club_ai_context else 0)
                 options.append((seller,pid,overall,need,
                                 need+seller_fit+sporting_gain+sporting_appeal,
