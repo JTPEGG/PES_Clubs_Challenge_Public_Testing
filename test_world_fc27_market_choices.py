@@ -105,6 +105,41 @@ class AutonomousChoicesTests(unittest.TestCase):
             =="DEF" for i in range(5000,1000000,5000))
         self.assertGreater(counts(weak_defense),counts(ordinary))
 
+    def test_established_player_needs_real_career_case_to_take_sporting_drop(self):
+        inputs={"buyer_appeal":68,"seller_appeal":91,
+                "overall":84,"sporting_upgrade":4,
+                "prospect":False,"buyer_ambition":73}
+        first_choice=player_market_opportunity(
+            **inputs,seller_first_choice=True)
+        backup=player_market_opportunity(**inputs)
+        promotion=player_market_opportunity(
+            **inputs,seller_first_choice=True,starting_upgrade=True)
+        self.assertLess(first_choice,backup)
+        self.assertGreater(promotion,first_choice)
+        # A career step to a *better* club should not be penalised
+        # because its current club happened to start the player.
+        upgraded=player_market_opportunity(
+            **{**inputs,"buyer_appeal":93},seller_first_choice=True)
+        upgraded_backup=player_market_opportunity(
+            **{**inputs,"buyer_appeal":93})
+        self.assertEqual(upgraded,upgraded_backup)
+
+    def test_full_formation_quality_loss_raises_seller_price_without_veto(self):
+        base={"valid":True,"formation_lineup_loss":0,
+            "after_depth":3,"before_depth":4,
+            "tactically_required":True,"starter_rating_drop":0,
+            "source_standard_top11":85,
+            "formation_quality_loss":0,"protected_rotation":False,
+            "below_target_cover":False}
+        damaged={**base,"formation_quality_loss":8}
+        self.assertEqual(disruption_sale_premium(base),0)
+        self.assertGreater(disruption_sale_premium(damaged),0)
+        first_keeper={**damaged,"starter_rating_drop":14,
+                      "first_choice":True,"protected_rotation":True}
+        self.assertGreater(disruption_sale_premium(first_keeper),
+                           disruption_sale_premium(damaged))
+        self.assertLess(disruption_sale_premium(first_keeper),1.18)
+
     def test_fc27_ability_and_source_wage_fix_extremely_low_elite_values(self):
         old=model_value(84,26,"DMF")
         modern=fc27_game_reference_value(
