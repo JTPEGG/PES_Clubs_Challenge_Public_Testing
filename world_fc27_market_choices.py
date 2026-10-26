@@ -78,7 +78,9 @@ def pursue_transfer(*,priority,profile,draw):
 
 def player_market_opportunity(*,buyer_appeal,seller_appeal,
                               overall,sporting_upgrade,prospect,
-                              buyer_ambition):
+                              buyer_ambition,seller_first_choice=False,
+                              seller_rotation_critical=False,
+                              starting_upgrade=False):
     """Sporting merit of a potential move, independent of nationality.
 
     Modelled sporting appeal is the same game-context used to assess
@@ -91,7 +93,10 @@ def player_market_opportunity(*,buyer_appeal,seller_appeal,
         raise ValueError("Source-labelled 0-100 club appeal is required")
     if type(overall) is not int or not 1<=overall<=99:
         raise ValueError("Source-rated ability is required")
-    if type(sporting_upgrade) not in (int,float) or type(prospect) is not bool:
+    if (type(sporting_upgrade) not in (int,float) or
+            type(prospect) is not bool or
+            any(type(v) is not bool for v in
+                (seller_first_choice,seller_rotation_critical,starting_upgrade))):
         raise ValueError("Valid player fit and intent required")
     gap=buyer_appeal-seller_appeal
     # Prestige alone should not compel a club to spend. Buying an actual
@@ -104,7 +109,25 @@ def player_market_opportunity(*,buyer_appeal,seller_appeal,
         career=max(-29,min(15,gap*.55))
         if gap<0 and sporting_upgrade>=5:
             career+=min(9,sporting_upgrade*1.3)
-    return round(quality+career+ambition,2)
+    # A settled first-choice player is much less likely to consider a
+    # weaker project just because another club can afford a transfer.
+    # An unverified wage promise is NOT assumed to overcome this. A
+    # genuinely better first-team opportunity softens the doubt, but never
+    # creates a compulsory deal. Bench players/youngsters have flexibility.
+    incumbent=0
+    if not prospect and gap<0:
+        if seller_first_choice:
+            incumbent=min(31,-gap*.65)
+        elif seller_rotation_critical:
+            incumbent=min(13,-gap*.28)
+        if starting_upgrade:
+            incumbent*=.65
+    if not prospect and not starting_upgrade and gap<5:
+        # Prevent prestigious buyers pursuing established stars merely
+        # as expensive spare parts. A verified depth shortage or signed
+        # departure can still put the player into the senior category.
+        incumbent+=4
+    return round(quality+career+ambition-incumbent,2)
 
 
 def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
@@ -121,9 +144,18 @@ def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
                       sale.get("tactically_required",False))
     starter_drop=max(0,sale.get("starter_rating_drop",0))
     coverage_gap=(loss>=1 or final_specialist)
-    percent=(.34 if coverage_gap else .0)+min(.22,starter_drop*.025)
+    # A major drop in a *starting specialist's quality* is more damaging
+    # than a raw missing player. This remains a soft reservation premium,
+    # not a hard sale veto; even a world-class keeper has a price.
+    percent=(.34 if coverage_gap else .0)+min(.71,starter_drop*.047)
     if sale.get("protected_rotation"):
-        percent+=.07
+        percent+=.09
+    # Contrast replacement quality with the existing top XI. Especially
+    # relevant for dominant teams whose fourth defender or second keeper
+    # may be genuinely first-team standard at most other clubs.
+    standard=max(0,sale.get("source_standard_top11",0))
+    if sale.get("first_choice") and starter_drop>=4 and standard>=79:
+        percent+=min(.18,(standard-78)*.008)
     # Losing the last credible bench option is meaningful even when the
     # manager can still field eleven starters. Not an absolute veto.
     if sale.get("below_target_cover") and not coverage_gap:
@@ -134,4 +166,4 @@ def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
     # can tolerate without hard-coding a permanent sale refusal.
     percent*=max(.4,1-min(.45,max(0,seller_pressure)/180))
     if player_wants_exit:percent*=.72
-    return round(min(.78,percent),3)
+    return round(min(1.17,percent),3)
