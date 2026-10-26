@@ -98,6 +98,10 @@ jobs:
                      for c in a["elite_club_transfer_decisions"].values())
           assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
           assert "tactical_xi_coverage_alerts" in a
+          assert "tactical_xi_quality_alerts" in a
+          assert len(a["tactical_xi_quality_samples"]) <= a["tactical_xi_quality_alerts"]
+          assert all(item["avg_rating_loss"] >= 1.5
+                     for item in a["tactical_xi_quality_samples"])
           assert a["in_game_final_registrations"]<a["autonomous_moments_processed"], (
               "Every market tick became a forced signing: autonomous declines broken")
           assert a["opportunity_scale_QA_only"]==${{ matrix.opportunity_scale }}
