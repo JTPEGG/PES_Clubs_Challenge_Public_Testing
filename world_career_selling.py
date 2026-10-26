@@ -339,7 +339,38 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
                             "lineup_loss":sale["formation_lineup_loss"],
                             "tactical_sale_premium_pct":round(100*uplift,1),
                             "first_choice":sale["first_choice"],
+                            "starter_quality_drop":sale["starter_rating_drop"],
+                            "formation_quality_loss":sale["formation_quality_loss"],
+                            "rotation_quality_drop":sale["rotation_quality_drop"],
                             "after_specialist_depth":sale["after_depth"]}
+                        if board["decision"]=="direct_sale" and uplift>0:
+                            # The board's standard exceptional threshold used
+                            # source market value alone. That could make a
+                            # club sell its strongest specialist at a small
+                            # fee even when the manager's XI collapses.
+                            # Price real sporting loss into the intervention
+                            # decision, without removing its override power.
+                            from world_fc27_seller_value import (
+                                exceptional_seller_board_floor)
+                            enhanced=exceptional_seller_board_floor(
+                                reference_value=info["market_value"],
+                                base_board_floor=board["required_offer"],
+                                projected_squad_sale=sale,
+                                risk_uplift=uplift,
+                                club_ambition=profile["ambition_level"])
+                            tactical_review["board_standard_override_floor"]=board["required_offer"]
+                            tactical_review["board_sporting_override_floor"]=enhanced
+                            if offer_fee<enhanced:
+                                board={**board,"decision":"no_intervention",
+                                    "required_offer":enhanced,
+                                    "shortfall":enhanced-offer_fee,
+                                    "reason":("Exceptional board sale does not "
+                                        "yet cover the measured specialist "
+                                        "and starting-XI loss; £"
+                                        f"{enhanced:,} required.")}
+                                effective=seller["decision"]
+                                reason=seller["reason"]
+                                asking=seller["asking_price"]
                         if board["decision"]!="direct_sale" and uplift>0:
                             reference_floor=int((info["market_value"]*(1+uplift)+49999)
                                 //50000)*50000
