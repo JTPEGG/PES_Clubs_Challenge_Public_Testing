@@ -47,6 +47,32 @@ def select_tactical_family(*,family_needs,starting_roles,draw):
     return _pick(FAMILIES,[2+slots[f]*2+
         2*max(0,min(90,round(family_needs[f]))) for f in FAMILIES],draw)
 
+def revise_tactical_search_after_outcomes(*,family_needs,previous_searches):
+    """Softly avoid retrying the same exhausted specialist desk repeatedly.
+
+    Every family keeps a nonzero chance. An actual new roster vacancy still
+    creates urgency in the base input, and even the family that failed may
+    be tried again. No player, country, club or transfer-count restrictions.
+    previous_searches is the last 3 real (family,outcome) observations.
+    """
+    if set(family_needs)!=set(FAMILIES):
+        raise ValueError("All tactical families must have live need scores")
+    if not isinstance(previous_searches,(list,tuple)) or len(previous_searches)>3:
+        raise ValueError("Supply up to three audited market searches")
+    adjusted=dict(family_needs)
+    for i,entry in enumerate(previous_searches):
+        if len(entry)!=2 or entry[0] not in FAMILIES:
+            raise ValueError("Invalid market family history")
+        family,outcome=entry
+        if outcome in ("no_eligible_target","no_affordable_target",
+                       "buyer_opening_bid_unaffordable"):
+            # Most recent evidence matters more than older scouting. Need
+            # doesn't vanish; this simply broadens the possible search.
+            weight=(1.0,.55,.3)[i]
+            adjusted[family]=max(-18,adjusted[family]-15*weight)
+    return adjusted
+
+
 def choose_development_focus(*,profile,draw,senior_upgrade_pressure=0):
     """Development is an independent ambition-based strategy, not a quota."""
     if type(draw) is not int or not 0<=draw<1000:
