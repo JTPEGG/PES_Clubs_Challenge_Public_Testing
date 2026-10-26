@@ -343,6 +343,30 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
                             "formation_quality_loss":sale["formation_quality_loss"],
                             "rotation_quality_drop":sale["rotation_quality_drop"],
                             "after_specialist_depth":sale["after_depth"]}
+                        # Ageing and succession are a separate, explainable
+                        # 3-season financial/sporting choice. Source age and
+                        # salary are required; never invent PA or renewal.
+                        from world_fc27_long_term_strategy import (
+                            source_ages,seller_horizon_review)
+                        years=source_ages(conn,dataset=ds,
+                                          player_ids=[player_id])
+                        wage_row=conn.execute("""SELECT weekly_wage_gbp
+                            FROM world_dataset_contract_snapshots
+                            WHERE dataset_id=? AND player_id=?""",
+                            (ds,player_id)).fetchone()
+                        strategic=None
+                        if (player_id in years and wage_row and
+                                wage_row[0] is not None and
+                                info["contract_years"] is not None):
+                            strategic=seller_horizon_review(
+                                age=years[player_id],overall=pid_row[1],
+                                position=pid_row[0],
+                                market_value=info["market_value"],
+                                offered_fee=offer_fee,
+                                weekly_wage=wage_row[0],
+                                contract_years=info["contract_years"],
+                                squad_sale=sale,profile=profile)
+                        tactical_review["three_season_strategy"]=strategic
                         if board["decision"]=="direct_sale" and uplift>0:
                             # The board's standard exceptional threshold used
                             # source market value alone. That could make a
@@ -371,6 +395,20 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
                                 effective=seller["decision"]
                                 reason=seller["reason"]
                                 asking=seller["asking_price"]
+                        if (board["decision"]=="direct_sale" and strategic
+                                and strategic["asking_price_shift_pct"]>0):
+                            extra=int((info["market_value"]*
+                                strategic["asking_price_shift_pct"]/100+49999)
+                                //50000)*50000
+                            if offer_fee<board["required_offer"]+extra:
+                                board={**board,"decision":"no_intervention",
+                                    "required_offer":board["required_offer"]+extra,
+                                    "shortfall":board["required_offer"]+extra-offer_fee,
+                                    "reason":"Three-season sporting and financial "
+                                    "strategy raises the exceptional-sale value."}
+                                effective=seller["decision"]
+                                reason=seller["reason"]
+                                asking=seller["asking_price"]
                         if board["decision"]!="direct_sale" and uplift>0:
                             reference_floor=int((info["market_value"]*(1+uplift)+49999)
                                 //50000)*50000
@@ -388,6 +426,20 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
                                            else "negotiate")
                                 reason+=(" Tactical squad disruption requires "
                                     f"£{asking:,} without a signed replacement.")
+                        if (strategic and board["decision"]!="direct_sale"
+                                and asking is not None):
+                            factor=1+strategic["asking_price_shift_pct"]/100
+                            adjusted=max(50000,int((
+                                asking*factor+49999)//50000)*50000)
+                            # Both ageing cash-in and current-season retention
+                            # matter; never an age-based hard sale ban.
+                            if adjusted!=asking:
+                                asking=adjusted
+                                effective=("accept" if offer_fee>=asking
+                                           else "negotiate")
+                                reason+=(" Three-season squad, contract "
+                                    "and ageing-asset review sets an "
+                                    f"asking price of £{asking:,}.")
     if tactical_review is not None:
         seller={**seller,"decision":effective,
                 "asking_price":asking,"reason":reason,
