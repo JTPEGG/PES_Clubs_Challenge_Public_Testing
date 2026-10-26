@@ -170,7 +170,9 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
         country_pool=con.execute("""SELECT
             COALESCE(SUM(eligible_candidates),0),
             COALESCE(SUM(same_country_candidates),0),
-            COALESCE(SUM(foreign_country_candidates),0)
+            COALESCE(SUM(foreign_country_candidates),0),
+            COALESCE(SUM(affordable_same_country),0),
+            COALESCE(SUM(affordable_foreign_country),0)
             FROM world_fc27_market_negotiation_diagnostics
             WHERE window_id=? AND result_stage!='no_eligible_target'""",
             (start["window_id"],)).fetchone()
@@ -192,7 +194,14 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                 d.search_strategy,d.eligible_candidates,
                 d.same_country_candidates,d.foreign_country_candidates,
                 d.result_stage,d.reason,d.first_eligible_player_id,
-                d.chosen_player_id,d.selected_source_country
+                d.chosen_player_id,d.selected_source_country,
+                d.contract_phase,d.buyer_offer_fee_gbp,
+                d.seller_counter_fee_gbp,d.buyer_sensible_ceiling_gbp,
+                d.promised_role,d.player_interest_signal,
+                d.player_required_role,d.source_player_wage_gbp,
+                d.agent_initial_demand_gbp,d.agent_final_demand_gbp,
+                d.buyer_remaining_wage_gbp,
+                d.affordable_same_country,d.affordable_foreign_country
                 FROM world_fc27_market_negotiation_diagnostics d
                 WHERE d.window_id=? AND d.club_id=?
                 ORDER BY d.interval_index""",
@@ -211,6 +220,18 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                     "top_ranked_player_id":v[8],
                     "negotiated_player_id":v[9],
                     "negotiated_source_country":v[10],
+                    "last_negotiation_phase":v[11],
+                    "offered_fee_gbp":v[12],
+                    "seller_counter_fee_gbp":v[13],
+                    "buyer_sensible_fee_ceiling_gbp":v[14],
+                    "role_promised":v[15],"player_signal":v[16],
+                    "player_required_role":v[17],
+                    "source_game_wage_gbp":v[18],
+                    "first_agent_wage_demand_gbp":v[19],
+                    "final_agreed_or_demanded_wage_gbp":v[20],
+                    "buyer_remaining_weekly_wage_headroom_gbp":v[21],
+                    "plausible_same_country_targets":v[22],
+                    "plausible_overseas_targets":v[23],
                 } for v in rows]}
         buyers_with_signings=len(inbound)
         sellers_with_sales=len(outbound)
@@ -349,6 +370,9 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
               "all_eligible_target_screenings":country_pool[0],
               "same_country_candidates":country_pool[1],
               "cross_country_candidates":country_pool[2],
+              "budget_plausible_same_country_candidates":country_pool[3],
+              "budget_plausible_cross_country_candidates":country_pool[4],
+              "budget_plausible_candidates":country_pool[3]+country_pool[4],
               "cross_country_share_of_eligible_shortlists":(
                   round(country_pool[2]/(country_pool[1]+country_pool[2]),4)
                   if country_pool[1]+country_pool[2] else None)},
