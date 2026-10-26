@@ -640,7 +640,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                 approaches+=1
                 diagnose("negotiation_started",chosen_player_id=pid,
                     chosen_seller_id=seller,
-                    selected_source_country=audit_countries.get(seller))
+                    selected_source_country=audit_countries.get(seller),
+                    source_reference_fee_gbp=value,
+                    source_player_wage_gbp=(
+                        shortlist_values.get(pid,(None,None))[1]
+                        if club_ai_context else None))
+                phase="seller_model"
                 try:
                     _model_player_and_seller(conn,career_id=career_id,
                                               player_id=pid,target=target,
@@ -648,6 +653,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                                               replacement_outlook=replacement_plan["forecast_replacement_outlook"])
                     from world_career_selling import get_seller_assumptions
                     seller_facts=get_seller_assumptions(conn,career_id,pid)
+                    phase="buyer_pricing"
                     price=determine_offer(career_id=career_id,player_id=pid,
                         club_id=buyer,valuation=value,available_budget=money,
                         need_score=need,eligible_clubs=1,
@@ -674,6 +680,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                         if club_ai_context:
                             return None
                         continue
+                    phase="offer_submission"
                     oid=propose_offer(conn,career_id=career_id,request_key=key,
                         player_id=pid,buying_club_id=buyer,offered_fee=price["fee"],
                         agreement_date=game_date,
@@ -686,6 +693,11 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                         FROM world_career_offers WHERE offer_id=?""",(oid,)).fetchone()
                     status=terms_row["status"]
                     final_fee=terms_row["offered_fee"]
+                    diagnose("seller_response_recorded",
+                        offer_id=oid,contract_phase="seller_response",
+                        buyer_offer_fee_gbp=price["fee"],
+                        buyer_sensible_ceiling_gbp=price["maximum_sensible_fee"],
+                        seller_counter_fee_gbp=terms_row["demanded_fee"])
                     if status=="countered":
                         asking=terms_row["demanded_fee"]
                         # AI accepts a reasoned asking price only within its
@@ -708,6 +720,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                                 return None
                             continue
                         from world_careers import accept_counter
+                        phase="seller_counter_acceptance"
                         accept_counter(conn,career_id=career_id,offer_id=oid)
                         status="accepted_pending_contract"
                         final_fee=asking
@@ -727,16 +740,28 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     promise=("rotation" if fit.get("category")=="prospect" else
                              "key_player" if need>=90 and
                              club_ratings and overall>=max(club_ratings) else "regular_starter")
+                    phase="player_interest"
                     interest=player_move_interest(conn,career_id=career_id,
                         offer_id=oid,role_promise=promise)
+                    diagnose("player_interest_reviewed",
+                        contract_phase="player_interest",promised_role=promise,
+                        player_interest_signal=interest.get("decision"),
+                        player_required_role=interest.get("required_role"))
                     if not interest["can_negotiate"]:
                         if club_ai_context:
                             diagnose("player_not_interested",interest.get("reason"))
                             return None
                         continue
+                    phase="agent_quote"
                     terms=agent_terms(conn,career_id=career_id,offer_id=oid)
                     demand=terms["demanded_wage_weekly"]
-                    if demand>wage_budget_breakdown(conn,career_id,buyer)["remaining"]:
+                    wage_remaining=wage_budget_breakdown(
+                        conn,career_id,buyer)["remaining"]
+                    diagnose("agent_wage_requested",
+                        contract_phase="agent_quote",
+                        agent_initial_demand_gbp=demand,
+                        buyer_remaining_wage_gbp=wage_remaining)
+                    if demand>wage_remaining:
                         if club_ai_context:
                             diagnose("initial_wage_budget_shortfall")
                             return None
@@ -744,6 +769,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     first_wage,style=_ai_wage_opening(
                         demand=demand,career_id=career_id,buyer=buyer,
                         player_id=pid)
+                    phase="agent_first_response"
                     response=negotiate_agent(conn,career_id=career_id,
                         offer_id=oid,weekly_wage=first_wage,contract_years=3,
                         role_promise=promise,agreement_date=game_date)
@@ -754,7 +780,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                         # others will match the updated demand if affordable.
                         if style%9==0 or style>=93:
                             if club_ai_context:
-                                diagnose("buyer_walked_from_agent_counter")
+                                diagnose("buyer_walked_from_agent_counter",
+                                    contract_phase="agent_counter")
                                 return None
                             continue
                         demand=conn.execute("""SELECT demanded_wage_weekly
@@ -763,19 +790,24 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                         if demand>wage_budget_breakdown(
                                 conn,career_id,buyer)["remaining"]:
                             if club_ai_context:
-                                diagnose("agent_counter_wage_unaffordable")
+                                diagnose("agent_counter_wage_unaffordable",
+                                    contract_phase="agent_counter",
+                                    agent_final_demand_gbp=demand)
                                 return None
                             continue
                         final_wage=demand
+                        phase="agent_counter_response"
                         response=negotiate_agent(conn,career_id=career_id,
                             offer_id=oid,weekly_wage=final_wage,
                             contract_years=3,role_promise=promise,
                             agreement_date=game_date)
                     if response!="accepted":
                         if club_ai_context:
-                            diagnose("agent_terms_not_accepted",response)
+                            diagnose("agent_terms_not_accepted",response,
+                                contract_phase=phase)
                             return None
                         continue
+                    phase="final_transfer_approval"
                     _sign_ai_deal(conn,career_id=career_id,offer_id=oid,buyer=buyer,
                         seller=seller,fee=final_fee,wage=final_wage,
                         game_date=game_date)
@@ -833,14 +865,19 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                                    "First-team recruitment. ")
                                 + "The deal registers at the deadline."))
                     conn.commit()
-                    diagnose("completed",f"Offer {oid}")
+                    diagnose("completed",f"Offer {oid}",
+                        contract_phase="signed",offer_id=oid,
+                        agent_final_demand_gbp=final_wage)
                     return oid
                 except (ValueError, TypeError) as exc:
                     # A chosen recruiting desk may fail. FC27 must not
                     # try another footballer/club until one finally signs.
                     if club_ai_context:
-                        diagnose("negotiation_exception",
-                                 type(exc).__name__+": "+str(exc))
+                        from world_fc27_decision_audit import (
+                            classify_negotiation_failure)
+                        diagnose(classify_negotiation_failure(phase,exc),
+                                 type(exc).__name__+": "+str(exc),
+                                 contract_phase=phase)
                         return None
                     continue
     diagnose("no_affordable_target")
