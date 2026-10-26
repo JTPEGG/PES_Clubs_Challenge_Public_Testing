@@ -162,6 +162,11 @@ def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
         percent+=.16
     percent+=min(.17,max(0,sale.get("backup_quality_drop",0))*.0035)
     percent+=min(.10,max(0,sale.get("rotation_quality_drop",0))*.008)
+    # Whole-lineup loss can be spread across different specialists even
+    # when no one position is uncovered. This is a soft selling incentive;
+    # it cannot turn the player into a permanently unavailable asset.
+    if not coverage_gap:
+        percent+=min(.19,max(0,sale.get("formation_quality_loss",0))*.012)
     # Financial distress and player pressure change the risk the club
     # can tolerate without hard-coding a permanent sale refusal.
     percent*=max(.4,1-min(.45,max(0,seller_pressure)/180))
