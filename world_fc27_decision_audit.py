@@ -36,14 +36,68 @@ CREATE TABLE IF NOT EXISTS world_fc27_market_negotiation_diagnostics(
   chosen_player_id INTEGER,
   chosen_seller_id INTEGER,
   selected_source_country TEXT,
+  contract_phase TEXT,
+  offer_id INTEGER,
+  source_reference_fee_gbp INTEGER,
+  buyer_offer_fee_gbp INTEGER,
+  seller_counter_fee_gbp INTEGER,
+  buyer_sensible_ceiling_gbp INTEGER,
+  promised_role TEXT,
+  player_interest_signal TEXT,
+  player_required_role TEXT,
+  source_player_wage_gbp INTEGER,
+  agent_initial_demand_gbp INTEGER,
+  agent_final_demand_gbp INTEGER,
+  buyer_remaining_wage_gbp INTEGER,
   result_stage TEXT NOT NULL,
   reason TEXT,
   PRIMARY KEY(window_id,interval_index,club_id)
 );
 """
 
+DETAIL_COLUMNS={
+    "contract_phase":"TEXT",
+    "offer_id":"INTEGER",
+    "source_reference_fee_gbp":"INTEGER",
+    "buyer_offer_fee_gbp":"INTEGER",
+    "seller_counter_fee_gbp":"INTEGER",
+    "buyer_sensible_ceiling_gbp":"INTEGER",
+    "promised_role":"TEXT",
+    "player_interest_signal":"TEXT",
+    "player_required_role":"TEXT",
+    "source_player_wage_gbp":"INTEGER",
+    "agent_initial_demand_gbp":"INTEGER",
+    "agent_final_demand_gbp":"INTEGER",
+    "buyer_remaining_wage_gbp":"INTEGER",
+}
+
+def classify_negotiation_failure(phase,exception):
+    """Separate genuine agent/player refusals from model errors.
+
+    Do not erase the actual exception or invent consent. Classification is
+    diagnostic only; the signing engine still retains its original policies.
+    """
+    if phase=="agent_quote" and "Player will not open agent talks" in str(exception):
+        return "player_refused_agent_talks"
+    if phase in ("agent_first_response","agent_counter_response"):
+        return "agent_negotiation_failure"
+    if phase in ("player_interest",):
+        return "player_interest_evaluation_failure"
+    if phase in ("seller_model","buyer_pricing","seller_response","offer_submission"):
+        return "seller_or_offer_evaluation_failure"
+    return "negotiation_processing_error"
+
+
 def initialize_decision_audit(conn):
     conn.executescript(SCHEMA)
+    # Upgrade only isolated development audit tables if a previous sandbox
+    # was already created. No live or legacy career table is touched.
+    existing={row[1] for row in conn.execute(
+        "PRAGMA table_info(world_fc27_market_negotiation_diagnostics)")}
+    for name,kind in DETAIL_COLUMNS.items():
+        if name not in existing:
+            conn.execute("ALTER TABLE world_fc27_market_negotiation_diagnostics "
+                         f"ADD COLUMN {name} {kind}")
     conn.commit()
 
 def save_evaluations(conn,rows):
@@ -64,7 +118,8 @@ def save_negotiation(conn,*,window_id,interval_index,club_id,**facts):
         "affordable_same_country","affordable_foreign_country",
         "first_eligible_player_id","first_eligible_seller_id",
         "first_eligible_source_country","chosen_player_id",
-        "chosen_seller_id","selected_source_country","result_stage","reason"
+        "chosen_seller_id","selected_source_country","result_stage","reason",
+        *DETAIL_COLUMNS
     }
     if not facts or set(facts)-allowed or "result_stage" not in facts:
         raise ValueError("Source-backed negotiation stage required")
