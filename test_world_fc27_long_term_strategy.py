@@ -10,7 +10,8 @@ import unittest
 
 from world_fc27_long_term_strategy import (
     DATASET,source_ages,three_season_outlook,club_horizon,
-    recruitment_horizon_score,seller_horizon_review)
+    recruitment_horizon_score,seller_horizon_review,
+    senior_succession_fit)
 from world_fc27_market_choices import choose_development_focus
 
 PROFILE={"ambition_level":85,"pressure_to_improve":80,
@@ -98,6 +99,49 @@ class FC27ThreeSeasonStrategyTests(unittest.TestCase):
                 player_overall=76,plan=plan)["score"]
         self.assertGreater(score(p1),score(p0))
         self.assertGreater(score(p1,"senior",34),-100)
+
+    def test_senior_succession_enables_comparable_25yo_to_replace_ageing_cb(self):
+        squad={"CB":[(1,86,"CB"),(2,80,"CB"),(3,73,"CB")]}
+        profile=PROFILE
+        ages={1:35,2:26,3:24}
+        plan=club_horizon(profile=profile,roster=squad,
+            ages=ages,starting_roles={"CB":1})
+        case=senior_succession_fit(
+            roster=squad,lane="CB",overall=83,candidate_age=25,
+            incumbent_ages=ages,starting_roles={"CB":1},
+            club_plan=plan)
+        self.assertTrue(case["eligible"])
+        self.assertEqual(case["category"],"senior")
+        self.assertTrue(case["succession"])
+        self.assertLess(case["upgrade"],0)
+        # A 25yo 83-rated CB isn't guaranteed to improve the immediate XI.
+        self.assertFalse(case["senior_replacement"])
+        self.assertIn("future ability unverified",case["reason"])
+
+    def test_senior_succession_does_not_override_real_youth_scouting(self):
+        squad={"CB":[(1,86,"CB"),(2,78,"CB")]}
+        ages={1:35,2:20}
+        plan=club_horizon(profile=PROFILE,roster=squad,
+            ages=ages,starting_roles={"CB":1})
+        def case(age,rating):
+            return senior_succession_fit(
+                roster=squad,lane="CB",overall=rating,
+                candidate_age=age,incumbent_ages=ages,
+                starting_roles={"CB":1},club_plan=plan)
+        self.assertFalse(case(20,86)["eligible"])
+        self.assertFalse(case(26,73)["eligible"])
+        self.assertFalse(case(35,87)["eligible"])
+        self.assertTrue(case(25,83)["eligible"])
+
+    def test_senior_succession_no_old_starter_means_no_special_case(self):
+        squad={"CB":[(1,86,"CB"),(2,83,"CB")]}
+        ages={1:27,2:25}
+        plan=club_horizon(profile=PROFILE,roster=squad,ages=ages,
+                          starting_roles={"CB":1})
+        case=senior_succession_fit(
+            roster=squad,lane="CB",overall=85,candidate_age=25,
+            incumbent_ages=ages,starting_roles={"CB":1},club_plan=plan)
+        self.assertFalse(case["eligible"])
 
     def test_cashing_in_on_older_player_is_still_allowed(self):
         older=seller_horizon_review(
