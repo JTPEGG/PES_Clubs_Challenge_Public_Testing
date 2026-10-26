@@ -355,8 +355,18 @@ def sale_profile(squads, *, seller, player_id, position, overall,
         match_after=assign_available_players(
             squads,seller,starting_roles,exclude_player=player_id)
         formation_lineup_loss=max(0,match_before["filled"]-match_after["filled"])
+        ratings_by_player={pid:rating for group in roster.values()
+                           for pid,rating,_pos in group}
+        # This is assignment-level evidence. The same versatile player
+        # cannot simultaneously cover two damaged positions.
+        before_quality=sum(ratings_by_player[a["player_id"]]
+                           for a in match_before["assignments"])
+        after_quality=sum(ratings_by_player[a["player_id"]]
+                          for a in match_after["assignments"])
+        formation_quality_loss=max(0,before_quality-after_quality)
     else:
         formation_lineup_loss=0
+        formation_quality_loss=0
     seriousness=max((r["starter_rating_drop"]*2+
                      r["backup_quality_drop"]+
                      (15 if r["depth_shortage"] else 0)
@@ -392,6 +402,7 @@ def sale_profile(squads, *, seller, player_id, position, overall,
         "sporting_risk":seriousness+formation_lineup_loss*35,
         "simultaneous_cover_loss":simultaneous_loss,
         "formation_lineup_loss":formation_lineup_loss,
+        "formation_quality_loss":round(formation_quality_loss,2),
         "tactically_required":(starting_roles is None or
                                starting_roles.get(slot,0)>0),
         "affected_positions":reports,
