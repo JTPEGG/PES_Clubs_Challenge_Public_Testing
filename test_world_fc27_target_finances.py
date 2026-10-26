@@ -8,7 +8,8 @@ import unittest
 
 from world_fc27_target_finances import (
     shortlist_reference_values,prospective_purchase_fit)
-from world_careers import _player_reference
+from world_valuation import model_value,fc27_game_reference_value
+from world_fc27_target_finances import _source_age_on
 
 FC27="fc27-warehouse-659-mens-2026-27"
 SALE=dict(valid=True,first_choice=False,protected_rotation=False,
@@ -82,7 +83,21 @@ class TargetFinanceTests(unittest.TestCase):
                 db,dataset=FC27,player_ids=[3,2,1,1])
             self.assertEqual(set(batch),{1,2,3})
             for pid in (1,2,3):
-                reference,_=_player_reference(db,FC27,pid)
+                row=db.execute("""SELECT x.overall,p.birth_date,p.primary_position,
+                    d.source_date,c.weekly_wage_gbp FROM
+                    world_dataset_rosters r JOIN world_players p
+                      ON p.player_id=r.player_id
+                    JOIN world_dataset_ratings x ON x.dataset_id=r.dataset_id
+                      AND x.player_id=r.player_id
+                    JOIN world_datasets d ON d.dataset_id=r.dataset_id
+                    LEFT JOIN world_dataset_contract_snapshots c
+                      ON c.dataset_id=r.dataset_id AND c.player_id=r.player_id
+                    WHERE r.dataset_id=? AND r.player_id=?""",
+                    (FC27,pid)).fetchone()
+                overall,birth,position,when,wage=row
+                baseline=model_value(overall,_source_age_on(birth,when),position)
+                reference=fc27_game_reference_value(
+                    baseline=baseline,overall=overall,weekly_wage=wage)
                 self.assertEqual(batch[pid][0],reference)
             self.assertIsNone(batch[2][1])
             self.assertEqual(batch[1][1],125000)
