@@ -61,6 +61,32 @@ class ClubLedMarketTests(unittest.TestCase):
         strained={**aggressive,"financial_pressure_index":96}
         self.assertLess(probability(strained),probability(aggressive))
 
+    def test_unresolved_real_scouting_needs_build_without_guaranteed_action(self):
+        profile={"ambition_level":84,"pressure_to_improve":85,
+                 "financial_pressure_index":30}
+        hits=lambda passes:sum(club_market_interest(
+            priority=75,profile=profile,draw=draw,
+            unattended_intervals=passes)
+            for draw in range(0,1000000,1000))
+        self.assertGreater(hits(8),hits(0))
+        self.assertLess(hits(12),1000)
+        self.assertGreater(hits(12),hits(8))
+        with self.assertRaises(ValueError):
+            club_market_interest(priority=75,profile=profile,
+                draw=10,unattended_intervals=-1)
+
+    def test_failure_categories_distinguish_player_refusal_and_agent_error(self):
+        from world_fc27_decision_audit import classify_negotiation_failure
+        self.assertEqual(classify_negotiation_failure(
+            "agent_quote",ValueError("Player will not open agent talks: no role")),
+            "player_refused_agent_talks")
+        self.assertEqual(classify_negotiation_failure(
+            "agent_first_response",ValueError("agent terms failed")),
+            "agent_negotiation_failure")
+        self.assertEqual(classify_negotiation_failure(
+            "seller_model",ValueError("invalid seller facts")),
+            "seller_or_offer_evaluation_failure")
+
     def test_each_club_and_interval_has_stable_non_colliding_checkpoint(self):
         slots={fc27_market_slot(index,club) for index in range(12)
                for club in range(1,660)}
