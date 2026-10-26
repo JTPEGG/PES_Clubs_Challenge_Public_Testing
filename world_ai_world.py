@@ -28,6 +28,7 @@ from world_fc27_ai_recruitment import (read_fc27_profiles,
 from world_ai_tactics import preferred_formation,tactical_needs
 from world_fc27_market_choices import (select_recruiting_club,
     select_tactical_family,choose_development_focus,pursue_transfer,
+    revise_tactical_search_after_outcomes,
     player_market_opportunity,POLICY_VERSION as DEAL_CHOICE_VERSION)
 from world_fc27_target_finances import (
     shortlist_reference_values,prospective_purchase_fit)
@@ -411,6 +412,17 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
             lane_scores=positional_family_priorities(projected,club=buyer,
                 departed_lanes=outgoing_lanes[buyer],
                 starting_roles=club_tactics.get(buyer))
+            if audit_enabled and audit_interval is not None:
+                # Read real failed searches, not hypothetical club opinions.
+                # A manager has more than one sporting need; an unsuccessful
+                # previous desk can reconsider other roles next interval.
+                recent=conn.execute("""SELECT search_family,result_stage
+                    FROM world_fc27_market_negotiation_diagnostics
+                    WHERE window_id=? AND club_id=? AND interval_index<?
+                    ORDER BY interval_index DESC LIMIT 3""",
+                    (window_id,buyer,audit_interval)).fetchall()
+                lane_scores=revise_tactical_search_after_outcomes(
+                    family_needs=lane_scores,previous_searches=recent)
             targeted_family=select_tactical_family(
                 family_needs=lane_scores,
                 starting_roles=club_tactics[buyer],
