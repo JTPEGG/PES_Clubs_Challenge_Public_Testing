@@ -34,7 +34,8 @@ from world_fc27_target_finances import (
     shortlist_reference_values,prospective_purchase_fit)
 from world_fc27_contract_terms import fc27_sporting_recruitment_case
 from world_fc27_long_term_strategy import (
-    source_ages,club_horizon,recruitment_horizon_score)
+    source_ages,club_horizon,recruitment_horizon_score,
+    senior_succession_fit)
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -477,6 +478,17 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     continue
             club_ratings=profiles[family]
             options=[]
+            # Age-relative *senior* succession is distinct from prospect
+            # scouting. No need to load candidate birthdays when the
+            # manager has no evidenced ageing first-choice specialist.
+            successor_ages={}
+            if (club_ai_context and not development_focus and
+                    any(lane in horizon_plan["succession_pressure"]
+                        for lane,group in __import__(
+                            "world_squad_planner").FAMILY.items()
+                        if group==family)):
+                successor_ages=source_ages(conn,dataset=dataset,
+                    player_ids=[pid for _,pid,_ in players[family]])
             for seller,pid,overall in players[family]:
                 if seller==buyer or pid in signed_players:
                     continue
@@ -506,6 +518,15 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                         position=position,overall=overall,signals=scouting,
                         existing_prospects=youth_signings[buyer],
                         contextual_policy=bool(club_ai_context))
+                if (not fit["eligible"] and club_ai_context
+                        and not development_focus and successor_ages):
+                    fit=senior_succession_fit(
+                        roster=buyer_roster,
+                        lane=lane_of(position),overall=overall,
+                        candidate_age=successor_ages.get(pid),
+                        incumbent_ages=buyer_source_ages,
+                        starting_roles=club_tactics[buyer],
+                        club_plan=horizon_plan)
                 if not fit["eligible"]:
                     continue
                 sale_key=(seller,pid)
@@ -580,7 +601,9 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                             projected.get(buyer,{}))),
                         overall=overall,
                         ambition=club_ai_context[buyer]["ambition_level"],
-                        has_recent_departure=bool(fit.get("senior_replacement")))
+                        has_recent_departure=bool(
+                            fit.get("senior_replacement") or
+                            fit.get("succession")))
                     fit={**fit,"fc27_sporting_case":case}
                     sporting_gain+=case["score"]
                 # Player career trajectory matters in an actual global
