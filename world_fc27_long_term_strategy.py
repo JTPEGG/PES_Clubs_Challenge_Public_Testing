@@ -75,7 +75,6 @@ def club_horizon(*,profile,roster,ages,starting_roles):
     if not profile or not isinstance(starting_roles,dict):
         raise ValueError("Modelled club profile and preferred starting XI needed")
     from world_squad_planner import lane_of
-    from world_ai_tactics import FAMILY
     # Avoid reliance on arbitrary club names. A source-rated ageing starter
     # drives succession, and youthful same-lane competition moderates it.
     lanes={}
