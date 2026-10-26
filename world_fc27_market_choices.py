@@ -73,19 +73,23 @@ def revise_tactical_search_after_outcomes(*,family_needs,previous_searches):
     return adjusted
 
 
-def choose_development_focus(*,profile,draw,senior_upgrade_pressure=0):
+def choose_development_focus(*,profile,draw,senior_upgrade_pressure=0,
+                             succession_pressure=0):
     """Development is an independent ambition-based strategy, not a quota."""
     if type(draw) is not int or not 0<=draw<1000:
         raise ValueError("Need stable prospect draw")
     if (type(senior_upgrade_pressure) not in (int,float) or
-            not 0<=senior_upgrade_pressure<=100):
+            not 0<=senior_upgrade_pressure<=100 or
+            type(succession_pressure) not in (int,float) or
+            not 0<=succession_pressure<=100):
         raise ValueError("Invalid evidence-based senior recruitment pressure")
     ambition=profile.get("ambition_level",50) if profile else 50
     risk=profile.get("simulated_manager_risk",50) if profile else 50
     financial=profile.get("financial_pressure_index",50) if profile else 50
     likelihood=max(30,min(285,round(145+(ambition-50)*1.3+
                         (risk-50)*.45-(financial-50)*.65-
-                        senior_upgrade_pressure*1.05)))
+                        senior_upgrade_pressure*1.05+
+                        min(75,succession_pressure*1.15))))
     return draw<likelihood
 
 def pursue_transfer(*,priority,profile,draw):
