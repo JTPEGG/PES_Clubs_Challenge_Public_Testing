@@ -33,6 +33,8 @@ from world_fc27_market_choices import (select_recruiting_club,
 from world_fc27_target_finances import (
     shortlist_reference_values,prospective_purchase_fit)
 from world_fc27_contract_terms import fc27_sporting_recruitment_case
+from world_fc27_long_term_strategy import (
+    source_ages,club_horizon,recruitment_horizon_score)
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -409,9 +411,21 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
         # but 7-9 defenders/midfielders; 3 keepers are NOT the largest need.
         expected={"GK":3,"DEF":8,"MID":9,"FWD":6}
         if club_ai_context:
+            # Three-season strategy uses the actual projected squad AFTER
+            # signed arrivals/departures. The prospect scouting gate stays
+            # independent: this only changes relative sporting interest.
+            buyer_roster=projected.get(buyer,{})
+            buyer_source_ages=source_ages(conn,dataset=dataset,
+                player_ids=[pid for members in buyer_roster.values()
+                            for pid,_,_ in members])
+            horizon_plan=club_horizon(
+                profile=club_ai_context[buyer],roster=buyer_roster,
+                ages=buyer_source_ages,starting_roles=club_tactics[buyer])
             lane_scores=positional_family_priorities(projected,club=buyer,
                 departed_lanes=outgoing_lanes[buyer],
                 starting_roles=club_tactics.get(buyer))
+            for group,pressure in horizon_plan["family_succession_pressure"].items():
+                lane_scores[group]+=min(13,pressure*.32)
             if audit_enabled and audit_interval is not None:
                 # Read real failed searches, not hypothetical club opinions.
                 # A manager has more than one sporting need; an unsuccessful
@@ -434,6 +448,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                            max(0,profile["ambition_level"]-72)*1.35)
             development_focus=choose_development_focus(
                 profile=profile,senior_upgrade_pressure=senior_need,
+                succession_pressure=horizon_plan["youth_pipeline_priority"],
                 draw=_stable(career_id,window_id,slot,buyer,
                              DEAL_CHOICE_VERSION,"development-or-XI")%1000)
         else:
@@ -589,12 +604,34 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                                 need+seller_fit+sporting_gain+sporting_appeal,
                                 fit,sale,replacement_plan))
             if club_ai_context:
-                # A manager has chosen whether this is a development search
-                # or a senior-tactics search. A lack of targets is a
-                # legitimate no-deal result; don't switch clubs and keep
-                # searching until a transaction is manufactured.
+                # Preserve existing prospect_fit() eligibility, source
+                # potential evidence and independent development intent.
+                # Strategy may favour a verified prospect as FUTURE depth,
+                # never turn it into an automatic first-team upgrade.
                 options=[o for o in options if (
                     (o[5].get("category")=="prospect")==development_focus)]
+                option_ages=source_ages(conn,dataset=dataset,
+                                       player_ids=[v[1] for v in options])
+                strategic_options=[]
+                for seller,pid,ovr,need,total,fit,sale,repl in options:
+                    lane=lane_of(projected_positions.get(pid))
+                    existing_youth=sum(1 for teammate,_,_ in
+                        buyer_roster.get(lane,())
+                        if buyer_source_ages.get(teammate,99)<=23)
+                    outlook=recruitment_horizon_score(
+                        category=("prospect" if
+                                  fit.get("category")=="prospect" else "senior"),
+                        lane=lane,player_age=option_ages.get(pid),
+                        player_overall=ovr,plan=horizon_plan,
+                        existing_youth_in_lane=existing_youth,
+                        immediate_starter_upgrade=bool(
+                            fit.get("fc27_sporting_case",{}).get(
+                                "first_team_upgraded",False)))
+                    strategic_options.append((seller,pid,ovr,need,
+                        total+outlook["score"],
+                        {**fit,"three_season_recruitment":outlook},
+                        sale,repl))
+                options=strategic_options
             # Actual model reference values, source salary and the current
             # seller's squad risk now inform how realistic each shortlist is.
             # This is a SOFT preference, not a sale veto or target-count cap.
@@ -880,6 +917,23 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     _sign_ai_deal(conn,career_id=career_id,offer_id=oid,buyer=buyer,
                         seller=seller,fee=final_fee,wage=final_wage,
                         game_date=game_date)
+                    if club_ai_context:
+                        # The independent prospect marker is written BELOW
+                        # unchanged: multi-year succession is a *reason*,
+                        # not a second category or a promise of future PA.
+                        import json
+                        conn.execute("""INSERT INTO world_career_offer_events
+                            (offer_id,event_type,detail) VALUES(?,?,?)""",
+                            (oid,"ai_fc27_three_season_recruitment",
+                             json.dumps({
+                                 "recruitment_category":fit.get(
+                                     "category","senior"),
+                                 "decision":fit["three_season_recruitment"],
+                                 "club_horizon":horizon_plan,
+                                 "source_player_age":option_ages.get(pid),
+                                 "replacement_assumed_signed":False,
+                             },sort_keys=True)))
+                        conn.commit()
                     if sale["protected_rotation"]:
                         conn.execute("""INSERT INTO world_career_offer_events
                             (offer_id,event_type,detail) VALUES(?,?,?)""",
