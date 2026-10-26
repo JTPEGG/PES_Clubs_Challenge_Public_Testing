@@ -31,6 +31,7 @@ from world_fc27_market_choices import (select_recruiting_club,
     player_market_opportunity,POLICY_VERSION as DEAL_CHOICE_VERSION)
 from world_fc27_target_finances import (
     shortlist_reference_values,prospective_purchase_fit)
+from world_fc27_contract_terms import fc27_sporting_recruitment_case
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -512,6 +513,23 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     fit=fit,departed_lanes=outgoing_lanes[buyer],
                     starting_roles=club_tactics.get(buyer))
                     if club_ai_context else 0)
+                if club_ai_context:
+                    # Keep succession and credible depth signings, but do
+                    # not call an inferior signing a "first-team upgrade".
+                    # For strong teams, routine backup churn should rarely
+                    # beat a genuinely stronger specialist at similar price.
+                    from world_squad_planner import squad_standard
+                    case=fc27_sporting_recruitment_case(
+                        category=fit.get("category","senior"),
+                        starter_gain=fit.get("upgrade",0),
+                        role_required=bool(fit.get("depth_shortage")),
+                        team_standard=round(squad_standard(
+                            projected.get(buyer,{}))),
+                        overall=overall,
+                        ambition=club_ai_context[buyer]["ambition_level"],
+                        has_recent_departure=bool(fit.get("senior_replacement")))
+                    fit={**fit,"fc27_sporting_case":case}
+                    sporting_gain+=case["score"]
                 # Player career trajectory matters in an actual global
                 # market. This never examines home country, nationality,
                 # distance, borders, or a domestic quota: an international
@@ -737,9 +755,21 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                         _modelled_europe(conn,career_id=career_id,club_id=seller),
                         "fictional-preseason-prestige-seeding-v1"))
                     conn.commit()
-                    promise=("rotation" if fit.get("category")=="prospect" else
-                             "key_player" if need>=90 and
-                             club_ratings and overall>=max(club_ratings) else "regular_starter")
+                    if club_ai_context:
+                        # Do not promise guaranteed starts to a weaker
+                        # rotation/depth player. He may decline a bench role,
+                        # which is genuine voluntary player behaviour.
+                        case=fit["fc27_sporting_case"]
+                        promise=("rotation" if fit.get("category")=="prospect"
+                                 or not case["first_team_upgraded"] else
+                                 "key_player" if need>=90 and
+                                 club_ratings and overall>=max(club_ratings)
+                                 else "regular_starter")
+                    else:
+                        promise=("rotation" if fit.get("category")=="prospect" else
+                                 "key_player" if need>=90 and
+                                 club_ratings and overall>=max(club_ratings)
+                                 else "regular_starter")
                     phase="player_interest"
                     interest=player_move_interest(conn,career_id=career_id,
                         offer_id=oid,role_promise=promise)
@@ -753,7 +783,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                             return None
                         continue
                     phase="agent_quote"
-                    terms=agent_terms(conn,career_id=career_id,offer_id=oid)
+                    terms=agent_terms(conn,career_id=career_id,offer_id=oid,
+                                      role_promise=promise)
                     demand=terms["demanded_wage_weekly"]
                     wage_remaining=wage_budget_breakdown(
                         conn,career_id,buyer)["remaining"]
