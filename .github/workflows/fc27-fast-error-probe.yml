@@ -1,0 +1,38 @@
+name: FC27 fast seller and offer model error probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/fc27_error_probe.py'
+      - '.github/workflows/fc27-fast-error-probe.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runtime
+        run: python -m pip install -r requirements.txt
+      - name: Download immutable FC27 659 club source
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          run-id: 39616187183
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: warehouse-source/
+      - name: Build disposable FC27 659 world
+        run: |
+          mkdir -p qa659
+          python -u -m scripts.fc27_warehouse_world_bridge \
+            --warehouse warehouse-source/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --target qa659/FC27_659_ERROR_PROBE.sqlite
+      - name: Probe three real market intervals and show precise failed offer reasons
+        run: |
+          python -u -m scripts.fc27_error_probe \
+            --world qa659/FC27_659_ERROR_PROBE.sqlite --intervals 3
