@@ -739,8 +739,11 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                 # Existing manager offers or future commitments have precedence.
                 conflict=conn.execute("""SELECT 1 FROM world_career_offers
                     WHERE career_id=? AND player_id=?
-                    AND status IN ('agreed_future','completed') LIMIT 1""",
-                    (career_id,pid)).fetchone()
+                    AND (status IN ('agreed_future','completed')
+                         OR (buying_club_id=? AND status IN
+                          ('proposed','countered',
+                           'accepted_pending_contract')))
+                    LIMIT 1""",(career_id,pid,buyer)).fetchone()
                 if conflict:
                     continue
                 key=f"ai-world-v1-{window_id}-{slot}-{buyer}-{pid}"
