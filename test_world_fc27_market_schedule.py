@@ -6,6 +6,9 @@ import hashlib
 from world_fc27_market_schedule import (
     VERSION,FC27_SLOT_BASE,club_market_interest,fc27_market_slot,
     initialise_fc27_market_schedule,is_fc27_market)
+from world_fc27_decision_audit import (
+    initialize_decision_audit,save_negotiation,save_evaluations,
+    shortlist_country_mix)
 # The unit suite runs without the Flask web dependency; reproduce the
 # exact deterministic stable hash without importing the live web module.
 MARKET_MOMENTS=range(12)
@@ -94,6 +97,49 @@ class ClubLedMarketTests(unittest.TestCase):
             self.assertFalse(is_fc27_market(con,career_id="legacy"))
         finally:
             con.close()
+
+    def test_each_club_funnel_is_saved_without_affecting_market(self):
+        con=sqlite3.connect(":memory:")
+        try:
+            initialize_decision_audit(con)
+            save_evaluations(con,[
+                (9,2,11,72,90202,403,"proceeded_to_search"),
+                (9,2,12,62,779500,403,"did_not_scout")])
+            self.assertEqual(con.execute("""SELECT stage FROM
+                world_fc27_market_club_evaluations WHERE club_id=12"""
+                ).fetchone()[0],"did_not_scout")
+            save_negotiation(con,window_id=9,interval_index=2,
+                club_id=11,result_stage="shortlist_ready",
+                eligible_candidates=4,same_country_candidates=1,
+                foreign_country_candidates=3,search_family="DEF")
+            save_negotiation(con,window_id=9,interval_index=2,
+                club_id=11,result_stage="player_not_interested",
+                reason="Sporting downgrade")
+            row=con.execute("""SELECT result_stage,reason,
+                eligible_candidates,same_country_candidates,
+                foreign_country_candidates,search_family
+                FROM world_fc27_market_negotiation_diagnostics
+                WHERE window_id=9 AND club_id=11""").fetchone()
+            self.assertEqual(row,("player_not_interested",
+                "Sporting downgrade",4,1,3,"DEF"))
+            with self.assertRaises(ValueError):
+                save_negotiation(con,window_id=9,interval_index=2,
+                    club_id=11,result_stage="bad",invented_personality=10)
+        finally:
+            con.close()
+
+    def test_foreign_candidate_share_is_a_pool_measure_not_preference(self):
+        eligible=[(13,100),(14,101),(14,102),(15,103),(16,104)]
+        countries={1:"England",13:"England",14:"France",
+                   15:"Portugal",16:"France"}
+        mix=shortlist_country_mix(options=eligible,buyer=1,
+                                  countries=countries)
+        self.assertEqual(mix["same_country_candidates"],1)
+        self.assertEqual(mix["foreign_country_candidates"],4)
+        self.assertEqual(mix["unknown_country_candidates"],0)
+        self.assertEqual(shortlist_country_mix(
+            options=eligible,buyer=999,countries=countries)
+            ["unknown_country_candidates"],5)
 
     def test_nothing_is_mathematically_fixed_to_112(self):
         from pathlib import Path
