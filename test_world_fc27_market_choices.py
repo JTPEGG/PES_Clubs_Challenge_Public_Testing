@@ -4,11 +4,30 @@ import unittest
 from world_ai_tactics import FORMATION_STARTERS
 from world_fc27_market_choices import (
     select_recruiting_club,select_tactical_family,choose_development_focus,
-    pursue_transfer,disruption_sale_premium,player_market_opportunity)
+    pursue_transfer,disruption_sale_premium,player_market_opportunity,
+    revise_tactical_search_after_outcomes)
 from world_valuation import model_value,fc27_game_reference_value
 from scripts.fc27_warehouse_world_bridge import explicit_source_alternative_positions
 
 class AutonomousChoicesTests(unittest.TestCase):
+    def test_failed_positional_search_softly_broadens_followup_options(self):
+        needs={"GK":19,"DEF":40,"MID":35,"FWD":21}
+        changed=revise_tactical_search_after_outcomes(
+            family_needs=needs,
+            previous_searches=[("DEF","no_affordable_target"),
+                               ("DEF","buyer_opening_bid_unaffordable"),
+                               ("GK","completed")])
+        self.assertLess(changed["DEF"],needs["DEF"])
+        self.assertEqual(changed["GK"],needs["GK"])
+        self.assertEqual(changed["MID"],needs["MID"])
+        self.assertGreater(changed["DEF"],-18)
+        self.assertEqual(revise_tactical_search_after_outcomes(
+            family_needs=needs,previous_searches=[]),needs)
+        with self.assertRaises(ValueError):
+            revise_tactical_search_after_outcomes(
+                family_needs=needs,
+                previous_searches=[("UNKNOWN","no_affordable_target")])
+
     def test_a_market_pulse_picks_one_club_without_hard_club_shortlist(self):
         desks={club:48 for club in range(1,660)}
         first=select_recruiting_club(desks,draw=0)
