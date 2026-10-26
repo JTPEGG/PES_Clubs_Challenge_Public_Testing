@@ -869,6 +869,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                          f"secondary-position impact {sale['affected_positions']}. "
                          f"Replacement is never a pre-sale requirement."))
                     conn.commit()
+                    if (club_ai_context and fit.get("category")!="prospect"
+                            and not fit["fc27_sporting_case"]["first_team_upgraded"]):
+                        # A legitimate depth or replacement signing must not
+                        # be reported as "XI strengthened". This is audit-only:
+                        # it never prevents contracts or deadline registration.
+                        conn.execute("""INSERT INTO world_career_offer_events
+                            (offer_id,event_type,detail) VALUES(?,?,?)""",
+                            (oid,"ai_fc27_senior_rotation_signed",
+                             fit["fc27_sporting_case"]["kind"]))
+                        conn.commit()
                     if fit.get("category")=="prospect":
                         conn.execute("""INSERT INTO world_career_offer_events
                             (offer_id,event_type,detail) VALUES(?,? ,?)""",
