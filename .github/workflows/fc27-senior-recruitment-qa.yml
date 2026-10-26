@@ -12,6 +12,7 @@ on:
       - 'world_ai_tactics.py'
       - 'world_fc27_market_choices.py'
       - 'world_fc27_market_schedule.py'
+      - 'world_fc27_decision_audit.py'
       - 'test_world_fc27_market_schedule.py'
       - 'world_careers.py'
       - 'world_valuation.py'
