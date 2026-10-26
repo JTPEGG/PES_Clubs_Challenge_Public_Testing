@@ -92,7 +92,7 @@ def club_market_interest(*,priority,profile,draw,activity_scale_qa=1,
     # Reset after any actual search; previous deals/roster changes already
     # affect the live priority above.
     unresolved=max(0,min(115,priority-15))
-    persistence=min(.22,unattended_intervals*(.011+unresolved*.00042))
+    persistence=min(.30,unattended_intervals*(.008+unresolved*.0002))
     return draw/1000000<min(.82,max(.035,base+persistence)*activity_scale_qa)
 
 def fc27_market_slot(interval_index,club_id):
