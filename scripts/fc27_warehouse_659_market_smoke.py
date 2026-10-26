@@ -167,6 +167,18 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
               world_fc27_market_negotiation_diagnostics
             WHERE window_id=? GROUP BY result_stage""",
             (start["window_id"],)).fetchall())
+        # Preserve real failure codes and original phase, not just a headline
+        # count. This distinguishes model errors from valid club refusals.
+        failure_reasons=[dict(stage=stage,phase=phase,reason=reason,count=n)
+            for stage,phase,reason,n in con.execute("""
+            SELECT result_stage,contract_phase,reason,COUNT(*)
+            FROM world_fc27_market_negotiation_diagnostics
+            WHERE window_id=? AND result_stage IN (
+            'seller_or_offer_evaluation_failure',
+            'negotiation_processing_error','player_interest_evaluation_failure',
+            'buyer_opening_bid_unaffordable')
+            GROUP BY result_stage,contract_phase,reason
+            ORDER BY COUNT(*) DESC LIMIT 35""",(start["window_id"],))]
         country_pool=con.execute("""SELECT
             COALESCE(SUM(eligible_candidates),0),
             COALESCE(SUM(same_country_candidates),0),
@@ -444,6 +456,7 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "club_led_negotiation_intents":activity[1],
           "club_decision_funnel_stages":evaluation_stages,
           "club_negotiation_funnel_stages":negotiation_stages,
+          "negotiation_error_reasons":failure_reasons,
           "eligible_target_country_pool":{
               "all_eligible_target_screenings":country_pool[0],
               "same_country_candidates":country_pool[1],
