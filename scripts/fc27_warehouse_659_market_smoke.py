@@ -86,6 +86,19 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             print("source world AI market moment",index+1,
                   "of",len(MARKET_MOMENTS),
                   "QA opportunity scale",opportunity_scale,flush=True)
+            # Immediate root-cause diagnostic in streaming CI logs; don't
+            # wait for the entire thirty-minute world before seeing why
+            # selected managers could not even submit their proposed bids.
+            if index in (0,2,5,11):
+                failures=con.execute("""SELECT contract_phase,reason,COUNT(*)
+                    FROM world_fc27_market_negotiation_diagnostics
+                    WHERE window_id=? AND result_stage IN
+                      ('seller_or_offer_evaluation_failure',
+                       'negotiation_processing_error')
+                    GROUP BY contract_phase,reason ORDER BY COUNT(*) DESC
+                    LIMIT 8""",(start["window_id"],)).fetchall()
+                print("fc27_debug_model_failures",index+1,
+                      [list(v) for v in failures],flush=True)
         finish=process_live_market(con,career_id=career,
            now=now+timedelta(seconds=1801))
         if finish["state"]!="closed":
