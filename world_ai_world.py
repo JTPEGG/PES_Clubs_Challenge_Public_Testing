@@ -756,9 +756,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                             if club_ai_context else 0.0))
                     if price["fee"] is None:
                         if club_ai_context:
+                            # No bid was placed and no seller/player has
+                            # refused. The manager can evaluate another
+                            # ALREADY-scouted option in this same search.
+                            # Genuine refused bids still end this intent.
                             diagnose("buyer_opening_bid_unaffordable",
                                 price.get("reason"))
-                            return None
                         continue
                     # No veto based on an unsigned replacement or a numerical
                     # net-departure cap. High-quality/rotation-critical exits
