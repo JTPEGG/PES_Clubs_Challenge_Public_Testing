@@ -161,6 +161,51 @@ def recruitment_horizon_score(*,category,lane,player_age,player_overall,
             "future_ability_verified":False}
 
 
+def senior_succession_fit(*,roster,lane,overall,candidate_age,
+                          incumbent_ages,starting_roles,club_plan):
+    """Credible 23-30yo first-team succession WITHOUT appropriating prospects.
+
+    A young professional who is close to an ageing specialist's real source
+    ability can be valuable before becoming a current-XI improvement.
+    prospect_fit() stays authoritative for 16-22yos, with its own evidence.
+    Soft search eligibility -- seller/player/board can still decline.
+    """
+    if (not isinstance(lane,str) or type(overall) is not int or
+            type(candidate_age) is not int or not 23<=candidate_age<=30 or
+            not isinstance(roster,dict) or not isinstance(starting_roles,dict)
+            or not isinstance(incumbent_ages,dict) or not isinstance(club_plan,dict)):
+        return {"eligible":False,"reason":"No supported senior succession case"}
+    needed=starting_roles.get(lane,0)
+    if needed<=0 or club_plan["succession_pressure"].get(lane,0)<=0:
+        return {"eligible":False,"reason":"No ageing tactical specialist to succeed"}
+    peers=sorted(roster.get(lane,()),key=lambda x:-x[1])
+    starters=peers[:needed]
+    if not starters:
+        return {"eligible":False,"reason":"No actual incumbent specialist"}
+    older=[(pid,ability,incumbent_ages.get(pid))
+           for pid,ability,_ in starters
+           if incumbent_ages.get(pid,0)>=(34 if lane=="GK" else 31)]
+    if not older:
+        return {"eligible":False,"reason":"No sourced ageing starter"}
+    baseline=min(v[1] for v in older)
+    age_advantage=max(v[2]-candidate_age for v in older)
+    gap=baseline-overall
+    # Similar quality now, room for growth is *unknown*, not promised.
+    # Older top-class stars can also be replaced by credible senior players
+    # slightly below them, but not unrelated 10-OVR weaker squad fillers.
+    if gap>4 or age_advantage<4:
+        return {"eligible":False,"reason":"Insufficient verified succession case"}
+    score=max(46,min(86,58+max(0,age_advantage)*1.2-
+                      max(0,gap)*2+
+                      club_plan["succession_pressure"][lane]*.33))
+    return {"eligible":True,"category":"senior","score":round(score,2),
+            "upgrade":-gap,"lane":lane,
+            "depth_shortage":False,"senior_replacement":False,
+            "succession":True,"eligible_age_range":"23-30",
+            "evidence":"Sourced ages and comparable current positional ability",
+            "reason":"Senior succession option for a sourced ageing starter; future ability unverified"}
+
+
 def seller_horizon_review(*,age,overall,position,market_value,
                           offered_fee,weekly_wage,contract_years,
                           squad_sale,profile):
