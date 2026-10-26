@@ -135,6 +135,32 @@ def _sign_ai_deal(conn, *, career_id, offer_id, buyer, seller, fee,
         buying_club_id=buyer)
     if seller_review["decision"]!="accept":
         raise ValueError("Selling club has not accepted the final AI transfer fee")
+    if dataset=="fc27-warehouse-659-mens-2026-27":
+        # Immutable final decision-chain evidence for real audit cases:
+        # board intervention, recorded seller finances, squad loss and ask.
+        # No change to approvals, signing sequence or old careers.
+        from world_career_selling import get_seller_assumptions
+        import json
+        frozen=get_seller_assumptions(conn,career_id,row[0])
+        detail={
+            "source_market_reference_gbp":frozen["market_value"],
+            "seller_financial_state":frozen["financial_state"],
+            "seller_squad_role":frozen["squad_role"],
+            "seller_stance":frozen["seller_stance"],
+            "modelled_contract_years":frozen["contract_years"],
+            "modelled_player_wants_exit":bool(frozen["player_wants_exit"]),
+            "seller_replacement_outlook":frozen["replacement"],
+            "board_decision":seller_review["board_decision"],
+            "board_reason":seller_review["board"]["reason"],
+            "seller_reason":seller_review["reason"],
+            "seller_expected_asking_gbp":seller_review["asking_price"],
+            "tactical_impact":seller_review.get("tactical_squad_review"),
+            "board_expected_fee_gbp":seller_review["board"].get("required_offer"),
+        }
+        conn.execute("""INSERT INTO world_career_offer_events
+            (offer_id,event_type,detail) VALUES(?, ?, ?)""",
+            (offer_id,"ai_fc27_final_seller_rationale",
+             json.dumps(detail,sort_keys=True)))
     headroom=wage_budget_breakdown(conn,career_id,buyer)["remaining"]
     if fee>budget_remaining(conn,career_id,buyer)+fee or wage>headroom:
         raise ValueError("AI buyer cannot fund the signed contract")
