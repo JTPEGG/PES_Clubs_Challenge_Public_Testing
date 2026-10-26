@@ -13,6 +13,8 @@ on:
       - 'world_ai_replacement_outlook.py'
       - 'world_squad_planner.py'
       - 'world_fc27_market_choices.py'
+      - 'world_fc27_contract_terms.py'
+      - 'test_world_fc27_contract_terms.py'
       - 'world_fc27_market_schedule.py'
       - 'world_fc27_decision_audit.py'
       - 'world_fc27_target_finances.py'
@@ -111,6 +113,13 @@ jobs:
           assert all("modelled_preferred_formation" in c
                      for c in a["elite_club_transfer_decisions"].values())
           assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
+          assert a["source_wage_large_drops"]==0, (
+              "A signed contract undercuts its verified FC27 game wage by 10%+: "
+              +str(a["source_wage_large_drop_examples"][:5]))
+          assert a["senior_confirmed_xi_upgrades"] + a["senior_rotation_or_replacement_deals"] == a["senior_first_team_deals"]
+          assert all(t["source_game_weekly_wage_gbp"] is not None
+                     and t["accepted_simulated_weekly_wage_gbp"] is not None
+                     for t in a["actual_transfer_details"])
           assert "tactical_xi_coverage_alerts" in a
           assert "tactical_xi_quality_alerts" in a
           assert len(a["tactical_xi_quality_samples"]) <= a["tactical_xi_quality_alerts"]
