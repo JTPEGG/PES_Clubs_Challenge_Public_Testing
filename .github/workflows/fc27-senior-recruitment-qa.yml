@@ -11,6 +11,8 @@ on:
       - 'world_squad_planner.py'
       - 'world_ai_tactics.py'
       - 'world_fc27_market_choices.py'
+      - 'world_fc27_seller_value.py'
+      - 'test_world_fc27_seller_value.py'
       - 'world_fc27_contract_terms.py'
       - 'test_world_fc27_contract_terms.py'
       - 'world_fc27_market_schedule.py'
@@ -45,7 +47,7 @@ jobs:
           python-version: '3.12'
       - name: Check source-backed projected-squad and autonomous AI decision tests
         run: |
-          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment test_world_market_decision_policy test_world_fc27_market_choices test_world_fc27_market_schedule test_world_fc27_target_finances test_world_fc27_contract_terms
+          python -m unittest -v test_world_squad_planner test_world_recruitment_strategy test_world_ai_replacement_outlook test_world_fc27_ai_recruitment test_world_market_decision_policy test_world_fc27_market_choices test_world_fc27_market_schedule test_world_fc27_target_finances test_world_fc27_contract_terms test_world_fc27_seller_value
       - name: Verify AI does not require purchasing a replacement before sale
         run: |
           python - <<'PY'
