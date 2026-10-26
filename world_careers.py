@@ -833,7 +833,8 @@ def settle_future_deal(conn, *, career_id, offer_id, weekly_wage, agreement_date
     return _transaction(conn,action)
 
 
-def agent_terms(conn, *, career_id, offer_id):
+def agent_terms(conn, *, career_id, offer_id,
+                role_promise="unspecified"):
     """Create/read fictional agent expectations. No verified salary inference."""
     from world_preseason_window import assert_window_allows_negotiation
     assert_window_allows_negotiation(conn,career_id=career_id)
@@ -867,6 +868,48 @@ def agent_terms(conn, *, career_id, offer_id):
             raise ValueError("Cannot generate fictional agent terms without a sourced rating")
         demand=int(round((1000*2**((overall-55)/8))/500)*500)
         demand=max(1000,min(demand,250_000))
+        # FC27 has explicit EA-game wage snapshots. The old fictional
+        # rating-only salary is not a credible demand for a £200k/w player.
+        # Applies to this FC27 edition ONLY; historic and live careers keep
+        # their original decisions and wage-negotiation terms.
+        source_fc27=(o[2]=="fc27-warehouse-659-mens-2026-27")
+        if source_fc27:
+            from world_fc27_contract_terms import fc27_agent_wage_floor
+            from world_fc27_ai_recruitment import read_fc27_profiles
+            info=conn.execute("""SELECT o.buying_club_id,o.selling_club_id,
+                 s.weekly_wage_gbp FROM world_career_offers o
+                 JOIN world_dataset_contract_snapshots s
+                   ON s.dataset_id=? AND s.player_id=o.player_id
+                 WHERE o.offer_id=? AND o.career_id=?""",
+                 (o[2],offer_id,career_id)).fetchone()
+            if not info or info[2] is None:
+                raise ValueError("FC27 source-game wage unavailable; do not invent a contract demand")
+            profiles=read_fc27_profiles(conn,dataset=o[2])
+            buyer,seller=profiles.get(info[0]),profiles.get(info[1])
+            if not buyer or not seller:
+                raise ValueError("FC27 club sporting context required for salary terms")
+            from world_squad_planner import projected_squads,sale_profile
+            from world_ai_tactics import preferred_formation,tactical_needs
+            player_info=conn.execute("""SELECT p.primary_position,x.overall
+                 FROM world_players p JOIN world_dataset_ratings x
+                   ON x.player_id=p.player_id AND x.dataset_id=?
+                 WHERE p.player_id=?""",(o[2],o[1])).fetchone()
+            first_choice=False
+            if player_info:
+                tactics=tactical_needs(preferred_formation(
+                    club_id=info[1],profile=seller))["starting_roles"]
+                cost=sale_profile(projected_squads(
+                    conn,career_id=career_id,dataset=o[2]),
+                    seller=info[1],player_id=o[1],
+                    position=player_info[0],overall=player_info[1],
+                    starting_roles=tactics)
+                first_choice=bool(cost.get("first_choice",False))
+            demand=fc27_agent_wage_floor(
+                source_weekly_wage=info[2],
+                buyer_appeal=buyer["sporting_appeal"],
+                seller_appeal=seller["sporting_appeal"],
+                offered_role=role_promise,
+                seller_first_choice=first_choice)
         if policy["version"] in (DECISION_VERSION,DECISION_V2_VERSION):
             if not choice["can_negotiate"]:
                 raise ValueError("Player will not open agent talks: "+choice["reason"])
@@ -882,6 +925,8 @@ def agent_terms(conn, *, career_id, offer_id):
             (offer_id,career_id,demanded_wage_weekly,status)
             VALUES (?,?,?,'awaiting_offer')""",(offer_id,career_id,demand))
         source_label=(
+            "FC27 source-game current wage + modelled role/sporting incentives"
+            if source_fc27 else
             "player-decisions-v2; explicit current wages, squad role and renewal assumptions"
             if policy["version"]==DECISION_V2_VERSION else
             "player-decisions-v1; provisional historical prestige and role"
