@@ -13,6 +13,8 @@ on:
       - 'world_ai_replacement_outlook.py'
       - 'world_squad_planner.py'
       - 'world_fc27_market_choices.py'
+      - 'world_fc27_seller_value.py'
+      - 'test_world_fc27_seller_value.py'
       - 'world_fc27_contract_terms.py'
       - 'test_world_fc27_contract_terms.py'
       - 'world_fc27_market_schedule.py'
@@ -113,6 +115,9 @@ jobs:
           assert all("modelled_preferred_formation" in c
                      for c in a["elite_club_transfer_decisions"].values())
           assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
+          assert a["seller_approval_rationales_recorded"] == a["in_game_final_registrations"], (
+              "Missing final selling board and squad-loss rationale in audit")
+          assert all("seller_decision" in item for item in a["important_seller_case_studies"])
           assert a["source_wage_large_drops"]==0, (
               "A signed contract undercuts its verified FC27 game wage by 10%+: "
               +str(a["source_wage_large_drop_examples"][:5]))
