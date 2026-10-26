@@ -147,7 +147,7 @@ def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
     # A major drop in a *starting specialist's quality* is more damaging
     # than a raw missing player. This remains a soft reservation premium,
     # not a hard sale veto; even a world-class keeper has a price.
-    percent=(.34 if coverage_gap else .0)+min(.71,starter_drop*.047)
+    percent=(.34 if coverage_gap else .0)+min(.90,starter_drop*.060)
     if sale.get("protected_rotation"):
         percent+=.09
     # Contrast replacement quality with the existing top XI. Especially
@@ -155,7 +155,14 @@ def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
     # may be genuinely first-team standard at most other clubs.
     standard=max(0,sale.get("source_standard_top11",0))
     if sale.get("first_choice") and starter_drop>=4 and standard>=79:
-        percent+=min(.18,(standard-78)*.008)
+        percent+=min(.22,(standard-78)*.009)
+    # A goalkeeper/specialist can be numerically replaced but still cost
+    # an enormous amount of match-winning quality. Holding firm on the
+    # reservation fee is rational when there is no equally good replacement
+    # committed. Club distress and exit demands still relax the fee.
+    if (sale.get("first_choice") and sale.get("tactically_required") and
+            starter_drop>=8):
+        percent+=min(.23,(starter_drop-6)*.025)
     # Losing the last credible bench option is meaningful even when the
     # manager can still field eleven starters. Not an absolute veto.
     if sale.get("below_target_cover") and not coverage_gap:
@@ -166,9 +173,9 @@ def disruption_sale_premium(sale,*,seller_pressure=0,player_wants_exit=False):
     # when no one position is uncovered. This is a soft selling incentive;
     # it cannot turn the player into a permanently unavailable asset.
     if not coverage_gap:
-        percent+=min(.19,max(0,sale.get("formation_quality_loss",0))*.012)
+        percent+=min(.28,max(0,sale.get("formation_quality_loss",0))*.018)
     # Financial distress and player pressure change the risk the club
     # can tolerate without hard-coding a permanent sale refusal.
     percent*=max(.4,1-min(.45,max(0,seller_pressure)/180))
     if player_wants_exit:percent*=.72
-    return round(min(1.17,percent),3)
+    return round(min(1.55,percent),3)
