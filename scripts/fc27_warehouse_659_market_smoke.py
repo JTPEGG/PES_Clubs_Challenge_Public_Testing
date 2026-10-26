@@ -324,6 +324,19 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             WHERE o.career_id=? AND e.event_type='ai_prospect_signed'
             """,(career,))}
         player_names=dict(con.execute("SELECT player_id,full_name FROM world_players"))
+        source_game_wages=dict(con.execute("""SELECT player_id,weekly_wage_gbp
+            FROM world_dataset_contract_snapshots WHERE dataset_id=?""",
+            (DATASET,)).fetchall())
+        signed_contract_wages=dict(con.execute("""SELECT offer_id,
+            offered_wage_weekly FROM world_career_offers
+            WHERE career_id=? AND status='completed'""",
+            (career,)).fetchall())
+        senior_rotation_offers={r[0] for r in con.execute("""SELECT o.offer_id
+            FROM world_career_offers o
+            JOIN world_career_offer_events e ON e.offer_id=o.offer_id
+            WHERE o.career_id=? AND e.event_type='ai_fc27_senior_rotation_signed'
+            """,(career,))}
+        source_wage_shortfalls=[]
         ai_club_rows={row[0]:{"financial_pressure_band":row[1],
                              "ambition_level":row[2]}
             for row in con.execute("""SELECT club_id,financial_pressure_band,
@@ -336,8 +349,12 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             "source_seller_country":club_country[seller],
             "source_buyer_country":club_country[buyer],
             "agreed_fee_gbp":fee,
+            "source_game_weekly_wage_gbp":source_game_wages.get(pid),
+            "accepted_simulated_weekly_wage_gbp":signed_contract_wages.get(offer),
             "simulated_recruitment_type":(
-                "prospect" if offer in prospect_ids else "senior_first_team"),
+                "prospect" if offer in prospect_ids else
+                "senior_rotation_or_replacement"
+                if offer in senior_rotation_offers else "senior_first_team_upgrade"),
             "simulated_seller_squad_case":deal_cases.get(offer,"unclassified"),
             "modelled_buyer_context":ai_club_rows.get(buyer),
             "modelled_seller_context":ai_club_rows.get(seller),
@@ -345,6 +362,16 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             "source_top11_strength_change_seller":buyer_quality_change[seller],
             "provenance":"Source FC27 player/club/OVR; fee, interests, club pressure and transfer are GAME SIMULATION, not historical facts"
         } for offer,pid,seller,buyer,primary,overall,fee in actual]
+        source_wage_shortfalls=[
+            {"player":item["player"],
+             "source_weekly_wage_gbp":item["source_game_weekly_wage_gbp"],
+             "accepted_weekly_wage_gbp":item["accepted_simulated_weekly_wage_gbp"]}
+            for item in transfers
+            if (item["source_game_weekly_wage_gbp"] is not None and
+                item["source_game_weekly_wage_gbp"]>=1000 and
+                item["accepted_simulated_weekly_wage_gbp"] is not None and
+                item["accepted_simulated_weekly_wage_gbp"]<
+                    .9*item["source_game_weekly_wage_gbp"])]
         if con.execute("PRAGMA integrity_check").fetchone()[0]!="ok":
             raise ValueError("SQLite integrity failed")
         if con.execute("PRAGMA foreign_key_check").fetchall():
@@ -411,6 +438,10 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
               for cid,n in outbound.most_common(10)],
           "source_ability_position_counts":dict(position),
           "senior_first_team_deals":len(senior),
+          "senior_confirmed_xi_upgrades":len(senior)-len(senior_rotation_offers),
+          "senior_rotation_or_replacement_deals":len(senior_rotation_offers),
+          "source_wage_large_drops":len(source_wage_shortfalls),
+          "source_wage_large_drop_examples":source_wage_shortfalls[:30],
           "prospect_deals":len(prospects),
           "senior_overall_mean":round(sum(senior)/len(senior),2) if senior else None,
           "first_team_or_cover_alerts":len(quality_warnings),
