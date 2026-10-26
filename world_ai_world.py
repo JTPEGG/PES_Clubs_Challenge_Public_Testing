@@ -29,6 +29,8 @@ from world_ai_tactics import preferred_formation,tactical_needs
 from world_fc27_market_choices import (select_recruiting_club,
     select_tactical_family,choose_development_focus,pursue_transfer,
     player_market_opportunity,POLICY_VERSION as DEAL_CHOICE_VERSION)
+from world_fc27_target_finances import (
+    shortlist_reference_values,prospective_purchase_fit)
 
 AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
 # The bounded, idempotent market-moment ledger already controls processing.
@@ -537,12 +539,46 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                 # searching until a transaction is manufactured.
                 options=[o for o in options if (
                     (o[5].get("category")=="prospect")==development_focus)]
-            options.sort(key=lambda v:(-v[4],
-                _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
+            # Actual model reference values, source salary and the current
+            # seller's squad risk now inform how realistic each shortlist is.
+            # This is a SOFT preference, not a sale veto or target-count cap.
+            shortlist_values={}
+            current_budget=None
+            if club_ai_context and options:
+                shortlist_values=shortlist_reference_values(
+                    conn,dataset=dataset,player_ids=[v[1] for v in options])
+                current_budget=budget_remaining(conn,career_id,buyer)
+                wage_room=wage_budget_breakdown(
+                    conn,career_id,buyer)["remaining"]
+                def score_purchase(option):
+                    money_wage=shortlist_values.get(option[1])
+                    if money_wage is None:
+                        return -999.0
+                    fee,wage=money_wage
+                    planned=prospective_purchase_fit(
+                        valuation=fee,transfer_headroom=current_budget,
+                        weekly_wage=wage,wage_headroom=wage_room,
+                        sale=option[6])
+                    return option[4]+planned["score"]
+                options.sort(key=lambda v:(-score_purchase(v),
+                    _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
+            else:
+                options.sort(key=lambda v:(-v[4],
+                    _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
             if audit_enabled:
                 mix=shortlist_country_mix(
                     options=options,buyer=buyer,countries=audit_countries)
                 head=options[0] if options else None
+                # "Plausible" is a soft *forecast*, not a confirmed ask.
+                plausible=[v for v in options if v[1] in shortlist_values
+                    and prospective_purchase_fit(
+                        valuation=shortlist_values[v[1]][0],
+                        transfer_headroom=current_budget,
+                        weekly_wage=shortlist_values[v[1]][1],
+                        wage_headroom=wage_room,sale=v[6]
+                    )["budget_plausible"]]
+                plausible_mix=shortlist_country_mix(
+                    options=plausible,buyer=buyer,countries=audit_countries)
                 diagnose("shortlist_ready" if head else "no_eligible_target",
                     search_family=family,
                     search_strategy=("development" if development_focus
@@ -550,6 +586,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     eligible_candidates=len(options),
                     same_country_candidates=mix["same_country_candidates"],
                     foreign_country_candidates=mix["foreign_country_candidates"],
+                    affordable_same_country=plausible_mix["same_country_candidates"],
+                    affordable_foreign_country=plausible_mix["foreign_country_candidates"],
                     first_eligible_player_id=head[1] if head else None,
                     first_eligible_seller_id=head[0] if head else None,
                     first_eligible_source_country=(
@@ -557,8 +595,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                 if not options:
                     return None
             for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:
-                value,_=_player_reference(conn,dataset,pid)
-                money=budget_remaining(conn,career_id,buyer)
+                if club_ai_context:
+                    value=(shortlist_values.get(pid) or (None,None))[0]
+                    money=current_budget
+                else:
+                    value,_=_player_reference(conn,dataset,pid)
+                    money=budget_remaining(conn,career_id,buyer)
                 if not isinstance(value,int) or value<=0 or money<value*0.85:
                     continue
                 if fit.get("category")=="prospect" and not club_ai_context:
@@ -615,7 +657,8 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                             if club_ai_context else 0.0))
                     if price["fee"] is None:
                         if club_ai_context:
-                            diagnose("buyer_ceiling_unaffordable")
+                            diagnose("buyer_opening_bid_unaffordable",
+                                price.get("reason"))
                             return None
                         continue
                     # No veto based on an unsigned replacement or a numerical
