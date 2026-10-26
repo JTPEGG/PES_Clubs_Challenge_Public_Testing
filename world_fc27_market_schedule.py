@@ -44,6 +44,8 @@ CREATE INDEX IF NOT EXISTS world_fc27_market_intents_pending
 
 def initialise_fc27_market_schedule(conn):
     conn.executescript(SCHEMA)
+    from world_fc27_decision_audit import initialize_decision_audit
+    initialize_decision_audit(conn)
     conn.commit()
 
 def is_fc27_market(conn,*,career_id):
@@ -135,10 +137,16 @@ def plan_fc27_market_interval(conn,*,career_id,window_id,interval_index,
                 committed_fees,committed_wages
          FROM world_career_club_ledger WHERE career_id=?""",(career_id,))
        if trans>fees and wages>wage_use}
+    from world_fc27_decision_audit import save_evaluations
     possibilities=0
     plans=[]
-    for club in sorted(funded & profiles.keys() & squads.keys()):
+    evaluation_rows=[]
+    for club in sorted(profiles.keys() & squads.keys()):
         if club==manager:
+            continue
+        if club not in funded:
+            evaluation_rows.append((window_id,interval_index,club,None,
+                                    None,None,"no_budget_or_wage_headroom"))
             continue
         possibilities+=1
         profile=profiles[club]
@@ -150,15 +158,22 @@ def plan_fc27_market_interval(conn,*,career_id,window_id,interval_index,
             previous_signings=arrivals.get(club,0),
             stable_variation=_stable(career_id,window_id,interval_index,
                         club,VERSION,"variation")%26)
+        scout_draw=_stable(career_id,window_id,interval_index,
+                           club,VERSION,"scout")%1000000
+        commitment_draw=_stable(career_id,window_id,interval_index,
+                                club,VERSION,"commit")%1000
         if not club_market_interest(priority=priority,profile=profile,
-                draw=_stable(career_id,window_id,interval_index,
-                            club,VERSION,"scout")%1000000,
-                activity_scale_qa=activity_scale_qa):
+                draw=scout_draw,activity_scale_qa=activity_scale_qa):
+            evaluation_rows.append((window_id,interval_index,club,
+                priority,scout_draw,commitment_draw,"did_not_scout"))
             continue
         if not pursue_transfer(priority=priority,profile=profile,
-                draw=_stable(career_id,window_id,interval_index,
-                            club,VERSION,"commit")%1000):
+                draw=commitment_draw):
+            evaluation_rows.append((window_id,interval_index,club,
+                priority,scout_draw,commitment_draw,"scouted_but_held"))
             continue
+        evaluation_rows.append((window_id,interval_index,club,
+            priority,scout_draw,commitment_draw,"proceeded_to_search"))
         plans.append((window_id,interval_index,club,priority))
     # Deterministic fair order. Clubs are never removed merely because an
     # earlier club signed a player; later clubs recheck actual availability.
@@ -170,6 +185,7 @@ def plan_fc27_market_interval(conn,*,career_id,window_id,interval_index,
     conn.executemany("""INSERT INTO world_fc27_market_club_intents
       (window_id,interval_index,club_id,source_priority)
       VALUES(?,?,?,?)""",plans)
+    save_evaluations(conn,evaluation_rows)
     conn.commit()
 
 def process_fc27_market_interval(conn,*,career_id,window_id,
