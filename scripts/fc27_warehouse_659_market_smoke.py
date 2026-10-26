@@ -155,6 +155,63 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                          "senior_first_team_arrivals":senior_signings,
                          "initial_source_cb_count":len(initial[cid].get("CB",[])),
                          "final_source_cb_count":len(final[cid].get("CB",[]))}
+        # Actual FC27 decision-chain audit: eligible clubs -> scouts ->
+        # negotiation -> seller/player/agent -> completed deal.
+        # This is not a country preference or a newly generated offer.
+        evaluation_stages=dict(con.execute("""
+            SELECT stage,COUNT(*) FROM world_fc27_market_club_evaluations
+            WHERE window_id=? GROUP BY stage""",
+            (start["window_id"],)).fetchall())
+        negotiation_stages=dict(con.execute("""
+            SELECT result_stage,COUNT(*) FROM
+              world_fc27_market_negotiation_diagnostics
+            WHERE window_id=? GROUP BY result_stage""",
+            (start["window_id"],)).fetchall())
+        country_pool=con.execute("""SELECT
+            COALESCE(SUM(eligible_candidates),0),
+            COALESCE(SUM(same_country_candidates),0),
+            COALESCE(SUM(foreign_country_candidates),0)
+            FROM world_fc27_market_negotiation_diagnostics
+            WHERE window_id=? AND result_stage!='no_eligible_target'""",
+            (start["window_id"],)).fetchone()
+        elite_funnels={}
+        for name in ("Arsenal","Chelsea","Manchester City"):
+            matches=[cid for cid,display in clubs.items()
+                     if display.startswith(name+" [WH27:")]
+            if len(matches)!=1:raise ValueError("Unmapped elite QA club "+name)
+            cid=matches[0]
+            selections=dict(con.execute("""SELECT stage,COUNT(*)
+                FROM world_fc27_market_club_evaluations
+                WHERE window_id=? AND club_id=? GROUP BY stage""",
+                (start["window_id"],cid)).fetchall())
+            negotiation=dict(con.execute("""SELECT result_stage,COUNT(*)
+                FROM world_fc27_market_negotiation_diagnostics
+                WHERE window_id=? AND club_id=? GROUP BY result_stage""",
+                (start["window_id"],cid)).fetchall())
+            rows=con.execute("""SELECT d.interval_index,d.search_family,
+                d.search_strategy,d.eligible_candidates,
+                d.same_country_candidates,d.foreign_country_candidates,
+                d.result_stage,d.reason,d.first_eligible_player_id,
+                d.chosen_player_id,d.selected_source_country
+                FROM world_fc27_market_negotiation_diagnostics d
+                WHERE d.window_id=? AND d.club_id=?
+                ORDER BY d.interval_index""",
+                (start["window_id"],cid)).fetchall()
+            elite_funnels[name]={
+                "evaluations":selections,
+                "negotiation_outcomes":negotiation,
+                "searches":[{
+                    "interval":v[0]+1,"position_family":v[1],
+                    "search_strategy":v[2],
+                    "eligible_targets":v[3],
+                    "eligible_same_country":v[4],
+                    "eligible_in_other_countries":v[5],
+                    "outcome":v[6],
+                    "reason":v[7],
+                    "top_ranked_player_id":v[8],
+                    "negotiated_player_id":v[9],
+                    "negotiated_source_country":v[10],
+                } for v in rows]}
         buyers_with_signings=len(inbound)
         sellers_with_sales=len(outbound)
         active_clubs=len(set(inbound)|set(outbound))
@@ -286,6 +343,16 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
           "fc27_independent_club_market":True,
           "eligible_independent_club_decisions":activity[0],
           "club_led_negotiation_intents":activity[1],
+          "club_decision_funnel_stages":evaluation_stages,
+          "club_negotiation_funnel_stages":negotiation_stages,
+          "eligible_target_country_pool":{
+              "all_eligible_target_screenings":country_pool[0],
+              "same_country_candidates":country_pool[1],
+              "cross_country_candidates":country_pool[2],
+              "cross_country_share_of_eligible_shortlists":(
+                  round(country_pool[2]/(country_pool[1]+country_pool[2]),4)
+                  if country_pool[1]+country_pool[2] else None)},
+          "elite_club_decision_chains":elite_funnels,
           "independent_intervals_reconciled":activity[2],
           "distinct_clubs_with_negotiation_intent":club_activity,
           "persisted_club_intents_processed":recorded_activities,
