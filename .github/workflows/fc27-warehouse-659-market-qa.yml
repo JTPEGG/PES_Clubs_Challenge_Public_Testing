@@ -15,6 +15,8 @@ on:
       - 'world_fc27_market_choices.py'
       - 'world_fc27_market_schedule.py'
       - 'world_fc27_decision_audit.py'
+      - 'world_fc27_target_finances.py'
+      - 'test_world_fc27_target_finances.py'
       - 'test_world_fc27_market_schedule.py'
       - 'world_careers.py'
       - 'world_valuation.py'
@@ -100,6 +102,11 @@ jobs:
                      for club in ("Arsenal","Chelsea","Manchester City"))
           assert sum(a["club_negotiation_funnel_stages"].values()) == a["club_led_negotiation_intents"]
           assert a["eligible_target_country_pool"]["same_country_candidates"] >= 0
+          pool=a["eligible_target_country_pool"]
+          assert pool["budget_plausible_candidates"] <= pool["all_eligible_target_screenings"]
+          assert pool["budget_plausible_candidates"] == (
+              pool["budget_plausible_same_country_candidates"] +
+              pool["budget_plausible_cross_country_candidates"])
           assert sum(a["modelled_tactical_formation_distribution"].values())==659
           assert all("modelled_preferred_formation" in c
                      for c in a["elite_club_transfer_decisions"].values())
