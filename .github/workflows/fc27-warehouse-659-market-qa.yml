@@ -117,6 +117,12 @@ jobs:
           assert all("modelled_preferred_formation" in c
                      for c in a["elite_club_transfer_decisions"].values())
           assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
+          # Never accept hidden AI seller/buyer API exceptions as legitimate
+          # negotiation failures: these previously wasted 31 and 85 intents.
+          assert a["club_negotiation_funnel_stages"].get(
+              "seller_or_offer_evaluation_failure",0)==0, a["negotiation_error_reasons"]
+          assert a["club_negotiation_funnel_stages"].get(
+              "negotiation_processing_error",0)==0, a["negotiation_error_reasons"]
           assert a["three_season_recruitment_cases_audited"] == a["in_game_final_registrations"]
           assert a["three_season_prospect_classification_errors"] == []
           assert a["three_season_prospects_signed_unchanged"] == a["prospect_deals"]
