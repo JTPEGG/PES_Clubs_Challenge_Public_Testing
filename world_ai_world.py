@@ -774,7 +774,12 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                     phase="buyer_pricing"
                     price=determine_offer(career_id=career_id,player_id=pid,
                         club_id=buyer,valuation=value,available_budget=money,
-                        need_score=need,eligible_clubs=1,
+                        # Sporting and succession scores can be fractional.
+                        # The bid protocol's need_score is explicitly an
+                        # integer 0-100; round ONLY at its API boundary,
+                        # leaving the continuous shortlist ranking intact.
+                        need_score=max(0,min(100,int(round(need)))),
+                        eligible_clubs=1,
                         seller_assumptions=seller_facts,
                         strategic_ceiling_uplift=(
                             min(0.40,max(0,(need-55)*0.012))
