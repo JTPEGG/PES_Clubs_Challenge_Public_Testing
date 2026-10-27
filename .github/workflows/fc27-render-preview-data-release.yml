@@ -68,7 +68,7 @@ jobs:
           assert create.status_code==302 and 'error=' not in create.location,create.location
           market=c.get('/world/play/career/render_full_fc27_browser_launch/market',**kw)
           assert market.status_code==200 and b'Start 30-minute transfer window' in market.data
-          start=c.post('/world/play/career/render_full_fc27_browser_launch/market/start',data={'csrf':csrf},**kw)
+          start=c.post('/world/play/career/render_full_fc27_browser_launch/market/start',data={'csrf':csrf,'confirm':'start-30-minute-window'},**kw)
           assert start.status_code==302 and 'error=' not in start.location,start.location
           with sqlite3.connect(os.environ['DATABASE_PATH']) as db:
               count=db.execute("""SELECT COUNT(*) FROM world_career_registrations
