@@ -137,6 +137,34 @@ def _sign_ai_deal(conn, *, career_id, offer_id, buyer, seller, fee,
     seller_review=evaluate_career_seller_bid(conn,career_id=career_id,
         player_id=row[0],seller_club_id=seller,offer_fee=fee,
         buying_club_id=buyer)
+    accepted_previous_quote=False
+    if (seller_review["decision"]!="accept"
+            and dataset=="fc27-warehouse-659-mens-2026-27"):
+        # The seller may have already accepted a counteroffer that the
+        # buyer committed to. A revised fee can slightly alter the
+        # modelled quote on *re-evaluation*. Honour an actual accepted
+        # price when the seller's live tactical situation is unchanged;
+        # never use this path to bypass a changed squad or a rejected bid.
+        from world_career_selling import offer_decision
+        from world_fc27_seller_value import honour_accepted_seller_quote
+        import json
+        prior=offer_decision(conn,offer_id)
+        accepted_counter=conn.execute("""SELECT 1
+            FROM world_career_offer_events
+            WHERE offer_id=? AND event_type='counter_accepted' LIMIT 1""",
+            (offer_id,)).fetchone() is not None
+        if honour_accepted_seller_quote(
+                saved_decision=prior,current_review=seller_review,
+                fee=fee,counter_accepted=accepted_counter):
+            original=json.loads(prior["input_snapshot"])
+            seller_review={**seller_review,"decision":"accept",
+                "board_decision":prior["board_decision"],
+                "board":original["board"],
+                "reason":("Binding seller asking price was accepted in an "
+                          "earlier recorded negotiation stage. Live tactical "
+                          "squad evidence remains unchanged."),
+                "asking_price":prior["asking_price"]}
+            accepted_previous_quote=True
     if seller_review["decision"]!="accept":
         raise ValueError("Selling club has not accepted the final AI transfer fee")
     if dataset=="fc27-warehouse-659-mens-2026-27":
@@ -158,6 +186,7 @@ def _sign_ai_deal(conn, *, career_id, offer_id, buyer, seller, fee,
             "board_reason":seller_review["board"]["reason"],
             "seller_reason":seller_review["reason"],
             "seller_expected_asking_gbp":seller_review["asking_price"],
+            "accepted_seller_quote_honoured":accepted_previous_quote,
             "tactical_impact":seller_review.get("tactical_squad_review"),
             "board_expected_fee_gbp":seller_review["board"].get("required_offer"),
         }
