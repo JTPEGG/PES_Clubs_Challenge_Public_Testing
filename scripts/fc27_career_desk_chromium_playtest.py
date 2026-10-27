@@ -123,6 +123,8 @@ def run(world,output):
                   "Manager cannot find the shareable read-only spectator link")
             check("/world/play/watch/" in page.locator("#spectator-share-url").input_value(),
                   "Spectator share input contains an invalid URL")
+            check("WH27:" not in page.locator(".desk-header-right").inner_text(),
+                  "Internal source-key suffix visible in manager heading")
             page.screenshot(path=str(output/"02-desktop-active-overview.png"),
                             animations="disabled",full_page=True)
             found.append("Real Start POST opened exactly one live 30-minute clock")
@@ -136,6 +138,8 @@ def run(world,output):
             page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
             check(page.locator('form.scout-filters').is_visible(),
                   "Scouting form absent on full FC27 source")
+            check("WH27:" not in page.locator("#desk-view-scouting").inner_text(),
+                  "Internal FC27 source tags visible in scouting club labels")
             page.screenshot(path=str(output/"03-desktop-scouting.png"),
                             animations="disabled",full_page=True)
             found.append("Desktop navigation: Squad, Inbox, Scouting, Transfers, Finances")
@@ -173,6 +177,9 @@ def run(world,output):
                   "Spectator view not rendered")
             check(view.locator('form[action$="/market/decision"]').count()==0,
                   "Spectator sees privileged decision form")
+            spectator_width=view.locator(".desk-workspace").bounding_box()["width"]
+            check(spectator_width>=900,
+                  f"Read-only spectator content collapsed to {spectator_width}px; manager sidebar must not reserve its column")
             view.screenshot(path=str(output/"05-readonly-spectator.png"),
                             animations="disabled",full_page=True)
             found.append("Unauthenticated spectator page is read-only")
