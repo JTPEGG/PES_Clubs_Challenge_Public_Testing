@@ -176,6 +176,53 @@ class FC27ThreeSeasonStrategyTests(unittest.TestCase):
         self.assertTrue(older["future_ability_is_scenario_only"])
         self.assertEqual(older["contract_wage_exposure_gbp"],44100*52*2)
 
+    def test_young_capable_player_has_soft_retention_option_not_guaranteed_growth(self):
+        # Real 659-club audit analogue: 19-year-old, 78-rated LB at a
+        # high-ambition seller; fee is 21% above game market reference.
+        # Current XI loss can be zero without making future squad depth free.
+        kwargs=dict(age=19,overall=78,position="LB",
+                    market_value=12_400_000,offered_fee=15_000_000,
+                    weekly_wage=58500,contract_years=3,
+                    squad_sale={"valid":True,"formation_quality_loss":0,
+                                "starter_rating_drop":0})
+        retained=seller_horizon_review(
+            **kwargs,profile={**PROFILE,"ambition_level":91,
+                              "financial_pressure_index":25})
+        pressured=seller_horizon_review(
+            **kwargs,profile={**PROFILE,"ambition_level":55,
+                              "financial_pressure_index":95})
+        expiring=seller_horizon_review(
+            **{**kwargs,"contract_years":1},
+            profile={**PROFILE,"ambition_level":91,
+                     "financial_pressure_index":25})
+        older=seller_horizon_review(
+            **{**kwargs,"age":34},
+            profile={**PROFILE,"ambition_level":91,
+                     "financial_pressure_index":25})
+        self.assertGreater(retained["current_ability_retention_option_pct"],10)
+        self.assertGreater(retained["asking_price_shift_pct"],8)
+        self.assertGreater(retained["asking_price_shift_pct"],
+                           pressured["asking_price_shift_pct"])
+        self.assertGreater(retained["current_ability_retention_option_pct"],
+                           expiring["current_ability_retention_option_pct"])
+        self.assertEqual(older["current_ability_retention_option_pct"],0)
+        self.assertFalse(retained["verified_future_growth_assumed"])
+        self.assertFalse(retained["future_replacement_assumed"])
+
+    def test_young_inexperienced_player_not_automatically_unsellable(self):
+        kwargs=dict(age=18,overall=65,position="CB",
+                    market_value=900_000,offered_fee=1_350_000,
+                    weekly_wage=4000,contract_years=3,
+                    squad_sale={"valid":True,"formation_quality_loss":0,
+                                "starter_rating_drop":0},
+                    profile={**PROFILE,"ambition_level":95,
+                             "financial_pressure_index":25})
+        case=seller_horizon_review(**kwargs)
+        self.assertEqual(case["current_ability_retention_option_pct"],0)
+        self.assertLessEqual(case["asking_price_shift_pct"],21)
+        # A current-quality reservation price never alters the separately
+        # tested 16-22 prospect signing eligibility or creates a sale veto.
+
     def test_immediate_title_objective_and_financial_pressure_disagree(self):
         a=seller_horizon_review(
             age=35,overall=82,position="CB",market_value=6_400_000,
