@@ -14,6 +14,8 @@ from world_fc27_long_term_strategy import (
     senior_succession_fit)
 from world_fc27_market_choices import choose_development_focus
 from world_ai_bidding import bid_need_score,determine_offer
+# Include isolated long-running 659-club deadline regressions in focused FC27 QA.
+from test_fc27_qa_market_clock import FC27QAClockTests
 
 PROFILE={"ambition_level":85,"pressure_to_improve":80,
          "financial_pressure_index":30,"simulated_manager_risk":53}
