@@ -8,8 +8,11 @@ import argparse
 import json
 import sqlite3
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime,timedelta,timezone
 from pathlib import Path
+from unittest.mock import patch
+import world_preseason_window as _preseason_clock
 
 from scripts.fc27_warehouse_world_bridge import DATASET
 from world_careers import start_sandbox, wage_budget_breakdown
@@ -20,6 +23,27 @@ from world_fc27_ai_recruitment import (VERSION as FC27_RECRUITMENT_VERSION,
     read_fc27_profiles)
 from world_ai_tactics import preferred_formation,tactical_needs,TACTIC_VERSION
 from world_squad_planner import projected_squads, effective_cover,STARTERS,MIN_COVER,lane_of,squad_standard,assign_available_players
+
+@contextmanager
+def isolated_simulation_clock(moment):
+    """Pin *implicit* deadline reads to a single audited QA market instant.
+
+    Full 659-club 3x evaluation can take longer than 30 wall-clock minutes.
+    Each market interval has its own authorised logical due time, but
+    lower-level career offer/agent functions still call the real UTC clock.
+    Without this QA-only scope, late simulation intervals spuriously fail
+    with 'Transfer deadline passed' even though their logical instant is
+    inside the 30-minute window. The normal app clock and actual deadlines
+    are never patched outside this isolated context.
+    """
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise ValueError("QA market moment must be timezone-aware")
+    actual_utc=_preseason_clock._utc
+    with patch.object(_preseason_clock,"_utc",
+        side_effect=lambda explicit=None: actual_utc(
+            moment if explicit is None else explicit)):
+        yield
+
 
 def evaluate(full_world_path,output,*,opportunity_scale=1):
     # Scale 1 is the real source club behaviour; scale 3 amplifies every
@@ -79,8 +103,9 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             raise ValueError("Incorrect preseason duration")
         for index,second in enumerate(MARKET_MOMENTS):
             due=now+timedelta(seconds=second+1)
-            response=process_live_market(con,career_id=career,now=due,
-                fc27_activity_scale_qa=opportunity_scale)
+            with isolated_simulation_clock(due):
+                response=process_live_market(con,career_id=career,now=due,
+                    fc27_activity_scale_qa=opportunity_scale)
             if response["state"]!="open":
                 raise ValueError("AI window closed early")
             print("source world AI market moment",index+1,
@@ -99,8 +124,9 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                     LIMIT 8""",(start["window_id"],)).fetchall()
                 print("fc27_debug_model_failures",index+1,
                       [list(v) for v in failures],flush=True)
-        finish=process_live_market(con,career_id=career,
-           now=now+timedelta(seconds=1801))
+        deadline=now+timedelta(seconds=1801)
+        with isolated_simulation_clock(deadline):
+            finish=process_live_market(con,career_id=career,now=deadline)
         if finish["state"]!="closed":
             raise ValueError("AI window deadline did not finalise")
         actual=con.execute("""SELECT e.offer_id,e.player_id,e.from_club_id,
