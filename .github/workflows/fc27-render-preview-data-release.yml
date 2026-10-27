@@ -52,7 +52,7 @@ jobs:
           home=c.get('/world/play',**kw)
           html=home.get_data(as_text=True)
           assert home.status_code==200 and 'FC27' in html,html[:1000]
-          assert 'england-2026-27-fc27' not in html
+          assert 'name="dataset_id" value="fc27-warehouse-659-mens-2026-27"' in html
           assert html.count('<option value=')>=659
           csrf=re.search(r'name="csrf" value="([^"]+)"',html).group(1)
           with sqlite3.connect(os.environ['DATABASE_PATH']) as db:
