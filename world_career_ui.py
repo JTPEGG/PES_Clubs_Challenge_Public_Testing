@@ -26,6 +26,10 @@ body.desk-ui [hidden]{display:none!important}
 .desk-header-clock small{display:block;color:#a5bdce;font-size:10px;text-transform:uppercase;letter-spacing:.1em}
 .desk-header-clock strong{font-variant-numeric:tabular-nums;font-size:23px;font-weight:850;line-height:1.1;color:#f8fcff}
 .desk-shell{max-width:1570px;margin:0 auto!important;display:grid;grid-template-columns:216px minmax(0,1fr);gap:0;padding:0!important;min-height:calc(100vh - 63px)}
+/* A spectator has no manager sidebar: occupy the FULL grid, not its 216px first column. */
+body.desk-ui[data-spectator="true"] .desk-shell{grid-template-columns:minmax(0,1fr)}
+body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;margin:0 auto}
+
 .desk-sidebar{padding:24px 13px 22px;border-right:1px solid #2a4057;background:#101e2e;min-width:0}
 .desk-nav-label{padding:5px 14px 13px;color:#839bb0;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.14em}
 .desk-tab{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;border:1px solid transparent;background:transparent;color:#b9cad9;padding:11px 13px;border-radius:8px;margin:2px 0;font-size:14px;font-weight:650;cursor:pointer;text-decoration:none}

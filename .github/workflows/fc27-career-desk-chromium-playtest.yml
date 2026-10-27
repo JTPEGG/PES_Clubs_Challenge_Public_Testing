@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'scripts/fc27_career_desk_chromium_playtest.py'
+      - 'world_career_play.py'
+      - 'world_career_ui.py'
       - '.github/workflows/fc27-career-desk-chromium-playtest.yml'
 permissions:
   contents: read
