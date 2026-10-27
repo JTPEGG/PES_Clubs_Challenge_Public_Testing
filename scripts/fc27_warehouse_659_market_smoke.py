@@ -12,6 +12,7 @@ from datetime import datetime,timedelta,timezone
 from pathlib import Path
 
 from scripts.fc27_warehouse_world_bridge import DATASET
+from scripts.fc27_qa_simulation_clock import isolated_simulation_clock
 from world_careers import start_sandbox, wage_budget_breakdown
 from world_live_market import (initialise_live_market,start_live_market,
   process_live_market,MARKET_MOMENTS)
@@ -79,8 +80,9 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
             raise ValueError("Incorrect preseason duration")
         for index,second in enumerate(MARKET_MOMENTS):
             due=now+timedelta(seconds=second+1)
-            response=process_live_market(con,career_id=career,now=due,
-                fc27_activity_scale_qa=opportunity_scale)
+            with isolated_simulation_clock(due):
+                response=process_live_market(con,career_id=career,now=due,
+                    fc27_activity_scale_qa=opportunity_scale)
             if response["state"]!="open":
                 raise ValueError("AI window closed early")
             print("source world AI market moment",index+1,
@@ -99,8 +101,9 @@ def evaluate(full_world_path,output,*,opportunity_scale=1):
                     LIMIT 8""",(start["window_id"],)).fetchall()
                 print("fc27_debug_model_failures",index+1,
                       [list(v) for v in failures],flush=True)
-        finish=process_live_market(con,career_id=career,
-           now=now+timedelta(seconds=1801))
+        deadline=now+timedelta(seconds=1801)
+        with isolated_simulation_clock(deadline):
+            finish=process_live_market(con,career_id=career,now=deadline)
         if finish["state"]!="closed":
             raise ValueError("AI window deadline did not finalise")
         actual=con.execute("""SELECT e.offer_id,e.player_id,e.from_club_id,

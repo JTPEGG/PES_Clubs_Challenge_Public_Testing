@@ -182,6 +182,33 @@ class ClubAIContextTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             scouting_desk_activation(priority=30,draw=-1)
 
+    def test_young_seller_valuation_does_not_disable_prospect_recruitment(self):
+        # Release gate: protecting a current young squad asset remains only
+        # a seller's negotiable reservation price. It must not replace the
+        # independent ability to scout and sign a different youth prospect.
+        from world_fc27_long_term_strategy import (
+            seller_horizon_review,recruitment_horizon_score)
+        evaluation=seller_horizon_review(
+            age=19,overall=78,position="LB",
+            market_value=12_400_000,offered_fee=15_000_000,
+            weekly_wage=18_000,contract_years=3,
+            squad_sale={"valid":True,"formation_quality_loss":0,
+                        "starter_rating_drop":0},
+            profile={**self.profile,"ambition_level":91,
+                     "financial_pressure_index":25})
+        prospect=recruitment_horizon_score(
+            category="prospect",lane="CB",player_age=19,
+            player_overall=72,
+            plan={"succession_pressure":{"CB":24},
+                  "youth_pipeline_priority":65,
+                  "current_competitive_pressure":75},
+            existing_youth_in_lane=1)
+        self.assertGreater(evaluation["current_ability_retention_option_pct"],0)
+        self.assertFalse(evaluation["future_replacement_assumed"])
+        self.assertEqual(prospect["kind"],"prospect_succession_option")
+        self.assertFalse(prospect["promised_immediate_xi_improvement"])
+        self.assertFalse(prospect["future_ability_verified"])
+
     def test_invalid_market_variation_is_still_rejected(self):
         with self.assertRaises(ValueError):
             buyer_recruitment_priority(self.squad,club=1,stable_variation=28)
