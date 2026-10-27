@@ -1568,7 +1568,7 @@ def create_play_blueprint(db_path):
                mode="login")
         with connect() as db:
             datasets=db.execute("SELECT * FROM world_datasets ORDER BY season_id DESC").fetchall()
-            selected=request.args.get("dataset","england-2026-27-fc27")
+            selected=request.args.get("dataset",os.getenv("FC27_PREVIEW_DATASET","england-2026-27-fc27"))
             if selected not in {d["dataset_id"] for d in datasets}:abort(404)
             clubs=db.execute("""SELECT c.club_id,c.name FROM world_dataset_entries e
                 JOIN world_clubs c ON c.club_id=e.club_id WHERE e.dataset_id=?
