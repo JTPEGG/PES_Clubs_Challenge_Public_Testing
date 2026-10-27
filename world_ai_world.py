@@ -9,7 +9,7 @@ All unknown contracts/intentions are explicitly fictional model assumptions.
 from collections import defaultdict
 from datetime import date, timedelta
 
-from world_ai_bidding import club_need, determine_offer, position_family
+from world_ai_bidding import club_need, determine_offer, position_family, bid_need_score
 from world_careers import (
     _player_reference, budget_remaining, wage_budget_breakdown,
     propose_offer, agent_terms, negotiate_agent, player_move_interest,
@@ -778,7 +778,7 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
                         # The bid protocol's need_score is explicitly an
                         # integer 0-100; round ONLY at its API boundary,
                         # leaving the continuous shortlist ranking intact.
-                        need_score=max(0,min(100,int(round(need)))),
+                        need_score=bid_need_score(need),
                         eligible_clubs=1,
                         seller_assumptions=seller_facts,
                         strategic_ceiling_uplift=(
