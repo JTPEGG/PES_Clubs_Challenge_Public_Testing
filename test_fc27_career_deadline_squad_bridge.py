@@ -15,6 +15,7 @@ def make_files(directory,*,closed=True,correct_owner=True):
     stage=root/"source_app_stage.sqlite"
     source_world,source_catalogue=fixtures(root)
     install(source_world,source_catalogue,strict=False)
+    source_world.commit()
     with sqlite3.connect(stage) as disk:
         source_world.backup(disk)
     source_world.close()
