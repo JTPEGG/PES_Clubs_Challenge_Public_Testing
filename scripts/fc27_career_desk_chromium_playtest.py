@@ -78,7 +78,7 @@ def run(world,output):
     failures=[]
     try:
         with sync_playwright() as p:
-            browser=p.chromium.launch(headless=True,args=["--no-sandbox"])
+            browser=p.chromium.launch(headless=True,channel="chrome",args=["--no-sandbox"])
             context=browser.new_context(viewport={"width":1440,"height":900},
                 device_scale_factor=1,ignore_https_errors=False)
             page=context.new_page()
@@ -113,7 +113,11 @@ def run(world,output):
             check(header.is_visible(),"Always-visible deadline clock missing")
             check(page.locator('.desk-sidebar [data-desk-tab="inbox"]').count()==1,
                   "Manager's Inbox tab missing")
-            page.screenshot(path=str(output/"02-desktop-active-overview.png"),
+            check(page.locator("#spectator-share-url").is_visible(),
+                  "Manager cannot find the shareable read-only spectator link")
+            check("/world/play/watch/" in page.locator("#spectator-share-url").input_value(),
+                  "Spectator share input contains an invalid URL")
+                        page.screenshot(path=str(output/"02-desktop-active-overview.png"),
                             animations="disabled",full_page=True)
             found.append("Real Start POST opened exactly one live 30-minute clock")
 
