@@ -241,9 +241,26 @@ def seller_horizon_review(*,age,overall,position,market_value,
     cost_of_loss=min(.11,max(0,squad_sale.get("formation_quality_loss",0))*.0035+
                      max(0,squad_sale.get("starter_rating_drop",0))*.003)
     title_pressure=max(0,ambition-78)*.0011
+    # A young, already-capable player gives an ambitious, financially stable
+    # seller several seasons of squad flexibility. Market value already
+    # includes age, so this is a modest SELLER-SPECIFIC opportunity cost,
+    # never an assertion of verified potential or guaranteed future growth.
+    # Low current ability, expiring contracts and urgent financial pressure
+    # naturally reduce the premium. Every player remains negotiable.
+    youth_retention_option=0.0
+    if age<26:
+        source_readiness=min(1,max(0,(overall-66)/14))
+        age_window=(26-age)/10
+        club_horizon_weight=.65+max(0,ambition-55)*.014
+        liquidity_weight=max(.25,1-max(0,financial-45)/80)
+        contract_weight=.55 if contract_years<=1 else 1.0
+        youth_retention_option=min(.20,
+            .20*age_window*source_readiness*club_horizon_weight*
+            liquidity_weight*contract_weight)
     # A negative shift favours a cash-in sale, positive protects now.
-    shift=max(-.105,min(.105,
-        cost_of_loss+title_pressure-
+    # No hard refusal or fixed transfer-volume rule is introduced.
+    shift=max(-.105,min(.21,
+        cost_of_loss+title_pressure+youth_retention_option-
         future_pressure-fee_opportunity-financial_impetus))
     return {"version":VERSION,"years_examined":3,
             "age_at_source_date":age,"position":position,
@@ -257,6 +274,9 @@ def seller_horizon_review(*,age,overall,position,market_value,
                 projection["scenarios"][2]["decline_exposure"],
             "future_ability_is_scenario_only":True,
             "future_replacement_assumed":False,
+            "verified_future_growth_assumed":False,
+            "current_ability_retention_option_pct":
+                round(100*youth_retention_option,3),
             "asking_price_shift_pct":round(100*shift,3),
             "decision_tension":(
                 "retain_for_current_competition" if shift>.025 else
