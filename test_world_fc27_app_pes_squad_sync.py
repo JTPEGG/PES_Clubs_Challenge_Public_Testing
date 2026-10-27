@@ -74,6 +74,29 @@ class FC27SquadSyncTests(unittest.TestCase):
                   "FROM fc27_app_player_registration WHERE player_key='P4'"
                 ).fetchone(),("P4","C344","C344"))
             finally:world.close()
+    def test_real_completed_career_events_reach_only_copied_squad_stage(self):
+        # Run the new handoff integration test in the existing fast CI job.
+        from test_fc27_career_deadline_squad_bridge import make_files
+        from scripts.stage_fc27_completed_career_squads import (
+            build_completed_career_review,STAGED_DB)
+        with tempfile.TemporaryDirectory() as tmp:
+            source_stage,career=make_files(tmp)
+            dest=Path(tmp)/"sealed-career-review"
+            audit=build_completed_career_review(
+                source_stage,career,"career-1",dest,
+                strict_source_counts=False)
+            self.assertEqual(audit["handoff"]["transfers_applied"],1)
+            self.assertEqual(audit["squad_preview"][
+                "registered_players_currently_at_playable_clubs"],4)
+            with sqlite3.connect(dest/STAGED_DB) as db:
+                self.assertEqual(db.execute("""SELECT current_club_key FROM
+                  fc27_app_player_registration WHERE player_key='P4'"""
+                  ).fetchone()[0],"C000")
+            with sqlite3.connect(source_stage) as db:
+                self.assertEqual(db.execute("""SELECT current_club_key FROM
+                  fc27_app_player_registration WHERE player_key='P4'"""
+                  ).fetchone()[0],"C344")
+
     def test_background_club_player_enters_playable_export_after_transfer(self):
         with tempfile.TemporaryDirectory() as tmp:
             world,source=fixtures(tmp)
