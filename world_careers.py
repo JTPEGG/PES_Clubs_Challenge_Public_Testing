@@ -5,6 +5,7 @@ career ownership exists. No mutation of shared dataset squads or PES League Mode
 All mutations use one SQLite IMMEDIATE transaction and idempotency keys.
 """
 import sqlite3
+import os
 import json
 from datetime import date
 from world_market import allowed_effective_date, offer_result
@@ -233,7 +234,22 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
                 WHERE dataset_id=?""",(dataset_id,)).fetchone()
                 if "world_dataset_pes_v2_verified_competitions" in schema
                 else None)
-            if readiness is None or readiness[0]!="ready":
+            # This one isolated FC27 website is a SINGLE TRANSFER WINDOW
+            # playtest, not a playable multi-season football pyramid.
+            # Gate on its explicitly enabled deployment and fully audited
+            # source snapshot; no other dataset may use this exception.
+            is_fc27_preview = (
+                os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1"
+                and dataset_id=="fc27-warehouse-659-mens-2026-27"
+                and "fc27_warehouse_import_audit" in schema
+                and conn.execute("""SELECT 1 FROM fc27_warehouse_import_audit
+                    WHERE dataset_id=? AND source_clubs=659
+                      AND source_players=17593 AND original_source_competitions=53""",
+                    (dataset_id,)).fetchone() is not None
+                and conn.execute("""SELECT COUNT(*) FROM world_dataset_rosters
+                    WHERE dataset_id=?""",(dataset_id,)).fetchone()[0]==17593
+            )
+            if (readiness is None or readiness[0]!="ready") and not is_fc27_preview:
                 raise ValueError("Historical competition hierarchy incomplete: "
                   "verify every domestic league, tier, promotion/relegation "
                   "destination, and nonplayable feeder pool before career launch")
