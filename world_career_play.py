@@ -760,6 +760,18 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 
  </div>
 </div>
+{% if not spectator and watch_url and snap.state=='open' %}
+<div class="card desk-spectator-share">
+  <h3>Share the live transfer window</h3>
+  <p class="muted">Other players can follow the market without seeing or changing your manager decisions.</p>
+  <div class="desk-share-controls">
+    <a href="{{watch_url}}" target="_blank" rel="noopener noreferrer">Open read-only spectator view</a>
+    <input id="spectator-share-url" type="text" value="{{watch_url}}" readonly
+      aria-label="Read-only spectator link" onclick="this.select()">
+    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('spectator-share-url').value)">Copy link</button>
+  </div>
+</div>
+{% endif %}
 {% if not spectator %}
 <h2 id="recruitment">Shortlist</h2>
 <div class="card">
@@ -2043,7 +2055,7 @@ def create_play_blueprint(db_path):
             spectator=spectator,snap=snap,offers=offers,
             purchases=purchases,targets=targets,player_search=player_search,
             buy_request_key="manager-buy-v1-"+secrets.token_urlsafe(14),
-            messages=messages,unread=unread,signed=signed,watch_url=None,
+            messages=messages,unread=unread,signed=signed,watch_url=watch_url,
             scout_results=scout_results,scout_attributes=scout_attributes,
             shortlist=shortlist,recommendations=recommendations,squad=squad,
             scout_categories=CATEGORIES,scout_query=scout_query,
