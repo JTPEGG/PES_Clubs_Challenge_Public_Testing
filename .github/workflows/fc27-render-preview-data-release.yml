@@ -1,0 +1,94 @@
+name: Prepare approved FC27 world for isolated Render manual playtest
+on:
+  push:
+    paths:
+      - '.github/workflows/fc27-render-preview-data-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-preflight-publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Career Desk dependencies
+        run: pip install -r requirements.txt
+      - name: Fetch approved immutable FC27 warehouse from provenance run
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          run-id: 39616187183
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: immutable-input/
+      - name: Generate new dedicated source-identity world
+        run: |
+          mkdir -p preview-build
+          python -u -m scripts.fc27_warehouse_world_bridge \
+            --warehouse immutable-input/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --target preview-build/FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite
+      - name: Verify real login, actual career creation and one 30-minute start
+        env:
+          WORLD_MARKET_ACCESS_KEY: ci-disposable-only
+          WORLD_MARKET_COOKIE_SECRET: ci-disposable-signed-cookie-secret
+          FC27_PRESEASON_PLAYTEST_ENABLED: '1'
+          FC27_PREVIEW_DATASET: fc27-warehouse-659-mens-2026-27
+          DATABASE_PATH: preview-build/FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite
+        run: |
+          cp preview-build/FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite preview-build/qa_live.sqlite
+          DATABASE_PATH=preview-build/qa_live.sqlite python - <<'PY'
+          import re,sqlite3,os
+          from fc27_playtest_app import app,COVERAGE
+          from scripts.fc27_warehouse_world_bridge import DATASET
+          assert COVERAGE=={'clubs':659,'players':17593,'competitions':53}
+          c=app.test_client()
+          kw={'base_url':'https://localhost'}
+          auth=c.post('/world/play/login',data={'password':os.environ['WORLD_MARKET_ACCESS_KEY']},**kw)
+          assert auth.status_code==302,auth.status_code
+          home=c.get('/world/play',**kw)
+          html=home.get_data(as_text=True)
+          assert home.status_code==200 and 'FC27' in html,html[:1000]
+          assert 'england-2026-27-fc27' not in html
+          assert html.count('<option value=')>=659
+          csrf=re.search(r'name="csrf" value="([^"]+)"',html).group(1)
+          with sqlite3.connect(os.environ['DATABASE_PATH']) as db:
+              manager=db.execute("""SELECT world_id FROM world_dataset_pes_v2_club_map
+                WHERE dataset_id=? ORDER BY world_id LIMIT 1""",(DATASET,)).fetchone()[0]
+          create=c.post('/world/play/create',data={
+              'csrf':csrf,'career_id':'render_full_fc27_browser_launch',
+              'dataset_id':DATASET,'title':'FC27 playtest launch acceptance',
+              'manager_club_id':str(manager),'player_decision_version':'legacy-sporting-v2',
+              'economy_version':'prototype-v1','scale':'1',
+              'pes_lock_date':'2026-08-01','next_summer_date':'2027-07-01'
+          },**kw)
+          assert create.status_code==302 and 'error=' not in create.location,create.location
+          market=c.get('/world/play/career/render_full_fc27_browser_launch/market',**kw)
+          assert market.status_code==200 and b'Start 30-minute transfer window' in market.data
+          start=c.post('/world/play/career/render_full_fc27_browser_launch/market/start',data={'csrf':csrf},**kw)
+          assert start.status_code==302 and 'error=' not in start.location,start.location
+          with sqlite3.connect(os.environ['DATABASE_PATH']) as db:
+              count=db.execute("""SELECT COUNT(*) FROM world_career_registrations
+                WHERE career_id='render_full_fc27_browser_launch'""").fetchone()[0]
+              assert count==17593,count
+          print('REAL FC27 PREVIEW: PASS 659 selectable clubs, 17593 roster, real career POST, one 1800s window',flush=True)
+          PY
+      - name: Compress validated pristine pre-career world and produce SHA256
+        run: |
+          cd preview-build
+          gzip -n -9 -c FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite > FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz
+          sha256sum FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz > FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz.sha256
+          ls -lh FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz
+      - name: Publish prerelease asset for isolated test deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create fc27-playtest-world-2026-10-27-v1 \
+            preview-build/FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz \
+            preview-build/FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz.sha256 \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "FC27 659-club disposable manual transfer window starter" \
+            --notes "Derived from approved immutable warehouse Actions run 39616187183; 659 clubs, 53 competitions, 17593 players. PRE-SEASON TRANSFER TEST ONLY. No private careers, authentic PES EDIT, or original production save."
