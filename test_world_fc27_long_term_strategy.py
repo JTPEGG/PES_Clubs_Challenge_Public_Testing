@@ -13,6 +13,7 @@ from world_fc27_long_term_strategy import (
     recruitment_horizon_score,seller_horizon_review,
     senior_succession_fit)
 from world_fc27_market_choices import choose_development_focus
+from world_ai_bidding import bid_need_score,determine_offer
 
 PROFILE={"ambition_level":85,"pressure_to_improve":80,
          "financial_pressure_index":30,"simulated_manager_risk":53}
@@ -21,6 +22,23 @@ SALE={"valid":True,"first_choice":True,
 
 
 class FC27ThreeSeasonStrategyTests(unittest.TestCase):
+    def test_fractional_succession_priority_reaches_bid_engine(self):
+        # Regression: formerly caused 31/85 real-world negotiation failures.
+        # 66.32 is a legitimate scored tactical successor, not bad data.
+        self.assertEqual(bid_need_score(66.32),66)
+        self.assertEqual(bid_need_score(66.78),67)
+        self.assertEqual(bid_need_score(104.22),100)
+        self.assertEqual(bid_need_score(-5.12),0)
+        from math import nan
+        with self.assertRaises(ValueError):
+            bid_need_score(nan)
+        quote=determine_offer(
+            career_id="three-season-qa",player_id=71,club_id=22,
+            valuation=9_000_000,available_budget=25_000_000,
+            need_score=bid_need_score(66.78),eligible_clubs=1)
+        self.assertGreater(quote["fee"],0)
+        self.assertEqual(quote["buyer_need_score"],67)
+
     def test_age_comes_from_source_snapshot_not_runtime_clock(self):
         con=sqlite3.connect(":memory:")
         try:
