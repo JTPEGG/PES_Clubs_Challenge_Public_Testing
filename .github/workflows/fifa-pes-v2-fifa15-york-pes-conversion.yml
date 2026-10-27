@@ -1,0 +1,59 @@
+name: PES V2 FIFA15 authentic York City full 25+4 player conversion
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/convert_fifa15_york_real_source_pes2020_v2.py'
+      - '.github/workflows/fifa-pes-v2-fifa15-york-pes-conversion.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test existing PES2020 V2 converter does not permit missing numeric attributes
+        run: python -m unittest -v test_fifa_pes_converter_v2
+      - name: Retrieve actual FIFA15 original 20-player source-attribute York game roster
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FIFA15-REAL-YORK-CITY-ORIGINAL-GAME-PLAYER-ROSTER
+          run-id: 39557140558
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Estimate every real York player original FIFA ability for complete PES20 25+4 model
+        run: |
+          python -u -m scripts.convert_fifa15_york_real_source_pes2020_v2 \
+            --source source/FIFA15_YORK_CITY_SOURCE_ATTRIBUTES_FROM_PINNED_GAME.csv \
+            --output release/
+      - name: Validate 20 identity-preserving FIFA15 game players with complete numeric PES ratings
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          p=Path('release')
+          d=json.loads((p/'FIFA15_YORK_SOURCE_PES2020_V2_CONVERSION_AUDIT.json').read_text())
+          with (p/'FIFA15_YORK_REAL_SOURCE_PES2020_25_PLUS_4_ESTIMATED.csv').open(encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+          assert len(rows)==d['original_game_players']==20
+          assert len({x['source_player_id'] for x in rows})==20
+          assert d['numeric_core_attributes_per_original_player']==25
+          assert d['numeric_auxiliary_attributes_per_original_player']==4
+          assert d['total_core_estimates']==500
+          assert d['total_auxiliary_estimates']==80
+          assert all(x['source_edition']=='2015' and x['source_club']=='York City' for x in rows)
+          assert d['does_not_fill_york_source_missing_eight_players']
+          assert not d['native_game_option_file_created'] and not d['career_ready']
+          print(json.dumps(d,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FIFA15-YORK-20-AUTHENTIC-SOURCE-PLAYERS-ESTIMATED-PES20-25-PLUS-4
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

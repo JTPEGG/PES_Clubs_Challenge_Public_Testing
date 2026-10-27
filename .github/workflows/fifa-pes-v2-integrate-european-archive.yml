@@ -1,0 +1,70 @@
+name: PES V2 integrate historical European game league evidence
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_european_membership_overlay.py'
+      - 'test_world_historical_european_membership_overlay.py'
+      - '.github/workflows/fifa-pes-v2-integrate-european-archive.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  join-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Load pinned 22-edition game and historical source match overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-ORIGINAL-GAME-AND-SOURCED-COMPETITION-DATABASE
+          run-id: 39505095998
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Read 87 independent historical league-seasons from 11 countries
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-PINNED-EUROPEAN-2008-2016-REAL-LEAGUE-CLUB-SEASONS
+          run-id: 39506262007
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: sources/
+      - name: Append season-specific historical club source identity evidence
+        run: |
+          python -u -m world_historical_european_membership_overlay \
+            --registry input/HISTORICAL_COMPETITION_REGISTER_WITH_ORIGINAL_FIFA_LEAGUES.sqlite \
+            --leagues sources/EUROPEAN_MATCH_DOMESTIC_LEAGUE_SEASONS.csv \
+            --clubs sources/EUROPEAN_MATCH_DOMESTIC_LEAGUE_CLUBS.csv \
+            --output release/
+      - name: Reconcile source and game league evidence, never activate careers
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          p=Path("release")
+          j=json.loads((p/"EXPANDED_2009_16_LEAGUE_MATCH_AUDIT.json").read_text())
+          assert j["original_game_club_seasons"]==13104
+          assert j["previous_league_evidence"]==8142
+          assert j["external_match_source_league_seasons"]==87
+          assert j["external_match_source_memberships"]==1474
+          assert j["combined_club_seasons_with_league_evidence"]==8142+j["new_source_linked_club_seasons"]
+          assert j["combined_club_seasons_with_league_evidence"]+j["remaining_unresolved"]==13104
+          assert j["does_not_certify_original_game_team_identity"]
+          assert j["career_ready_editions"]==0
+          assert not j["original_source_squads_modified"]
+          with sqlite3.connect(p/"HISTORICAL_COMPETITION_REGISTER_WITH_EUROPEAN_SOURCE_LEAGUES.sqlite") as db:
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM expanded_historical_club_starting_leagues").fetchone()[0]==13104
+          print(json.dumps(j,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-GAME-AND-11-EUROPEAN-2009-16-LEAGUE-EVIDENCE
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

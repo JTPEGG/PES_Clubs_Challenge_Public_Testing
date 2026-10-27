@@ -23,8 +23,12 @@ def assess_transfer_affordability(*, transfer_budget=None, wage_headroom=None,
                   signing_on_fee=signing_on_fee, agent_fee=agent_fee,
                   other_upfront_fees=other_upfront_fees)
     for name, value in values.items():
-        if value is not None and (type(value) is not int or not 0 <= value <= 1_000_000_000):
-            raise ValueError(name+" must be an integer amount in pounds or unknown")
+        # Remaining weekly headroom is a SIGNED number. Relegated or distressed
+        # clubs can already be over payroll ceiling. Never turn that into zero
+        # or crash the recruitment simulation: it is an unaffordable proposal.
+        lower=-1_000_000_000 if name=="wage_headroom" else 0
+        if value is not None and (type(value) is not int or not lower <= value <= 1_000_000_000):
+            raise ValueError(name+" must be a valid integer amount in pounds or unknown")
     if contract_years is not None and (
         type(contract_years) is not int or contract_years not in (1,2,3,4,5)
     ):

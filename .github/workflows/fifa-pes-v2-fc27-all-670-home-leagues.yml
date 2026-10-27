@@ -1,0 +1,314 @@
+name: PES V2 FC27 2026-27 all 659 eligible club home division associations
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_fc27_2026_conmebol_domestic_overlay.py'
+      - 'world_fc27_release_exclusions.py'
+      - 'world_fc27_source_membership_policy.py'
+      - 'world_fc27_additional_movement_rules.py'
+      - 'world_fc27_movement_gameplay_policy.py'
+      - 'world_fc27_remaining_movement_game_policy.py'
+      - 'world_fc27_broader_closed_league_scope.py'
+      - 'world_fc27_career_world_playability.py'
+      - 'world_fc27_mls_playable_scope.py'
+      - 'world_fc27_nl_pt_feeder_review.py'
+      - 'world_fc27_season_end_logic.py'
+      - 'world_fc27_regional_feeder_rosters.py'
+      - 'world_fc27_regional_season_end.py'
+      - 'world_fc27_effective_season_end_routes.py'
+      - 'test_world_fc27_effective_season_end_routes.py'
+      - 'test_world_fc27_regional_feeder_rosters.py'
+      - 'data/warehouse/fc27_2026_27_es_de_regional_feeder_clubs.json'
+      - 'test_world_fc27_season_end_logic.py'
+      - 'data/warehouse/fc27_2026_mls_playable_competition.json'
+      - 'data/warehouse/fc27_2026_27_netherlands_portugal_feeder_clubs.json'
+      - 'test_world_fc27_mls_playable_scope.py'
+      - 'test_world_fc27_nl_pt_feeder_review.py'
+      - 'world_fc27_six_country_playable_scope.py'
+      - 'world_fc27_eight_country_playable_scope.py'
+      - 'test_world_fc27_eight_country_playable_scope.py'
+      - 'data/warehouse/fc27_2026_27_eight_country_playable_scope.json'
+      - 'test_world_fc27_six_country_playable_scope.py'
+      - 'data/warehouse/fc27_2026_27_six_country_playable_scope.json'
+      - 'test_world_fc27_career_world_playability.py'
+      - 'data/warehouse/fc27_2026_27_verified_feeder_club_rosters.json'
+      - 'test_world_fc27_broader_closed_league_scope.py'
+      - 'data/warehouse/fc27_remaining_34_gameplay_movement_policy.json'
+      - 'test_world_fc27_remaining_movement_game_policy.py'
+      - 'data/warehouse/fc27_2026_27_gameplay_movement_decisions.json'
+      - 'test_world_fc27_movement_gameplay_policy.py'
+      - 'data/warehouse/fc27_2026_27_additional_movement_regimes.json'
+      - 'test_world_fc27_additional_movement_rules.py'
+      - 'world_fc27_domestic_competition_alignment.py'
+      - 'test_world_fc27_2026_conmebol_membership_review.py'
+      - 'test_world_fc27_release_exclusions.py'
+      - 'test_world_fc27_source_membership_policy.py'
+      - 'scripts/audit_fc27_active_competition_structure.py'
+      - 'scripts/audit_fc27_canonical_movement_crosswalk.py'
+      - 'data/warehouse/fc27_2026_conmebol_domestic_participation_review.json'
+      - 'data/warehouse/fc27_2026_conmebol_official_country_review.json'
+      - '.github/workflows/fifa-pes-v2-fc27-all-670-home-leagues.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test individual CONMEBOL memberships, FC27 active exclusions and source overlays
+        run: |
+          python -m unittest -v \
+            test_world_fc27_2026_conmebol_membership_review \
+            test_world_fc27_release_exclusions \
+            test_world_fc27_source_membership_policy \
+            test_world_fc27_additional_movement_rules \
+            test_world_fc27_movement_gameplay_policy \
+            test_world_fc27_remaining_movement_game_policy \
+            test_world_fc27_broader_closed_league_scope \
+            test_world_fc27_career_world_playability \
+            test_world_fc27_mls_playable_scope \
+            test_world_fc27_nl_pt_feeder_review \
+            test_world_fc27_season_end_logic \
+            test_world_fc27_regional_feeder_rosters \
+            test_world_fc27_effective_season_end_routes \
+            test_world_fc27_six_country_playable_scope \
+            test_world_fc27_eight_country_playable_scope \
+            test_world_fc27_domestic_competition_alignment \
+            test_world_competition_exclusions
+      - name: Download 242-club source-group active domestic competition database
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-659-ACTIVE-DOMESTIC-COMPETITION-GROUPS
+          run-id: 39578545599
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: prior/
+      - name: Validate every original FC27 source club against its real 2026 first division
+        run: |
+          python -u -m world_fc27_2026_conmebol_domestic_overlay \
+            --registry prior/FC27_2026_27_CLUB_COMPETITION_SOURCE_ASSOCIATION.sqlite \
+            --countries data/warehouse/fc27_2026_conmebol_official_country_review.json \
+            --domestic data/warehouse/fc27_2026_conmebol_domestic_participation_review.json \
+            --movement-rules data/warehouse/fc27_2026_27_additional_movement_regimes.json \
+            --gameplay-decisions data/warehouse/fc27_2026_27_gameplay_movement_decisions.json \
+            --remaining-game-rules data/warehouse/fc27_remaining_34_gameplay_movement_policy.json \
+            --official-feeder-rosters data/warehouse/fc27_2026_27_verified_feeder_club_rosters.json \
+            --playable-scope data/warehouse/fc27_2026_27_eight_country_playable_scope.json \
+            --mls-scope data/warehouse/fc27_2026_mls_playable_competition.json \
+            --nl-pt-feeders data/warehouse/fc27_2026_27_netherlands_portugal_feeder_clubs.json \
+            --regional-feeders data/warehouse/fc27_2026_27_es_de_regional_feeder_clubs.json \
+            --output release/
+      - name: Confirm 659 active source clubs and original 670 records retained without career changes
+        run: |
+          python - <<'PY'
+          import sqlite3,json,csv
+          from pathlib import Path
+          p=Path("release")
+          j=json.loads((p/"FC27_ALL_659_CLUB_DOMESTIC_SOURCE_ALIGNMENT_AUDIT.json").read_text())
+          assert j["edition"]==2027
+          assert j["fc27_active_club_records"]==659
+          assert j["archived_unchanged_FC27_club_records"]==670
+          assert j["excluded_original_source_clubs"]==11
+          assert j["excluded_clubs_remaining_in_derived_SQLite"]==0
+          assert j["derived_SQLite_club_season_rows"]==13093
+          assert j["individually_reviewed_2026_domestic_club_memberships"]==40
+          assert j["additional_2027_movement_rules_staged"]["additional_2026_27_movements"]==9
+          assert j["user_approved_2027_gameplay_movement_assumptions"]["explicitly_logged_gameplay_assumptions"]==2
+          assert j["remaining_2027_gameplay_movement_scope"]["source_competitions_with_new_game_rules"]==34
+          assert j["remaining_2027_gameplay_movement_scope"]["new_named_nonplayable_single_step_feeders_without_squads"]==4
+          assert j["remaining_2027_gameplay_movement_scope"]["closed_2026_27_game_competitions"]==30
+          assert j["remaining_2027_gameplay_movement_scope"]["south_korea_2027_k_league_expansion_applied_in_game"]==False
+          assert j["prior_2027_game_scope_before_six_country_choice"]["closed_game_domestic_competitions"]==32
+          assert j["final_2027_open_and_closed_gameplay_scope"]["closed_background_competitions"]==37
+          assert j["final_2027_open_and_closed_gameplay_scope"]["open_intended_playable_competitions"]==16
+          assert j["final_2027_open_and_closed_gameplay_scope"]["original_clubs_in_intended_playable_competitions"]==314
+          assert j["final_2027_open_and_closed_gameplay_scope"]["original_clubs_in_closed_background_competitions"]==345
+          assert j["final_2027_open_and_closed_gameplay_scope"]["effective_named_one_hop_feeders"]==4
+          assert j["source_club_career_world_and_real_2027_feeders"]["official_real_feeder_clubs_now_named"]==93
+          assert j["MLS_2026_closed_division_intended_playable"]["intended_selectable_original_game_clubs"]==344
+          assert j["MLS_2026_closed_division_intended_playable"]["mls_regular_season_matches_per_club"]==34
+          assert j["Dutch_Portuguese_2026_27_real_feeder_name_registration"]["newly_sourced_named_feeder_clubs"]==38
+          assert j["Dutch_Portuguese_2026_27_real_feeder_name_registration"]["open_feeders_without_real_named_club_members"]==0
+          assert j["Spain_Germany_2026_27_regional_feeder_registration"]["new_real_feeder_club_names"]==131
+          assert j["Spain_Germany_2026_27_regional_feeder_registration"]["separate_one_hop_regional_groups"]==7
+          assert j["FC27_16_open_league_effective_season_end_routes"]["open_playable_routes_with_derived_effective_rule"]==16
+          assert j["FC27_16_open_league_effective_season_end_routes"]["MLS_erroneous_relegation_routes"]==0
+          assert j["source_club_career_world_and_real_2027_feeders"]["open_pyramid_season_candidate_clubs"]==314
+          assert j["source_club_career_world_and_real_2027_feeders"]["official_feeder_names_active_in_open_game_competitions"]==78
+          assert j["source_club_career_world_and_real_2027_feeders"]["manager_career_target_countries"]==9
+          assert j["source_club_career_world_and_real_2027_feeders"]["closed_background_world_clubs"]==315
+          assert j["source_club_career_world_and_real_2027_feeders"]["playable_closed_mls_clubs"]==30
+          assert j["prior_2027_game_scope_before_six_country_choice"]["open_game_domestic_competitions"]==21
+          assert j["prior_2027_game_scope_before_six_country_choice"]["remaining_game_one_hop_named_feeders_without_rosters"]==9
+          assert j["user_approved_2027_gameplay_movement_assumptions"]["source_regulations_preserved"]
+          assert j["additional_2027_movement_rules_staged"]["first_time_named_one_hop_feeder_competitions"]==6
+          assert j["user_approved_source_membership_scope"]["accepted_source_as_provided_competitions"]==33
+          assert j["user_approved_source_membership_scope"]["retained_source_clubs_in_accepted_groups"]==280
+          assert j["user_approved_source_membership_scope"]["source_as_provided_canonical_division_records"]==33
+          assert j["user_approved_source_membership_scope"]["combined_active_domestic_competition_catalogue_size"]==53
+          assert j["user_approved_source_membership_scope"]["greece_2027_original_source_clubs_kept"]==4
+          assert j["user_approved_source_membership_scope"]["german_second_division_original_source_clubs_kept"]==18
+          assert j["previously_domestic_source_groups"]==619
+          assert j["new_2026_country_backed_domestic_league_candidates"]==40
+          assert j["total_staged_domestic_source_competition_associations"]==659
+          assert j["national_2026_first_division_evidence_sources"]==9
+          assert j["source_club_identity_EA_ids_not_verified"]
+          assert j["full_real_world_league_rosters_not_verified"]
+          assert not j["season_promotion_relegation_graph_complete"] and not j["career_ready"]
+          with sqlite3.connect(p/"FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite") as db:
+              assert db.execute("PRAGMA integrity_check").fetchone()[0]=="ok"
+              assert not db.execute("PRAGMA foreign_key_check").fetchall()
+              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions").fetchone()[0]==13093
+              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_conmebol_original_club_domestic_candidates").fetchone()[0]==40
+              assert db.execute("SELECT COUNT(*) FROM fc27_source_as_provided_membership_policy").fetchone()[0]==33
+              assert db.execute("SELECT COUNT(*) FROM fc27_additional_movement_boundaries").fetchone()[0]==9
+              assert db.execute("SELECT COUNT(*) FROM fc27_user_approved_movement_game_rules").fetchone()[0]==2
+              assert db.execute("SELECT COUNT(*) FROM fc27_remaining_34_gameplay_movement").fetchone()[0]==34
+              assert db.execute("SELECT COUNT(*) FROM fc27_game_only_named_immediate_feeders").fetchone()[0]==4
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_world_league_movement_scope").fetchone()[0]==53
+              assert db.execute("SELECT COUNT(*) FROM fc27_career_world_clubs").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_eight_country_playable_approval").fetchone()[0]==16
+              assert db.execute("SELECT COUNT(*) FROM fc27_eight_country_new_closed_decisions").fetchone()[0]==5
+              assert db.execute("SELECT COUNT(*) FROM fc27_manager_selectable_career_clubs").fetchone()[0]==344
+              assert db.execute("SELECT COUNT(*) FROM fc27_mls_playable_closed_league_approval").fetchone()[0]==1
+              assert db.execute("SELECT COUNT(*) FROM fc27_mls_official_conference_membership").fetchone()[0]==30
+              assert db.execute("SELECT COUNT(DISTINCT mapped_original_game_club_key) FROM fc27_mls_official_conference_membership").fetchone()[0]==30
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_manager_selectable_competitions").fetchone()[0]==17
+              assert db.execute("SELECT COUNT(*) FROM fc27_career_world_clubs WHERE competition_mode='playable_closed_league_candidate'").fetchone()[0]==30
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_core_pyramid_game_boundaries WHERE game_enabled=1").fetchone()[0]==7
+              assert db.execute("SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs").fetchone()[0]==131
+              assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_2026_27_group").fetchone()[0]==7
+              assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_2026_27_club").fetchone()[0]==131
+              assert db.execute("SELECT COUNT(*) FROM fc27_regional_feeder_game_policy").fetchone()[0]==2
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_playable_season_end_routes").fetchone()[0]==16
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_playable_season_end_routes WHERE executable_career_movement!=0 OR upper_code='2027:us.mls'").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness").fetchone()[0]==4
+              assert db.execute("SELECT COUNT(*) FROM fc27_feeder_pool_readiness WHERE published_real_club_names>0").fetchone()[0]==4
+              assert db.execute("SELECT COUNT(*) FROM fc27_sourced_real_one_hop_feeder_clubs WHERE PES_player_squad_imported=1").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_world_league_movement_scope WHERE movement_policy='closed'").fetchone()[0]==37
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_named_immediate_game_feeders").fetchone()[0]==4
+              assert db.execute("""SELECT direct_promotions,playoff_promotions,
+                  direct_relegations,interdivision_playoff_places
+                  FROM fc27_effective_additional_movement_after_world_closure
+                  WHERE upper_code='2027:ch.1'""").fetchone()==(0,0,0,0)
+              for disabled in ('2027:at.1','2027:be.1'):
+                  assert db.execute("""SELECT direct_promotions,playoff_promotions,
+                      direct_relegations,interdivision_playoff_places
+                      FROM fc27_effective_additional_movement_after_world_closure
+                      WHERE upper_code=?""",(disabled,)).fetchone()==(0,0,0,0)
+              assert db.execute("""SELECT direct_promotions,direct_relegations
+                  FROM fc27_effective_additional_movement_after_world_closure
+                  WHERE upper_code='2027:nl.1'""").fetchone()==(2,2)
+              assert db.execute("""SELECT direct_promotions,playoff_promotions,
+                direct_relegations,top_division_size_delta
+                FROM fc27_simplified_game_movement_scope
+                WHERE upper_code='2027:kr.1'""").fetchone()==(0,0,0,0)
+              assert db.execute("""SELECT direct_promotions,playoff_promotions,
+                direct_relegations FROM fc27_simplified_game_movement_scope
+                WHERE upper_code='2027:mx.1'""").fetchone()==(0,0,0)
+              assert db.execute("SELECT COUNT(*) FROM fc27_effective_additional_game_movement_rules").fetchone()[0]==9
+              assert db.execute("""SELECT effective_direct_promotions,effective_playoff_promotions,
+                  effective_direct_relegations,effective_interdivision_playoff_places
+                  FROM fc27_effective_additional_game_movement_rules
+                  WHERE upper_code='2027:it.1'""").fetchone()==(2,1,3,0)
+              assert db.execute("""SELECT effective_direct_promotions,effective_playoff_promotions,
+                  effective_direct_relegations,effective_interdivision_playoff_places
+                  FROM fc27_effective_additional_game_movement_rules
+                  WHERE upper_code='2027:at.1'""").fetchone()==(1,0,1,0)
+              assert db.execute("SELECT COUNT(*) FROM fc27_extra_movement_feeder_nodes").fetchone()[0]==6
+              assert db.execute("SELECT COUNT(*) FROM fc27_accepted_source_as_provided_clubs").fetchone()[0]==280
+              assert db.execute("SELECT COUNT(*) FROM fc27_source_as_provided_competition_seasons").fetchone()[0]==33
+              assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_active_domestic_competitions").fetchone()[0]==53
+              assert db.execute("SELECT SUM(active_source_clubs) FROM fc27_2026_27_active_domestic_competitions").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_accepted_source_as_provided_clubs WHERE starting_competition='2027:gr.1'").fetchone()[0]==4
+              assert db.execute("SELECT COUNT(*) FROM edition_club_competitions WHERE edition=2027 AND LOWER(TRIM(original_source_league)) IN ('isl','indian super league')").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM source_league_groups WHERE edition=2027 AND LOWER(TRIM(source_label)) IN ('isl','indian super league')").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition IS NULL").fetchone()[0]==0
+              assert db.execute("SELECT COUNT(DISTINCT club_key) FROM fc27_2026_27_complete_source_competition_alignment").fetchone()[0]==659
+              assert db.execute("SELECT COUNT(*) FROM fc27_2026_27_complete_source_competition_alignment WHERE starting_competition='2027:in.1'").fetchone()[0]==0
+          print(json.dumps(j,indent=2))
+          PY
+      - name: Produce precise FC27 season-correct competition and immediate-feeder gap inventory
+        run: |
+          python -m scripts.audit_fc27_active_competition_structure \
+            --registry release/FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite \
+            --output release/
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads((Path("release")/"FC27_COMPETITION_STRUCTURE_READINESS.json").read_text())
+          assert data["edition"]==2027 and data["active_source_clubs"]==659
+          assert data["unknown_home_league_clubs"]==0
+          assert data["source_as_provided_competitions_user_accepted"]==33
+          assert data["source_as_provided_original_clubs_preserved"]==280
+          assert data["additional_membership_roster_research_required_for_current_scope"]==0
+          assert data["additional_source_country_movement_edges"]==9
+          assert data["user_approved_explicit_gameplay_movement_simplifications"]==2
+          assert data["new_pragmatic_gameplay_competition_decisions"]==34
+          assert data["gameplay_competitions_with_closed_division_format"]==30
+          assert data["gameplay_closed_leagues_across_entire_fc27"]==37
+          assert data["manager_intended_playable_competition_codes"]==16
+          assert data["manager_intended_playable_club_candidates"]==344
+          assert data["manager_intended_playable_competition_codes_including_MLS"]==17
+          assert data["manager_MLS_original_clubs"]==30
+          assert data["manager_MLS_no_promotion_relegation"]
+          assert data["effective_historical_core_pyramid_edges_enabled"]==7
+          assert data["gameplay_open_leagues_across_entire_fc27"]==16
+          assert data["gameplay_remaining_effective_feeders_without_club_rosters"]==4
+          assert data["official_real_feeder_clubs_in_current_open_league_scope"]==116
+          assert data["genuine_feeder_club_names_registered"]==131
+          assert data["dated_real_spanish_regional_feeder_names"]==40
+          assert data["dated_real_german_regional_feeder_names"]==91
+          assert data["named_regional_source_groups"]==7
+          assert data["regional_game_4up_4down_policies_staged"]==2
+          assert data["fc27_effective_open_playable_season_end_routes"]==16
+          assert data["fc27_career_movement_routes_actually_executable"]==0
+          assert data["fc27_MLS_separate_playable_without_relegation_route"]
+          assert data["feeder_divisions_with_official_real_2026_27_memberships"]==4
+          assert data["feeder_divisions_still_without_any_2026_27_real_club_pool"]==0
+          assert data["original_clubs_eligible_for_open_league_schedule_after_game_import"]==314
+          assert data["original_clubs_retained_in_closed_background_job_and_transfer_market"]==315
+          assert data["original_clubs_eligible_for_any_intended_playable_competition"]==344
+          assert data["gameplay_named_one_hop_feeders_without_club_squads"]==4
+          assert data["no_remaining_completely_unmapped_active_movement_policy"]
+          assert data["competitions_with_no_linked_season_end_movement_rule"]==0
+          assert data["italian_serie_b_gameplay_uses_promotion_playoff"]
+          assert not data["austrian_gameplay_uses_direct_one_up_one_down"]
+          assert data["austrian_prior_direct_exchange_retained_in_history_but_game_closed"]
+          assert data["total_staged_2027_movement_edges"]==16
+          assert data["competitions_with_additional_season_dated_movement_rules"]==6  # Five game-open source-rule destinations remain
+          assert data["additional_one_hop_feeder_names_without_game_rosters"]==6
+          assert data["greece_original_source_clubs_preserved"]==4
+          assert data["germany_second_division_source_clubs_preserved"]==18
+          assert data["distinct_active_domestic_competitions"]>0
+          assert not data["career_ready"] and not data["FC26_allowed_to_start"]
+          assert not data["complete_2027_canonical_movement_destinations"]
+          PY
+      - name: Crosswalk existing FC27 England Germany Spain pyramid boundaries
+        run: |
+          python -m scripts.audit_fc27_canonical_movement_crosswalk \
+            --registry release/FC27_2026_27_ALL_659_SOURCE_CLUB_HOME_COMPETITIONS.sqlite \
+            --output release/
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads((Path("release")/"FC27_MOVEMENT_BOUNDARY_NEXT_STAGE.json").read_text())
+          assert result["edition"]==2027
+          assert result["source_2027_competition_edges_canonically_linked"]==7
+          assert result["german_second_tier_original_clubs_preserved"]==18
+          assert result["national_league_one_hop_feeder_present"]
+          assert not result["all_53_competitions_career_ready"]
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-ALL-659-ACTIVE-SOURCE-CLUB-DOMESTIC-LEAGUES
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

@@ -6,6 +6,19 @@ assumptions. Each decision includes an auditable set of pricing inputs.
 """
 from hashlib import sha256
 
+def bid_need_score(raw):
+    """Translate a continuous tactical/succession score for the integer bid API.
+
+    The scoring model may contain fractional evidence. Only the buyer's
+    monetary bid protocol requires a discrete 0-100 score; sorting and
+    scouting should retain full precision and never silently throw TypeError.
+    """
+    from math import isfinite
+    if type(raw) not in (int,float) or not isfinite(raw):
+        raise ValueError("A finite modelled squad-need score is required")
+    return max(0,min(100,int(round(raw))))
+
+
 AI_BID_VERSION="club-demand-bidding-v2"
 MAX_ROUNDS=3
 ACTIVE_STATES=frozenset(("proposed","countered","accepted_pending_contract","agreed_future"))
@@ -76,7 +89,8 @@ def _strategy(career_id,player_id,club_id):
 
 def determine_offer(*,career_id,player_id,club_id,valuation,available_budget,
                     need_score,eligible_clubs,active_rival_clubs=0,
-                    seller_assumptions=None,prior_fee=None,round_number=1):
+                    seller_assumptions=None,prior_fee=None,round_number=1,
+                    strategic_ceiling_uplift=0.0):
     if any(type(v) is not int for v in
            (player_id,club_id,valuation,available_budget,need_score,
             eligible_clubs,active_rival_clubs,round_number)):
@@ -85,6 +99,9 @@ def determine_offer(*,career_id,player_id,club_id,valuation,available_budget,
         raise ValueError("Unavailable player valuation or buyer transfer budget")
     if not 0<=need_score<=100 or eligible_clubs<0 or active_rival_clubs<0:
         raise ValueError("Invalid rated need or real eligible-club count")
+    if (type(strategic_ceiling_uplift) not in (float,int) or
+            not 0<=strategic_ceiling_uplift<=0.60):
+        raise ValueError("Invalid discretionary strategic bid premium")
     if not 1<=round_number<=MAX_ROUNDS:
         raise ValueError("AI bidder has exhausted its permitted negotiation rounds")
     if round_number==1 and prior_fee is not None:
@@ -105,7 +122,8 @@ def determine_offer(*,career_id,player_id,club_id,valuation,available_budget,
                 demand_premium+rivalry_premium+seller["adjustment"])
     base_ratio=max(0.72,min(1.43,base_ratio))
     baseline_bid=round_up_fee(valuation*base_ratio)
-    ceiling=round_up_fee(valuation*(1.55+min(0.07,demand_premium/2)))
+    ceiling=round_up_fee(valuation*(1.55+min(0.07,demand_premium/2)+
+                                   strategic_ceiling_uplift))
     if round_number==1:
         amount=baseline_bid
     else:
@@ -140,6 +158,7 @@ def determine_offer(*,career_id,player_id,club_id,valuation,available_budget,
             "recorded_seller_facts":seller["reasons"],
             "last_offer":prior_fee,
             "maximum_sensible_fee":ceiling,
+            "strategic_ceiling_uplift":strategic_ceiling_uplift,
             "reason":(
                 f"Rated squad need {need_score}/100; {eligible_clubs} eligible AI buyers; "
                 f"competition premium {round(100*demand_premium,1)}%; "

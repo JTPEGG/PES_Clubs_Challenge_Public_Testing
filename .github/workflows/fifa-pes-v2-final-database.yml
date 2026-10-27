@@ -1,0 +1,151 @@
+name: PES V2 finished 22-edition player database starter
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/export_fifa_pes_v2.py'
+      - 'scripts/assemble_fifa_pes_v2_final_sources.py'
+      - 'scripts/merge_fifa_pes_v2_final_database.py'
+      - 'test_fifa_pes_v2_final_sources.py'
+      - 'test_fifa_pes_v2_final_database.py'
+      - '.github/workflows/fifa-pes-v2-final-database.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pes-v2-finished-player-databases-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  prepare-sources:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Release gates - immutable originals, 22 years, FC25 gap, player identity namespace
+        run: |
+          python -m unittest -v \
+            test_fifa_pes_v2_final_sources \
+            test_fifa_pes_v2_final_database \
+            test_fifa_pes_v2_restoration \
+            test_fifa_pes_export_v2
+      - name: Fetch unchanged 23-edition FIFA source archive
+        run: python -u scripts/build_fifa_fc_archive.py --output build-input/original.zip --workers 5
+      - name: Fetch six pinned SoFIFA restored source years
+        run: |
+          python -u -m scripts.build_fifa_fc_restored_2015_2020 \
+            --original-source build-input/original.zip \
+            --output build-input/restored.zip
+      - name: Build single 22-year source selection and source-identity review
+        run: |
+          python -u -m scripts.assemble_fifa_pes_v2_final_sources \
+            --original-source build-input/original.zip \
+            --restored-source build-input/restored.zip \
+            --output build-input/selected_source_22_years.zip
+      - name: Preserve validated source selection for all shards
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-final-source-selection
+          path: build-input/selected_source_22_years.zip
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+  convert-editions:
+    needs: prepare-sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: legacy
+            editions: "2005 2006 2007 2008 2009 2010 2011 2012 2013 2014"
+          - shard: restored
+            editions: "2015 2016 2017 2018 2019 2020"
+          - shard: modern
+            editions: "2021 2022 2023 2024 2026 2027"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Retrieve exactly the same versioned 22-year source archive
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-final-source-selection
+          path: build-input/
+      - name: Convert entire shard - all source players, 25 PES ratings and four extras
+        env:
+          EDITIONS: ${{ matrix.editions }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          args=()
+          for yr in $EDITIONS; do
+            args+=(--edition "$yr")
+          done
+          python -u -m scripts.export_fifa_pes_v2 \
+            --source build-input/selected_source_22_years.zip \
+            --output "part-output/shard-$SHARD.zip" \
+            "${args[@]}"
+      - name: Upload shard and numerical validation manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-Final-Shard-${{ matrix.shard }}
+          path: part-output/shard-${{ matrix.shard }}.zip
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+  finish-database:
+    needs: [prepare-sources, convert-editions]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Retrieve all three independently converted player archive shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: PES-V2-Final-Shard-*
+          merge-multiple: true
+          path: parts/
+      - name: Retrieve source archive used to generate all three shards
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-final-source-selection
+          path: source-archive/
+      - name: Verify every record and all 29 numeric fields across 22 years
+        run: |
+          python -u -m scripts.merge_fifa_pes_v2_final_database \
+            --source source-archive/selected_source_22_years.zip \
+            --shards parts/ \
+            --output release/PES2020_V2_COMPLETE_ESTIMATED_PLAYER_DATABASE_22_YEARS.zip
+      - name: Include full original source archive and clear release notes
+        run: |
+          cp source-archive/selected_source_22_years.zip \
+            release/FIFA_SOURCE_DATABASES_22_YEARS_VERSIONED.zip
+          cat > release/START_HERE.txt <<'EOF'
+          PES CHALLENGE: V2 PLAYER DATABASE STARTER
+          These are fully populated estimated gameplay-attribute CSVs for 22
+          FIFA edition years, with source records kept in a separate archive.
+          FC25 is intentionally excluded and NOT patched. Only FIFA20 can
+          calibrate the PES2020 model; experimental offsets are disabled.
+          Source year identity, ratings provenance and coverage caveats
+          are recorded in MANIFEST.json inside the converted ZIP.
+          Completeness against original in-game rosters, physical/face data,
+          Konami skills/playing styles and native PES game file export
+          remain next-stage tasks. Xbox PES2020 has no option-file import.
+          Original careers and Render production remain untouched.
+          EOF
+      - name: Upload finished V2 player database starting point
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-COMPLETE-22-YEAR-PLAYER-DATABASES-STARTER
+          path: release/
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error

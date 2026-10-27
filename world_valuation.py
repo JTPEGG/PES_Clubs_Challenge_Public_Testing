@@ -41,6 +41,32 @@ def model_value(overall, age, position):
     return max(nearest,round(raw/nearest)*nearest)
 
 
+FC27_GAME_VALUE_VERSION="fc27-source-wage-and-ability-calibration-v1"
+
+def fc27_game_reference_value(*,baseline,overall,weekly_wage=None):
+    """Modelled 2026/27 GAME-market reference, not a real transfer fee.
+
+    The previous prototype v1 made an established 84 OVR international
+    available for roughly £10-15m. A stronger high-ability curve and the
+    actual source-game weekly wage provide a more meaningful starting
+    reference. No market prices, external rumours or potential are invented.
+    Older editions retain precisely their original v1 valuations.
+    """
+    if (type(baseline) is not int or baseline<=0 or
+            type(overall) is not int or not 1<=overall<=99):
+        raise ValueError("Rated and positive baseline required")
+    if (weekly_wage is not None and
+            (type(weekly_wage) is not int or weekly_wage<0)):
+        raise ValueError("Source-game weekly wage must be nonnegative or unknown")
+    strength_multiplier=min(3.6,1+max(0,overall-70)*.13)
+    wage_yearly=52*(weekly_wage or 0)
+    candidate=max(baseline*strength_multiplier+
+                  min(baseline*.25,wage_yearly*.40),
+                  wage_yearly*2.4)
+    increment=100000 if candidate>=5_000_000 else 25000
+    return min(350_000_000,max(increment,
+        int((candidate+increment/2)//increment)*increment))
+
 def display_gbp(amount):
     if amount is None:
         return "Not estimated"

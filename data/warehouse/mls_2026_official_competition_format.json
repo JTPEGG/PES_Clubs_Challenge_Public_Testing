@@ -1,0 +1,74 @@
+{
+  "edition": 2027,
+  "calendar_season": 2026,
+  "competition_code": "2027:us.mls",
+  "competition": "Major League Soccer",
+  "category": "domestic_closed_league",
+  "reference_status": "official_2026_format_pending_career_simulator_validation",
+  "source_url": "https://www.mlssoccer.com/league-reports/competition-guidelines/",
+  "club_conferences": {
+    "Eastern": [
+      "Atlanta United",
+      "Charlotte FC",
+      "Chicago Fire FC",
+      "FC Cincinnati",
+      "Columbus Crew",
+      "D.C. United",
+      "Inter Miami CF",
+      "CF Montréal",
+      "Nashville SC",
+      "New England Revolution",
+      "New York City FC",
+      "Orlando City SC",
+      "Philadelphia Union",
+      "Red Bull New York",
+      "Toronto FC"
+    ],
+    "Western": [
+      "Austin FC",
+      "Colorado Rapids",
+      "FC Dallas",
+      "Houston Dynamo FC",
+      "Los Angeles Football Club",
+      "LA Galaxy",
+      "Minnesota United FC",
+      "Portland Timbers",
+      "Real Salt Lake",
+      "St. Louis CITY SC",
+      "San Diego FC",
+      "San Jose Earthquakes",
+      "Seattle Sounders FC",
+      "Sporting Kansas City",
+      "Vancouver Whitecaps FC"
+    ]
+  },
+  "regular_season": {
+    "clubs": 30,
+    "conferences": 2,
+    "clubs_per_conference": 15,
+    "matches_per_team": 34,
+    "points_win": 3,
+    "points_draw": 1
+  },
+  "postseason": {
+    "qualification_per_conference": 9,
+    "direct_round_one_per_conference": 7,
+    "wildcard_seeds": [
+      8,
+      9
+    ],
+    "wildcard_format": "single_elimination",
+    "round_one_format": "best_of_three",
+    "conference_semifinals": "single_elimination",
+    "conference_finals": "single_elimination",
+    "mls_cup": "single_elimination"
+  },
+  "pyramid_movement": {
+    "automatic_promotions": 0,
+    "automatic_relegations": 0,
+    "playoff_promotions": 0,
+    "feeder_club_promotions": 0
+  },
+  "source_status": "official_2026_mls_competition_guidelines",
+  "game_career_ready": false
+}

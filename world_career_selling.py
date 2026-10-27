@@ -224,7 +224,10 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
         transfer_listed=(None if info["transfer_listed"] is None else bool(info["transfer_listed"])),
         player_wants_exit=(None if info["player_wants_exit"] is None else bool(info["player_wants_exit"])),
         financial_state=info["financial_state"],replacement=info["replacement"],
-        seller_stance=info["seller_stance"])
+        seller_stance=info["seller_stance"],
+        autonomous_market_reassessment=bool(
+            str(info.get("source_note") or "").startswith("fictional-autonomous-seller-")
+            and seller_club_id!=_check_manager(conn,career_id)))
     board_kwargs={"intervene":bool(info["board_enabled"]),
         "approval_multiple_pct":info["exceptional_offer_pct"]}
     if info["board_enabled"]:
@@ -297,12 +300,158 @@ def evaluate_career_seller_bid(conn,*,career_id,player_id,seller_club_id,
                     "pre_competition_asking_price":seller["asking_price"],
                     "pre_competition_reason":seller["reason"],
                     "decision":effective,"asking_price":asking,"reason":reason}
+    # FC27 autonomous sellers re-assess the *current projected squad* at
+    # the moment of this offer. Earlier departures cannot be ignored merely
+    # because another offer for the same player froze contextual facts.
+    # A severely disruptive deal remains available at an exceptional price;
+    # no signing a replacement before selling and no position-count veto.
+    tactical_review=None
+    if (seller_club_id!=_check_manager(conn,career_id) and
+        str(info.get("source_note") or "").startswith("fictional-autonomous-seller-")):
+        ds=conn.execute("""SELECT dataset_id FROM world_career_saves
+            WHERE career_id=?""",(career_id,)).fetchone()[0]
+        if ds=="fc27-warehouse-659-mens-2026-27":
+            from world_squad_planner import projected_squads,sale_profile
+            from world_ai_tactics import preferred_formation,tactical_needs
+            from world_fc27_ai_recruitment import read_fc27_profiles
+            from world_fc27_market_choices import disruption_sale_premium
+            profile=read_fc27_profiles(conn,dataset=ds,
+                club_id=seller_club_id).get(seller_club_id)
+            if profile:
+                pid_row=conn.execute("""SELECT p.primary_position,r.overall
+                    FROM world_players p JOIN world_dataset_ratings r
+                      ON r.player_id=p.player_id AND r.dataset_id=?
+                    WHERE p.player_id=?""",(ds,player_id)).fetchone()
+                if pid_row:
+                    tactics=tactical_needs(preferred_formation(
+                        club_id=seller_club_id,profile=profile))
+                    sale=sale_profile(projected_squads(
+                        conn,career_id=career_id,dataset=ds),
+                        seller=seller_club_id,player_id=player_id,
+                        position=pid_row[0],overall=pid_row[1],
+                        starting_roles=tactics["starting_roles"])
+                    if sale["valid"]:
+                        uplift=disruption_sale_premium(
+                            sale,seller_pressure=profile["financial_pressure_index"],
+                            player_wants_exit=bool(info["player_wants_exit"]))
+                        tactical_review={
+                            "formation":tactics["formation"],
+                            "lineup_loss":sale["formation_lineup_loss"],
+                            "tactical_sale_premium_pct":round(100*uplift,1),
+                            "first_choice":sale["first_choice"],
+                            "starter_quality_drop":sale["starter_rating_drop"],
+                            "formation_quality_loss":sale["formation_quality_loss"],
+                            "rotation_quality_drop":sale["rotation_quality_drop"],
+                            "after_specialist_depth":sale["after_depth"]}
+                        # Ageing and succession are a separate, explainable
+                        # 3-season financial/sporting choice. Source age and
+                        # salary are required; never invent PA or renewal.
+                        from world_fc27_long_term_strategy import (
+                            source_ages,seller_horizon_review)
+                        years=source_ages(conn,dataset=ds,
+                                          player_ids=[player_id])
+                        wage_row=conn.execute("""SELECT weekly_wage_gbp
+                            FROM world_dataset_contract_snapshots
+                            WHERE dataset_id=? AND player_id=?""",
+                            (ds,player_id)).fetchone()
+                        strategic=None
+                        if (player_id in years and wage_row and
+                                wage_row[0] is not None and
+                                info["contract_years"] is not None):
+                            strategic=seller_horizon_review(
+                                age=years[player_id],overall=pid_row[1],
+                                position=pid_row[0],
+                                market_value=info["market_value"],
+                                offered_fee=offer_fee,
+                                weekly_wage=wage_row[0],
+                                contract_years=info["contract_years"],
+                                squad_sale=sale,profile=profile)
+                        tactical_review["three_season_strategy"]=strategic
+                        if board["decision"]=="direct_sale" and uplift>0:
+                            # The board's standard exceptional threshold used
+                            # source market value alone. That could make a
+                            # club sell its strongest specialist at a small
+                            # fee even when the manager's XI collapses.
+                            # Price real sporting loss into the intervention
+                            # decision, without removing its override power.
+                            from world_fc27_seller_value import (
+                                exceptional_seller_board_floor)
+                            enhanced=exceptional_seller_board_floor(
+                                reference_value=info["market_value"],
+                                base_board_floor=board["required_offer"],
+                                projected_squad_sale=sale,
+                                risk_uplift=uplift,
+                                club_ambition=profile["ambition_level"])
+                            tactical_review["board_standard_override_floor"]=board["required_offer"]
+                            tactical_review["board_sporting_override_floor"]=enhanced
+                            if offer_fee<enhanced:
+                                board={**board,"decision":"no_intervention",
+                                    "required_offer":enhanced,
+                                    "shortfall":enhanced-offer_fee,
+                                    "reason":("Exceptional board sale does not "
+                                        "yet cover the measured specialist "
+                                        "and starting-XI loss; £"
+                                        f"{enhanced:,} required.")}
+                                effective=seller["decision"]
+                                reason=seller["reason"]
+                                asking=seller["asking_price"]
+                        if (board["decision"]=="direct_sale" and strategic
+                                and strategic["asking_price_shift_pct"]>0):
+                            extra=int((info["market_value"]*
+                                strategic["asking_price_shift_pct"]/100+49999)
+                                //50000)*50000
+                            if offer_fee<board["required_offer"]+extra:
+                                board={**board,"decision":"no_intervention",
+                                    "required_offer":board["required_offer"]+extra,
+                                    "shortfall":board["required_offer"]+extra-offer_fee,
+                                    "reason":"Three-season sporting and financial "
+                                    "strategy raises the exceptional-sale value."}
+                                effective=seller["decision"]
+                                reason=seller["reason"]
+                                asking=seller["asking_price"]
+                        if board["decision"]!="direct_sale" and uplift>0:
+                            reference_floor=int((info["market_value"]*(1+uplift)+49999)
+                                //50000)*50000
+                            # A seller may already be demanding a premium
+                            # for its key player's status. Bench disruption
+                            # adds a smaller *incremental* cost to that
+                            # existing reservation quote rather than vanishing
+                            # whenever that quote exceeds the reference floor.
+                            elevated_asking=(int((asking*(1+uplift*.36)+49999)//50000)
+                                *50000 if asking is not None else 0)
+                            risk_floor=max(reference_floor,elevated_asking)
+                            if asking is not None and risk_floor>asking:
+                                asking=risk_floor
+                                effective=("accept" if offer_fee>=asking
+                                           else "negotiate")
+                                reason+=(" Tactical squad disruption requires "
+                                    f"£{asking:,} without a signed replacement.")
+                        if (strategic and board["decision"]!="direct_sale"
+                                and asking is not None):
+                            factor=1+strategic["asking_price_shift_pct"]/100
+                            adjusted=max(50000,int((
+                                asking*factor+49999)//50000)*50000)
+                            # Both ageing cash-in and current-season retention
+                            # matter; never an age-based hard sale ban.
+                            if adjusted!=asking:
+                                asking=adjusted
+                                effective=("accept" if offer_fee>=asking
+                                           else "negotiate")
+                                reason+=(" Three-season squad, contract "
+                                    "and ageing-asset review sets an "
+                                    f"asking price of £{asking:,}.")
+    if tactical_review is not None:
+        seller={**seller,"decision":effective,
+                "asking_price":asking,"reason":reason,
+                "current_tactical_squad_review":tactical_review}
     return {
         "decision":effective,
         "board_decision":board["decision"],
         "reason":reason,"asking_price":asking,"seller":seller,"board":board,
         "market_competition":competition,
+        "tactical_squad_review":tactical_review,
         "snapshot":json.dumps({"seller":seller,"board":board,
+            "tactical_squad_review":tactical_review,
             "market_competition":competition,
             "effective_reason":reason,"effective_asking_price":asking,
             "recorded_context":{k:v for k,v in info.items() if k not in (

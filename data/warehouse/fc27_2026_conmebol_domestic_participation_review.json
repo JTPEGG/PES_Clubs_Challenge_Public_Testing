@@ -1,0 +1,459 @@
+{
+  "version": "fc27-2026-conmebol-domestic-participation-review-v1",
+  "edition": 2027,
+  "real_world_season": "calendar_2026",
+  "purpose": "Assign a real 2026 domestic top flight to original FC27 continental source clubs using independently published same-year first-division team lists AND their official CONMEBOL country; stage only, no new EA game IDs",
+  "original_official_country_review": "data/warehouse/fc27_2026_conmebol_official_country_review.json",
+  "countries": {
+    "Bolivia": {
+      "code": "bo.1",
+      "competition": "División Profesional",
+      "source": "https://fbf.com.bo/torneos/division-profesional/"
+    },
+    "Ecuador": {
+      "code": "ec.1",
+      "competition": "LigaPro Serie A",
+      "source": "https://www.independientedelvalle.com/torneo-ligapro-ecuabet/"
+    },
+    "Peru": {
+      "code": "pe.1",
+      "competition": "Liga 1",
+      "source": "https://liga1.pe/fixture-y-resultados-del-clausura-liga1-te-apuesto-2026/"
+    },
+    "Paraguay": {
+      "code": "py.1",
+      "competition": "Primera División",
+      "source": "https://www.rsssf.org/tablesp/para2026.html"
+    },
+    "Chile": {
+      "code": "cl.1",
+      "competition": "Primera División",
+      "source": "https://www.campeonatochileno.cl/noticias/hay-fixture-de-la-liga-de-primera-2026/"
+    },
+    "Venezuela": {
+      "code": "ve.1",
+      "competition": "Primera División",
+      "source": "https://www.carabobofc.org/clasificacion.php"
+    },
+    "Colombia": {
+      "code": "co.1",
+      "competition": "Categoría Primera A",
+      "source": "https://www.rsssf.org/tablesc/col2026.html"
+    },
+    "Uruguay": {
+      "code": "uy.1",
+      "competition": "Primera División",
+      "source": "https://www.rsssf.org/tablesu/uru2026.html"
+    },
+    "Brazil": {
+      "code": "br.1",
+      "competition": "Campeonato Brasileiro Série A",
+      "source": "https://raw.githubusercontent.com/openfootball/south-america/f51b2dcf5e0fab9f0abd5206ab8c24a413e67277/brazil/2026_br1.txt"
+    }
+  },
+  "individual_membership_status": "reviewed_same_2026_calendar_domestic_top_division; not source-EA-ID certified",
+  "no_inferred_future_promotion": true,
+  "individual_club_memberships": [
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Always Ready",
+      "domestic_2026_roster_club": "Always Ready",
+      "national_association": "Bolivia",
+      "domestic_code": "bo.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://fbf.com.bo/torneos/division-profesional/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Barcelona SC",
+      "domestic_2026_roster_club": "Barcelona SC",
+      "national_association": "Ecuador",
+      "domestic_code": "ec.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.independientedelvalle.com/torneo-ligapro-ecuabet/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Bolívar",
+      "domestic_2026_roster_club": "Bolívar",
+      "national_association": "Bolivia",
+      "domestic_code": "bo.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://fbf.com.bo/torneos/division-profesional/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Cerro Porteño",
+      "domestic_2026_roster_club": "Cerro Porteño",
+      "national_association": "Paraguay",
+      "domestic_code": "py.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesp/para2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Coquimbo Unido",
+      "domestic_2026_roster_club": "Coquimbo Unido",
+      "national_association": "Chile",
+      "domestic_code": "cl.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.campeonatochileno.cl/noticias/hay-fixture-de-la-liga-de-primera-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Cusco FC",
+      "domestic_2026_roster_club": "Cusco",
+      "national_association": "Peru",
+      "domestic_code": "pe.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://liga1.pe/fixture-y-resultados-del-clausura-liga1-te-apuesto-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Dep. La Guaira",
+      "domestic_2026_roster_club": "Deportivo La Guaira",
+      "national_association": "Venezuela",
+      "domestic_code": "ve.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.carabobofc.org/clasificacion.php",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Deportes Tolima",
+      "domestic_2026_roster_club": "Deportes Tolima",
+      "national_association": "Colombia",
+      "domestic_code": "co.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesc/col2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "IDV",
+      "domestic_2026_roster_club": "Independiente del Valle",
+      "national_association": "Ecuador",
+      "domestic_code": "ec.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.independientedelvalle.com/torneo-ligapro-ecuabet/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Indep. Medellín",
+      "domestic_2026_roster_club": "Independiente Medellín",
+      "national_association": "Colombia",
+      "domestic_code": "co.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesc/col2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Indep. Santa Fe",
+      "domestic_2026_roster_club": "Independiente Santa Fe",
+      "national_association": "Colombia",
+      "domestic_code": "co.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesc/col2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Junior",
+      "domestic_2026_roster_club": "Junior",
+      "national_association": "Colombia",
+      "domestic_code": "co.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesc/col2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "LDU Quito",
+      "domestic_2026_roster_club": "LDU Quito",
+      "national_association": "Ecuador",
+      "domestic_code": "ec.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.independientedelvalle.com/torneo-ligapro-ecuabet/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Libertad",
+      "domestic_2026_roster_club": "Libertad",
+      "national_association": "Paraguay",
+      "domestic_code": "py.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesp/para2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Nacional",
+      "domestic_2026_roster_club": "Nacional",
+      "national_association": "Uruguay",
+      "domestic_code": "uy.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesu/uru2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Peñarol",
+      "domestic_2026_roster_club": "Peñarol",
+      "national_association": "Uruguay",
+      "domestic_code": "uy.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesu/uru2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Sporting Cristal",
+      "domestic_2026_roster_club": "Sporting Cristal",
+      "national_association": "Peru",
+      "domestic_code": "pe.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://liga1.pe/fixture-y-resultados-del-clausura-liga1-te-apuesto-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "UCV FC",
+      "domestic_2026_roster_club": "Universidad Central de Venezuela",
+      "national_association": "Venezuela",
+      "domestic_code": "ve.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.carabobofc.org/clasificacion.php",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Uni. Católica",
+      "domestic_2026_roster_club": "Universidad Católica",
+      "national_association": "Chile",
+      "domestic_code": "cl.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.campeonatochileno.cl/noticias/hay-fixture-de-la-liga-de-primera-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Libertadores",
+      "original_source_club": "Universitario",
+      "domestic_2026_roster_club": "Universitario",
+      "national_association": "Peru",
+      "domestic_code": "pe.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://liga1.pe/fixture-y-resultados-del-clausura-liga1-te-apuesto-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Alianza Atltico",
+      "domestic_2026_roster_club": "Alianza Atlético",
+      "national_association": "Peru",
+      "domestic_code": "pe.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://liga1.pe/fixture-y-resultados-del-clausura-liga1-te-apuesto-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "América de Cali",
+      "domestic_2026_roster_club": "América de Cali",
+      "national_association": "Colombia",
+      "domestic_code": "co.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesc/col2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Audax Italiano",
+      "domestic_2026_roster_club": "Audax Italiano",
+      "national_association": "Chile",
+      "domestic_code": "cl.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.campeonatochileno.cl/noticias/hay-fixture-de-la-liga-de-primera-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Blooming",
+      "domestic_2026_roster_club": "Blooming",
+      "national_association": "Bolivia",
+      "domestic_code": "bo.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://fbf.com.bo/torneos/division-profesional/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Boston River",
+      "domestic_2026_roster_club": "Boston River",
+      "national_association": "Uruguay",
+      "domestic_code": "uy.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesu/uru2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Botafogo",
+      "domestic_2026_roster_club": "Botafogo",
+      "national_association": "Brazil",
+      "domestic_code": "br.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://raw.githubusercontent.com/openfootball/south-america/f51b2dcf5e0fab9f0abd5206ab8c24a413e67277/brazil/2026_br1.txt",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Carabobo FC",
+      "domestic_2026_roster_club": "Carabobo",
+      "national_association": "Venezuela",
+      "domestic_code": "ve.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.carabobofc.org/clasificacion.php",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Caracas FC",
+      "domestic_2026_roster_club": "Caracas",
+      "national_association": "Venezuela",
+      "domestic_code": "ve.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.carabobofc.org/clasificacion.php",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Cienciano",
+      "domestic_2026_roster_club": "Cienciano",
+      "national_association": "Peru",
+      "domestic_code": "pe.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://liga1.pe/fixture-y-resultados-del-clausura-liga1-te-apuesto-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "City Torque",
+      "domestic_2026_roster_club": "Montevideo City Torque",
+      "national_association": "Uruguay",
+      "domestic_code": "uy.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesu/uru2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Dep. Cuenca",
+      "domestic_2026_roster_club": "Deportivo Cuenca",
+      "national_association": "Ecuador",
+      "domestic_code": "ec.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.independientedelvalle.com/torneo-ligapro-ecuabet/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Ind. Petrolero",
+      "domestic_2026_roster_club": "Independiente Petrolero",
+      "national_association": "Bolivia",
+      "domestic_code": "bo.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://fbf.com.bo/torneos/division-profesional/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Juventud",
+      "domestic_2026_roster_club": "Juventud",
+      "national_association": "Uruguay",
+      "domestic_code": "uy.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesu/uru2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Macar",
+      "domestic_2026_roster_club": "Macará",
+      "national_association": "Ecuador",
+      "domestic_code": "ec.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.independientedelvalle.com/torneo-ligapro-ecuabet/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Millonarios",
+      "domestic_2026_roster_club": "Millonarios",
+      "national_association": "Colombia",
+      "domestic_code": "co.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesc/col2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "O'Higgins",
+      "domestic_2026_roster_club": "O'Higgins",
+      "national_association": "Chile",
+      "domestic_code": "cl.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.campeonatochileno.cl/noticias/hay-fixture-de-la-liga-de-primera-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Olimpia",
+      "domestic_2026_roster_club": "Olimpia",
+      "national_association": "Paraguay",
+      "domestic_code": "py.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesp/para2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Palestino",
+      "domestic_2026_roster_club": "Palestino",
+      "national_association": "Chile",
+      "domestic_code": "cl.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.campeonatochileno.cl/noticias/hay-fixture-de-la-liga-de-primera-2026/",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Puerto Cabello",
+      "domestic_2026_roster_club": "Academia Puerto Cabello",
+      "national_association": "Venezuela",
+      "domestic_code": "ve.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.carabobofc.org/clasificacion.php",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    },
+    {
+      "continental_source_group": "CONMEBOL Sudamericana",
+      "original_source_club": "Recoleta",
+      "domestic_2026_roster_club": "Deportivo Recoleta",
+      "national_association": "Paraguay",
+      "domestic_code": "py.1",
+      "verified_season": 2026,
+      "domestic_membership_source": "https://www.rsssf.org/tablesp/para2026.html",
+      "status": "2026_named_first_division_participation_review_game_identity_not_verified"
+    }
+  ],
+  "individual_review_limit": "Explicit 40-row domestic 2026 club-membership source crosswalk; named presence reviewed, but EA source team ID, entire league roster, and movement eligibility not certified."
+}

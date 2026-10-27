@@ -1,0 +1,65 @@
+name: PES V2 2026-27 source-backed domestic and feeder club evidence
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/collect_pinned_2027_domestic_memberships.py'
+      - 'test_collect_pinned_2027_domestic_memberships.py'
+      - '.github/workflows/fifa-pes-v2-2027-competition-memberships.yml'
+permissions:
+  contents: read
+concurrency:
+  group: pinned-2027-domestic-sources-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  source-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test season boundaries and club-ID-safe fixture parsing
+        run: python -m unittest -v test_collect_pinned_2027_domestic_memberships
+      - name: Collect fixed-version 2026/27 domestic and feeder memberships
+        run: |
+          python -u -m scripts.collect_pinned_2027_domestic_memberships --output release/
+      - name: Audit fixture evidence and no accidental squad eligibility
+        run: |
+          python - <<'PY'
+          import json,csv
+          from pathlib import Path
+          d=Path("release")
+          j=json.loads((d/"FC27_PINNED_CURRENT_MEMBERSHIP_AUDIT.json").read_text())
+          with (d/"FC27_PINNED_CURRENT_COMPETITION_SEASONS.csv").open(
+              encoding="utf-8-sig",newline="") as f:
+              seasons=list(csv.DictReader(f))
+          with (d/"FC27_PINNED_CURRENT_SOURCE_CLUBS.csv").open(
+              encoding="utf-8-sig",newline="") as f:
+              names=list(csv.DictReader(f))
+          assert len(seasons)==j["independently_observed_competitions"]
+          assert len(names)==j["independently_observed_club_memberships"]
+          assert j["edition"]==2027 and j["staging_only"]
+          assert not j["career_ready"] and not j["game_club_identity_confirmed"]
+          assert j["manufactured_game_players"]==0
+          codes={r["League_Code"] for r in seasons}
+          assert {"en.3","en.4","de.3","es.2","it.2","fr.2","us.mls","ar.1"}.issubset(codes)
+          assert {"en.5","en.6n","en.6s","sco.3","sco.4"}.issubset(codes)
+          assert j["independently_observed_competitions"]==16
+          assert j["independently_observed_club_memberships"]==328
+          assert j["rejected_competitions"]==0
+          assert len({(r["Edition"],r["League_Code"]) for r in seasons})==len(seasons)
+          assert all(r["Edition"]=="2027" for r in names)
+          assert all(r["Evidence_Status"]=="source_observation_pending_game_identity_review" for r in names)
+          assert not any("All-Stars" in r["Fixture_Club"] for r in names)
+          assert all(int(r["Fixture_Count"])>=4*int(r["Parsed_Teams"]) for r in seasons)
+          assert j["independently_observed_competitions"]>=11
+          print(json.dumps(j,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-2027-PINNED-DOMESTIC-AND-NONPLAYABLE-FEEDER-MEMBERSHIPS
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

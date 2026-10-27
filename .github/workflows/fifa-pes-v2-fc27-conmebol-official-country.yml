@@ -1,0 +1,58 @@
+name: PES V2 FC27 official CONMEBOL country and home division audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_fc27_official_conmebol_home_countries.py'
+      - 'test_audit_fc27_official_conmebol_home_countries.py'
+      - 'data/warehouse/fc27_2026_conmebol_official_country_review.json'
+      - '.github/workflows/fifa-pes-v2-fc27-conmebol-official-country.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  clubs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Official club country identity source parser tests
+        run: python -m unittest -v test_audit_fc27_official_conmebol_home_countries
+      - name: Download latest FC27 one-year original imported game league source alignment
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FC27-2026-27-REVIEWED-DOMESTIC-COMPETITION-GROUP-ALIGNMENT
+          run-id: 39567617440
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: baseline/
+      - name: Review official CONMEBOL national associations for all FC27 continental cup clubs
+        run: |
+          python -u -m scripts.audit_fc27_official_conmebol_home_countries \
+            --registry baseline/FC27_2026_27_CLUB_COMPETITION_SOURCE_ASSOCIATION.sqlite \
+            --reviewed-official data/warehouse/fc27_2026_conmebol_official_country_review.json \
+            --output release/
+      - name: Preserve unknown home domestic leagues, never pretend cup is a domestic league
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          p=Path('release')
+          x=json.loads((p/'FC27_CONMEBOL_ASSOCIATION_REVIEW_AUDIT.json').read_text())
+          assert x['original_fc27_cup_group_clubs']==40
+          assert x['official_countries_uniquely_identified']+x['country_ambiguous_or_not_in_official_source']==40
+          assert x['domestic_home_division_unresolved']+x['source_domestic_league_fixture_matches']==40
+          assert x['continents_are_not_leagues'] and not x['career_ready']
+          with (p/'FC27_CONMEBOL_NATIONAL_ASSOCIATIONS_REVIEW.csv').open(encoding='utf-8-sig') as f:
+              rows=list(csv.DictReader(f))
+          print(json.dumps(x,indent=2))
+          print('ASSOCIATION_EXAMPLES',rows[:40])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-FC27-40-CONMEBOL-2026-CLUB-COUNTRY-HOME-LEAGUE-SOURCE-REVIEW
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

@@ -1,0 +1,74 @@
+name: PES V2 automated same-edition historical club league matching
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/reconcile_historical_club_aliases.py'
+      - 'test_reconcile_historical_club_aliases.py'
+      - '.github/workflows/fifa-pes-v2-club-name-reconciliation.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test season isolation and 1-to-1 club identity safety
+        run: python -m unittest -v test_reconcile_historical_club_aliases
+      - name: Download immutable original 22-edition FIFA clubs
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: originals/
+      - name: Download 447-season source-backed competition register
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
+          run-id: 39501911329
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous/
+      - name: Reconcile unique club abbreviations against real season league memberships
+        run: |
+          python -u -m scripts.reconcile_historical_club_aliases \
+            --source originals/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --registry previous/HISTORICAL_COMPETITION_REGISTER.sqlite \
+            --identity-review data/warehouse/historical_club_identity_disambiguation_v1.json \
+            --output release/
+      - name: Verify no original leagues, player squads or career activation inferred
+        run: |
+          python - <<'PY'
+          import json,csv,sqlite3
+          from pathlib import Path
+          p=Path("release")
+          report=json.loads((p/"AUTO_ALIAS_RECONCILIATION_AUDIT.json").read_text())
+          with (p/"AUTO_CONTROLLED_CLUB_ALIASES.csv").open(encoding="utf-8-sig") as f:
+              rows=list(csv.DictReader(f))
+          assert report["original_club_seasons"]==13104
+          assert report["previously_evidenced_game_club_seasons"]==5941
+          assert report["previously_unresolved"]==7163
+          assert len(rows)==report["controlled_unique_same_edition_name_links"]
+          assert len(rows)==len(set((r["Edition"],r["FIFA_Club_Key"]) for r in rows))
+          assert not report["career_ready"] and report["player_squads_created"]==0
+          assert report["no_fuzzy_auto_assignments"]
+          assert all(r["Source_SHA256"] and r["Match_Reason"]=="controlled_alias_same_edition_unique" for r in rows)
+          with sqlite3.connect("previous/HISTORICAL_COMPETITION_REGISTER.sqlite") as db:
+              lookup={r[0]:(r[1],r[2]) for r in db.execute("SELECT code,edition,country FROM competition_seasons")}
+              known={(r[0],r[1]) for r in db.execute("SELECT edition,club_key FROM fixture_club_evidence")}
+          assert all((int(r["Edition"]),r["FIFA_Club_Key"]) not in known for r in rows)
+          assert all(lookup[r["Competition_Code"]]==(int(r["Edition"]),r["Source_Country"]) for r in rows)
+          print(json.dumps(report,indent=2))
+          print("Safe illustrative club name assignments:",rows[:35])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-CONTROLLED-CLUB-ALIAS-AUTOMATCH
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

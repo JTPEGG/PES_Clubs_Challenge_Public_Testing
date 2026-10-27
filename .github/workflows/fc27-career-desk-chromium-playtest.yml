@@ -1,0 +1,55 @@
+name: FC27 659-club real Chromium Career Desk usability QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/fc27_career_desk_chromium_playtest.py'
+      - 'world_career_play.py'
+      - 'world_career_ui.py'
+      - '.github/workflows/fc27-career-desk-chromium-playtest.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fc27-career-desk-real-browser-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  desktop-and-mobile-manager-playtest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install application and Chromium Playwright runtime
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install playwright==1.55.0
+          google-chrome --version
+      - name: Fetch already-approved immutable 659-club FC27 source
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          run-id: 39616187183
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: immutable-input/
+      - name: Build disposable FC27 world, keep original dataset read-only
+        run: |
+          mkdir -p e2e
+          python -u -m scripts.fc27_warehouse_world_bridge \
+            --warehouse immutable-input/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --target e2e/FC27_CHROMIUM_DISPOSABLE_WORLD.sqlite
+      - name: Browser-test desktop / mobile Career Desk and screenshot real screens
+        run: |
+          python -u -m scripts.fc27_career_desk_chromium_playtest \
+            --world e2e/FC27_CHROMIUM_DISPOSABLE_WORLD.sqlite \
+            --output e2e/browser-screenshots
+      - name: Archive all browser screenshots and QA report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC27-659-CAREER-DESK-REAL-CHROMIUM-SCREENSHOTS
+          path: e2e/browser-screenshots/
+          retention-days: 30
+          if-no-files-found: warn

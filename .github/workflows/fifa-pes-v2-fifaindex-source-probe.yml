@@ -1,0 +1,34 @@
+name: PES V2 historic SoFIFA official API roster source probe
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fifa-pes-v2-fifaindex-source-probe.yml'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe documented historical SoFIFA roster API by edition
+        run: |
+          python - <<'PY'
+          import urllib.request,urllib.error,json
+          for roster in ("050001","060001","070001","100001","140001","240001","260001","270001"):
+              address="https://api.sofifa.net/teams/"+roster
+              req=urllib.request.Request(address,headers={
+                  "User-Agent":"PES-Clubs-Challenge-Historic-Data-Probe/1.0",
+                  "Accept":"application/json"})
+              try:
+                  with urllib.request.urlopen(req,timeout=12) as response:
+                      data=response.read(4000000)
+                  parsed=json.loads(data)
+                  teams=parsed.get("data",[])
+                  print("ROSTER",roster,"teams",len(teams),"sample",
+                      [(x.get("id"),x.get("name"),x.get("version"),x.get("league"))
+                       for x in teams[:2]],flush=True)
+              except Exception as e:
+                  print("ROSTER_UNAVAILABLE",roster,type(e).__name__,str(e),flush=True)
+          PY

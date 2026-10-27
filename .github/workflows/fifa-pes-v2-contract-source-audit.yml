@@ -1,0 +1,44 @@
+name: PES V2 starting contracts wages and loans source audit
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_fifa_pes_v2_contract_sources.py'
+      - 'test_fifa_pes_v2_contract_audit.py'
+      - '.github/workflows/fifa-pes-v2-contract-source-audit.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: v2-contract-source-audit-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  audit-source-fields:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate the audit without changing career files
+        run: python -m unittest -v test_fifa_pes_v2_contract_audit
+      - name: Get exact 22-edition original source snapshot from validated PES V2 release
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-final-source-selection
+          run-id: 39397460464
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source/
+      - name: Inspect salary contract expiry and loan fields for each edition
+        run: |
+          python -u -m scripts.audit_fifa_pes_v2_contract_sources \
+            --source source/selected_source_22_years.zip \
+            --output source-audit/
+      - name: Upload full per-field year-by-year evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-WAGE-CONTRACT-LOAN-COVERAGE-AUDIT
+          path: source-audit/
+          retention-days: 30
+          if-no-files-found: error

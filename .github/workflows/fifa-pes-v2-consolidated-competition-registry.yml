@@ -1,0 +1,177 @@
+name: PES V2 consolidated 22-year historical competition registry
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_competition_registry.py'
+      - 'scripts/collect_historical_domestic_backfill.py'
+      - 'data/warehouse/historical_club_identity_disambiguation_v1.json'
+      - 'scripts/collect_legacy_multicountry_leagues.py'
+      - 'world_historical_movement_rules.py'
+      - 'test_world_historical_competition_registry.py'
+      - '.github/workflows/fifa-pes-v2-consolidated-competition-registry.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: historical-consolidated-competition-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  audit-world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify 22 season rules and no cup/pyramid identity guessing
+        run: python -m unittest -v test_world_historical_competition_registry
+      - name: Read pinned immutable FIFA/PES V2 clubs and source leagues
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-YEAR-MENS-ONLY-CLUBS-LEAGUES-AND-SQUADS
+          run-id: 39409971210
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: input/
+      - name: Read 2010-11 onward independent fixture membership data
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-DOMESTIC-LEAGUE-MEMBERSHIP-EVIDENCE-2011-2027
+          run-id: 39449937724
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: recent/
+      - name: Read pinned 2004-05 through 2009-10 English fixture data
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-ENGLAND-2005-2010-HISTORICAL-DOMESTIC-COMPETITION-MEMBERSHIPS
+          run-id: 39443877744
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: early/
+      - name: Read separately pinned 2005–2010 eight-country first divisions
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-2005-2010-EIGHT-COUNTRY-DOMESTIC-LEAGUE-MEMBERSHIPS
+          run-id: 39450520785
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: legacy/
+      - name: Read pinned 37 unfilled English, MLS and Argentine historical domestic seasons
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-PINNED-ENGLISH-MLS-ARGENTINA-HISTORIC-DOMESTIC-MEMBERSHIPS
+          run-id: 39457937149
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: supplement/
+      - name: Read 80 additional dated CC0 league-seasons spanning twenty domestic systems
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-BULK-PINNED-HISTORICAL-DOMESTIC-SOURCE-CLUB-RECOVERY
+          run-id: 39501727986
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: backfill/
+      - name: Read pinned FC27 domestic and regional nonplayable fixture-member review
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-2027-PINNED-DOMESTIC-AND-NONPLAYABLE-FEEDER-MEMBERSHIPS
+          run-id: 39467154912
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: current2027/
+      - name: Read FA official step 1 and 2 allocation reconciliation for 2026/27
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-FA-OFFICIAL-2027-NATIONAL-LEAGUE-NORTH-SOUTH-MEMBERSHIPS
+          run-id: 39465806639
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: fa-official/
+      - name: Read official MLS 2026 30-club conferences and knockout qualification
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-OFFICIAL-MLS-2026-2027-CAREER-EDITION-COMPETITION-RULES
+          run-id: 39466458050
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: official-mls/
+      - name: Read sourced historical fifth-tier National League feeder clubs
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-NATIONAL-LEAGUE-TIER5-FEEDER-CLUBS
+          run-id: 39447460963
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: feeders/
+      - name: Read audited dated England Germany Spain competition topology
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-GRAPH-AND-UNRESOLVED-MEMBERSHIP-AUDIT
+          run-id: 39442462702
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: topo/
+      - name: Produce single history-wide immutable competition evidence register
+        run: |
+          python -u -m world_historical_competition_registry \
+            --source input/PES_V2_22_EDITION_CLUB_SQUAD_MAP.sqlite \
+            --recent-dir recent/ --early-dir early/ \
+            --graph topo/HISTORICAL_PROMOTION_RELEGATION_GRAPH.json \
+            --feeder-dir feeders/ --legacy-multicountry-dir legacy/ \
+            --supplement-dir supplement/ \
+            --backfill-dir backfill/ \
+            --current-edition-dir current2027/ \
+            --fa-allocations-dir fa-official/ \
+            --official-mls-dir official-mls/ \
+            --identity-review data/warehouse/historical_club_identity_disambiguation_v1.json \
+            --output release/
+          python -m world_historical_movement_rules --output release/
+      - name: Fail closed until all teams and promotion feeders are proved
+        run: |
+          python - <<'PY'
+          import sqlite3,json,csv
+          from pathlib import Path
+          d=Path('release')
+          summary=json.loads((d/'COMPETITION_REGISTRY_AUDIT.json').read_text())
+          movement=json.loads((d/'SEASON_VERSIONED_MOVEMENT_RULES_AUDIT.json').read_text())
+          assert summary['source_clubs']==13104
+          assert summary['source_years']==22
+          assert summary['historical_domestic_league_seasons']==447
+          assert summary['current_edition_third_party_snapshot_memberships']==328
+          assert summary['current_edition_source_feeder_entries']==72
+          assert summary['official_fa_2027_allocations_crosschecked']==72
+          assert summary['official_mls_2026_clubs_crosschecked']==30
+          assert summary['official_2026_non_pyramid_league_formats']==1
+          assert summary['exact_matches']>=2800
+          assert summary['normalized_alias_candidates']>=700
+          assert summary['independent_domestic_fixture_club_years']==8491
+          assert summary['new_pinned_backfill_source_memberships']==1418
+          assert summary['source_identity_country_guards']==2
+          assert summary['curated_named_groups_with_independent_fixture_count']>=0
+          assert summary['source_club_country_count']>=19
+          assert not summary['career_ready_editions']
+          assert summary['season_versioned_rule_records']==128
+          assert summary['historical_nonplayable_feeder_club_years']==311
+          assert movement['editions']==22
+          assert movement['movement_rule_records']==128
+          with sqlite3.connect(d/'HISTORICAL_COMPETITION_REGISTER.sqlite') as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM edition_club_competitions').fetchone()[0]==13104
+              assert db.execute('SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM sourced_nonplayable_feeder_clubs').fetchone()[0]==311
+              assert db.execute('SELECT COUNT(*) FROM sourced_domestic_league_clubs').fetchone()[0]==summary['independent_domestic_fixture_club_years']
+              assert db.execute('SELECT COUNT(DISTINCT edition) FROM sourced_domestic_league_clubs').fetchone()[0]==22
+              assert db.execute('SELECT COUNT(*) FROM sourced_domestic_league_clubs WHERE verification=?',
+                  ('pinned_third_party_snapshot_review',)).fetchone()[0]==328
+              assert db.execute('SELECT COUNT(*) FROM sourced_nonplayable_feeder_clubs WHERE edition=2027').fetchone()[0]==72
+              assert db.execute('SELECT COUNT(*) FROM official_fa_nls_allocations').fetchone()[0]==72
+              assert db.execute('SELECT COUNT(DISTINCT competition_code) FROM official_fa_nls_allocations').fetchone()[0]==3
+              assert db.execute('SELECT COUNT(*) FROM official_mls_conference_clubs').fetchone()[0]==30
+              assert db.execute('SELECT COUNT(*) FROM season_non_pyramid_formats WHERE edition=2027 AND direct_promotions=0 AND direct_relegations=0 AND playoff_promotions=0').fetchone()[0]==1
+              assert db.execute('SELECT COUNT(*) FROM season_versioned_rules').fetchone()[0]==128
+              assert db.execute('SELECT COUNT(*) FROM season_versioned_rules WHERE feeder_verified!=0').fetchone()[0]==0
+              assert db.execute('SELECT COUNT(*) FROM edition_club_competitions WHERE group_type=?',('continental_cup_bucket',)).fetchone()[0]==40
+          print('SUCCESS 22 years / 447 domestic league seasons: 13,104 source clubs, NO unverified ready careers')
+          print(json.dumps(summary,indent=2))
+          PY
+      - name: Upload evidence SQLite and season-to-season movement documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-SEASON-COMPETITION-REGISTRY-SOURCED-AND-REVIEWED
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

@@ -101,7 +101,7 @@ All deals are subject to the PES league summer registration lock. This screen ca
 <label>Career identifier</label><input name="career_id" required placeholder="my-test-career" pattern="[A-Za-z0-9_-]+">
 <label>Career name</label><input name="title" maxlength="80" required placeholder="2026/27 career sandbox">
 <input type="hidden" name="dataset_id" value="{{selected_dataset}}"><p class="muted">Starting snapshot: {{selected_dataset}}</p>
-<label>Manager's club</label><select name="manager_club_id">{% for c in clubs %}<option value="{{c['club_id']}}">{{c['name']}}</option>{% endfor %}</select>
+<label>Manager's club</label><select name="manager_club_id">{% for c in clubs %}<option value="{{c['club_id']}}">{{c['name']|club_display}}</option>{% endfor %}</select>
 <p class="muted">The club list belongs to your selected dataset. Historical teams only appear after an independent historical season has been imported.</p>
 <label>Player and agent decision model</label>
 <select name="player_decision_version">
@@ -192,9 +192,9 @@ value="Explicit fictional career five-stage transfer process">
 <input type="hidden" name="player_search" value="{{player_search}}">
 <label>Target player (source data; not a confirmed registration)</label>
 <select name="player_id" required {% if not targets %}disabled{% endif %}>
-{% for t in targets %}<option value="{{t['player_id']}}">{{t['full_name']}} — {{t['club_name']}} · OVR {{t['overall'] if t['overall'] is not none else '?'}}</option>{% endfor %}
+{% for t in targets %}<option value="{{t['player_id']}}">{{t['full_name']}} — {{t['club_name']|club_display}} · OVR {{t['overall'] if t['overall'] is not none else '?'}}</option>{% endfor %}
 </select>
-<label>Buying club</label><select name="buying_club_id"><option value="{{career['manager_club_id']}}">{{manager_name}}</option></select>
+<label>Buying club</label><select name="buying_club_id"><option value="{{career['manager_club_id']}}">{{manager_name|club_display}}</option></select>
 <label>Offer fee (£)</label><input type="number" name="offered_fee" min="0" step="100000" value="1000000" required>
 <label>Agreement date</label><input type="date" name="agreement_date" value="{{today}}" required>
 <label>Seller's negotiating stance</label><select name="seller_stance">
@@ -218,7 +218,7 @@ seller and board decision system</a> without changing historical offers.
 This is an explicit sandbox simulation, not a claim that real clubs have placed bids.</p>
 <form method="post" action="/world/play/career/{{career['career_id']}}/ai">
 <input type="hidden" name="csrf" value="{{csrf}}">
-<label>Target player</label><select name="player_id">{% for t in targets %}<option value="{{t['player_id']}}">{{t['full_name']}} — {{t['club_name']}}</option>{% endfor %}</select>
+<label>Target player</label><select name="player_id">{% for t in targets %}<option value="{{t['player_id']}}">{{t['full_name']}} — {{t['club_name']|club_display}}</option>{% endfor %}</select>
 <button>Simulate rival interest (up to 2 AI offers)</button>
 </form></div>
 <h2 id="ai-inbound">Simulate incoming offers for your own players</h2>
@@ -243,7 +243,7 @@ but it does not register a transfer or establish the player's consent.</p>
 {% if notice and notice_scope in ['seller_review','offer'] %}<div class="warn" role="status">{{notice}}</div>{% endif %}
 {% if error and notice_scope=='seller_review' %}<div class="warn" role="alert">{{error}}</div>{% endif %}
 <table><tr><th>Player</th><th>Buying club</th><th>Selling club</th><th>Offered fee</th><th>Stage</th><th>Next steps</th></tr>
-{% for o in offers %}<tr><td>{{o['full_name']}}</td><td><b>{{o['buyer_name']}}</b>{% if o['buying_club_id']==career['manager_club_id'] %} <small>(Your club)</small>{% else %} <small>(AI rival)</small>{% endif %}</td><td>{{o['seller_name']}}</td><td>{{o['fee_label']}}</td><td>{{o['stage_label']}}
+{% for o in offers %}<tr><td>{{o['full_name']}}</td><td><b>{{o['buyer_name']|club_display}}</b>{% if o['buying_club_id']==career['manager_club_id'] %} <small>(Your club)</small>{% else %} <small>(AI rival)</small>{% endif %}</td><td>{{o['seller_name']|club_display}}</td><td>{{o['fee_label']}}</td><td>{{o['stage_label']}}
 {% if o['demanded_fee'] is not none %}<p class="muted">Counter: {{o['counter_label']}}</p>{% endif %}
 {% if o['ai_bid'] %}
 <p class="muted"><b>AI bid round {{o['ai_bid']['round']}} of 3:</b>
@@ -563,7 +563,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 .scout-table th{position:sticky;top:0;background:#20364c}
 .scout-table tr.owned{background:#233c49}
 
-</style></head><body class="desk-ui" data-window-state="{{snap.state}}"
+</style></head><body class="desk-ui" data-window-state="{{snap.state}}" data-spectator="{{'true' if spectator else 'false'}}"
  data-incoming-offers="{{offers|length}}" data-unread="{{unread}}"
  data-signed="{{signed}}" data-saved="{{shortlist|length}}"
  data-fee-remaining="{{funds}}" data-fee-total="{{budget_total}}"
@@ -574,7 +574,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
   <span><strong>Clubs Challenge</strong><small>Career transfer centre · Development</small></span>
  </a>
  <div class="desk-header-right">
-  <span class="desk-header-tag"><strong>{{manager_name}}</strong> · Summer window</span>
+  <span class="desk-header-tag"><strong>{{manager_name|club_display}}</strong> · Summer window</span>
   <span class="desk-live-status {{'closed' if snap.state!='open' else ''}}">
    {{'Live market' if snap.state=='open' else 'Window closed' if snap.state=='closed' else 'Pre-season'}}
   </span>
@@ -612,7 +612,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
   <div>
    <div class="desk-section-kicker" id="desk-current-view">Manager overview</div>
    <h1>{{title}}</h1>
-   <p class="muted">{{manager_name}} · {{'30-minute window active' if snap.state=='open' else 'Transfer window closed' if snap.state=='closed' else 'Pre-season planning'}}{% if spectator %} · Read only · Spectator{% endif %}</p>
+   <p class="muted">{{manager_name|club_display}} · {{'30-minute window active' if snap.state=='open' else 'Transfer window closed' if snap.state=='closed' else 'Pre-season planning'}}{% if spectator %} · Read only · Spectator{% endif %}</p>
   </div>
  </div>
  {% if not spectator %}
@@ -724,7 +724,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
  <div class="scout-table"><table data-desk-table="scouting"><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>OVR</th><th>Indicative value</th></tr></thead><tbody>
  {% for p in shortlist %}
  <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a></td>
- <td>{{p.club_name}}</td><td>{{p.primary_position or '—'}}</td><td>{{p.overall}}</td>
+ <td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td><td>{{p.overall}}</td>
  <td>{{money(p.market_value) if p.market_value is not none else '—'}}</td></tr>
  {% endfor %}</tbody></table></div>
  {% else %}
@@ -760,6 +760,18 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 
  </div>
 </div>
+{% if not spectator and watch_url and snap.state=='open' %}
+<div class="card desk-spectator-share">
+  <h3>Share the live transfer window</h3>
+  <p class="muted">Other players can follow the market without seeing or changing your manager decisions.</p>
+  <div class="desk-share-controls">
+    <a href="{{watch_url}}" target="_blank" rel="noopener noreferrer">Open read-only spectator view</a>
+    <input id="spectator-share-url" type="text" value="{{watch_url}}" readonly
+      aria-label="Read-only spectator link" onclick="this.select()">
+    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('spectator-share-url').value)">Copy link</button>
+  </div>
+</div>
+{% endif %}
 {% if not spectator %}
 <h2 id="recruitment">Shortlist</h2>
 <div class="card">
@@ -769,7 +781,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th></tr></thead>
 <tbody>{% for p in shortlist %}
 <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a></td>
-<td>{{p.club_name}}</td><td>{{p.primary_position}}</td><td>{{p.overall}}</td>
+<td>{{p.club_name|club_display}}</td><td>{{p.primary_position}}</td><td>{{p.overall}}</td>
 <td>{{money(p.market_value) if p.market_value is not none else '—'}}</td></tr>
 {% endfor %}</tbody></table></div>
 {% else %}<p class="muted">No shortlisted players yet.</p>{% endif %}
@@ -813,7 +825,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if scout_attribute %}<th>{{scout_attribute|replace('_',' ')|title}}</th>{% endif %}</tr></thead>
 <tbody>{% for p in scout_results %}
 <tr class="{{'owned' if p.owned else ''}}">
-<td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{p.club_name}}</td><td>{{p.primary_position or '—'}}</td>
+<td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{money(p.market_value) if p.market_value is not none else '—'}}</td>
 <td>{{p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
@@ -838,7 +850,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th></tr></thead>
   <tbody>{% for o in purchases %}
   <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
-   <td>{{o.seller_name}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
+   <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
    <td><a href="#inbox">{{o.status_label}}</a></td></tr>
   {% endfor %}</tbody></table></div>
   {% if not purchases %}<p class="muted">No incoming bids</p>{% endif %}
@@ -849,7 +861,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <div class="scout-table"><table data-desk-table="outgoing">
   <thead><tr><th>Player</th><th>To</th><th data-sort-type="number">Fee</th><th>Status</th></tr></thead>
   <tbody>{% for o in offers %}
-  <tr><td>{{o.player_name}}</td><td>{{o.buyer_name}}</td>
+  <tr><td>{{o.player_name}}</td><td>{{o.buyer_name|club_display}}</td>
    <td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
    <td><a href="#inbox">{{o.status_label}}</a></td></tr>
   {% endfor %}</tbody></table></div>
@@ -860,7 +872,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if purchases %}
 <div class="grid">{% for o in purchases %}
 <div class="card offer">
-<div class="label">Buying from {{o.seller_name}} · {{o.status_label}}</div>
+<div class="label">Buying from {{o.seller_name|club_display}} · {{o.status_label}}</div>
 <h3 style="margin:6px 0"><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}" class="desk-player-profile">{{o.player_name}}</a></h3>
 <div class="count">{{money(o.offered_fee)}}</div>
 {% if o.demanded_fee is not none %}
@@ -943,8 +955,8 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <div class="grid">{% for o in offers %}
 <div class="card offer" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
- data-desk-buyer="{{o.buyer_name}}">
- <div class="label">{{o.buyer_name}} · {{o.status_label}}</div>
+ data-desk-buyer="{{o.buyer_name|club_display}}">
+ <div class="label">{{o.buyer_name|club_display}} · {{o.status_label}}</div>
  <h3 style="margin:6px 0"><button type="button" class="desk-player-quickfilter"
  data-desk-filter-player="{{o.player_name}}" title="Filter offers for {{o.player_name}}">{{o.player_name}}</button></h3>
  <div class="count">{{money(o.offered_fee)}}</div>
@@ -985,7 +997,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  <div class="buyer-decision" style="width:100%">
  {% if o.confirmation %}
  <p class="time-note" style="margin:7px 0">
- <b>{{o.buyer_name}} needs your decision in
+ <b>{{o.buyer_name|club_display}} needs your decision in
  <span class="buyer-decision-clock" data-deadline="{{o.confirmation.deadline_at}}">--:--</span></b>.
  The buying club can withdraw when this timer expires.</p>
  {% if o.confirmation.extension_requested %}
@@ -1035,7 +1047,7 @@ a quiet market is possible. No transfers will be invented to fill the inbox.</p>
 <table><thead><tr><th>Movement</th><th>Player</th><th>Club</th><th>Fee</th><th>Weekly wage</th></tr></thead>
 <tbody>{% for deal in summary.deals %}
 <tr><td>{{deal.direction}}</td><td>{{deal.player}}</td>
-<td>{{deal.other_club}}</td><td>{{money(deal.fee)}}</td>
+<td>{{deal.other_club|club_display}}</td><td>{{money(deal.fee)}}</td>
 <td>{{money(deal.wage)}}</td></tr>
 {% endfor %}</tbody></table>
 {% else %}<p>No transfers registered before the deadline.</p>{% endif %}
@@ -1053,7 +1065,7 @@ a quiet market is possible. No transfers will be invented to fill the inbox.</p>
 <div class="scout-table"><table data-desk-table="unavailable">
 <thead><tr><th>Player</th><th>Club</th><th>Eligibility</th></tr></thead>
 <tbody>{% for person in season_exclusions %}
-<tr><td>{{person.player_name}}</td><td>{{person.club_name}}</td>
+<tr><td>{{person.player_name}}</td><td>{{person.club_name|club_display}}</td>
 <td>Unavailable for the coming season</td></tr>
 {% endfor %}</tbody></table></div>
 {% endif %}
@@ -1088,7 +1100,7 @@ Rejected and expired offers are not transfers.</p>
 <h3>Remove from eligible PES squads</h3>
 <div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th></tr></thead>
 <tbody>{% for person in season_exclusions %}
-<tr><td>{{person.player_name}}</td><td>{{person.club_name}}</td></tr>
+<tr><td>{{person.player_name}}</td><td>{{person.club_name|club_display}}</td></tr>
 {% endfor %}</tbody></table></div>
 {% endif %}
 {% if summary.deals %}
@@ -1096,7 +1108,7 @@ Rejected and expired offers are not transfers.</p>
 <div class="scout-table"><table><thead><tr><th>Action</th><th>Player</th><th>Club</th></tr></thead><tbody>
 {% for deal in summary.deals %}
 <tr><td>{{'Add to squad' if deal.direction=='In' else 'Remove from squad'}}</td>
-<td>{{deal.player}}</td><td>{{deal.other_club}}</td></tr>
+<td>{{deal.player}}</td><td>{{deal.other_club|club_display}}</td></tr>
 {% endfor %}</tbody></table></div>
 {% else %}<p class="muted">No changes to your squad this window.</p>{% endif %}
 {% if season_tasks.completed %}
@@ -1199,7 +1211,7 @@ main{max-width:880px;margin:25px auto;padding:0 20px}a{color:#b8dbff}
 .muted{color:#bed0e1}b{font-size:18px}button{background:#3276a7;border:0;border-radius:7px;padding:10px 16px;color:white;cursor:pointer}
 table{width:100%;border-collapse:collapse}td{padding:8px;border-bottom:1px solid #3c5c78}</style></head><body><main>
 <a href="/world/play/career/{{career_id}}/market#recruitment">← Recruitment centre &amp; shortlist</a>
-<h1>{{player.full_name}}</h1><p class="muted">{{player.club_name}} · {{player.primary_position or 'Unknown position'}} ·
+<h1>{{player.full_name}}</h1><p class="muted">{{player.club_name|club_display}} · {{player.primary_position or 'Unknown position'}} ·
 Age {{player.age if player.age is not none else 'unknown'}}</p>
 <div class="grid">
 <div class="card">Overall<br><b>{{player.overall}}</b></div>
@@ -1268,7 +1280,7 @@ input,select,button{padding:10px;width:100%;box-sizing:border-box;background:#29
 button{cursor:pointer;background:#315d83}label{display:block;color:#c5d7e4;margin:8px 0 5px}h2{margin-top:27px}
 table{width:100%;border-collapse:collapse}td,th{padding:10px;text-align:left;border-bottom:1px solid #405267}
 </style></head><body><header><a href="/world/play/career/{{career_id}}">← Career desk</a></header>
-<main><h1>Career Management</h1><p class="muted">{{club_name}} · {{career_id}}</p>
+<main><h1>Career Management</h1><p class="muted">{{club_name|club_display}} · {{career_id}}</p>
 <div class="card">Development career only. Existing career-budget assumptions are reused.
 Unknown wages and contract expiries stay unknown. No PES registration or transfer is changed.</div>
 <div class="grid">
@@ -1322,7 +1334,7 @@ Each club is ranked by its mean rating across the best 16 rated players, with
 a minimum of eight rated players for every club. This is a <b>relative squad-strength
 ranking</b>, not a guaranteed finishing position or a historical season result.</p>
 {% if strength_baseline.available %}
-<p><b>{{club_name}}: {{strength_baseline.rank}} of {{strength_baseline.league_size}}</b>
+<p><b>{{club_name|club_display}}: {{strength_baseline.rank}} of {{strength_baseline.league_size}}</b>
 — suggested objective range {{strength_baseline.band[0]}}–{{strength_baseline.band[1]}}.
 {% if strength_baseline.expected_relegation is not none %}
 Expected relegation risk based on squad rank:
@@ -1374,7 +1386,7 @@ players doesn't automatically count as success.</p>
 <details><summary>See complete relative league squad ranking</summary>
 <table><tr><th>Strength rank</th><th>Club</th><th>Top-rated squad mean</th><th>Rated players</th></tr>
 {% for team in strength_baseline.clubs %}
-<tr><td>{{team.rank}}</td><td>{{team.name}}{% if team.club_id==strength_baseline.club_id %} (you){% endif %}</td>
+<tr><td>{{team.rank}}</td><td>{{team.name|club_display}}{% if team.club_id==strength_baseline.club_id %} (you){% endif %}</td>
 <td>{{team.strength}}</td><td>{{team.sample_players}}</td></tr>{% endfor %}
 </table></details>
 {% else %}
@@ -1473,6 +1485,13 @@ Promotion/relegation is treated contextually, not as a separate +20/−22 award.
 
 def create_play_blueprint(db_path):
     bp=Blueprint("world_play",__name__)
+    @bp.app_template_filter("club_display")
+    def club_display(value):
+        """Remove internal warehouse IDs from presentation only, never source keys."""
+        if not isinstance(value,str):return value
+        import re
+        return re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$", "",value)
+
     def serializer():
         secret=os.getenv("WORLD_MARKET_COOKIE_SECRET","")
         if not secret: return None
@@ -2043,7 +2062,7 @@ def create_play_blueprint(db_path):
             spectator=spectator,snap=snap,offers=offers,
             purchases=purchases,targets=targets,player_search=player_search,
             buy_request_key="manager-buy-v1-"+secrets.token_urlsafe(14),
-            messages=messages,unread=unread,signed=signed,watch_url=None,
+            messages=messages,unread=unread,signed=signed,watch_url=watch_url,
             scout_results=scout_results,scout_attributes=scout_attributes,
             shortlist=shortlist,recommendations=recommendations,squad=squad,
             scout_categories=CATEGORIES,scout_query=scout_query,
@@ -2090,7 +2109,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
 {% if players %}<div class="scroll"><table><thead><tr>
 <th>Player</th><th>Club</th><th>Position</th><th>OVR</th><th>Age</th><th>Estimated market value</th><th>Report</th>
 </tr></thead><tbody>{% for p in players %}
-<tr><td>{{p.full_name}}</td><td>{{p.club_name}}</td><td>{{p.primary_position or '—'}}</td>
+<tr><td>{{p.full_name}}</td><td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td>{{p.overall}}</td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{money(p.market_value) if p.market_value is not none else 'Unknown'}}</td>
 <td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">Scout / approach</a></td></tr>

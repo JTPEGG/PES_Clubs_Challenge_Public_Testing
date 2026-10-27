@@ -77,6 +77,22 @@ class LongTermRecruitmentTests(unittest.TestCase):
         self.assertTrue(candidate["eligible"])
         self.assertIn("source-calibrated",candidate["evidence"])
 
+    def test_fc27_contextual_youth_recruitment_has_no_transaction_quota(self):
+        # Both the prospect count and existing young teammates can weaken
+        # priority without making a genuinely credible target ineligible.
+        self.signals["players"][10]=(20,"ST",90)
+        self.signals["players"][11]=(21,"ST",87)
+        candidate=prospect_fit(self.squads,buyer=1,player_id=99,
+            overall=78,position="ST",signals=self.signals,
+            existing_prospects=4,contextual_policy=True)
+        self.assertTrue(candidate["eligible"])
+        self.assertGreater(candidate["score"],0)
+        # Old saved worlds continue to use their original deterministic policy.
+        old=prospect_fit(self.squads,buyer=1,player_id=99,
+            overall=78,position="ST",signals=self.signals,
+            existing_prospects=4)
+        self.assertFalse(old["eligible"])
+
     def test_no_youth_overstocking_same_position(self):
         self.signals["players"][10]=(20,"ST",90)
         self.signals["players"][11]=(21,"ST",87)

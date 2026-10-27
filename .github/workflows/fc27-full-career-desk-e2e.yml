@@ -1,0 +1,72 @@
+name: FC27 full 659-club human Career Desk + PES squad handoff
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/fc27_full_career_desk_http_playtest.py'
+      - '.github/workflows/fc27-full-career-desk-e2e.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fc27-full-human-desk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser-full-warehouse-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install app and test client runtime
+        run: python -m pip install -r requirements.txt
+      - name: Download immutable 659-club FC27 approved source
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          run-id: 39616187183
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: immutable-input/
+      - name: Download passing original app PES staging source-key database
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-APP-TO-PES-CURRENT-SQUAD-REVIEW-AND-STAGING
+          run-id: 40509118174
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: immutable-stage/
+      - name: Build entirely disposable FC27 world retaining exact source IDs
+        run: |
+          mkdir -p e2e
+          python -u -m scripts.fc27_warehouse_world_bridge \
+            --warehouse immutable-input/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --target e2e/FC27_659_FULL_HUMAN_DESK_TEMPORARY_WORLD.sqlite
+      - name: Verify original app stage and source coverage before session
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sqlite3
+          source=Path('immutable-stage/FC27_2026_27_APP_PLAYER_REGISTRATION_STAGING.sqlite')
+          assert source.is_file(),'Previous passing source player staging not available'
+          with sqlite3.connect('file:'+source.resolve().as_posix()+'?mode=ro',uri=True) as db:
+              assert db.execute('SELECT COUNT(*) FROM fc27_app_player_registration').fetchone()[0]==17593
+              assert db.execute('SELECT COUNT(*) FROM fc27_app_transfer_ledger').fetchone()[0]==0
+          print('Original source staging verified: 17,593 registered FC27 players')
+          PY
+      - name: Exercise authenticated single-window FC27 Career Desk and copy PES squads
+        run: |
+          python -u -m scripts.fc27_full_career_desk_http_playtest \
+            --world e2e/FC27_659_FULL_HUMAN_DESK_TEMPORARY_WORLD.sqlite \
+            --stage immutable-stage/FC27_2026_27_APP_PLAYER_REGISTRATION_STAGING.sqlite \
+            --output e2e/playtest-output
+      - name: Publish QA audit plus copied current squads (never native PES EDIT)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC27-659-HUMAN-DESK-SIGNED-DEADLINE-AND-PES-SQUAD-REVIEW
+          path: |
+            e2e/playtest-output/FC27_659_CAREER_DESK_END_TO_END_AUDIT.json
+            e2e/playtest-output/completed-squads/
+          retention-days: 30
+          if-no-files-found: warn

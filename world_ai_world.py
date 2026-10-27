@@ -9,7 +9,7 @@ All unknown contracts/intentions are explicitly fictional model assumptions.
 from collections import defaultdict
 from datetime import date, timedelta
 
-from world_ai_bidding import club_need, determine_offer, position_family
+from world_ai_bidding import club_need, determine_offer, position_family, bid_need_score
 from world_careers import (
     _player_reference, budget_remaining, wage_budget_breakdown,
     propose_offer, agent_terms, negotiate_agent, player_move_interest,
@@ -17,17 +17,35 @@ from world_careers import (
 from world_preseason_window import window_snapshot
 from world_career_board_policy import career_board_decision, require_board_approval
 from world_squad_planner import (projected_squads, recruitment_fit,
-    sale_profile, lane_of, MIN_COVER, STARTERS)
+    sale_profile, lane_of, MIN_COVER, STARTERS, FAMILY)
 from world_recruitment_strategy import (development_signals, prospect_fit,
     prospect_fee_cap, MAX_PROSPECTS_PER_WINDOW)
+from world_ai_replacement_outlook import assess_future_replacement
+from world_fc27_ai_recruitment import (read_fc27_profiles,
+    buyer_recruitment_priority,positional_family_priorities,
+    prospect_budget_penalty,candidate_sporting_priority,
+    scouting_desk_activation)
+from world_ai_tactics import preferred_formation,tactical_needs
+from world_fc27_market_choices import (select_recruiting_club,
+    select_tactical_family,choose_development_focus,pursue_transfer,
+    revise_tactical_search_after_outcomes,
+    player_market_opportunity,POLICY_VERSION as DEAL_CHOICE_VERSION)
+from world_fc27_target_finances import (
+    shortlist_reference_values,prospective_purchase_fit)
+from world_fc27_contract_terms import fc27_sporting_recruitment_case
+from world_fc27_long_term_strategy import (
+    source_ages,club_horizon,recruitment_horizon_score,
+    senior_succession_fit)
 
-AI_WORLD_VERSION = "ai-world-v6-versatile-cover-rotation-quality"
-# Global ceiling is a safety bound, not a target. A real market may be quiet.
-# Multiple independent clubs may agree moves during one market interval.
-MAX_AI_DEALS = 90  # upper safety bound, not a minimum or forced sales
-MAX_SIGNINGS_PER_AI_CLUB = 3  # do not let one club dominate a short window
-MAX_OUTGOING_PER_AI_CLUB = 4
-AI_APPROACHES_PER_ATTEMPT = 5
+AI_WORLD_VERSION = "ai-world-v8-senior-replacement-after-agreement"
+# The bounded, idempotent market-moment ledger already controls processing.
+# Do not impose an arbitrary global signing count: a 659-club market reached
+# the old 90-deal ceiling exactly and was artificially truncated.
+# No arbitrary incoming/outgoing count limits; only sporting decisions,
+# fees, source budgets, player consent and board oversight determine deals.
+# No per-moment offer-count veto or first-32-buyers/first-10-targets shortcut.
+# An idempotent scheduled market opportunity ends after the first concluded deal,
+# and the 30-minute clock bounds the entire market. No transfer is guaranteed.
 
 
 def _need_for_family(*,family,overall,ratings):
@@ -119,8 +137,63 @@ def _sign_ai_deal(conn, *, career_id, offer_id, buyer, seller, fee,
     seller_review=evaluate_career_seller_bid(conn,career_id=career_id,
         player_id=row[0],seller_club_id=seller,offer_fee=fee,
         buying_club_id=buyer)
+    accepted_previous_quote=False
+    if (seller_review["decision"]!="accept"
+            and dataset=="fc27-warehouse-659-mens-2026-27"):
+        # The seller may have already accepted a counteroffer that the
+        # buyer committed to. A revised fee can slightly alter the
+        # modelled quote on *re-evaluation*. Honour an actual accepted
+        # price when the seller's live tactical situation is unchanged;
+        # never use this path to bypass a changed squad or a rejected bid.
+        from world_career_selling import offer_decision
+        from world_fc27_seller_value import honour_accepted_seller_quote
+        import json
+        prior=offer_decision(conn,offer_id)
+        accepted_counter=conn.execute("""SELECT 1
+            FROM world_career_offer_events
+            WHERE offer_id=? AND event_type='counter_accepted' LIMIT 1""",
+            (offer_id,)).fetchone() is not None
+        if honour_accepted_seller_quote(
+                saved_decision=prior,current_review=seller_review,
+                fee=fee,counter_accepted=accepted_counter):
+            original=json.loads(prior["input_snapshot"])
+            seller_review={**seller_review,"decision":"accept",
+                "board_decision":prior["board_decision"],
+                "board":original["board"],
+                "reason":("Binding seller asking price was accepted in an "
+                          "earlier recorded negotiation stage. Live tactical "
+                          "squad evidence remains unchanged."),
+                "asking_price":prior["asking_price"]}
+            accepted_previous_quote=True
     if seller_review["decision"]!="accept":
         raise ValueError("Selling club has not accepted the final AI transfer fee")
+    if dataset=="fc27-warehouse-659-mens-2026-27":
+        # Immutable final decision-chain evidence for real audit cases:
+        # board intervention, recorded seller finances, squad loss and ask.
+        # No change to approvals, signing sequence or old careers.
+        from world_career_selling import get_seller_assumptions
+        import json
+        frozen=get_seller_assumptions(conn,career_id,row[0])
+        detail={
+            "source_market_reference_gbp":frozen["market_value"],
+            "seller_financial_state":frozen["financial_state"],
+            "seller_squad_role":frozen["squad_role"],
+            "seller_stance":frozen["seller_stance"],
+            "modelled_contract_years":frozen["contract_years"],
+            "modelled_player_wants_exit":bool(frozen["player_wants_exit"]),
+            "seller_replacement_outlook":frozen["replacement"],
+            "board_decision":seller_review["board_decision"],
+            "board_reason":seller_review["board"]["reason"],
+            "seller_reason":seller_review["reason"],
+            "seller_expected_asking_gbp":seller_review["asking_price"],
+            "accepted_seller_quote_honoured":accepted_previous_quote,
+            "tactical_impact":seller_review.get("tactical_squad_review"),
+            "board_expected_fee_gbp":seller_review["board"].get("required_offer"),
+        }
+        conn.execute("""INSERT INTO world_career_offer_events
+            (offer_id,event_type,detail) VALUES(?, ?, ?)""",
+            (offer_id,"ai_fc27_final_seller_rationale",
+             json.dumps(detail,sort_keys=True)))
     headroom=wage_budget_breakdown(conn,career_id,buyer)["remaining"]
     if fee>budget_remaining(conn,career_id,buyer)+fee or wage>headroom:
         raise ValueError("AI buyer cannot fund the signed contract")
@@ -138,7 +211,8 @@ def _sign_ai_deal(conn, *, career_id, offer_id, buyer, seller, fee,
     conn.commit()
 
 
-def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
+def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None,
+                           buying_club_id=None):
     """One independent club-led AI market opportunity per persisted attempt.
 
     Returns a completed agreement ID or None. Failed negotiations never create
@@ -161,32 +235,98 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
     except __import__("sqlite3").IntegrityError:
         conn.rollback()
         return None
-    existing=conn.execute("""SELECT COUNT(*) FROM world_career_offer_events e
-        JOIN world_career_offers o ON o.offer_id=e.offer_id
-        JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
-        WHERE wo.window_id=? AND e.event_type='ai_world_signed'""",
-        (window_id,)).fetchone()[0]
-    if existing>=MAX_AI_DEALS:
-        return None
+    # The current market slot has already been persisted as an idempotent
+    # processing attempt; negotiated transfers still require all approvals.
+    # The finite scheduled market moments bound CPU and transactions.
     c=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=?""",(career_id,)).fetchone()
     if c is None:
         return None
     dataset,manager,lock_date=c
+    # The FC27-only audit does not alter market selection or deal terms.
+    # It is intended to distinguish "did not scout", "no viable target",
+    # seller/agent refusal and successful completion in a disposable world.
+    from world_fc27_decision_audit import (
+        save_negotiation,source_club_countries,shortlist_country_mix)
+    audit_enabled=(buying_club_id is not None and
+        dataset=="fc27-warehouse-659-mens-2026-27")
+    audit_interval=((slot-100000000)//1000000 if audit_enabled else None)
+    audit_countries=(source_club_countries(conn,dataset)
+                     if audit_enabled else {})
+    def diagnose(stage,reason=None,**facts):
+        if audit_enabled:
+            save_negotiation(conn,window_id=window_id,
+                interval_index=audit_interval,club_id=buying_club_id,
+                result_stage=stage,reason=(str(reason)[:220]
+                    if reason is not None else None),**facts)
+    if buying_club_id is not None:
+        # Only the FC27 independent-club scheduler can provide an explicit
+        # buyer. Older careers retain their original deterministic sampling.
+        if (dataset!="fc27-warehouse-659-mens-2026-27" or
+                type(buying_club_id) is not int or buying_club_id==manager):
+            raise ValueError("Explicit AI buyer is only valid for FC27 world markets")
     squads,players=_candidates(conn,career_id,dataset,manager)
     projected=projected_squads(conn,career_id=career_id,dataset=dataset)
+    # Absent on old/non-FC27 worlds: retain their legacy ordering.
+    # These are labelled board/finance/anonymous manager GAME estimates,
+    # copied at disposable-world creation, not real-world appointments.
+    club_ai_context=read_fc27_profiles(conn,dataset=dataset)
+    # A tactical plan is a labelled game-generated anonymous-manager
+    # preference, not an inferred real coaching appointment or tactic.
+    club_tactics={club:tactical_needs(preferred_formation(
+        club_id=club,profile=profile))["starting_roles"]
+        for club,profile in club_ai_context.items()}
     # Age is measured at the HISTORICAL dataset snapshot, not today's date.
     scouting=development_signals(conn,dataset=dataset)
     projected_positions={pid:pos for lanes in projected.values() for group in lanes.values()
                          for pid,_overall,pos in group}
     buyers=sorted((club for club in squads if club!=manager),
                   key=lambda club:_stable(career_id,window_id,slot,club,AI_WORLD_VERSION))
+    if club_ai_context:
+        # Recruitment shortlists must not be filled by clubs that already
+        # lack funds for ANY fee or ANY salary. Use the same reserved funds
+        # as career affordability, but grouped instead of a per-club query.
+        ledger={club:(money-committed,wage-payroll) for
+            club,money,committed,wage,payroll in conn.execute(
+            """SELECT club_id,transfer_budget,committed_fees,
+                weekly_wage_budget,committed_wages
+                FROM world_career_club_ledger WHERE career_id=?""",
+            (career_id,)).fetchall()}
+        commitments=dict(conn.execute("""SELECT buying_club_id,
+            SUM(COALESCE(demanded_fee,offered_fee)) FROM world_career_offers
+            WHERE career_id=? AND status IN
+             ('proposed','countered','accepted_pending_contract','agreed_future')
+            GROUP BY buying_club_id""",(career_id,)).fetchall())
+        future_wages=dict(conn.execute("""SELECT buying_club_id,
+            SUM(COALESCE(offered_wage_weekly,0)) FROM world_career_offers
+            WHERE career_id=? AND status='agreed_future'
+            GROUP BY buying_club_id""",(career_id,)).fetchall())
+        buyers=[club for club in buyers if
+            club in ledger and
+            ledger[club][0]-commitments.get(club,0)>0 and
+            ledger[club][1]-future_wages.get(club,0)>0]
+    if buying_club_id is not None:
+        # Avoid re-scoring all 659 clubs for a desk already independently
+        # selected by the FC27 interval planner.
+        if buying_club_id not in buyers:
+            diagnose("buyer_budget_or_wage_exhausted")
+            return None
+        buyers=[buying_club_id]
     game_date=(date.fromisoformat(lock_date)-timedelta(days=1)).isoformat()
     previous=conn.execute("""SELECT o.player_id FROM world_career_offers o
         JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
         WHERE wo.window_id=? AND o.status='agreed_future'""",
         (window_id,)).fetchall()
     signed_players={r[0] for r in previous}
+    # Real source-rated possible recruits, NOT signed replacement promises.
+    # Rebuilt after the current agreed deals alter projected registration.
+    future_options_by_lane=defaultdict(list)
+    for family,options in players.items():
+        for origin,pid,ovr in options:
+            if pid not in signed_players:
+                lane=lane_of(projected_positions.get(pid))
+                if lane:
+                    future_options_by_lane[lane].append((origin,pid,ovr))
     # Cap scanning and attempts: a world-wide market must not monopolise an
     # interactive request or manufacture activity when no credible deal exists.
     approaches=0
@@ -239,11 +379,58 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         return sum(1 for lane in outgoing_lanes[club]
                    if len(projected.get(club,{}).get(lane,())) <
                    max(MIN_COVER[lane],STARTERS[lane]))
-    buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
-        _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
-    for buyer in buyers[:32]:
-        if (signings_by_buyer[buyer]>=MAX_SIGNINGS_PER_AI_CLUB or
-                budget_remaining(conn,career_id,buyer)<=0):
+    if club_ai_context:
+        # All 659 clubs are eligible each moment. Opening an active
+        # recruitment desk is a weighted, idempotent game decision based
+        # on tactical/squad urgency and simulated club ambition, NOT the
+        # old artificial first-32 shortlist or a per-club transfer quota.
+        scouting_priority={club:buyer_recruitment_priority(
+            projected,club=club,departed_lanes=outgoing_lanes[club],
+            profile=club_ai_context.get(club),
+            starting_roles=club_tactics.get(club),
+            previous_signings=signings_by_buyer[club],
+            stable_variation=_stable(career_id,window_id,slot,club,
+                AI_WORLD_VERSION,"scout")%26) for club in buyers}
+        if buying_club_id is not None:
+            # Independently approved AND checkpointed by the FC27 scheduler.
+            # Never choose another club after a failed negotiation, or apply
+            # the old single-desk random selection again.
+            if buying_club_id not in buyers:
+                return None
+            buyers=[buying_club_id]
+        else:
+            # Compatibility for older isolated FC27 QA callers that do not
+            # supply a planned club. Live FC27 goes through the new planner.
+            buyers=[club for club in buyers if scouting_desk_activation(
+                priority=scouting_priority[club],
+                draw=_stable(career_id,window_id,slot,club,
+                             AI_WORLD_VERSION,"market-desk")%1000)]
+            buyer=select_recruiting_club(
+                {club:scouting_priority[club] for club in buyers},
+                draw=_stable(career_id,window_id,slot,
+                    DEAL_CHOICE_VERSION,"lead-desk")%1000000)
+            if buyer is None:
+                return None
+            buyers=[buyer]
+            if not pursue_transfer(priority=scouting_priority[buyer],
+                    profile=club_ai_context.get(buyer),
+                    draw=_stable(career_id,window_id,slot,buyer,
+                                 DEAL_CHOICE_VERSION,"commit-or-hold")%1000):
+                return None
+    else:
+        buyers.sort(key=lambda club:(-urgent_sale_vacancies(club),
+            -len(outgoing_lanes[club]),
+            signings_by_buyer[club],
+            _stable(career_id,window_id,slot,club,AI_WORLD_VERSION)))
+    # During a single market moment, no squad moves until a successful deal
+    # returns. Cache repeated source-rated fits and seller risk calculations,
+    # not final accept/reject/agent/board approvals. This matters at 659 clubs.
+    cached_fit={}
+    cached_sale={}
+    cached_replacement={}
+    cached_market_lanes={}
+    for buyer in buyers:
+        if budget_remaining(conn,career_id,buyer)<=0:
             continue
         profiles=squads[buyer]
         # Do not ignore an entire missing position family.
@@ -253,7 +440,49 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
         # of sorting on absolute count. An average squad might carry 3 GKs
         # but 7-9 defenders/midfielders; 3 keepers are NOT the largest need.
         expected={"GK":3,"DEF":8,"MID":9,"FWD":6}
-        priorities=sorted(profiles,key=lambda group:(
+        if club_ai_context:
+            # Three-season strategy uses the actual projected squad AFTER
+            # signed arrivals/departures. The prospect scouting gate stays
+            # independent: this only changes relative sporting interest.
+            buyer_roster=projected.get(buyer,{})
+            buyer_source_ages=source_ages(conn,dataset=dataset,
+                player_ids=[pid for members in buyer_roster.values()
+                            for pid,_,_ in members])
+            horizon_plan=club_horizon(
+                profile=club_ai_context[buyer],roster=buyer_roster,
+                ages=buyer_source_ages,starting_roles=club_tactics[buyer])
+            lane_scores=positional_family_priorities(projected,club=buyer,
+                departed_lanes=outgoing_lanes[buyer],
+                starting_roles=club_tactics.get(buyer))
+            for group,pressure in horizon_plan["family_succession_pressure"].items():
+                lane_scores[group]+=min(13,pressure*.32)
+            if audit_enabled and audit_interval is not None:
+                # Read real failed searches, not hypothetical club opinions.
+                # A manager has more than one sporting need; an unsuccessful
+                # previous desk can reconsider other roles next interval.
+                recent=conn.execute("""SELECT search_family,result_stage
+                    FROM world_fc27_market_negotiation_diagnostics
+                    WHERE window_id=? AND club_id=? AND interval_index<?
+                    ORDER BY interval_index DESC LIMIT 3""",
+                    (window_id,buyer,audit_interval)).fetchall()
+                lane_scores=revise_tactical_search_after_outcomes(
+                    family_needs=lane_scores,previous_searches=recent)
+            targeted_family=select_tactical_family(
+                family_needs=lane_scores,
+                starting_roles=club_tactics[buyer],
+                draw=_stable(career_id,window_id,slot,buyer,
+                             DEAL_CHOICE_VERSION,"tactical-brief")%1000000)
+            priorities=[targeted_family]
+            profile=club_ai_context.get(buyer)
+            senior_need=min(100,max(lane_scores.values())*.65+
+                           max(0,profile["ambition_level"]-72)*1.35)
+            development_focus=choose_development_focus(
+                profile=profile,senior_upgrade_pressure=senior_need,
+                succession_pressure=horizon_plan["youth_pipeline_priority"],
+                draw=_stable(career_id,window_id,slot,buyer,
+                             DEAL_CHOICE_VERSION,"development-or-XI")%1000)
+        else:
+            priorities=sorted(profiles,key=lambda group:(
             (-0.4 if any(
                 lane in outgoing_lanes[buyer] and
                 len(projected.get(buyer,{}).get(lane,())) <
@@ -265,10 +494,10 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
             (0.36 if group=="GK" else -0.12 if group=="DEF" else 0),
             _stable(slot,buyer,group,AI_WORLD_VERSION)))
         for family in priorities:
-            if family=="GK" and not _keeper_slot_open(
+            if not club_ai_context and family=="GK" and not _keeper_slot_open(
                     family_counts["GK"],non_keeper):
                 continue
-            if family=="FWD":
+            if not club_ai_context and family=="FWD":
                 # A 92-club world has a far larger need for defenders and
                 # midfielders than for permanent forward replacements.
                 # Avoid replacing keeper saturation with striker saturation.
@@ -278,9 +507,18 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                     continue
             club_ratings=profiles[family]
             options=[]
+            # Age-relative *senior* succession is distinct from prospect
+            # scouting. No need to load candidate birthdays when the
+            # manager has no evidenced ageing first-choice specialist.
+            successor_ages={}
+            if (club_ai_context and not development_focus and
+                    any(lane in horizon_plan["succession_pressure"]
+                        for lane,group in FAMILY.items()
+                        if group==family)):
+                successor_ages=source_ages(conn,dataset=dataset,
+                    player_ids=[pid for _,pid,_ in players[family]])
             for seller,pid,overall in players[family]:
-                if (seller==buyer or pid in signed_players or
-                        signings_by_seller[seller]>=MAX_OUTGOING_PER_AI_CLUB):
+                if seller==buyer or pid in signed_players:
                     continue
                 try:
                     from world_player_morale import is_unavailable
@@ -292,28 +530,65 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # Do not mistake an extra average defender for a needed CB:
                 # only the player's actual specialist slot can justify demand.
                 position=projected_positions.get(pid)
-                fit=recruitment_fit(projected,buyer=buyer,
-                                    position=position,overall=overall)
+                new_recruit=lane_of(position) in outgoing_lanes[buyer]
+                fit_key=(buyer,position,overall,new_recruit)
+                if fit_key not in cached_fit:
+                    cached_fit[fit_key]=recruitment_fit(
+                        projected,buyer=buyer,position=position,overall=overall,
+                        recent_senior_departure=new_recruit,
+                        starting_roles=club_tactics.get(buyer))
+                fit=cached_fit[fit_key]
                 # Future recruitment is separate from a starting-XI upgrade.
                 # Never manufacture a potential rating or guarantee a deal:
                 # agent and seller can still independently refuse.
                 if not fit["eligible"]:
                     fit=prospect_fit(projected,buyer=buyer,player_id=pid,
                         position=position,overall=overall,signals=scouting,
-                        existing_prospects=youth_signings[buyer])
+                        existing_prospects=youth_signings[buyer],
+                        contextual_policy=bool(club_ai_context))
+                if (not fit["eligible"] and club_ai_context
+                        and not development_focus and successor_ages):
+                    fit=senior_succession_fit(
+                        roster=buyer_roster,
+                        lane=lane_of(position),overall=overall,
+                        candidate_age=successor_ages.get(pid),
+                        incumbent_ages=buyer_source_ages,
+                        starting_roles=club_tactics[buyer],
+                        club_plan=horizon_plan)
                 if not fit["eligible"]:
                     continue
-                sale=sale_profile(projected,seller=seller,
-                    player_id=pid,position=position,overall=overall)
+                sale_key=(seller,pid)
+                if sale_key not in cached_sale:
+                    cached_sale[sale_key]=sale_profile(
+                        projected,seller=seller,player_id=pid,
+                        position=position,overall=overall,
+                        starting_roles=club_tactics.get(seller))
+                sale=cached_sale[sale_key]
                 if not sale["valid"]:
                     continue
+                # Scan the entire source-rated candidate pool, but build
+                # other-club alternatives once per specialist lane and seller.
+                # No replacement is assumed to have signed.
+                market_key=(sale["lane"],seller)
+                if market_key not in cached_market_lanes:
+                    cached_market_lanes[market_key]=[
+                      source_ovr for source_club,source_player,source_ovr
+                      in future_options_by_lane.get(sale["lane"],())
+                      if source_club!=seller
+                    ]
+                if sale_key not in cached_replacement:
+                    cached_replacement[sale_key]=assess_future_replacement(
+                        sale=sale,departing_overall=overall,
+                        market_options=cached_market_lanes[market_key])
+                replacement_plan=cached_replacement[sale_key]
                 # Seller, player and board decide whether an uncomfortable
                 # sale proceeds. An unsigned replacement is not a veto.
                 # Rank surplus deals higher to discourage gratuitous
                 # starter churn; don't forbid an attractive late offer.
                 need=fit["score"]
-                if club_ratings and overall>max(club_ratings)+14:
-                    continue
+                # A major quality jump is not automatically implausible.
+                # Source player motivation, seller valuation, wages and board
+                # policy decide whether an exceptional transfer can occur.
                 lane=lane_of(position)
                 seller_depth=projected.get(seller,{}).get(lane,[])
                 seller_rank=next((i for i,item in enumerate(seller_depth)
@@ -321,21 +596,158 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # Routine selling priorities favour genuine surplus;
                 # strong clubs resist cashing in on key rotation quality.
                 seller_fit=(22 if sale["surplus_sale"] else
-                            -28 if sale["requires_recruitment"] else
+                            -15 if sale["requires_recruitment"] else
                             8 if seller_rank>=3 else -15)
-                seller_fit-=min(60,sale["sporting_risk"]*3)
-                if sale["protected_rotation"]:
-                    seller_fit-=30
+                # A continuing club with poor cover and few plausible targets
+                # needs more compensation. This changes market PRIORITY, never
+                # forbids a sale or assumes a prospect has already agreed.
+                seller_fit-=min(100,replacement_plan["strategic_sale_risk_weight"])
+                # Selling repeatedly in this window raises the opportunity
+                # cost, without setting a numerical quota or guaranteeing
+                # a replacement. Financial/player/board decisions still stand.
+                seller_fit-=min(75,12*signings_by_seller[seller])
+                # Compare each potential purchase's actual positional impact.
+                # The global keeper share, unrelated forwards and club names
+                # are NOT recruitment constraints. Seller/board/agent still
+                # have independent authority to reject the suggested deal.
+                sporting_gain=(candidate_sporting_priority(
+                    projected,club=buyer,position=position,overall=overall,
+                    fit=fit,departed_lanes=outgoing_lanes[buyer],
+                    starting_roles=club_tactics.get(buyer))
+                    if club_ai_context else 0)
+                if club_ai_context:
+                    # Keep succession and credible depth signings, but do
+                    # not call an inferior signing a "first-team upgrade".
+                    # For strong teams, routine backup churn should rarely
+                    # beat a genuinely stronger specialist at similar price.
+                    from world_squad_planner import squad_standard
+                    case=fc27_sporting_recruitment_case(
+                        category=fit.get("category","senior"),
+                        starter_gain=fit.get("upgrade",0),
+                        role_required=bool(fit.get("depth_shortage")),
+                        team_standard=round(squad_standard(
+                            projected.get(buyer,{}))),
+                        overall=overall,
+                        ambition=club_ai_context[buyer]["ambition_level"],
+                        has_recent_departure=bool(
+                            fit.get("senior_replacement") or
+                            fit.get("succession")))
+                    fit={**fit,"fc27_sporting_case":case}
+                    sporting_gain+=case["score"]
+                # Player career trajectory matters in an actual global
+                # market. This never examines home country, nationality,
+                # distance, borders, or a domestic quota: an international
+                # move is perfectly attractive when the sporting step and
+                # first-team opportunity justify it.
+                sporting_appeal=(player_market_opportunity(
+                    buyer_appeal=club_ai_context[buyer]["sporting_appeal"],
+                    seller_appeal=club_ai_context[seller]["sporting_appeal"],
+                    overall=overall,sporting_upgrade=fit.get("upgrade",0),
+                    prospect=fit.get("category")=="prospect",
+                    buyer_ambition=club_ai_context[buyer]["ambition_level"],
+                    seller_first_choice=bool(sale["first_choice"]),
+                    seller_rotation_critical=bool(sale["protected_rotation"]),
+                    starting_upgrade=bool(fit.get("upgrade",0)>=3 or
+                        fit.get("depth_shortage",False) or
+                        fit.get("senior_replacement",False)))
+                    if club_ai_context and seller in club_ai_context else 0)
                 options.append((seller,pid,overall,need,
-                                need+seller_fit,fit,sale))
-            options.sort(key=lambda v:(-v[4],
-                _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
-            for seller,pid,overall,need,_score,fit,sale in options[:10]:
-                value,_=_player_reference(conn,dataset,pid)
-                money=budget_remaining(conn,career_id,buyer)
+                                need+seller_fit+sporting_gain+sporting_appeal,
+                                fit,sale,replacement_plan))
+            if club_ai_context:
+                # Preserve existing prospect_fit() eligibility, source
+                # potential evidence and independent development intent.
+                # Strategy may favour a verified prospect as FUTURE depth,
+                # never turn it into an automatic first-team upgrade.
+                options=[o for o in options if (
+                    (o[5].get("category")=="prospect")==development_focus)]
+                option_ages=source_ages(conn,dataset=dataset,
+                                       player_ids=[v[1] for v in options])
+                strategic_options=[]
+                for seller,pid,ovr,need,total,fit,sale,repl in options:
+                    lane=lane_of(projected_positions.get(pid))
+                    existing_youth=sum(1 for teammate,_,_ in
+                        buyer_roster.get(lane,())
+                        if buyer_source_ages.get(teammate,99)<=23)
+                    outlook=recruitment_horizon_score(
+                        category=("prospect" if
+                                  fit.get("category")=="prospect" else "senior"),
+                        lane=lane,player_age=option_ages.get(pid),
+                        player_overall=ovr,plan=horizon_plan,
+                        existing_youth_in_lane=existing_youth,
+                        immediate_starter_upgrade=bool(
+                            fit.get("fc27_sporting_case",{}).get(
+                                "first_team_upgraded",False)))
+                    strategic_options.append((seller,pid,ovr,need,
+                        total+outlook["score"],
+                        {**fit,"three_season_recruitment":outlook},
+                        sale,repl))
+                options=strategic_options
+            # Actual model reference values, source salary and the current
+            # seller's squad risk now inform how realistic each shortlist is.
+            # This is a SOFT preference, not a sale veto or target-count cap.
+            shortlist_values={}
+            current_budget=None
+            if club_ai_context and options:
+                shortlist_values=shortlist_reference_values(
+                    conn,dataset=dataset,player_ids=[v[1] for v in options])
+                current_budget=budget_remaining(conn,career_id,buyer)
+                wage_room=wage_budget_breakdown(
+                    conn,career_id,buyer)["remaining"]
+                def score_purchase(option):
+                    money_wage=shortlist_values.get(option[1])
+                    if money_wage is None:
+                        return -999.0
+                    fee,wage=money_wage
+                    planned=prospective_purchase_fit(
+                        valuation=fee,transfer_headroom=current_budget,
+                        weekly_wage=wage,wage_headroom=wage_room,
+                        sale=option[6])
+                    return option[4]+planned["score"]
+                options.sort(key=lambda v:(-score_purchase(v),
+                    _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
+            else:
+                options.sort(key=lambda v:(-v[4],
+                    _stable(career_id,slot,buyer,v[1],AI_WORLD_VERSION)))
+            if audit_enabled:
+                mix=shortlist_country_mix(
+                    options=options,buyer=buyer,countries=audit_countries)
+                head=options[0] if options else None
+                # "Plausible" is a soft *forecast*, not a confirmed ask.
+                plausible=[v for v in options if v[1] in shortlist_values
+                    and prospective_purchase_fit(
+                        valuation=shortlist_values[v[1]][0],
+                        transfer_headroom=current_budget,
+                        weekly_wage=shortlist_values[v[1]][1],
+                        wage_headroom=wage_room,sale=v[6]
+                    )["budget_plausible"]]
+                plausible_mix=shortlist_country_mix(
+                    options=plausible,buyer=buyer,countries=audit_countries)
+                diagnose("shortlist_ready" if head else "no_eligible_target",
+                    search_family=family,
+                    search_strategy=("development" if development_focus
+                                     else "first_team"),
+                    eligible_candidates=len(options),
+                    same_country_candidates=mix["same_country_candidates"],
+                    foreign_country_candidates=mix["foreign_country_candidates"],
+                    affordable_same_country=plausible_mix["same_country_candidates"],
+                    affordable_foreign_country=plausible_mix["foreign_country_candidates"],
+                    first_eligible_player_id=head[1] if head else None,
+                    first_eligible_seller_id=head[0] if head else None,
+                    first_eligible_source_country=(
+                        audit_countries.get(head[0]) if head else None))
+                if not options:
+                    return None
+            for seller,pid,overall,need,_score,fit,sale,replacement_plan in options:
+                if club_ai_context:
+                    value=(shortlist_values.get(pid) or (None,None))[0]
+                    money=current_budget
+                else:
+                    value,_=_player_reference(conn,dataset,pid)
+                    money=budget_remaining(conn,career_id,buyer)
                 if not isinstance(value,int) or value<=0 or money<value*0.85:
                     continue
-                if fit.get("category")=="prospect":
+                if fit.get("category")=="prospect" and not club_ai_context:
                     ledger=conn.execute("""SELECT transfer_budget FROM
                         world_career_club_ledger WHERE career_id=? AND club_id=?""",
                         (career_id,buyer)).fetchone()
@@ -343,11 +755,24 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                             initial_transfer_budget=ledger[0],
                             available_budget=money):
                         continue
+                if fit.get("category")=="prospect" and club_ai_context:
+                    # Financial opportunity cost reduces enthusiasm and bid,
+                    # but neither blocks the player nor imposes a youth quota.
+                    ledger=conn.execute("""SELECT transfer_budget FROM
+                        world_career_club_ledger WHERE career_id=? AND club_id=?""",
+                        (career_id,buyer)).fetchone()
+                    if ledger:
+                        need=max(15,need-round(prospect_budget_penalty(
+                            fee=value,available_budget=money,
+                            opening_budget=ledger[0])))
                 # Existing manager offers or future commitments have precedence.
                 conflict=conn.execute("""SELECT 1 FROM world_career_offers
                     WHERE career_id=? AND player_id=?
-                    AND status IN ('agreed_future','completed') LIMIT 1""",
-                    (career_id,pid)).fetchone()
+                    AND (status IN ('agreed_future','completed')
+                         OR (buying_club_id=? AND status IN
+                          ('proposed','countered',
+                           'accepted_pending_contract')))
+                    LIMIT 1""",(career_id,pid,buyer)).fetchone()
                 if conflict:
                     continue
                 key=f"ai-world-v1-{window_id}-{slot}-{buyer}-{pid}"
@@ -359,60 +784,75 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                 # authoritative; no unilateral movement of another squad.
                 target=dict(dataset=dataset,seller=seller,overall=overall,
                             value=value)
-                if approaches>=AI_APPROACHES_PER_ATTEMPT:
-                    return None
                 approaches+=1
+                diagnose("negotiation_started",chosen_player_id=pid,
+                    chosen_seller_id=seller,
+                    selected_source_country=audit_countries.get(seller),
+                    source_reference_fee_gbp=value,
+                    source_player_wage_gbp=(
+                        shortlist_values.get(pid,(None,None))[1]
+                        if club_ai_context else None))
+                phase="seller_model"
                 try:
                     _model_player_and_seller(conn,career_id=career_id,
                                               player_id=pid,target=target,
-                                              autonomous_club=True)
+                                              autonomous_club=True,
+                                              replacement_outlook=replacement_plan["forecast_replacement_outlook"])
                     from world_career_selling import get_seller_assumptions
                     seller_facts=get_seller_assumptions(conn,career_id,pid)
+                    phase="buyer_pricing"
                     price=determine_offer(career_id=career_id,player_id=pid,
                         club_id=buyer,valuation=value,available_budget=money,
-                        need_score=need,eligible_clubs=1,
-                        seller_assumptions=seller_facts)
+                        # Sporting and succession scores can be fractional.
+                        # The bid protocol's need_score is explicitly an
+                        # integer 0-100; round ONLY at its API boundary,
+                        # leaving the continuous shortlist ranking intact.
+                        need_score=bid_need_score(need),
+                        eligible_clubs=1,
+                        seller_assumptions=seller_facts,
+                        strategic_ceiling_uplift=(
+                            min(0.40,max(0,(need-55)*0.012))
+                            if club_ai_context else 0.0))
                     if price["fee"] is None:
+                        if club_ai_context:
+                            # No bid was placed and no seller/player has
+                            # refused. The manager can evaluate another
+                            # ALREADY-scouted option in this same search.
+                            # Genuine refused bids still end this intent.
+                            diagnose("buyer_opening_bid_unaffordable",
+                                price.get("reason"))
                         continue
-                    # Realistic seller hierarchy: a strong club protects
-                    # its high-grade rotation options. It may STILL sell
-                    # BEFORE replacing someone for a serious player exit,
-                    # a last-year contract, financial pressure, or a board-
-                    # justifiable exceptional offer. These are modelled
-                    # circumstances, not claims about a real footballer.
-                    protected_exception=None
-                    if sale["protected_rotation"]:
-                        if bool(seller_facts.get("player_wants_exit")):
-                            protected_exception="player_exit"
-                        elif seller_facts.get("contract_years")==1 and (
-                                price["fee"]>=value*1.1):
-                            protected_exception="expiring_contract"
-                        elif seller_facts.get("financial_state") in (
-                                "cash_needed","distressed"):
-                            protected_exception="financial_pressure"
-                        elif (seller_facts.get("board_enabled") and
-                              seller_facts.get("exceptional_offer_pct")
-                              is not None and
-                              price["fee"]*100>=value*
-                              seller_facts["exceptional_offer_pct"]):
-                            protected_exception="exceptional_board_offer"
-                        if protected_exception is None:
-                            continue
-                    if fit.get("category")=="prospect" and price["fee"]>prospect_fee_cap(
+                    # No veto based on an unsigned replacement or a numerical
+                    # net-departure cap. High-quality/rotation-critical exits
+                    # face a context-sensitive seller's asking price and lower
+                    # AI market priority, but can proceed before recruitment.
+                    protected_exception=("unconfirmed_future_replacement_plan"
+                        if sale["protected_rotation"] else None)
+                    if (fit.get("category")=="prospect" and not club_ai_context
+                            and price["fee"]>prospect_fee_cap(
                             initial_transfer_budget=ledger[0],
-                            available_budget=money):
+                            available_budget=money)):
+                        if club_ai_context:
+                            return None
                         continue
+                    phase="offer_submission"
                     oid=propose_offer(conn,career_id=career_id,request_key=key,
                         player_id=pid,buying_club_id=buyer,offered_fee=price["fee"],
                         agreement_date=game_date,
                         ai_bid_snapshot={**price,"recruitment_type":
                             fit.get("category","first_team"),
                             "recruitment_reason":fit["reason"],
-                            "scouting_evidence":fit.get("evidence")})
+                            "scouting_evidence":fit.get("evidence"),
+                            "selling_club_forward_plan":replacement_plan})
                     terms_row=conn.execute("""SELECT status,offered_fee,demanded_fee
                         FROM world_career_offers WHERE offer_id=?""",(oid,)).fetchone()
                     status=terms_row["status"]
                     final_fee=terms_row["offered_fee"]
+                    diagnose("seller_response_recorded",
+                        offer_id=oid,contract_phase="seller_response",
+                        buyer_offer_fee_gbp=price["fee"],
+                        buyer_sensible_ceiling_gbp=price["maximum_sensible_fee"],
+                        seller_counter_fee_gbp=terms_row["demanded_fee"])
                     if status=="countered":
                         asking=terms_row["demanded_fee"]
                         # AI accepts a reasoned asking price only within its
@@ -425,15 +865,24 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                                 asking>price["maximum_sensible_fee"]
                                 or asking>money or asking<=final_fee or
                                 (fit.get("category")=="prospect" and
+                                 not club_ai_context and
                                  asking>prospect_fee_cap(
                                      initial_transfer_budget=ledger[0],
                                      available_budget=money))):
+                            if club_ai_context:
+                                diagnose("seller_counter_unaffordable_or_unsuitable",
+                                    f"Ask {asking}; ceiling {price['maximum_sensible_fee']}; funds {money}")
+                                return None
                             continue
                         from world_careers import accept_counter
+                        phase="seller_counter_acceptance"
                         accept_counter(conn,career_id=career_id,offer_id=oid)
                         status="accepted_pending_contract"
                         final_fee=asking
                     if status!="accepted_pending_contract":
+                        if club_ai_context:
+                            diagnose("seller_declined_or_unresolved",status)
+                            return None
                         continue
                     from world_live_market import _modelled_europe
                     conn.execute("""INSERT OR IGNORE INTO world_career_offer_europe
@@ -443,20 +892,52 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         _modelled_europe(conn,career_id=career_id,club_id=seller),
                         "fictional-preseason-prestige-seeding-v1"))
                     conn.commit()
-                    promise=("rotation" if fit.get("category")=="prospect" else
-                             "key_player" if need>=90 and
-                             club_ratings and overall>=max(club_ratings) else "regular_starter")
+                    if club_ai_context:
+                        # Do not promise guaranteed starts to a weaker
+                        # rotation/depth player. He may decline a bench role,
+                        # which is genuine voluntary player behaviour.
+                        case=fit["fc27_sporting_case"]
+                        promise=("rotation" if fit.get("category")=="prospect"
+                                 or not case["first_team_upgraded"] else
+                                 "key_player" if need>=90 and
+                                 club_ratings and overall>=max(club_ratings)
+                                 else "regular_starter")
+                    else:
+                        promise=("rotation" if fit.get("category")=="prospect" else
+                                 "key_player" if need>=90 and
+                                 club_ratings and overall>=max(club_ratings)
+                                 else "regular_starter")
+                    phase="player_interest"
                     interest=player_move_interest(conn,career_id=career_id,
                         offer_id=oid,role_promise=promise)
+                    diagnose("player_interest_reviewed",
+                        contract_phase="player_interest",promised_role=promise,
+                        player_interest_signal=interest.get("decision"),
+                        player_required_role=interest.get("required_role"))
                     if not interest["can_negotiate"]:
+                        if club_ai_context:
+                            diagnose("player_not_interested",interest.get("reason"))
+                            return None
                         continue
-                    terms=agent_terms(conn,career_id=career_id,offer_id=oid)
+                    phase="agent_quote"
+                    terms=agent_terms(conn,career_id=career_id,offer_id=oid,
+                                      role_promise=promise)
                     demand=terms["demanded_wage_weekly"]
-                    if demand>wage_budget_breakdown(conn,career_id,buyer)["remaining"]:
+                    wage_remaining=wage_budget_breakdown(
+                        conn,career_id,buyer)["remaining"]
+                    diagnose("agent_wage_requested",
+                        contract_phase="agent_quote",
+                        agent_initial_demand_gbp=demand,
+                        buyer_remaining_wage_gbp=wage_remaining)
+                    if demand>wage_remaining:
+                        if club_ai_context:
+                            diagnose("initial_wage_budget_shortfall")
+                            return None
                         continue
                     first_wage,style=_ai_wage_opening(
                         demand=demand,career_id=career_id,buyer=buyer,
                         player_id=pid)
+                    phase="agent_first_response"
                     response=negotiate_agent(conn,career_id=career_id,
                         offer_id=oid,weekly_wage=first_wage,contract_years=3,
                         role_promise=promise,agreement_date=game_date)
@@ -466,23 +947,55 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                         # compromise. Some clubs walk away after the counter;
                         # others will match the updated demand if affordable.
                         if style%9==0 or style>=93:
+                            if club_ai_context:
+                                diagnose("buyer_walked_from_agent_counter",
+                                    contract_phase="agent_counter")
+                                return None
                             continue
                         demand=conn.execute("""SELECT demanded_wage_weekly
                             FROM world_career_agent_terms
                             WHERE offer_id=?""",(oid,)).fetchone()[0]
                         if demand>wage_budget_breakdown(
                                 conn,career_id,buyer)["remaining"]:
+                            if club_ai_context:
+                                diagnose("agent_counter_wage_unaffordable",
+                                    contract_phase="agent_counter",
+                                    agent_final_demand_gbp=demand)
+                                return None
                             continue
                         final_wage=demand
+                        phase="agent_counter_response"
                         response=negotiate_agent(conn,career_id=career_id,
                             offer_id=oid,weekly_wage=final_wage,
                             contract_years=3,role_promise=promise,
                             agreement_date=game_date)
                     if response!="accepted":
+                        if club_ai_context:
+                            diagnose("agent_terms_not_accepted",response,
+                                contract_phase=phase)
+                            return None
                         continue
+                    phase="final_transfer_approval"
                     _sign_ai_deal(conn,career_id=career_id,offer_id=oid,buyer=buyer,
                         seller=seller,fee=final_fee,wage=final_wage,
                         game_date=game_date)
+                    if club_ai_context:
+                        # The independent prospect marker is written BELOW
+                        # unchanged: multi-year succession is a *reason*,
+                        # not a second category or a promise of future PA.
+                        import json
+                        conn.execute("""INSERT INTO world_career_offer_events
+                            (offer_id,event_type,detail) VALUES(?,?,?)""",
+                            (oid,"ai_fc27_three_season_recruitment",
+                             json.dumps({
+                                 "recruitment_category":fit.get(
+                                     "category","senior"),
+                                 "decision":fit["three_season_recruitment"],
+                                 "club_horizon":horizon_plan,
+                                 "source_player_age":option_ages.get(pid),
+                                 "replacement_assumed_signed":False,
+                             },sort_keys=True)))
+                        conn.commit()
                     if sale["protected_rotation"]:
                         conn.execute("""INSERT INTO world_career_offer_events
                             (offer_id,event_type,detail) VALUES(?,?,?)""",
@@ -510,6 +1023,16 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                          f"secondary-position impact {sale['affected_positions']}. "
                          f"Replacement is never a pre-sale requirement."))
                     conn.commit()
+                    if (club_ai_context and fit.get("category")!="prospect"
+                            and not fit["fc27_sporting_case"]["first_team_upgraded"]):
+                        # A legitimate depth or replacement signing must not
+                        # be reported as "XI strengthened". This is audit-only:
+                        # it never prevents contracts or deadline registration.
+                        conn.execute("""INSERT INTO world_career_offer_events
+                            (offer_id,event_type,detail) VALUES(?,?,?)""",
+                            (oid,"ai_fc27_senior_rotation_signed",
+                             fit["fc27_sporting_case"]["kind"]))
+                        conn.commit()
                     if fit.get("category")=="prospect":
                         conn.execute("""INSERT INTO world_career_offer_events
                             (offer_id,event_type,detail) VALUES(?,? ,?)""",
@@ -537,8 +1060,20 @@ def consider_ai_world_deal(conn, *, career_id, window_id, slot, now=None):
                                    "First-team recruitment. ")
                                 + "The deal registers at the deadline."))
                     conn.commit()
+                    diagnose("completed",f"Offer {oid}",
+                        contract_phase="signed",offer_id=oid,
+                        agent_final_demand_gbp=final_wage)
                     return oid
-                except (ValueError, TypeError):
-                    # Unsupported or refused terms do not invent player consent.
+                except (ValueError, TypeError) as exc:
+                    # A chosen recruiting desk may fail. FC27 must not
+                    # try another footballer/club until one finally signs.
+                    if club_ai_context:
+                        from world_fc27_decision_audit import (
+                            classify_negotiation_failure)
+                        diagnose(classify_negotiation_failure(phase,exc),
+                                 type(exc).__name__+": "+str(exc),
+                                 contract_phase=phase)
+                        return None
                     continue
+    diagnose("no_affordable_target")
     return None

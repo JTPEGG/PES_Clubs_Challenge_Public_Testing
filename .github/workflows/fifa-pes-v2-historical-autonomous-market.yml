@@ -1,0 +1,48 @@
+name: PES V2 historical autonomous market actual 30-minute integration
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/historical_career_live_market_smoke.py'
+      - 'world_live_market.py'
+      - '.github/workflows/fifa-pes-v2-historical-autonomous-market.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: v2-historical-ai-market-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  autonomous-market:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [2026,2027]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install Flask==3.0.3
+      - name: Download newly created isolated historical career-world database
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-HISTORICAL-CAREER-SANDBOX-${{ matrix.edition }}
+          run-id: 39433587799
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: workspace/
+      - name: Start automatic AI transfer market and reconcile after 30 min
+        run: |
+          python -u -m scripts.historical_career_live_market_smoke \
+             --db workspace/historical_world_${{ matrix.edition }}.sqlite \
+             --edition ${{ matrix.edition }}
+      - name: Retain nonproduction AI market integration snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-AUTONOMOUS-MARKET-SMOKE-${{ matrix.edition }}
+          path: workspace/historical_world_${{ matrix.edition }}.sqlite
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 6

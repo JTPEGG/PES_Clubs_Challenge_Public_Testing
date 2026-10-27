@@ -1,0 +1,63 @@
+name: PES V2 rank 22 historical career pilot editions from real league evidence
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/audit_historical_edition_readiness.py'
+      - 'test_audit_historical_edition_readiness.py'
+      - '.github/workflows/fifa-pes-v2-edition-pilot-audit.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  rank:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prevent source club matching from accidentally activating incomplete careers
+        run: python -m unittest -v test_audit_historical_edition_readiness
+      - name: Read latest source-only 22-edition competition candidates and actual clubs
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-COMPETITION-CANDIDATES-PLUS-SEGUNDA
+          run-id: 39554046026
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: baseline/
+      - name: Audit actual original FIFA club gaps and rank first isolated career pilot
+        run: |
+          python -u -m scripts.audit_historical_edition_readiness \
+            --registry baseline/HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite \
+            --output release/
+      - name: Require honest 22-edition totals and disabled unverified career launches
+        run: |
+          python - <<'PY'
+          import csv,json
+          from pathlib import Path
+          p=Path('release')
+          d=json.loads((p/'HISTORICAL_EDITIONS_PILOT_READINESS_AUDIT.json').read_text())
+          assert d['original_game_club_seasons']==13104
+          assert d['editions']==22
+          assert d['club_seasons_with_home_league_evidence']==8750
+          assert d['unresolved_game_club_seasons']==4354
+          assert d['career_ready_editions']==0
+          assert d['pilot_readiness']=='read_only_evidence_diagnostic_not_career_enabled'
+          assert d['pilot_edition_missing_club_leagues']>=0
+          with (p/'HISTORICAL_EDITION_CAREER_PILOT_READINESS.csv').open(encoding='utf-8-sig') as f:
+              years=list(csv.DictReader(f))
+          assert len(years)==22
+          assert all(x['Can_Create_Career']=='no' for x in years)
+          assert sum(int(x['Original_Clubs']) for x in years)==13104
+          assert sum(int(x['Unresolved']) for x in years)==4354
+          print(json.dumps(d,indent=2))
+          print('MOST_COMPLETE_SOURCE_EDITIONS:',sorted(years,key=lambda x:int(x['Pilot_Evidence_Rank']))[:5])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-CAREER-PILOT-READINESS-AND-PRIORITISED-GAPS
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

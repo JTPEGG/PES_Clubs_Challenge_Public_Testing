@@ -1,0 +1,71 @@
+name: PES V2 early FIFA05-14 Spanish tier-2 game-club league merge
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_historical_legacy_segunda_overlay.py'
+      - 'test_world_historical_legacy_segunda_overlay.py'
+      - '.github/workflows/fifa-pes-v2-early-fifa-segunda-merge.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test one-to-one season-specific source game club merge
+        run: python -m unittest -v test_world_historical_legacy_segunda_overlay
+      - name: Download final previous 22-edition FC26 original game source club competitions
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-CLUB-LEAGUE-RECOVERY-FC26
+          run-id: 39507482880
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: baseline/
+      - name: Download ten authenticated CC0 Spanish Segunda game-year club lists
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-PINNED-FIFA05-14-SEGUNDA-DIVISION-GAME-CLUB-SOURCES
+          run-id: 39553624257
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: new-source/
+      - name: Merge real same-edition historical Segunda into game league candidate database
+        run: |
+          python -u -m world_historical_legacy_segunda_overlay \
+            --registry baseline/HISTORICAL_COMPETITION_REGISTER_22_EDITION_FC26_EXTENDED.sqlite \
+            --leagues new-source/FIFA05_14_PINNED_SPANISH_SEGUNDA_SEASONS.csv \
+            --clubs new-source/FIFA05_14_PINNED_SPANISH_SEGUNDA_CLUBS.csv \
+            --matches new-source/FIFA05_14_SPANISH_SEGUNDA_GAME_NAME_MATCHES.csv \
+            --output release/
+      - name: Verify all 22 years remain isolated and no careers are silently enabled
+        run: |
+          python - <<'PY'
+          import json,sqlite3
+          from pathlib import Path
+          p=Path('release')
+          r=json.loads((p/'EARLY_FIFA_2005_14_SEGUNDA_MERGE_AUDIT.json').read_text())
+          assert r['old_starting_league_evidence']==8672
+          assert r['source_league_seasons']==10
+          assert r['source_fixture_club_memberships']==220
+          assert 0<=r['new_early_fifa_club_division_candidates']<=84
+          assert r['combined_game_club_seasons_with_league_evidence']+r['game_club_seasons_still_unresolved']==13104
+          assert r['combined_game_club_seasons_with_league_evidence']==8672+r['new_early_fifa_club_division_candidates']
+          assert r['career_ready_editions']==0 and r['no_original_squads_changed']
+          with sqlite3.connect(p/'HISTORICAL_CAREER_DIVISION_CANDIDATES_22_EDITION.sqlite') as db:
+              assert db.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
+              assert not db.execute('PRAGMA foreign_key_check').fetchall()
+              assert db.execute('SELECT COUNT(*) FROM edition_career_starting_league_candidates').fetchone()[0]==13104
+              assert db.execute('SELECT COUNT(*) FROM edition_readiness WHERE career_ready=1').fetchone()[0]==0
+          print(json.dumps(r,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PES-V2-22-EDITION-HISTORICAL-COMPETITION-CANDIDATES-PLUS-SEGUNDA
+          path: release/
+          retention-days: 30
+          if-no-files-found: error

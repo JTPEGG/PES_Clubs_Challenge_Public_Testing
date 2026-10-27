@@ -30,8 +30,6 @@ VERSION="inbox-autonomous-market-v2-projected-squads"
 # Irregular spacing is deliberate: a market does not mechanically bid once
 # every minute. Each slot can also produce NO offer.
 MARKET_MOMENTS=(35,175,355,545,735,945,1165,1385,1580,1720,1740,1765)
-MAX_NEW_BIDS=8
-MAX_GK_BIDS=2
 
 SCHEMA="""
 CREATE TABLE IF NOT EXISTS world_career_live_market_access(
@@ -84,6 +82,8 @@ CREATE INDEX IF NOT EXISTS world_career_market_inbox_time
 
 def initialise_live_market(conn):
     conn.executescript(SCHEMA)
+    from world_fc27_market_schedule import initialise_fc27_market_schedule
+    initialise_fc27_market_schedule(conn)
     from world_offer_deadlines import initialise_confirmation_deadlines
     initialise_confirmation_deadlines(conn)
     from world_player_morale import initialise_player_morale
@@ -147,6 +147,22 @@ def _seed_context(conn,*,career_id,window_id):
         contract_years=1+_stable(career_id,player_id,VERSION)%4
         listed=int(role=="fringe" and contract_years<=2)
         estimated=min(350000,max(1000,round(1000*2**((overall-55)/8)/500)*500))
+        model_note=("Career-only modelling from player ability; "
+                    "no verified historical wage available")
+        source_contract=conn.execute("""SELECT weekly_wage_gbp,expires_on,
+            source_kind FROM world_career_contract_snapshots
+            WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
+        from world_historical_career_finances import is_historical_finance_career
+        if is_historical_finance_career(conn,career_id):
+            if source_contract is None or source_contract[0] is None:
+                raise ValueError("Historical starting contract wage is missing")
+            estimated=int(source_contract[0])
+            locked=conn.execute("""SELECT pes_lock_date FROM world_career_saves
+                WHERE career_id=?""",(career_id,)).fetchone()[0]
+            if source_contract[1]:
+                contract_years=max(1,min(10,int(source_contract[1][:4])-int(locked[:4])))
+            model_note=("Starting historical contract snapshot, source or flagged "
+                        "game estimate: "+str(source_contract[2]))
         manager_changes=conn.execute("""SELECT current_role,transfer_listed
             FROM world_career_player_circumstances
             WHERE career_id=? AND player_id=?""",
@@ -159,8 +175,7 @@ def _seed_context(conn,*,career_id,window_id):
             contract_years_estimate,squad_role_estimate,transfer_listed_estimate,model_note)
             VALUES(?,?,?,?,?,?,?,?,?,?)""",(career_id,player_id,window_id,ref,
             overall,estimated,contract_years,role,listed,
-            "Career-only modelling from PES-rated squad rank, age/rating proxies "
-            "and deterministic policy; NOT verified contracts, wages or wishes."))
+            model_note))
         # Feed the game's existing player-choice rules without asking
         # the human manager for missing wages or playing-time circumstances.
         existing=conn.execute("""SELECT 1 FROM world_career_player_circumstances
@@ -171,7 +186,8 @@ def _seed_context(conn,*,career_id,window_id):
                  transfer_listed,renewal_status,source_kind)
                 VALUES(?,?,?,?,?,?,?)""",(career_id,player_id,estimated,role,listed,
                 "not_offered" if contract_years==1 else "renewal_offered",
-                "modelled-autonomous-v1"))
+                "historical-contract-snapshot" if is_historical_finance_career(conn,career_id)
+                else "modelled-autonomous-v1"))
     conn.commit()
 
 def start_live_market(conn,*,career_id,now=None):
@@ -267,6 +283,12 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
         FROM world_career_saves WHERE career_id=?""",(career_id,)).fetchone()
     dataset,managed_club=save
     projected=projected_squads(conn,career_id=career_id,dataset=dataset)
+    from world_fc27_ai_recruitment import read_fc27_profiles
+    from world_ai_tactics import preferred_formation,tactical_needs
+    club_context=read_fc27_profiles(conn,dataset=dataset)
+    tactical_starters={club:tactical_needs(preferred_formation(
+        club_id=club,profile=profile))["starting_roles"]
+        for club,profile in club_context.items()}
     scouting=development_signals(conn,dataset=dataset)
     squads=defaultdict(lambda: {"all":[]})
     for club_id,lanes in projected.items():
@@ -334,19 +356,22 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
             if budget<context["value_gbp"]*0.85:
                 continue
             need=recruitment_fit(projected,buyer=club_id,
-                                 position=position,overall=overall)
+                                 position=position,overall=overall,
+                                 starting_roles=tactical_starters.get(club_id))
             if not need["eligible"]:
                 existing=previous_prospects[club_id]
                 need=prospect_fit(projected,buyer=club_id,player_id=player_id,
                     position=position,overall=overall,signals=scouting,
-                    existing_prospects=0 if player_id in existing else len(existing))
+                    existing_prospects=0 if player_id in existing else len(existing),
+                    contextual_policy=club_id in club_context)
                 if need["eligible"]:
                     finances=conn.execute("""SELECT transfer_budget FROM
                         world_career_club_ledger WHERE career_id=? AND club_id=?""",
                         (career_id,club_id)).fetchone()
-                    if finances is None or context["value_gbp"]*0.85>prospect_fee_cap(
+                    if (club_id not in club_context and
+                        (finances is None or context["value_gbp"]*0.85>prospect_fee_cap(
                             initial_transfer_budget=finances[0],
-                            available_budget=budget):
+                            available_budget=budget))):
                         continue
             if not need["eligible"]:
                 continue
@@ -365,7 +390,7 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
             _stable(career_id,window_id,slot,club_id,x[2],VERSION)))
         # Clubs shortlist a few prospects and favour a genuine improvement,
         # while leaving later slots free to target another position/player.
-        for priority,need_score,player_id,need in targets[:4]:
+        for priority,need_score,player_id,need in targets:
             opportunities.append(({
                 "club_id":club_id,"club_name":club_name,
                 "need_score":need_score,"priority_score":priority,
@@ -387,30 +412,12 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
 def _consider_bid(conn,*,career_id,window_id,slot,t):
     """Exactly one plausible proposal opportunity per due market moment."""
     from world_recruitment_strategy import prospect_fee_cap
+    from world_fc27_ai_recruitment import read_fc27_profiles
     row=conn.execute("""SELECT c.dataset_id,c.manager_club_id,c.pes_lock_date
         FROM world_career_saves c WHERE c.career_id=?""",(career_id,)).fetchone()
     dataset,manager,pes_lock=row
-    # Later offers are not forced. Eight successful bids per market is a cap,
-    # not a guaranteed number.
-    count=conn.execute("""SELECT COUNT(*) FROM world_career_market_inbox
-        WHERE career_id=? AND window_id=? AND message_key LIKE 'offer:%'""",
-        (career_id,window_id)).fetchone()[0]
-    # Reserve room for credible late interest instead of exhausting the
-    # human inbox in the opening half-hour. No bids are forced if clubs have
-    # no genuine need or cannot afford the target.
-    phase_limit=(3 if slot<6 else 5 if slot<9 else MAX_NEW_BIDS)
-    if count>=phase_limit:
-        return None,"No further credible bids this phase; clubs may revisit as deadline approaches"
-    # Goalkeepers were repeatedly consuming the finite six-bid inbox cap.
-    # Preserve organic positional interest without letting one position
-    # monopolise all opportunities in a short transfer window.
-    gk_count=conn.execute("""SELECT COUNT(*) FROM world_career_offers o
-        JOIN world_career_preseason_window_offers wt ON wt.offer_id=o.offer_id
-        JOIN world_players p ON p.player_id=o.player_id
-        WHERE wt.window_id=? AND o.career_id=?
-          AND o.request_key LIKE 'live-v1-%'
-          AND UPPER(COALESCE(p.primary_position,'')) IN ('GK','G')""",
-        (window_id,career_id)).fetchone()[0]
+    # Every generated bid must stand on its sporting and financial merit.
+    # The managed club's inbox has no artificial total or GK-specific quota.
     candidates=conn.execute("""SELECT player_id,overall
         FROM world_career_live_player_context
         WHERE career_id=? AND window_id=?
@@ -432,8 +439,6 @@ def _consider_bid(conn,*,career_id,window_id,slot,t):
         if buyer_id==manager:continue
         pos=conn.execute("SELECT primary_position FROM world_players WHERE player_id=?",
                          (player_id,)).fetchone()
-        if pos and position_family(pos[0])=="GK" and gk_count>=MAX_GK_BIDS:
-            continue
         history=conn.execute("""SELECT offer_id,offered_fee,status FROM
             world_career_offers WHERE career_id=? AND player_id=?
             AND buying_club_id=? AND request_key LIKE 'live-v1-%'
@@ -466,7 +471,8 @@ def _consider_bid(conn,*,career_id,window_id,slot,t):
             eligible_clubs=rivals,active_rival_clubs=active,
             seller_assumptions=seller,prior_fee=prev,round_number=rnd)
         if price["fee"] is None:continue
-        if buyer["recruitment_type"]=="prospect":
+        if (buyer["recruitment_type"]=="prospect" and not
+                read_fc27_profiles(conn,dataset=dataset,club_id=buyer_id)):
             initial=conn.execute("""SELECT transfer_budget FROM
                 world_career_club_ledger WHERE career_id=? AND club_id=?""",
                 (career_id,buyer_id)).fetchone()
@@ -557,7 +563,8 @@ def _respond_to_counter(conn,*,career_id,offer_id,window_id,t):
     conn.commit()
     return True
 
-def process_live_market(conn,*,career_id,now=None):
+def process_live_market(conn,*,career_id,now=None,
+                        fc27_activity_scale_qa=1):
     """Reconcile due market moments, then close at 30 min; safe on rerun.
 
     Each moment's row is unique and each AI proposal has an immutable request
@@ -571,6 +578,13 @@ def process_live_market(conn,*,career_id,now=None):
     if snap["state"]=="closed":
         return {"state":"closed","changed":False,"new_offers":0}
     win=snap["window_id"]
+    if fc27_activity_scale_qa not in (1,3):
+        raise ValueError("Unsupported isolated FC27 activity scenario")
+    from world_fc27_market_schedule import (
+        is_fc27_market,process_fc27_market_interval)
+    fc27_club_led=is_fc27_market(conn,career_id=career_id)
+    if fc27_activity_scale_qa!=1 and not fc27_club_led:
+        raise ValueError("QA scaling cannot apply to existing non-FC27 careers")
     if snap["state"]=="deadline_reached":
         from world_player_morale import reconcile_player_morale
         reconcile_player_morale(conn,career_id=career_id,
@@ -594,7 +608,13 @@ def process_live_market(conn,*,career_id,now=None):
         if elapsed<offset:break
         seen=conn.execute("""SELECT 1 FROM world_career_market_moments
             WHERE window_id=? AND moment_index=?""",(win,index)).fetchone()
-        if seen:continue
+        if seen:
+            if fc27_club_led:
+                # Recovery if a process died after recording the real-time
+                # interval but before clearing the durable club activity plan.
+                process_fc27_market_interval(conn,career_id=career_id,
+                    window_id=win,interval_index=index,when=t,activity_scale_qa=fc27_activity_scale_qa)
+            continue
         # Deal with accepted human fee decisions and manager counters on
         # each market moment, not on each page refresh.
         unresolved=conn.execute("""SELECT o.offer_id,o.status FROM
@@ -636,33 +656,30 @@ def process_live_market(conn,*,career_id,now=None):
         except ValueError as exc:
             # Failed eligibility never manufactures an offer.
             offer_id,outcome=None,"No eligible offer: "+str(exc)[:220]
-        # Independent world deals use the same persisted market moment and
-        # deadline registration batch. They never mutate the human roster
-        # before a fully approved deadline registration.
-        from world_ai_world import consider_ai_world_deal
-        # Multiple independent buyer/seller pairs can reach agreement during
-        # each real-time market interval. Late windows give clubs additional
-        # attempts, but the seller, player, agent and budget can still veto.
-        # The 92-club world has its own timetable beyond the manager's
-        # inbox. Build transfer activity progressively through the second
-        # half of the 30-minute window, rather than filling the market at
-        # 09:00 or having an implausible rush in its final 60 seconds.
-        # 112 opportunities are independent recruitment CHECKS, never 112
-        # guaranteed transfers: the buyer, seller, player and agent can veto.
-        attempts=(5 if index<4 else
-                  10 if index<6 else
-                  13 if index==6 else
-                  18 if index==7 else
-                  11 if index==8 else 10)
-        for round_index in range(attempts):
-            # Never renumber old checkpoints: in-progress careers created by
-            # prior releases must remain replay-safe and immutable.
-            world_slot=(index if round_index==0 else
-                len(MARKET_MOMENTS)+index*3+round_index-1
-                if round_index<4 else
-                len(MARKET_MOMENTS)*4+index*16+round_index-4)
-            consider_ai_world_deal(conn,career_id=career_id,window_id=win,
-                                   slot=world_slot,now=t)
+        if fc27_club_led:
+            # All solvent source-rated clubs make their own activity choice.
+            # The count of interested clubs changes with current tactical
+            # needs, club ambitions, budgets, recent sales, and the interval.
+            # There is no "112 opportunities" formula for FC27 worlds.
+            process_fc27_market_interval(conn,career_id=career_id,
+                window_id=win,interval_index=index,when=t,
+                activity_scale_qa=fc27_activity_scale_qa)
+        else:
+            # IMMUTABLE older careers use their original replay-safe moment
+            # keys and original 112 checks. Do not renumber historical slots.
+            from world_ai_world import consider_ai_world_deal
+            attempts=(5 if index<4 else
+                      10 if index<6 else
+                      13 if index==6 else
+                      18 if index==7 else
+                      11 if index==8 else 10)
+            for round_index in range(attempts):
+                world_slot=(index if round_index==0 else
+                    len(MARKET_MOMENTS)+index*3+round_index-1
+                    if round_index<4 else
+                    len(MARKET_MOMENTS)*4+index*16+round_index-4)
+                consider_ai_world_deal(conn,career_id=career_id,
+                                       window_id=win,slot=world_slot,now=t)
         from world_player_morale import reconcile_player_morale
         reconcile_player_morale(conn,career_id=career_id,now=t)
         conn.execute("""INSERT OR IGNORE INTO world_career_market_moments

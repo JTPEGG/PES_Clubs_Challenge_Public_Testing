@@ -1,0 +1,510 @@
+{
+  "version": "fc27-one-hop-official-2026-27-feeder-memberships-v1",
+  "edition": 2027,
+  "season": "2026-27",
+  "scope": "actual_named_clubs_only_not_playable_squads",
+  "game_policy": "Real 2026/27 feeder club identities are imported without inventing PES players; reserve/youth clubs are treated as ineligible for the game's first-team promotion pool (pragmatic gameplay restriction, not a statement of official eligibility).",
+  "groups": [
+    {
+      "edition": 2027,
+      "feeder_competition_code": "2027:fr.3",
+      "country": "France",
+      "competition": "Ligue 3",
+      "source_official_url": "https://www.fff.fr/article/17022-le-calendrier-2026-2027-est-servi.html",
+      "season": "2026-27",
+      "roster_count": 18,
+      "clubs": [
+        {
+          "club_name": "Amiens SC",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SC Aubagne Air Bel",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SC Bastia",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Football Bourg-en-Bresse Péronnas 01",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SM Caen",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "AS Cannes",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "US Concarneau",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Fleury 91",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "VFC La-Roche-sur-Yon",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Le Puy-en-Velay FC",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "US Orléans LF",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Paris 13 Atletico",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Quevilly Rouen Métropole",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Rouen 1899",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "US Thionville Lusitanos",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Valenciennes FC",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Versailles",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FC Villefranche-Beaujolais",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        }
+      ],
+      "original_game_player_squad_imported": false
+    },
+    {
+      "edition": 2027,
+      "feeder_competition_code": "2027:be.2",
+      "country": "Belgium",
+      "competition": "Challenger Pro League",
+      "source_official_url": "https://www.proleague.be/nieuws/kalender-2026-2027-nieuwkomers-treffen-elkaar-meteen-in-challenger-pro-league",
+      "season": "2026-27",
+      "roster_count": 15,
+      "clubs": [
+        {
+          "club_name": "Sporting Hasselt",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FCV Dender EH",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "KSC Lokeren",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "RFC Seraing",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Patro Eisden",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "RSCA Futures",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "Jong Genk",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "KAS Eupen",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "K. Lierse SK",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Royal Excelsior Virton",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "K. Beerschot VA",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Jong Gent",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "RFC Liège",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Royal Francs Borains",
+          "regional_group": "national",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "Club NXT",
+          "regional_group": "national",
+          "reserve_or_youth": true
+        }
+      ],
+      "original_game_player_squad_imported": false
+    },
+    {
+      "edition": 2027,
+      "feeder_competition_code": "2027:it.3",
+      "country": "Italy",
+      "competition": "Serie C",
+      "source_official_url": "https://www.seriec.com/clubs",
+      "season": "2026-27",
+      "roster_count": 60,
+      "clubs": [
+        {
+          "club_name": "ALBINOLEFFE",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "ALCIONE MILANO",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "ARZIGNANO V.",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CARPI",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CITTADELLA",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "DESENZANO",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "DOLOMITI BELLUNESI",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FOLGORE CARATESE",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "GIANA ERMINIO",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "JUVENTUS NEXT GEN",
+          "regional_group": "A",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "LECCO",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "LUMEZZANE",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "NOVARA",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "OSPITALETTO F.",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "PERGOLETTESE",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "PRO VERCELLI",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "RENATE",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "TRENTO",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "TREVISO",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "UNION BRESCIA",
+          "regional_group": "A",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "ATALANTA UNDER 23",
+          "regional_group": "B",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "CAMPOBASSO",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FORLÌ",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "GROSSETO",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "GUBBIO",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "GUIDONIA M.",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "LATINA",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "LIVORNO",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "OSTIAMARE",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "PERUGIA",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "PESCARA",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "PIANESE",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "PINETO",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "RAVENNA",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "REGGIANA",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SAMBENEDETTESE",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SPEZIA",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "TORRES",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "VADO",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "VIS PESARO",
+          "regional_group": "B",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "ALTAMURA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "AUDACE CERIGNOLA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "BARI",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "BARLETTA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CASARANO",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CASERTANA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CATANIA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CAVESE",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "COSENZA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "CROTONE",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "FOGGIA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "GIUGLIANO",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "INTER UNDER 23",
+          "regional_group": "C",
+          "reserve_or_youth": true
+        },
+        {
+          "club_name": "MONOPOLI",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "PICERNO",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "POTENZA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SALERNITANA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SAVOIA",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SCAFATESE",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        },
+        {
+          "club_name": "SORRENTO",
+          "regional_group": "C",
+          "reserve_or_youth": false
+        }
+      ],
+      "original_game_player_squad_imported": false
+    }
+  ]
+}

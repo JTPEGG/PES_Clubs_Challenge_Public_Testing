@@ -1,0 +1,72 @@
+name: FC27 warehouse transfer and AI realism regression
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'warehouse/fc27_ai_realism_audit.py'
+      - 'test_fc27_ai_realism.py'
+      - 'world_transfer_affordability.py'
+      - 'world_player_decisions.py'
+      - '.github/workflows/fc27-warehouse-realism-audit.yml'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fc27-warehouse-realism-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  simulate-read-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test historical simulated transfer and board policy plus FC27 realism scenarios
+        run: |
+          python -m unittest -v \
+            test_fc27_ai_realism \
+            test_transfer_affordability \
+            test_transfer_negotiations \
+            test_transfer_board \
+            test_board_context
+      - name: Fetch the frozen, previously verified FC27 enriched AI reference
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          run-id: 39616187183
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-warehouse/
+      - name: Run read-only 659-club warehouse distribution checks and 12+ hypothetical cases
+        run: |
+          python -m warehouse.fc27_ai_realism_audit \
+            --warehouse source-warehouse/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --output audit/FC27_REALISM_AUDIT_V1.json
+      - name: Validate realism report and safeguard provenance
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path("audit/FC27_REALISM_AUDIT_V1.json").read_text())
+          d=r["real_warehouse_audit"]
+          assert r["scenario_count"]>=12
+          assert r["all_scenario_assertions_passed"]
+          assert r["all_player_choices_are_hypothetical"]
+          assert r["recruitment_fit_is_proposed_qa_rule_not_current_live_ai"]
+          assert r["no_career_or_PES_mutation"]
+          assert d["clubs_audited"]==659
+          assert d["unknown_real_institutional_prestige"]==659
+          assert d["anonymous_fictional_manager_agents"]==659
+          assert d["player_game_priors"]==17593
+          assert d["signed_negative_wage_headroom_clubs"]>=1
+          assert len(d["flag_realism_gaps"])>=5
+          print("FC27 AI READ-ONLY REALISM AUDIT PASSED")
+          PY
+      - name: Publish red/amber/green hypothetical realism checks for human review
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC27-AI-WAREHOUSE-REALISM-AUDIT-V1
+          path: audit/
+          retention-days: 30
+          if-no-files-found: error

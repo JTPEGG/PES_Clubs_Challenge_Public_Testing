@@ -1,0 +1,164 @@
+name: FC27 real 659-club autonomous market QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/fc27-warehouse-659-market-qa.yml'
+      - 'scripts/fc27_warehouse_world_bridge.py'
+      - 'scripts/fc27_warehouse_659_market_smoke.py'
+      - 'world_ai_world.py'
+      - 'world_fc27_ai_recruitment.py'
+      - 'world_recruitment_strategy.py'
+      - 'world_live_buying.py'
+      - 'world_ai_replacement_outlook.py'
+      - 'world_squad_planner.py'
+      - 'world_fc27_market_choices.py'
+      - 'world_fc27_long_term_strategy.py'
+      - 'test_world_fc27_long_term_strategy.py'
+      - 'world_fc27_seller_value.py'
+      - 'test_world_fc27_seller_value.py'
+      - 'world_fc27_contract_terms.py'
+      - 'test_world_fc27_contract_terms.py'
+      - 'world_fc27_market_schedule.py'
+      - 'world_fc27_decision_audit.py'
+      - 'world_fc27_target_finances.py'
+      - 'test_world_fc27_target_finances.py'
+      - 'test_world_fc27_market_schedule.py'
+      - 'world_careers.py'
+      - 'world_valuation.py'
+      - 'world_career_selling.py'
+      - 'test_world_fc27_market_choices.py'
+      - 'world_ai_tactics.py'
+      - 'world_ai_bidding.py'
+      - 'world_selling_club.py'
+      - 'world_career_board_policy.py'
+      - 'world_live_market.py'
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: fc27-659-source-market-${{ github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  real-world-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    strategy:
+      fail-fast: false
+      matrix:
+        opportunity_scale: [1,3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install supported runtime requirements
+        run: python -m pip install -r requirements.txt
+      - name: Download immutable approved 659-club populated FC27 source warehouse
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          run-id: 39616187183
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: warehouse-source/
+      - name: Verify original reference is exactly 659 clubs and 17,593 squad registrations
+        run: |
+          python - <<'PY'
+          import sqlite3
+          p="warehouse-source/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite"
+          with sqlite3.connect("file:"+p+"?mode=ro",uri=True) as c:
+              assert c.execute("SELECT COUNT(*) FROM wh_fc27_clubs").fetchone()[0]==659
+              assert c.execute("SELECT COUNT(*) FROM wh_fc27_players").fetchone()[0]==17593
+              assert c.execute("SELECT COUNT(*) FROM wh_fc27_starting_rosters").fetchone()[0]==17593
+              assert c.execute("SELECT COUNT(*) FROM wh_fc27_competitions").fetchone()[0]==53
+          print("SOURCE 659 VERIFIED: not legacy 670 edition")
+          PY
+      - name: Build independent, source-identity-preserving 659-club career-engine world
+        run: |
+          mkdir -p qa659
+          python -u -m scripts.fc27_warehouse_world_bridge \
+            --warehouse warehouse-source/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --target qa659/FC27_659_SOURCE_DISPOSABLE_WORLD.sqlite
+      - name: Simulate one full autonomous transfer window with all 659 clubs
+        run: |
+          python -u -m scripts.fc27_warehouse_659_market_smoke \
+            --world qa659/FC27_659_SOURCE_DISPOSABLE_WORLD.sqlite \
+            --opportunity-scale ${{ matrix.opportunity_scale }} \
+            --output qa659/FC27_659_ACTUAL_AI_WINDOW_AUDIT_${{ matrix.opportunity_scale }}x.json
+      - name: Verify exact source counts, final window and no fake registration
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path("qa659/FC27_659_ACTUAL_AI_WINDOW_AUDIT_${{ matrix.opportunity_scale }}x.json")
+          a=json.loads(p.read_text())
+          assert a["source_clubs"]==659
+          assert a["source_competitions"]==53
+          assert a["source_players"]==17593
+          assert a["window_minutes"]==30
+          assert a["modelled_ai_club_contexts_copied"]==659
+          assert a["fc27_independent_club_market"] is True
+          assert a["independent_intervals_reconciled"]==12
+          assert a["eligible_independent_club_decisions"]>a["club_led_negotiation_intents"]
+          assert a["club_led_negotiation_intents"]==a["autonomous_moments_processed"]
+          assert a["persisted_club_intents_processed"]==a["club_led_negotiation_intents"]
+          assert sum(a["club_decision_funnel_stages"].values()) >= a["eligible_independent_club_decisions"]
+          assert "elite_club_decision_chains" in a
+          assert all(len(a["elite_club_decision_chains"][club]["searches"]) <= 12
+                     for club in ("Arsenal","Chelsea","Manchester City"))
+          assert sum(a["club_negotiation_funnel_stages"].values()) == a["club_led_negotiation_intents"]
+          assert a["eligible_target_country_pool"]["same_country_candidates"] >= 0
+          pool=a["eligible_target_country_pool"]
+          assert pool["budget_plausible_candidates"] <= pool["all_eligible_target_screenings"]
+          assert pool["budget_plausible_candidates"] == (
+              pool["budget_plausible_same_country_candidates"] +
+              pool["budget_plausible_cross_country_candidates"])
+          assert sum(a["modelled_tactical_formation_distribution"].values())==659
+          assert all("modelled_preferred_formation" in c
+                     for c in a["elite_club_transfer_decisions"].values())
+          assert len(a["actual_transfer_details"])==a["in_game_final_registrations"]
+          # Never accept hidden AI seller/buyer API exceptions as legitimate
+          # negotiation failures: these previously wasted 31 and 85 intents.
+          assert a["club_negotiation_funnel_stages"].get(
+              "seller_or_offer_evaluation_failure",0)==0, a["negotiation_error_reasons"]
+          assert a["club_negotiation_funnel_stages"].get(
+              "negotiation_processing_error",0)==0, a["negotiation_error_reasons"]
+          assert a["three_season_recruitment_cases_audited"] == a["in_game_final_registrations"]
+          assert a["three_season_prospect_classification_errors"] == []
+          assert a["three_season_prospects_signed_unchanged"] == a["prospect_deals"]
+          assert a["three_season_seller_cases_with_source_context"] == a["in_game_final_registrations"]
+          assert a["seller_approval_rationales_recorded"] == a["in_game_final_registrations"], (
+              "Missing final selling board and squad-loss rationale in audit")
+          assert all("seller_decision" in item for item in a["important_seller_case_studies"])
+          assert a["source_wage_large_drops"]==0, (
+              "A signed contract undercuts its verified FC27 game wage by 10%+: "
+              +str(a["source_wage_large_drop_examples"][:5]))
+          assert a["senior_confirmed_xi_upgrades"] + a["senior_rotation_or_replacement_deals"] == a["senior_first_team_deals"]
+          assert all(t["source_game_weekly_wage_gbp"] is not None
+                     and t["accepted_simulated_weekly_wage_gbp"] is not None
+                     for t in a["actual_transfer_details"])
+          assert "tactical_xi_coverage_alerts" in a
+          assert "tactical_xi_quality_alerts" in a
+          assert len(a["tactical_xi_quality_samples"]) <= a["tactical_xi_quality_alerts"]
+          assert all(item["avg_rating_loss"] >= 1.5
+                     for item in a["tactical_xi_quality_samples"])
+          assert a["in_game_final_registrations"]<a["autonomous_moments_processed"], (
+              "Every market tick became a forced signing: autonomous declines broken")
+          assert a["opportunity_scale_QA_only"]==${{ matrix.opportunity_scale }}
+          assert a["extra_QA_opportunities_not_forced_transfers"]
+          assert a["senior_first_team_deals"]+a["prospect_deals"]==a["in_game_final_registrations"]
+          assert a["player_registration_reconciled"] is True
+          assert a["no_production_career_modified"] is True
+          assert a["no_PES_export"] is True
+          assert a["in_game_final_registrations"]>=0
+          print("FULL 659-CLUB GAME-WORLD QA COMPLETED")
+          PY
+      - name: Publish immutable source-mapping audit and actual autonomous-market outcomes
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: FC27-659-CLUB-AUTONOMOUS-AUDIT-${{ matrix.opportunity_scale }}X
+          path: |
+            qa659/*.json
+          retention-days: 30
+          if-no-files-found: warn

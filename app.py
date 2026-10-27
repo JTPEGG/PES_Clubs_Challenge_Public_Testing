@@ -250,6 +250,11 @@ app.register_blueprint(create_market_blueprint(DB_PATH))
 from world_careers_ui import create_careers_blueprint
 app.register_blueprint(create_careers_blueprint(DB_PATH))
 
+# Read-only historical season and club selection preview. This GET-only
+# blueprint cannot import data, launch a live career or modify existing saves.
+from world_historical_career_setup_ui import create_historical_setup_blueprint
+app.register_blueprint(create_historical_setup_blueprint(DB_PATH))
+
 from world_career_play import create_play_blueprint
 app.register_blueprint(create_play_blueprint(DB_PATH))
 
