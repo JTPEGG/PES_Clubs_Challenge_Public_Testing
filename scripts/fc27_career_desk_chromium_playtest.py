@@ -117,7 +117,7 @@ def run(world,output):
                   "Manager cannot find the shareable read-only spectator link")
             check("/world/play/watch/" in page.locator("#spectator-share-url").input_value(),
                   "Spectator share input contains an invalid URL")
-                        page.screenshot(path=str(output/"02-desktop-active-overview.png"),
+            page.screenshot(path=str(output/"02-desktop-active-overview.png"),
                             animations="disabled",full_page=True)
             found.append("Real Start POST opened exactly one live 30-minute clock")
 
