@@ -46,3 +46,44 @@ def exceptional_seller_board_floor(*,reference_value,base_board_floor,
     # An extraordinary offer still causes board intervention.
     floor=max(base_board_floor,base_board_floor+round(sporting_cost))
     return int((floor+49999)//50000)*50000
+
+
+def honour_accepted_seller_quote(*,saved_decision,current_review,fee,
+                                counter_accepted):
+    """Recognise a seller's already accepted offer if squad facts did NOT move.
+
+    The initial quote is a legitimate club decision, not a fresh 'maybe' to
+    be repriced after the player/agent agreed terms. The actual accepted
+    offer must cover the immutable quoted demand. For a counter, there
+    must also be a real 'counter_accepted' event. Changed live formations
+    or squad quality still force the normal renewed seller examination.
+    """
+    import json
+    if (not isinstance(saved_decision,dict) or
+            not isinstance(current_review,dict) or
+            type(fee) is not int or fee<0 or
+            type(counter_accepted) is not bool):
+        return False
+    former=saved_decision.get("effective_decision")
+    if former not in ("negotiate","accept"):
+        return False
+    if former=="negotiate" and not counter_accepted:
+        return False
+    quoted=saved_decision.get("asking_price")
+    if type(quoted) is not int or fee<quoted:
+        return False
+    try:
+        previous=json.loads(saved_decision["input_snapshot"])
+    except (KeyError,TypeError,ValueError):
+        return False
+    old=previous.get("tactical_squad_review")
+    new=current_review.get("tactical_squad_review")
+    if not isinstance(old,dict) or not isinstance(new,dict):
+        return False
+    # The current price model may vary by bid value. These are stable live
+    # footballing facts and must match to honour the EXISTING agreement.
+    relevant=("formation","lineup_loss","first_choice",
+              "starter_quality_drop","formation_quality_loss",
+              "rotation_quality_drop","after_specialist_depth")
+    return all(key in old and key in new and old[key]==new[key]
+               for key in relevant)
