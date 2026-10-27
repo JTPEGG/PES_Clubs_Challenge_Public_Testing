@@ -24,7 +24,7 @@ jobs:
         run: |
           python -m pip install -r requirements.txt
           python -m pip install playwright==1.55.0
-          python -m playwright install --with-deps chromium
+          google-chrome --version
       - name: Fetch already-approved immutable 659-club FC27 source
         uses: actions/download-artifact@v4
         with:
