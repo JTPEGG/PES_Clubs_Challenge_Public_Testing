@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from datetime import datetime,timedelta,timezone
 
-from scripts.fc27_warehouse_659_market_smoke import isolated_simulation_clock
+from scripts.fc27_qa_simulation_clock import isolated_simulation_clock
 from world_preseason_window import (
     _utc,assert_window_allows_negotiation,window_snapshot)
 
