@@ -67,6 +67,12 @@ def run(world,output):
         "WORLD_MARKET_COOKIE_SECRET":"isolated-real-chrome-only-fc27-qa-secret",
     })
     app=Flask("fc27_visual_qa")
+    # The isolated QA app has no app.py static asset wiring; browsers request
+    # /favicon.ico automatically. A deliberate 204 prevents a misleading 404
+    # console error without suppressing genuine JavaScript/runtime failures.
+    @app.get("/favicon.ico")
+    def qa_no_favicon():
+        return "",204
     app.register_blueprint(create_play_blueprint(world))
     server=make_server("127.0.0.1",0,app,threaded=True)
     port=server.server_port
