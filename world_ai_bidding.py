@@ -6,6 +6,19 @@ assumptions. Each decision includes an auditable set of pricing inputs.
 """
 from hashlib import sha256
 
+def bid_need_score(raw):
+    """Translate a continuous tactical/succession score for the integer bid API.
+
+    The scoring model may contain fractional evidence. Only the buyer's
+    monetary bid protocol requires a discrete 0-100 score; sorting and
+    scouting should retain full precision and never silently throw TypeError.
+    """
+    from math import isfinite
+    if type(raw) not in (int,float) or not isfinite(raw):
+        raise ValueError("A finite modelled squad-need score is required")
+    return max(0,min(100,int(round(raw))))
+
+
 AI_BID_VERSION="club-demand-bidding-v2"
 MAX_ROUNDS=3
 ACTIVE_STATES=frozenset(("proposed","countered","accepted_pending_contract","agreed_future"))
