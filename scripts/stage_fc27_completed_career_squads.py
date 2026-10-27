@@ -6,6 +6,7 @@ opened read-only; the updated registration database is a NEW copy.
 """
 from __future__ import annotations
 import argparse
+from contextlib import closing
 import json
 import shutil
 import sqlite3
@@ -19,7 +20,8 @@ REPORT="FC27_POSTDEADLINE_SQUAD_HANDOFF_REPORT.json"
 
 
 def apply_completed_career_transfers(stage:sqlite3.Connection,
-                                     career:sqlite3.Connection,*,career_id:str):
+                                     career:sqlite3.Connection,*,career_id:str,
+                                     strict_source_counts=True):
     """Reconcile immutable career registration events by matching source keys."""
     if not isinstance(career_id,str) or not career_id.strip():
         raise ValueError("A specific completed career is required")
@@ -43,7 +45,7 @@ def apply_completed_career_transfers(stage:sqlite3.Connection,
           FROM world_dataset_pes_v2_player_map WHERE dataset_id=?""",(DATASET,)))
     clubs=dict(career.execute("""SELECT world_id,source_key
           FROM world_dataset_pes_v2_club_map WHERE dataset_id=?""",(DATASET,)))
-    if len(players)!=17593 or len(clubs)!=659:
+    if strict_source_counts and (len(players)!=17593 or len(clubs)!=659):
         raise ValueError("Source-key crosswalk must cover all 17,593 players and 659 clubs")
     events=career.execute("""SELECT offer_id,player_id,from_club_id,to_club_id
           FROM world_career_preseason_registration_events
@@ -93,7 +95,8 @@ def apply_completed_career_transfers(stage:sqlite3.Connection,
 
 
 def build_completed_career_review(stage_file:Path|str,career_file:Path|str,
-                                  career_id:str,output:Path|str,*,platform="pc"):
+                                  career_id:str,output:Path|str,*,platform="pc",
+                                  strict_source_counts=True):
     """Write a new isolated, source-preserving squad staging and review CSV."""
     original=Path(stage_file).resolve()
     frozen_career=Path(career_file).resolve()
@@ -104,11 +107,12 @@ def build_completed_career_review(stage_file:Path|str,career_file:Path|str,
     try:
         target=out/STAGED_DB
         shutil.copy2(original,target)
-        with (sqlite3.connect(frozen_career.as_uri()+"?mode=ro",uri=True)
-              as career, sqlite3.connect(target) as stage):
+        with (closing(sqlite3.connect(frozen_career.as_uri()+"?mode=ro",uri=True))
+              as career, closing(sqlite3.connect(target)) as stage):
             stage.execute("PRAGMA foreign_keys=ON")
             changes=apply_completed_career_transfers(
-                stage,career,career_id=career_id)
+                stage,career,career_id=career_id,
+                strict_source_counts=strict_source_counts)
             preview=export_playable_preview(stage,out,platform=platform)
             # This is not native PES data. Never conflate a reviewed CSV
             # with an importable PC or PS4 EDIT file.
