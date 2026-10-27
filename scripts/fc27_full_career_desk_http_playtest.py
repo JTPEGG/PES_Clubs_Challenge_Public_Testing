@@ -216,11 +216,11 @@ def simulate(world,stage,output):
         post(browser,market_url+"/buy",csrf,
              {"player_id":str(target[0]),
               "offered_fee":str(round(target[1]*1.6)),
-              "request_key":"fc27-e2e-manager-original-offer"},
+              "request_key":"manager-buy-v1-fc27-e2e-original"},
              moment=started+timedelta(seconds=2))
         offer=read(world,"""SELECT offer_id,status,player_id FROM world_career_offers
             WHERE career_id=? AND request_key=?""",
-            (CAREER,"fc27-e2e-manager-original-offer"))
+            (CAREER,"manager-buy-v1-fc27-e2e-original"))
         if len(offer)!=1 or offer[0]["player_id"]!=target[0]:
             raise AssertionError("Human browser bid failed to persist in FC27 career")
         steps.append({"step":"human_club_bid","offer_id":offer[0]["offer_id"],
@@ -291,7 +291,7 @@ def simulate(world,stage,output):
         if count_again!=len(events):raise AssertionError("Refresh duplicated transfers")
         late=browser.post(market_url+"/buy",data={
             "csrf":csrf,"player_id":str(target[0]),"offered_fee":str(target[1]*2),
-            "request_key":"fc27-e2e-postdeadline-bypass"},
+            "request_key":"manager-buy-v1-fc27-e2e-late-bypass"},
             base_url="https://localhost")
         if late.status_code!=302 or "error=" not in late.headers.get("Location",""):
             raise AssertionError("Post-deadline human offer was wrongly accepted")
