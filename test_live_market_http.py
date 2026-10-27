@@ -924,7 +924,7 @@ class LiveMarketHttpTests(unittest.TestCase):
         self.assertIn("error=",second.headers["Location"])
 
     def test_03f_late_market_moments_and_goalkeeper_balance(self):
-        from world_live_market import MARKET_MOMENTS,MAX_NEW_BIDS,MAX_GK_BIDS
+        from world_live_market import MARKET_MOMENTS
         from world_preseason_window import window_snapshot
         t=datetime.now(timezone.utc)
         with self.connect_db() as db:
@@ -985,14 +985,27 @@ class LiveMarketHttpTests(unittest.TestCase):
             print(f"AI_WORLD_KEEPER_SIGNINGS={keeper_world};OUTFIELD_SIGNINGS={world_signed-keeper_world}")
             self.assertLessEqual(keeper_world,max(2,world_signed//3),
                 "Goalkeepers should no longer dominate all completed market transfers")
+            # FC27 and current live markets deliberately have NO global
+            # incoming or GK deal quota. Test real routing/ledger identity,
+            # not removed arbitrary cap constants from a legacy prototype.
             incoming=db.execute("""SELECT COUNT(*) FROM world_career_offers
                 WHERE request_key LIKE 'live-v1-%'""").fetchone()[0]
-            self.assertLessEqual(incoming,MAX_NEW_BIDS)
-            goalkeepers=db.execute("""SELECT COUNT(*) FROM world_career_offers o
-                JOIN world_players p ON p.player_id=o.player_id
-                WHERE o.request_key LIKE 'live-v1-%'
-                AND UPPER(COALESCE(p.primary_position,''))='GK'""").fetchone()[0]
-            self.assertLessEqual(goalkeepers,MAX_GK_BIDS)
+            routed=db.execute("""SELECT COUNT(*) FROM world_career_offers o
+                JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
+                JOIN world_career_saves c ON c.career_id=o.career_id
+                JOIN world_career_preseason_windows w ON w.window_id=wo.window_id
+                WHERE o.career_id=? AND o.request_key LIKE 'live-v1-%'
+                  AND o.selling_club_id=c.manager_club_id
+                  AND o.buying_club_id<>c.manager_club_id
+                  AND w.career_id=o.career_id AND w.season_index=1""",
+                  (CAREER,)).fetchone()[0]
+            self.assertGreater(incoming,0)
+            self.assertEqual(routed,incoming,
+                "Autonomous incoming bids must all belong to the manager's live career window")
+            self.assertEqual(db.execute("""SELECT COUNT(DISTINCT request_key)
+                 FROM world_career_offers
+                 WHERE request_key LIKE 'live-v1-%'""").fetchone()[0],incoming,
+                 "Every autonomous incoming offer has an idempotent request key")
             self.assertEqual(window_snapshot(db,career_id=CAREER)["state"],"open")
 
     def test_03g_morale_request_vs_refusal_and_squad_eligibility(self):

@@ -1,0 +1,60 @@
+name: Career Desk single 30-minute live-window playtest
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/career-desk-single-window-playtest.yml'
+      - 'world_career_play.py'
+      - 'world_career_ui.py'
+      - 'world_live_market.py'
+      - 'world_preseason_window.py'
+      - 'world_offer_deadlines.py'
+      - 'world_career_incoming.py'
+      - 'world_live_buying.py'
+      - 'test_live_market_http.py'
+      - 'test_preseason_window.py'
+      - 'test_offer_deadlines.py'
+      - 'test_world_career_play.py'
+permissions:
+  contents: read
+concurrency:
+  group: career-desk-single-window-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  one-window-manager-playtest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install app runtime
+        run: python -m pip install -r requirements.txt
+      - name: Verify exactly ONE immutable 30-minute pre-season transfer window
+        run: |
+          python - <<'PY'
+          from world_preseason_window import WINDOW_SECONDS
+          assert WINDOW_SECONDS == 1800
+          from pathlib import Path
+          ui=Path('world_career_play.py').read_text()
+          assert 'Start 30-minute transfer window' in ui
+          assert 'manager_respond(db,career_id=career_id' in ui
+          assert 'process_live_market(db,career_id=career_id)' in ui
+          assert 'window_snapshot(db,career_id=career_id)' in ui
+          assert 'Final transfer window report' in ui
+          assert 'setInterval(function(){' in ui
+          print('ONE 30-MINUTE WINDOW; no separate finalisation period')
+          PY
+      - name: Test user-visible authenticated manager flow and deadline registration
+        run: |
+          python -m unittest -v \
+            test_preseason_window \
+            test_offer_deadlines \
+            test_live_market_http \
+            test_world_career_play
+      - name: Summarise browser-sandbox acceptance scope
+        run: |
+          echo 'Source: disposable England 2026/27 seeded club fixtures (HTTP E2E); no native PES EDIT generated.'
+          echo 'Validated: login/CSRF, one 30-minute clock, autonomous inbox, counters, accepts, delays, signed deals, deadline expiry, idempotent registration.'
+          echo 'FC27 full 659-club simulation validated separately; browser flow with full FC27 dataset still needs a live end-to-end playtest.'
