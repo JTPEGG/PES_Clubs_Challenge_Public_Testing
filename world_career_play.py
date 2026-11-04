@@ -958,7 +958,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if scout_attribute %}<td>{{p.detail_attribute if p.detail_attribute is not none else '—'}}</td>{% endif %}
 </tr>{% endfor %}</tbody></table></div>
 <nav class="desk-scout-pager" aria-label="Scouting pages">
- <span>Showing {{scout_first}}–{{scout_last}} of {{scout_total}} players
+ <span>Showing {{scout_first}}–{{scout_last}} of {{'{:,}'.format(scout_total)}} players
  · Page {{scout_page}} of {{scout_pages}}</span>
  <div class="desk-scout-pager-actions">
  {% if scout_prev_url %}<a href="{{scout_prev_url}}" class="desk-page-link">← Previous</a>{% endif %}
