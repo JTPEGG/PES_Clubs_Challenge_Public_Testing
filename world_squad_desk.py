@@ -80,10 +80,21 @@ def squad_preview(conn,*,career_id):
         move=pending.get(player)
         arrival=move=="buying"
         departure=move=="selling"
+        # Before the clock starts there is no live_market context row.
+        # Falling back to "rotation" here incorrectly labels the entire
+        # FC27 squad as rotation, even though a verified game role estimate
+        # already exists from their source OVR and positional depth.
+        inferred=None
+        if role is None and estimate_role is None and dataset=="fc27-warehouse-659-mens-2026-27":
+            from world_fc27_player_decisions_context import game_player_facts
+            inferred=game_player_facts(conn,career_id,player)
         data=dict(player_id=player,club_id=club,full_name=name,
                   position=pos,overall=overall,market_value=value,
-                  role=role or estimate_role or "rotation",
-                  listed=bool(listed if listed is not None else estimate_listed),
+                  role=role or estimate_role or
+                       (inferred or {}).get("current_role") or "rotation",
+                  listed=bool(listed if listed is not None else
+                              estimate_listed if estimate_listed is not None
+                              else (inferred or {}).get("transfer_listed",False)),
                   incoming=arrival,departing=departure,
                   from_club=club_name if arrival else None,
                   morale_status=(morale.get(player) or {}).get("status"),
@@ -134,11 +145,21 @@ def update_squad_player(conn,*,career_id,player_id,
         WHERE dataset_id=? AND player_id=?""",(club[1],player_id)).fetchone()
     if not info or info[0] is None:raise ValueError("Player has no rated career record")
     overall=int(info[0])
-    wage=(data[0] if data else max(1000,min(350000,
-        round(1000*2**((overall-55)/8)/500)*500)))
-    new_role=role if role is not None else (data[1] if data else "rotation")
-    new_listed=int(listed) if listed is not None else int(data[2]) if data else 0
-    renewal=(data[3] if data else "renewal_offered")
+    # Pre-window edits such as transfer-listing must preserve the game's
+    # initial status and source FC27 wage, rather than overwriting the
+    # player's context with a generic 'rotation' and synthetic wage.
+    base=None
+    if data is None and club[1]=="fc27-warehouse-659-mens-2026-27":
+        from world_fc27_player_decisions_context import game_player_facts
+        base=game_player_facts(conn,career_id,player_id)
+    wage=(data[0] if data else base["current_wage_weekly"] if base else
+          max(1000,min(350000,round(1000*2**((overall-55)/8)/500)*500)))
+    new_role=(role if role is not None else data[1] if data else
+              base["current_role"] if base else "rotation")
+    new_listed=(int(listed) if listed is not None else int(data[2]) if data
+                else int(base["transfer_listed"]) if base else 0)
+    renewal=(data[3] if data else
+             base["renewal_status"] if base else "renewal_offered")
     if offer_to_clubs and not new_listed:
         raise ValueError("Transfer-list this player before offering him to clubs")
     conn.execute("""INSERT INTO world_career_player_circumstances
