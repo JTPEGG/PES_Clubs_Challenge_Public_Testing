@@ -141,6 +141,23 @@ def run(world,output):
             page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
             check(page.locator('form.scout-filters').is_visible(),
                   "Scouting form absent on full FC27 source")
+            # A manager can spend minutes editing a scouting field. The
+            # market must continue advancing in independent server calls,
+            # not stop ticking because a focused input prevents reload.
+            scout_input=page.locator('input[name="scout_query"]')
+            scout_input.focus()
+            with page.expect_response(
+              lambda response:'/market/pulse' in response.url
+                              and response.status==200,
+              timeout=30000) as pulse_response:
+                page.wait_for_timeout(18000)
+            pulse=pulse_response.value.json()
+            check(pulse["state"]=="open" and pulse["messages"]>=1
+                  and pulse["incoming_offers"]>=0,
+                  "Focused-input market heartbeat did not report authoritative FC27 state")
+            check(scout_input.evaluate("(el)=>document.activeElement===el"),
+                  "Market progress interrupted or reset the actively edited Scouting form")
+            found.append("Autonomous market heartbeat keeps ticking while manager is focused on Scouting")
             check("WH27:" not in page.locator("#desk-view-scouting").inner_text(),
                   "Internal FC27 source tags visible in scouting club labels")
             check(page.locator("#desk-view-scouting .desk-scout-pager").is_visible(),

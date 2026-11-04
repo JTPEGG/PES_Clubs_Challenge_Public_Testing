@@ -697,6 +697,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 
 </style></head><body class="desk-ui" data-window-state="{{snap.state}}" data-spectator="{{'true' if spectator else 'false'}}"
  data-incoming-offers="{{offers|length}}" data-unread="{{unread}}"
+ data-last-message-id="{{messages[0].message_id if messages else 0}}"
  data-signed="{{signed}}" data-saved="{{shortlist|length}}"
  data-fee-remaining="{{funds}}" data-fee-total="{{budget_total}}"
  data-wage-remaining="{{wage_headroom}}" data-wage-total="{{wage_total}}">
@@ -1312,12 +1313,82 @@ Rejected and expired offers are not transfers.</p>
     clock.textContent=minutes+':'+seconds;
   }
   update();setInterval(update,1000);
-  if(document.body.dataset.windowState==='open'){
-   setInterval(function(){
-     const active=document.activeElement;
-     if(active && active.matches('input,textarea,select'))return;
-     location.reload();
-   },15000);
+  if(document.body.dataset.windowState==='open' &&
+     document.body.dataset.spectator!=='true'){
+   // The game clock cannot depend on a page reload. An active search field,
+   // contract form or scouting filter used to suppress ALL market updates,
+   // even though 30 minutes continued to elapse. Poll independently of
+   // input focus and never erase unsaved form changes.
+   let marketPulseBusy=false;
+   let lastInboxMessage=Number(document.body.dataset.lastMessageId||0);
+   const marketPath=window.location.pathname+'/pulse';
+   function refreshUnread(n){
+     document.body.dataset.unread=String(n);
+     document.querySelectorAll('[data-desk-tab="inbox"]').forEach(function(nav){
+       let badge=nav.querySelector('.desk-nav-count');
+       if(n>0){
+         if(!badge){
+           badge=document.createElement('span');
+           badge.className='desk-nav-count';
+           nav.appendChild(badge);
+         }
+         badge.textContent=String(n);
+       }else if(badge){badge.remove();}
+     });
+   }
+   function updateNotice(count){
+     let notice=document.getElementById('desk-new-market-activity');
+     if(!notice){
+       notice=document.createElement('div');
+       notice.id='desk-new-market-activity';
+       notice.className='desk-global-message';
+       notice.setAttribute('role','status');
+       const title=document.createElement('strong');
+       title.id='desk-new-market-headline';
+       const button=document.createElement('button');
+       button.type='button';
+       button.textContent='Open updated Inbox';
+       button.style.marginLeft='12px';
+       button.addEventListener('click',function(){
+         history.replaceState(null,'','#inbox');location.reload();
+       });
+       notice.appendChild(title);notice.appendChild(button);
+       const anchor=document.querySelector('.desk-intro');
+       if(anchor)anchor.insertAdjacentElement('afterend',notice);
+       else document.querySelector('.desk-workspace')?.prepend(notice);
+     }
+     notice.querySelector('#desk-new-market-headline').textContent=
+       count+' unread market notification'+(count===1?'':'s');
+   }
+   function marketHeartbeat(){
+     if(marketPulseBusy)return;
+     marketPulseBusy=true;
+     fetch(marketPath,{credentials:'same-origin',cache:'no-store',
+         headers:{'Accept':'application/json'}})
+       .then(function(response){
+         if(!response.ok)throw new Error('Market heartbeat rejected');
+         return response.json();
+       })
+       .then(function(state){
+         if(state.state==='closed' || state.state==='deadline_reached'){
+           location.reload();return;
+         }
+         const current=Number(state.latest_message_id||0);
+         const unread=Number(state.unread||0);
+         refreshUnread(unread);
+         if(current>lastInboxMessage){
+           lastInboxMessage=current;
+           document.body.dataset.lastMessageId=String(current);
+           if(unread>0)updateNotice(unread);
+         }
+       })
+       .catch(function(){
+         // The next poll retries naturally; never invent an offer or clear
+         // a server unread count following a failed response.
+       })
+       .finally(function(){marketPulseBusy=false;});
+   }
+   setInterval(marketHeartbeat,15000);
   }
  }
 })();
@@ -1395,6 +1466,35 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
 {% if player.attributes %}<table>{% for item in player.attributes %}
 <tr><td>{{item.name|replace('_',' ')|title}}</td><td><b>{{item.value}}</b></td></tr>
 {% endfor %}</table>{% else %}<p class="muted">No source-backed individual attributes currently available.</p>{% endif %}
+</div>
+{% if market_open %}
+<div id="scout-market-pulse-note" class="card" style="display:none" role="status">
+ <strong>New Inbox activity</strong>
+ <a href="/world/play/career/{{career_id}}/market#inbox">Open Manager's Inbox</a>
+</div>
+<script>
+(function(){
+  let busy=false;
+  function updateMarket(){
+    if(busy)return;
+    busy=true;
+    fetch("/world/play/career/{{career_id}}/market/pulse",{
+      cache:'no-store',credentials:'same-origin',headers:{'Accept':'application/json'}
+    }).then(function(response){
+      if(!response.ok)throw new Error('Market update unavailable');
+      return response.json();
+    }).then(function(data){
+      if(data.unread>0 && data.incoming_offers>0){
+        document.getElementById('scout-market-pulse-note').style.display='';
+      }
+    }).catch(function(){
+      // Preserve the scouting and fee-input work on a temporary network error.
+    }).finally(function(){busy=false;});
+  }
+  setInterval(updateMarket,15000);
+})();
+</script>
+{% endif %}
 </div></main></body></html>"""
 
 CAREER_MANAGEMENT_PAGE = """<!doctype html><html lang="en"><head>
@@ -2350,6 +2450,37 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 if result.get("changed"):
                     request.environ["career_live_market_dirty"]=True
             return live_market_render(db,career_id=career_id)
+
+    @bp.get("/world/play/career/<career_id>/market/pulse")
+    def manager_market_pulse(career_id):
+        """Advance due FC27 AI activity even while Scouting inputs have focus.
+
+        This is an authenticated same-origin, no-cache market heartbeat, not
+        a command to create an offer. All original sporting, financial and
+        player-choice vetoes still apply, with replay-safe moment keys.
+        """
+        if not authenticated():
+            return jsonify(error="Authentication required"),401
+        with connect() as db:
+            career=db.execute("""SELECT manager_club_id FROM world_career_saves
+                WHERE career_id=? AND state='sandbox'""",(career_id,)).fetchone()
+            if career is None:abort(404)
+            process_live_market(db,career_id=career_id)
+            snap=window_snapshot(db,career_id=career_id)
+            msg=db.execute("""SELECT COUNT(*),COALESCE(MAX(message_id),0),
+                COALESCE(SUM(CASE WHEN is_read=0 THEN 1 ELSE 0 END),0)
+                FROM world_career_market_inbox WHERE career_id=?""",
+                (career_id,)).fetchone()
+            offers=db.execute("""SELECT COUNT(*) FROM world_career_offers
+                WHERE career_id=? AND selling_club_id=?
+                  AND buying_club_id<>?""",
+                (career_id,career[0],career[0])).fetchone()[0]
+            payload=dict(state=snap["state"],latest_message_id=msg[1],
+                unread=msg[2],incoming_offers=offers,
+                messages=msg[0],remaining_seconds=snap["remaining_seconds"])
+        response=jsonify(payload)
+        response.headers["Cache-Control"]="private, no-store"
+        return response
 
     @bp.post("/world/play/career/<career_id>/market/start")
     def manager_market_start(career_id):
