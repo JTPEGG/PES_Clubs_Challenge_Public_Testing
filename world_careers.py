@@ -259,7 +259,18 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
         teams=conn.execute("""SELECT e.club_id,c.tier FROM world_dataset_entries e
             JOIN world_competitions c ON c.competition_id=e.competition_id
             WHERE e.dataset_id=?""",(dataset_id,)).fetchall()
-        if manager_club_id not in {x[0] for x in teams}:raise ValueError("Manager club not in dataset")
+        if manager_club_id not in {x[0] for x in teams}:
+            raise ValueError("Manager club not in dataset")
+        if (dataset_id=="fc27-warehouse-659-mens-2026-27"
+                and os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1"):
+            # Server-side enforcement: a forged POST cannot manage one of
+            # the 315 non-playable background clubs.
+            from world_fc27_manager_playability import approved_manager_club_ids
+            if manager_club_id not in approved_manager_club_ids(
+                    conn,dataset_id=dataset_id):
+                raise ValueError(
+                    "This FC27 club is in the AI transfer world but not "
+                    "one of the 344 manager-playable clubs")
         conn.execute("""INSERT INTO world_career_saves
             (career_id,dataset_id,title,economy_version,manager_club_id,pes_lock_date,next_summer_date)
             VALUES(?,?,?,?,?,?,?)""",(career_id,dataset_id,title,economy_version,manager_club_id,
