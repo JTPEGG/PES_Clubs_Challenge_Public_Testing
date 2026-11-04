@@ -2109,7 +2109,10 @@ def create_play_blueprint(db_path):
         scout_first=(scout_page-1)*scout_page_size+1 if scout_results else 0
         scout_last=(scout_page-1)*scout_page_size+len(scout_results)
         def scout_page_url(page_number):
-            params={k:v for k,v in request.args.items() if k!="scout_page"}
+            # Preserve scouting filters, but never drag transient notices,
+            # player-search inputs or unrelated query state across pages.
+            params={k:v for k,v in request.args.items()
+                    if k.startswith("scout_") and k!="scout_page"}
             params["scout_page"]=str(page_number)
             return ("/world/play/career/"+career_id+"/market?"+
                     urlencode(params)+"#scouting")
