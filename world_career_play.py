@@ -1466,6 +1466,35 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
 {% if player.attributes %}<table>{% for item in player.attributes %}
 <tr><td>{{item.name|replace('_',' ')|title}}</td><td><b>{{item.value}}</b></td></tr>
 {% endfor %}</table>{% else %}<p class="muted">No source-backed individual attributes currently available.</p>{% endif %}
+</div>
+{% if market_open %}
+<div id="scout-market-pulse-note" class="card" style="display:none" role="status">
+ <strong>New Inbox activity</strong>
+ <a href="/world/play/career/{{career_id}}/market#inbox">Open Manager's Inbox</a>
+</div>
+<script>
+(function(){
+  let busy=false;
+  function updateMarket(){
+    if(busy)return;
+    busy=true;
+    fetch("/world/play/career/{{career_id}}/market/pulse",{
+      cache:'no-store',credentials:'same-origin',headers:{'Accept':'application/json'}
+    }).then(function(response){
+      if(!response.ok)throw new Error('Market update unavailable');
+      return response.json();
+    }).then(function(data){
+      if(data.unread>0 && data.incoming_offers>0){
+        document.getElementById('scout-market-pulse-note').style.display='';
+      }
+    }).catch(function(){
+      // Preserve the scouting and fee-input work on a temporary network error.
+    }).finally(function(){busy=false;});
+  }
+  setInterval(updateMarket,15000);
+})();
+</script>
+{% endif %}
 </div></main></body></html>"""
 
 CAREER_MANAGEMENT_PAGE = """<!doctype html><html lang="en"><head>
