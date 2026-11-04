@@ -153,13 +153,20 @@ All deals are subject to the PES league summer registration lock. This screen ca
 <p class="muted">The club list belongs to your selected dataset. Historical teams only appear after an independent historical season has been imported.</p>
 <label>Player and agent decision model</label>
 <select name="player_decision_version">
-<option value="player-decisions-v2" {% if selected_dataset=='england-2026-27-fc27' %}selected{% endif %} {% if selected_dataset!='england-2026-27-fc27' %}disabled{% endif %}>Player decisions v2 — current wages, squad role, transfer listing, contract status and club appeal</option>
+<option value="player-decisions-v2" {% if selected_dataset in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}selected{% endif %} {% if selected_dataset not in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}disabled{% endif %}>Player decisions v2 — sporting appeal, current wages, playing time, contracts and player motivations</option>
 <option value="player-decisions-v1">Player decisions v1 (old model — for comparison)</option>
 <option value="legacy-sporting-v2" {% if selected_dataset!='england-2026-27-fc27' %}selected{% endif %}>Legacy sporting-appeal only</option>
 </select>
-<p class="muted">The new model freezes the <b>provisional 92-club historical prestige draft</b> in this new career.
-It is a gameplay calibration, not a verified real-world player preference. Existing careers keep their original model;
-later global prestige edits do not rewrite your career's saved inputs.</p>
+{% if selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
+<p class="muted">FC27 player decisions v2 uses <b>source-game wages and contracts</b>,
+simulated squad roles and transfer motivations, and the approved 659-club sporting-appeal model.
+These are game decisions, <b>not verified real-world player intentions</b>.
+Unverified European qualification carries no assumed advantage or disadvantage.
+No manual player-by-player setup is required for the model.</p>
+{% else %}
+<p class="muted">The 92-club model freezes provisional prestige rankings for each career.
+Those are game calibrations, not verified personal player motivations. Existing careers retain their saved decisions.</p>
+{% endif %}
 <p><a href="/world/player-decisions">Test hypothetical player decisions without creating a career →</a></p>
 <label>Economy model</label><select name="economy_version"><option value="prototype-v1">Prototype v1 (fictional, subject to rebalance)</option></select>
 <label>Financial scale</label><select name="scale"><option value="0.5">Conservative 0.5×</option><option value="1" selected>Baseline 1×</option><option value="1.5">Generous 1.5×</option></select>
@@ -174,12 +181,15 @@ later global prestige edits do not rewrite your career's saved inputs.</p>
 <a href="/world/play/career/{{career['career_id']}}/selling">Selling clubs and board overrides →</a></p>
 <div class="warn"><b>Player/agent rules:</b> {{decision_policy['version']}}.
 {% if decision_policy['version']=='player-decisions-v2' %}
-This career stores a fixed provisional prestige calibration and now requires
-<b>explicit current wage, current squad role, transfer listing and renewal circumstances</b>
-for each player before agent talks, plus the continental competition
-at each club. Those are user-entered <b>fictional sandbox assumptions</b>
-until independently sourced, not inferred real salaries or transfer requests.
-An elite Arsenal regular will not downgrade merely for a nominal wage offer.
+{% if career['dataset_id']=='fc27-warehouse-659-mens-2026-27' %}
+This FC27 career uses <b>source-game wages and contracts with game-model squad roles,
+listing and renewal decisions</b>. Club appeal comes from the 659-club game model;
+unknown European participation is neutral rather than invented.
+Any manual edits are optional game scenario overrides. These are not verified real club or player statements.
+{% else %}
+This career stores provisional 92-club prestige and requires explicit wages, roles,
+listing, renewal and continental circumstances before V2 can assess moves.
+{% endif %}
 {% elif decision_policy['version']=='player-decisions-v1' %}
 This existing career retains its frozen proposal prestige snapshot and earlier prestige/age model.
 Its player circumstances are not silently changed to v2.
