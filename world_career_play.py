@@ -1321,7 +1321,7 @@ Rejected and expired offers are not transfers.</p>
    // input focus and never erase unsaved form changes.
    let marketPulseBusy=false;
    let lastInboxMessage=Number(document.body.dataset.lastMessageId||0);
-   const marketPath=window.location.pathname.replace(/\\/$/,'')+'/pulse';
+   const marketPath=window.location.pathname+'/pulse';
    function refreshUnread(n){
      document.body.dataset.unread=String(n);
      document.querySelectorAll('[data-desk-tab="inbox"]').forEach(function(nav){
