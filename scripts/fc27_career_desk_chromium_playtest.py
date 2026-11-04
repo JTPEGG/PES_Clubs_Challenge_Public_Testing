@@ -98,11 +98,11 @@ def run(world,output):
             page.locator('form[action="/world/play/login"] button').click()
             page.goto(base+"/world/play?dataset="+DATASET,
                       wait_until="domcontentloaded")
-            check(page.locator("#manager-country option").count()>10,
-                  "Full-FC27 country selection missing")
+            check(page.locator("#manager-country option").count()==10,
+                  "Nine approved FC27 countries (including MLS) should be manager-selectable")
             check(page.locator("#manager-club").is_disabled(),
                   "Cascading club selector did not wait for a country and league")
-            found.append("Full 659-club career selection visible in real Chromium")
+            found.append("Approved 344 manager clubs available; full 659 remain in AI market")
 
             page.goto(base+manager_path,wait_until="domcontentloaded")
             check(page.locator('button:has-text("Start 30-minute transfer window")').count()==1,
