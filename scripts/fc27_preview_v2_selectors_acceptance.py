@@ -1,5 +1,6 @@
 """Chromium acceptance of FC27 V2 and country > league > team playtest UI."""
 import argparse
+import re
 import os
 from pathlib import Path
 import sqlite3
@@ -87,8 +88,17 @@ def run(output):
             page.locator('#manager-club').select_option(label="Arsenal")
             check(page.locator('#manager-club').input_value()==str(cid),
                   "Country/league/club cascade selected wrong source club")
-            check(page.locator('select[name="player_decision_version"]').input_value()=="player-decisions-v2",
-                  "Full FC27 V2 player decisions not enabled/selected")
+            # Technical settings must not clutter the human-manager flow.
+            for name in ("career_id","pes_lock_date","next_summer_date",
+                         "economy_version","scale","player_decision_version"):
+                check(page.locator(f'[name="{name}"]').count()==0,
+                      f"Unnecessary developer setting exposed to manager: {name}")
+            check(page.locator('#career-title').is_visible(),
+                  "Optional career-name field missing")
+            check(not page.locator('#career-title').get_attribute('required'),
+                  "Career name should be optional")
+            check(page.locator('form[action="/world/play"] select').count()==0,
+                  "Technical dataset picker still visible in FC27 preview")
             page.screenshot(path=str(root/"01-fc27-country-league-club-v2.png"),full_page=True)
             # Reject forged POST with an otherwise valid (but AI-only)
             # source club ID; browser filtering alone is insufficient.
@@ -110,27 +120,50 @@ def run(output):
                     WHERE career_id='fc27_closed_club_cannot_manage'""").fetchone()[0]==0,
                       "Failed closed-club career left partial saved state")
             form=page.locator('form[action="/world/play/create"]')
-            form.locator('input[name="career_id"]').fill("fc27_v2_selector_regression")
-            form.locator('input[name="title"]').fill("FC27 V2 dynamic country league club test")
-            form.locator('button').click()
-            page.wait_for_url("**/world/play/career/fc27_v2_selector_regression",timeout=30000)
-            check("error=" not in page.url,"FC27 V2 career creation was refused")
+            # Simulate a stale/manipulated client: the server must override
+            # attempts to alter the season rules, model or financial scale.
+            form.evaluate("""form => {
+               for(const [name,value] of Object.entries({
+                 'pes_lock_date':'2030-01-01',
+                 'next_summer_date':'2032-01-01',
+                 'economy_version':'tampered',
+                 'player_decision_version':'legacy-sporting-v2',
+                 'scale':'1.5'
+               })){
+                 const i=document.createElement('input');
+                 i.type='hidden';i.name=name;i.value=value;form.appendChild(i);
+               }
+            }""")
+            form.locator('button[type="submit"]').click()
+            page.wait_for_url(re.compile(r"/world/play/career/fc27-[a-f0-9]{16}/market$"),
+                              timeout=30000)
+            check("error=" not in page.url,"FC27 new career creation was refused")
+            test_career=page.url.split("/career/")[1].split("/")[0]
+            check(page.locator('button:has-text("Start 30-minute transfer window")').count()==1,
+                  "New career did not open the pre-start Manager's Desk")
             with sqlite3.connect(db_path) as db:
-                policy=career_player_policy(db,"fc27_v2_selector_regression")
+                policy=career_player_policy(db,test_career)
                 check(policy["version"]=="player-decisions-v2",
                       "Actual saved FC27 career did not use V2")
+                saved=db.execute("""SELECT title,pes_lock_date,next_summer_date,
+                    economy_version FROM world_career_saves WHERE career_id=?""",
+                    (test_career,)).fetchone()
+                check(saved==("Arsenal · 2026/27","2026-08-01",
+                              "2027-07-01","prototype-v1"),
+                      "Server-side career name/dates/economy defaults not enforced: "+str(saved))
+
                 prestige_count=db.execute("""SELECT COUNT(*) FROM
                     world_career_prestige_snapshots WHERE career_id=?""",
-                    ("fc27_v2_selector_regression",)).fetchone()[0]
+                    (test_career,)).fetchone()[0]
                 check(prestige_count==659,f"V2 frozen profiles {prestige_count} not 659")
                 player=db.execute("""SELECT r.player_id FROM world_career_registrations r
                     JOIN world_career_contract_snapshots ct ON ct.career_id=r.career_id
                       AND ct.player_id=r.player_id
                     WHERE r.career_id=? AND r.club_id=?
                       AND ct.weekly_wage_gbp IS NOT NULL LIMIT 1""",
-                      ("fc27_v2_selector_regression",cid)).fetchone()
+                      (test_career,cid)).fetchone()
                 check(player is not None,"No source-backed Arsenal wages")
-                context=player_circumstances(db,"fc27_v2_selector_regression",player[0])
+                context=player_circumstances(db,test_career,player[0])
                 check(context and context["source_kind"].startswith("FC27_GAME_ESTIMATE")
                       and context["current_wage_weekly"]>=0
                       and context["current_role"]!="unknown"
@@ -151,18 +184,18 @@ def run(output):
                       AND x.overall BETWEEN 67 AND 78
                       AND ct.weekly_wage_gbp IS NOT NULL
                     ORDER BY x.overall DESC LIMIT 1""",
-                    (DATASET,"fc27_v2_selector_regression",cid)).fetchone()
+                    (DATASET,test_career,cid)).fetchone()
                 check(candidate is not None,"No FC27 cross-club candidate for real V2 scenario")
                 cur=db.execute("""INSERT INTO world_career_offers
                     (career_id,request_key,player_id,buying_club_id,
                      selling_club_id,offered_fee,status,agreement_date,
                      source_rating,economy_version)
                     VALUES(?,?,?,?,?,?,'accepted_pending_contract',?,?,'prototype-v1')""",
-                    ("fc27_v2_selector_regression","CI_FC27_V2_EVAL_ONLY",
+                    (test_career,"CI_FC27_V2_EVAL_ONLY",
                      candidate["player_id"],cid,candidate["club_id"],
                      1000000,"2026-08-01",candidate["overall"]))
                 db.commit()
-                interest=player_move_interest(db,career_id="fc27_v2_selector_regression",
+                interest=player_move_interest(db,career_id=test_career,
                                              offer_id=cur.lastrowid)
                 check(interest["policy_version"]=="player-decisions-v2"
                       and interest["decision"]!="review",
@@ -184,7 +217,7 @@ def run(output):
                 renewal_status=context["renewal_status"],buyer_europe="unknown",
                 seller_europe="unknown")
             check(strict["decision"]=="review","Existing V2 protections inadvertently weakened")
-            page.goto(base+"/world/play/career/fc27_v2_selector_regression/market",
+            page.goto(base+"/world/play/career/"+test_career+"/market",
                 wait_until="domcontentloaded")
             check(page.locator('button:has-text("Start 30-minute transfer window")').count()==1,
                 "Single transfer-window start missing")

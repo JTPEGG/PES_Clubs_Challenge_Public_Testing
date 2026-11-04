@@ -75,33 +75,85 @@ table{border-collapse:collapse;width:100%;margin:20px 0}td,th{padding:11px;text-
 input,select,button{font:inherit;padding:8px 10px;background:#273c50;color:white;border:1px solid #5b748b;border-radius:6px}
 button{cursor:pointer;background:#285b83}button:disabled{opacity:.5}label{display:block;margin:10px 0 3px}
 form{margin:12px 0}.inline{display:inline}.danger{background:#613940}
-</style></head><body>
+/* A career should be set up by choosing a club, not configuring an engine. */
+body.fc27-setup{min-height:100vh;background:radial-gradient(ellipse at 70% -15%,#1b435a,#101c2c 48%,#0b1421);color:#f0f7fb}
+.fc27-setup header{padding:19px max(22px,calc((100vw - 860px)/2));border-bottom:1px solid #34536a;background:#101f30}
+.fc27-setup .setup-brand{font-weight:800;letter-spacing:.05em;font-size:14px}
+.fc27-setup .setup-brand small{color:#9bdbea;font-size:11px;margin-left:12px}
+.fc27-setup main{max-width:800px;margin:34px auto;padding:0 18px 75px}
+.fc27-setup h1{font-size:clamp(30px,4vw,40px);letter-spacing:-.04em;margin:7px 0}
+.fc27-setup .setup-eyebrow{color:#78cbe0;font-size:11px;font-weight:800;letter-spacing:.15em}
+.fc27-setup .setup-lead{color:#b4c9d9;font-size:15px;line-height:1.6;max-width:670px;margin:8px 0 24px}
+.fc27-setup .fc27-start-form{padding:clamp(20px,4vw,32px);background:#172a3d;border:1px solid #3b5d74;border-radius:16px;box-shadow:0 14px 38px #01071155;margin:0}
+.fc27-setup .setup-step{display:flex;gap:12px;align-items:center;margin:0 0 16px}
+.fc27-setup .setup-number{width:33px;height:33px;border-radius:9px;background:#1d596f;border:1px solid #4389a0;display:grid;place-items:center;color:#c2eff8;font-weight:800}
+.fc27-setup .setup-step strong{font-size:18px}
+.fc27-setup .setup-step small{display:block;color:#aec5d3;font-size:12px;margin-top:3px}
+.fc27-setup #club-cascade{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 15px}
+.fc27-setup #club-cascade label{font-size:13px;font-weight:700;color:#c8dbe8;margin:3px 0 0}
+.fc27-setup #club-cascade select{box-sizing:border-box;width:100%;min-width:0;min-height:46px;padding:10px 12px;background:#223c51;border:1px solid #4b7188;border-radius:9px}
+.fc27-setup #club-cascade label[for=manager-country]{grid-column:1;grid-row:1}
+.fc27-setup #club-cascade label[for=manager-league]{grid-column:2;grid-row:1}
+.fc27-setup #club-cascade #manager-country{grid-column:1;grid-row:2}
+.fc27-setup #club-cascade #manager-league{grid-column:2;grid-row:2}
+.fc27-setup #club-cascade label[for=manager-club]{grid-column:1/-1;grid-row:3}
+.fc27-setup #club-cascade #manager-club{grid-column:1/-1;grid-row:4}
+.fc27-setup .setup-note{font-size:12px;color:#b4cad8;line-height:1.6;margin:14px 0 22px}
+.fc27-setup .setup-step-2{padding-top:23px;border-top:1px solid #39536a}
+.fc27-setup #career-title{width:100%;box-sizing:border-box;background:#223c51;border:1px solid #4b7188;border-radius:9px;min-height:46px;padding:11px 13px}
+.fc27-setup .setup-defaults{margin:18px 0 0;background:#1a3b4e;border:1px solid #3e6a7c;border-radius:9px;padding:12px;font-size:12px;color:#c2dbe4;line-height:1.5}
+.fc27-setup .setup-submit{width:100%;display:flex;justify-content:space-between;gap:16px;background:#55bbdf;color:#082031;border:1px solid #89d9ef;font-weight:850;text-align:left;padding:14px 17px;border-radius:9px;margin:23px 0 0;font-size:16px}
+.fc27-setup .setup-submit:hover{background:#80d7ed}
+.fc27-setup .setup-existing{margin:32px 0 0}
+.fc27-setup .setup-existing h2{font-size:20px}
+.fc27-setup .setup-saved{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.fc27-setup .setup-saved .card{display:flex;justify-content:space-between;flex-wrap:wrap;gap:9px}
+@media(max-width:540px){.fc27-setup #club-cascade{grid-template-columns:minmax(0,1fr)}.fc27-setup #club-cascade>label,.fc27-setup #club-cascade>select{grid-column:1!important;grid-row:auto!important}.fc27-setup header{padding:15px 18px}}
+</style></head><body class="{% if mode=='index' and selected_dataset=='fc27-warehouse-659-mens-2026-27' %}fc27-setup{% endif %}">
+{% if mode=='index' and selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
+<header><span class="setup-brand">PES CLUBS CHALLENGE <small>FC27 PLAYTEST</small></span></header>
+{% else %}
 <header><a href="/world/explore">Football World</a> · <a href="/world/market">Market preview</a> · <a href="/world/careers">Career history</a> · <a href="/world/reputations">Reputation audit</a> · <a href="/world/reputations/progression">Season preview</a></header>
-<main><h1>{{title}}</h1>
+{% endif %}
+<main>
+{% if mode=='index' and selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
+<p class="setup-eyebrow">CAREER SETUP · 2026/27</p>
+<h1>Choose your club</h1>
+<p class="setup-lead">Pick your club and enter an optional career name. You'll review your squad before choosing when to start the 30-minute transfer window.</p>
+{% else %}
+<h1>{{title}}</h1>
 <div class="warn"><b>Development sandbox only.</b> These are fictional finance assumptions and source-snapshot squads.
 All deals are subject to the PES league summer registration lock. This screen cannot update the original challenge.
 {% if career %} Economy model: {{career['economy_version']}}. {% endif %}</div>
+{% endif %}
 {% if error %}<div class="warn" role="alert">{{error}}</div>{% endif %}
 {% if not authenticated %}
 <form method="post" action="/world/play/login"><label for="password">Development access passphrase</label>
 <input type="password" id="password" name="password" required autofocus><button type="submit">Unlock career desk</button></form>
 {% elif mode == 'index' %}
 {% if access_required %}<form method="post" action="/world/play/logout"><input type="hidden" name="csrf" value="{{csrf}}"><button>Sign out</button></form>{% endif %}
-{% if careers %}<h2>Your available development sandboxes</h2><div class="grid">
+{% if careers and selected_dataset!='fc27-warehouse-659-mens-2026-27' %}<h2>Your available development sandboxes</h2><div class="grid">
 {% for c in careers %}<div class="card"><b>{{c['title']}}</b><p class="muted">{{c['economy_version']}} · {{c['dataset_id']}}</p>
 <a href="/world/play/career/{{c['career_id']}}/market">Open manager's inbox →</a></div>{% endfor %}</div>{% endif %}
+{% if selected_dataset!='fc27-warehouse-659-mens-2026-27' %}
 <h2>Create new development career</h2>
 <p class="muted">Enhanced selling-club decisions are <b>enabled by default</b> for new careers. Unknown player contracts and selling-club circumstances must still be recorded before bids can progress.</p>
 <form method="get" action="/world/play">
 <label for="browse_dataset">Select starting dataset</label><select name="dataset" id="browse_dataset">{% for d in datasets %}
 <option value="{{d['dataset_id']}}" {% if d['dataset_id']==selected_dataset %}selected{% endif %}>{{d['title']}}</option>{% endfor %}</select>
 <button>Choose dataset</button></form>
-<form method="post" action="/world/play/create">
+{% endif %}
+<form method="post" action="/world/play/create" {% if selected_dataset=='fc27-warehouse-659-mens-2026-27' %}class="fc27-start-form"{% endif %}>
 <input type="hidden" name="csrf" value="{{csrf}}">
+{% if selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
+<div class="setup-step"><span class="setup-number">1</span><span><strong>Select your team</strong><small>Country → League → Club</small></span></div>
+{% else %}
 <label>Career identifier</label><input name="career_id" required placeholder="my-test-career" pattern="[A-Za-z0-9_-]+">
 <label>Career name</label><input name="title" maxlength="80" required placeholder="2026/27 career sandbox">
-<input type="hidden" name="dataset_id" value="{{selected_dataset}}"><p class="muted">Starting snapshot: {{selected_dataset}}</p>
-<div id="club-cascade" style="max-width:500px">
+{% endif %}
+<input type="hidden" name="dataset_id" value="{{selected_dataset}}">
+{% if selected_dataset!='fc27-warehouse-659-mens-2026-27' %}<p class="muted">Starting snapshot: {{selected_dataset}}</p>{% endif %}
+<div id="club-cascade" {% if selected_dataset!='fc27-warehouse-659-mens-2026-27' %}style="max-width:500px"{% endif %}>
 <label for="manager-country" hidden>Country</label>
 <select id="manager-country" hidden><option value="">Choose a country</option></select>
 <label for="manager-league" hidden>League</label>
@@ -151,12 +203,15 @@ All deals are subject to the PES league summer registration lock. This screen ca
 })();
 </script>
 {% if selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
-<p class="muted"><b>344 manager-selectable clubs across 17 competitions.</b>
-The other 315 source clubs remain active in the AI transfer market and cannot be managed.
-Feeder clubs are non-playable. This is a pre-season transfer-window preview, not a certified PES match-ready squad.</p>
+<p class="setup-note"><b>344 manager-selectable clubs</b> in 17 competitions. The remaining 315 clubs still participate in the AI market.</p>
+<div class="setup-step setup-step-2"><span class="setup-number">2</span><span><strong>Name your career</strong><small>Optional — we'll name it after your club if left blank</small></span></div>
+<label for="career-title">Career name <span class="muted">(optional)</span></label>
+<input type="text" id="career-title" name="title" maxlength="80" placeholder="e.g. Arsenal · 2026/27">
+<p class="setup-defaults">Player Decisions V2, standard finances and 2026/27 season dates are already configured for you.</p>
 {% else %}
 <p class="muted">The club list belongs to your selected dataset. Historical teams only appear after an independent historical season has been imported.</p>
 {% endif %}
+{% if selected_dataset!='fc27-warehouse-659-mens-2026-27' %}
 <label>Player and agent decision model</label>
 <select name="player_decision_version">
 <option value="player-decisions-v2" {% if selected_dataset in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}selected{% endif %} {% if selected_dataset not in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}disabled{% endif %}>Player decisions v2 — sporting appeal, current wages, playing time, contracts and player motivations</option>
@@ -178,7 +233,19 @@ Those are game calibrations, not verified personal player motivations. Existing 
 <label>Financial scale</label><select name="scale"><option value="0.5">Conservative 0.5×</option><option value="1" selected>Baseline 1×</option><option value="1.5">Generous 1.5×</option></select>
 <label>PES season squad lock</label><input type="date" name="pes_lock_date" value="2026-08-01" required>
 <label>Next summer registration date</label><input type="date" name="next_summer_date" value="2027-07-01" required>
-<p><button>Create separate career</button></p></form>
+<p><button>Create separate career</button></p>
+{% else %}
+<button type="submit" class="setup-submit">Create career <span aria-hidden="true">→</span></button>
+<p class="setup-note">Your transfer clock won't start until you press Start in the Career Desk.</p>
+{% endif %}
+</form>
+{% if selected_dataset=='fc27-warehouse-659-mens-2026-27' and careers %}
+<section class="setup-existing"><h2>Continue a career</h2><div class="setup-saved">
+{% for c in careers %}
+<div class="card"><strong>{{c['title']}}</strong>
+<a href="/world/play/career/{{c['career_id']}}/market">Continue →</a></div>
+{% endfor %}</div></section>
+{% endif %}
 {% elif mode == 'career' %}
 <p><a href="/world/play">← My development careers</a> ·
 <a href="/world/reputations/career/{{career['career_id']}}">Career reputation history →</a> ·
@@ -1936,14 +2003,43 @@ def create_play_blueprint(db_path):
         check_write()
         try:
             club_id=int(request.form["manager_club_id"])
-            scale=float(request.form.get("scale","1"))
+            dataset_id=request.form["dataset_id"]
+            fc27_preview=(dataset_id=="fc27-warehouse-659-mens-2026-27"
+                and os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1")
+            # The manager should not set internal IDs, lock dates, the
+            # economy model or decision-engine version during an FC27
+            # session. Freeze those choices on the server so an outdated
+            # browser, or a forged POST, cannot change the game's rules.
+            career_id=(request.form.get("career_id","").strip()
+                or ("fc27-"+secrets.token_hex(8) if fc27_preview else ""))
             with connect() as db:
-                start_sandbox(db,career_id=request.form["career_id"],dataset_id=request.form["dataset_id"],
-                    title=request.form["title"][:80],manager_club_id=club_id,
-                    pes_lock_date=request.form["pes_lock_date"],next_summer_date=request.form["next_summer_date"],
-                    economy_version=request.form.get("economy_version","prototype-v1"),scale=scale,
-                    player_decision_version=request.form.get("player_decision_version",LEGACY_VERSION))
-            return redirect("/world/play/career/"+request.form["career_id"])
+                if fc27_preview:
+                    row=db.execute("SELECT name FROM world_clubs WHERE club_id=?",
+                                   (club_id,)).fetchone()
+                    if row is None:raise ValueError("Choose a valid manager club")
+                    # Source-identity suffix is retained in the database
+                    # but never displayed in a career title.
+                    from re import sub
+                    club_name=sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",row[0])
+                    title=(request.form.get("title","").strip()
+                        or f"{club_name} · 2026/27")[:80]
+                    start_sandbox(
+                        db,career_id=career_id,dataset_id=dataset_id,
+                        title=title,manager_club_id=club_id,
+                        pes_lock_date="2026-08-01",
+                        next_summer_date="2027-07-01",
+                        economy_version="prototype-v1",scale=1.0,
+                        player_decision_version=DECISION_V2_VERSION)
+                else:
+                    start_sandbox(
+                        db,career_id=career_id,dataset_id=dataset_id,
+                        title=request.form["title"][:80],manager_club_id=club_id,
+                        pes_lock_date=request.form["pes_lock_date"],
+                        next_summer_date=request.form["next_summer_date"],
+                        economy_version=request.form.get("economy_version","prototype-v1"),
+                        scale=float(request.form.get("scale","1")),
+                        player_decision_version=request.form.get("player_decision_version",LEGACY_VERSION))
+            return redirect("/world/play/career/"+career_id+("/market" if fc27_preview else ""))
         except (ValueError,sqlite3.Error,KeyError) as exc:return on_error(exc)
 
     @bp.get("/world/play/watch/<token>")
