@@ -123,10 +123,9 @@ def run(world,output):
             check(header.is_visible(),"Always-visible deadline clock missing")
             check(page.locator('.desk-sidebar [data-desk-tab="inbox"]').count()==1,
                   "Manager's Inbox tab missing")
-            check(page.locator("#spectator-share-url").is_visible(),
-                  "Manager cannot find the shareable read-only spectator link")
-            check("/world/play/watch/" in page.locator("#spectator-share-url").input_value(),
-                  "Spectator share input contains an invalid URL")
+            check(page.locator("#spectator-share-url").count()==0
+                  and page.get_by_text("Share the live transfer window").count()==0,
+                  "Unwanted spectator-share feature is still shown in manager desk")
             check("WH27:" not in page.locator(".desk-header-right").inner_text(),
                   "Internal source-key suffix visible in manager heading")
             page.screenshot(path=str(output/"02-desktop-active-overview.png"),
@@ -144,8 +143,27 @@ def run(world,output):
                   "Scouting form absent on full FC27 source")
             check("WH27:" not in page.locator("#desk-view-scouting").inner_text(),
                   "Internal FC27 source tags visible in scouting club labels")
+            check(page.locator("#desk-view-scouting .desk-scout-pager").is_visible(),
+                  "Scouting has no server-powered pagination")
+            check("17,593" in page.locator(".desk-scout-pager").inner_text(),
+                  "Scouting total does not cover the FC27 registered roster")
+            first=page.locator('#desk-view-scouting table tbody tr').first.inner_text()
+            check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()==80,
+                  "First FC27 scouting page should show exactly 80 source players")
+            first_pace=page.locator("#desk-view-scouting .scout-table table tbody tr").first.locator("td").nth(8).inner_text()
+            check(first_pace.isdigit(),"FC27 six-category scouting source data is missing")
+            attrs=page.locator('select[name="scout_attribute"] option').count()
+            check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
             page.screenshot(path=str(output/"03-desktop-scouting.png"),
                             animations="disabled",full_page=True)
+            page.locator(".desk-scout-pager a:has-text('Next')").click()
+            page.wait_for_url("**/market?scout_page=2#scouting",timeout=35000)
+            check("Page 2 of" in page.locator(".desk-scout-pager").inner_text(),
+                  "Second page did not load")
+            page2_first=page.locator("#desk-view-scouting .scout-table table tbody tr").first.inner_text()
+            check(page2_first!=first,"Scouting page two repeats original players")
+            check(page.locator("#desk-view-scouting").is_visible(),
+                  "Pagination did not return to the Scouting view")
             found.append("Desktop navigation: Squad, Inbox, Scouting, Transfers, Finances")
 
             target,ref_value=select_target(world,manager)
@@ -164,9 +182,22 @@ def run(world,output):
                     (CAREER,target)).fetchone()[0]
             check(count==1,"Browser-submitted transfer offer did not persist exactly once")
             page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
+            page.wait_for_function("document.body.dataset.unread === '0'",timeout=20000)
+            check(page.locator('.desk-sidebar [data-desk-tab="inbox"] .desk-nav-count').count()==0,
+                  "Inbox badge did not clear on Inbox open")
+            check(page.locator("#desk-view-inbox #purchases").count()==0,
+                  "Redundant buying negotiations still displayed in Inbox")
+            with closing(sqlite3.connect(world)) as db:
+                unread_db=db.execute("""SELECT COUNT(*) FROM world_career_market_inbox
+                    WHERE career_id=? AND is_read=0""",(CAREER,)).fetchone()[0]
+            check(unread_db==0,"Clicking Inbox only hid badge; notification remained unread server-side")
+            page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
+            check(page.locator("#desk-view-transfers #purchases").count()==1,
+                  "Buy-side negotiation forms not available from Transfers")
+            page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
             page.screenshot(path=str(output/"04-desktop-inbox-after-bid.png"),
                             animations="disabled",full_page=True)
-            found.append("Source FC27 scouting card -> offer form -> saved manager bid")
+            found.append("Source FC27 scouting + page 2 -> offer -> Transfers negotiations; Inbox auto-read stored")
 
             # The spectator endpoint is separately accessible without login
             # but is read-only and does not show managerial POST forms.

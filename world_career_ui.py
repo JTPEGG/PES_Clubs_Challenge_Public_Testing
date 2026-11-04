@@ -64,6 +64,11 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-view .scout-filters{background:#122337;border-radius:8px;padding:13px;margin:14px 0}
 .desk-view .scout-table{border:1px solid #36516b;border-radius:8px}
 .desk-view .scout-table th{background:#203954}
+.desk-scout-pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:15px 0 6px;color:#c9e0ed;font-size:13px}
+.desk-scout-pager-actions{display:flex;align-items:center;gap:8px}
+.desk-page-link{display:inline-flex;align-items:center;justify-content:center;min-width:90px;padding:9px 12px;border:1px solid #4d839e;background:#214962;border-radius:8px;color:#e7f7ff;text-decoration:none;font-weight:700}
+.desk-page-link:hover,.desk-page-link:focus-visible{background:#2d6683;color:#fff}
+.desk-view[data-view="scouting"] .desk-scout-pager{position:relative;z-index:1}
 .desk-view .scout-table tbody tr:hover{background:#28415a}
 .desk-view .scout-table a{color:#bce6ff}
 .desk-view .pill{background:#294660}
@@ -212,7 +217,7 @@ DASHBOARD_JS = r"""
   const redirects={
     overview:'dashboard','overview-anchor':'dashboard',
     recruitment:'scouting','buy-players':'scouting',
-    purchases:'inbox','transfer-centre':'transfers',
+    purchases:'transfers','transfer-centre':'transfers',
     'window-summary':'transfers'
   };
   function viewForHash(){
@@ -237,7 +242,7 @@ DASHBOARD_JS = r"""
       else if(id==='transfer-centre'||id==='window-summary')
         destination='transfers';
       else if(id==='season-setup')destination='season-setup';
-      else if(id==='purchases')destination='inbox';
+      else if(id==='purchases')destination='transfers';
       else if(id==='inbox')destination='inbox';
       else if(text==='market news')destination='news';
     }else if(node.classList&&node.classList.contains('card')&&
@@ -605,6 +610,36 @@ DASHBOARD_JS = r"""
     if(applyButton)applyButton.hidden=true;
   }
 
+  // Opening Inbox acknowledges server-side unread messages. This is a
+  // proper CSRF-protected POST, not a client-only fake badge change.
+  // The existing form remains usable without JavaScript.
+  let inboxMarkInProgress=false;
+  function markInboxViewed(){
+    if(Number(document.body.dataset.unread||0)<=0||inboxMarkInProgress)return;
+    const form=views.inbox.querySelector('form[data-mark-inbox-read]');
+    if(!form)return;
+    inboxMarkInProgress=true;
+    fetch(form.action,{method:'POST',body:new FormData(form),
+      credentials:'same-origin',headers:{'Accept':'application/json'}})
+      .then(function(response){
+        if(!response.ok)throw new Error('Inbox unread acknowledgement failed');
+        return response.json();
+      })
+      .then(function(result){
+        if(!result.ok)return;
+        document.body.dataset.unread='0';
+        document.querySelectorAll('[data-desk-tab="inbox"] .desk-nav-count')
+          .forEach(function(badge){badge.remove();});
+        document.querySelectorAll('[data-inbox-unread-label]')
+          .forEach(function(item){item.textContent='0';});
+        const desc=views.dashboard.querySelector('[data-desk-tab="inbox"] small');
+        if(desc)desc.textContent=numOffers+' incoming offers · 0 unread';
+        form.remove();
+      })
+      .catch(function(){/* Keep badge if server did not confirm the POST. */})
+      .finally(function(){inboxMarkInProgress=false;});
+  }
+
   // Sidebar, mobile bar, overview buttons and legacy #section links use
   // the same one-page view switcher; no cross-page navigation is required.
   function switchView(name,changeUrl){
@@ -620,6 +655,7 @@ DASHBOARD_JS = r"""
     if(changeUrl&&location.hash!=='#'+name){
       history.pushState(null,'','#'+name);
     }
+    if(name==='inbox')markInboxViewed();
     window.scrollTo({top:0,behavior:'auto'});
   }
   document.addEventListener('click',function(e){

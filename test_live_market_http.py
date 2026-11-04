@@ -663,7 +663,7 @@ class LiveMarketHttpTests(unittest.TestCase):
                  AND event_type='buyer_revised_bid'""",(oid,)).fetchone()[0],1)
         visible=self.client.get(base,base_url="https://localhost").get_data(as_text=True)
         self.assertIn("Transfer Centre",visible)
-        self.assertIn("Outgoing bids",visible)
+        self.assertIn("Incoming transfer negotiations",visible)
 
     def test_02e_second_revision_and_invalid_bid_are_safely_handled(self):
         base=f"/world/play/career/{CAREER}/market"

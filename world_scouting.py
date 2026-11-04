@@ -19,6 +19,13 @@ def scouting_attributes(conn, *, career_id):
         JOIN world_datasets d ON d.dataset_id=c.dataset_id
         WHERE c.career_id=?""",(career_id,)).fetchone()
     if not row:return []
+    source=conn.execute("""SELECT dataset_id FROM world_career_saves
+        WHERE career_id=?""",(career_id,)).fetchone()
+    if source and source[0]=="fc27-warehouse-659-mens-2026-27":
+        return [r[0].removeprefix("PES2020V2:") for r in conn.execute(
+            """SELECT DISTINCT attribute FROM world_dataset_extended_attributes
+            WHERE dataset_id=? AND attribute LIKE 'PES2020V2:%'
+            ORDER BY attribute""",(source[0],)).fetchall()]
     return [r[0] for r in conn.execute("""SELECT DISTINCT attribute_name
         FROM world_player_attributes WHERE effective_season=?
         ORDER BY attribute_name""",(row[0],)).fetchall()]
@@ -27,7 +34,8 @@ def scouting_attributes(conn, *, career_id):
 def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     max_age=None, category="", min_category=None,
                     attribute="", min_attribute=None, contract="",
-                    squad_only=False, limit=80, sort_by='overall', descending=True, shortlist_only=False):
+                    squad_only=False, limit=80, sort_by='overall', descending=True,
+                    shortlist_only=False, offset=0, with_total=False):
     from world_ai_bidding import position_family
     save=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=? AND state='sandbox'""",
@@ -50,28 +58,76 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     initialise_scouting(conn)
     saved_ids={r[0] for r in conn.execute('SELECT player_id FROM world_career_scout_shortlist WHERE career_id=?',(career_id,)).fetchall()}
 
-    # Only actual source-backed current-club contracts are displayed as fact.
-    # For no source contract, display "Unknown" rather than invented expiry.
-    rows=conn.execute("""SELECT r.player_id,r.club_id,c.name club_name,
-        p.full_name,p.birth_date,p.primary_position,
-        x.overall,x.pace,x.shooting,x.passing,x.dribbling,x.defending,x.physicality,
-        (SELECT wc.expires FROM world_contracts wc
-         WHERE wc.player_id=r.player_id AND wc.club_id=r.club_id
-           AND wc.expires IS NOT NULL AND wc.source_url IS NOT NULL
-         ORDER BY wc.expires DESC LIMIT 1) expires,
-        (SELECT a.value FROM world_player_attributes a
-         WHERE a.player_id=r.player_id AND a.effective_season=?
-           AND a.attribute_name=? LIMIT 1) detail_attribute
+    # The 659-club FC27 source stores all 29 converted PES ratings and
+    # individual starting-game contracts in dataset-specific tables. The
+    # original England-style columns and scraped world contracts are empty
+    # for this warehouse. Never confuse a missing legacy field with no data.
+    if dataset=="fc27-warehouse-659-mens-2026-27":
+        # Clearly derived *game* six-category averages: these are not
+        # additional independently sourced FC27 ratings. All components
+        # come from the approved 29-attribute PES2020 V2 conversion.
+        rows=conn.execute("""WITH fc27 AS (
+          SELECT player_id,
+          CAST(ROUND(AVG(CASE WHEN attribute IN (
+            'PES2020V2:speed','PES2020V2:acceleration') THEN value END)) AS INT) pace,
+          CAST(ROUND(AVG(CASE WHEN attribute IN (
+            'PES2020V2:finishing','PES2020V2:kicking_power',
+            'PES2020V2:offensive_awareness') THEN value END)) AS INT) shooting,
+          CAST(ROUND(AVG(CASE WHEN attribute IN (
+            'PES2020V2:low_pass','PES2020V2:lofted_pass') THEN value END)) AS INT) passing,
+          CAST(ROUND(AVG(CASE WHEN attribute IN (
+            'PES2020V2:ball_control','PES2020V2:dribbling',
+            'PES2020V2:tight_possession') THEN value END)) AS INT) dribbling,
+          CAST(ROUND(AVG(CASE WHEN attribute IN (
+            'PES2020V2:defensive_awareness','PES2020V2:ball_winning',
+            'PES2020V2:aggression') THEN value END)) AS INT) defending,
+          CAST(ROUND(AVG(CASE WHEN attribute IN (
+            'PES2020V2:physical_contact','PES2020V2:balance',
+            'PES2020V2:stamina','PES2020V2:jump') THEN value END)) AS INT) physicality,
+          MAX(CASE WHEN attribute=? THEN value END) detail_attribute
+          FROM world_dataset_extended_attributes WHERE dataset_id=?
+          GROUP BY player_id
+        )
+        SELECT r.player_id,r.club_id,c.name club_name,
+          p.full_name,p.birth_date,p.primary_position,x.overall,
+          a.pace,a.shooting,a.passing,a.dribbling,a.defending,a.physicality,
+          cs.expires_on AS expires,a.detail_attribute
         FROM world_career_registrations r
         JOIN world_clubs c ON c.club_id=r.club_id
         JOIN world_players p ON p.player_id=r.player_id
         JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
+        LEFT JOIN fc27 a ON a.player_id=r.player_id
+        LEFT JOIN world_career_contract_snapshots cs
+          ON cs.career_id=r.career_id AND cs.player_id=r.player_id
         WHERE r.career_id=? AND x.overall BETWEEN 1 AND 99
           AND (?=0 OR r.club_id=?)
           AND (?='' OR lower(p.full_name) LIKE ?)
         ORDER BY x.overall DESC,p.full_name,r.player_id""",
-        (season,attribute,dataset,career_id,int(bool(squad_only)),manager,
+        ("PES2020V2:"+attribute if attribute else "",
+         dataset,dataset,career_id,int(bool(squad_only)),manager,
          q,"%"+q.replace("%","\\%").replace("_","\\_")+"%")).fetchall()
+    else:
+        # Older datasets preserve their own documented source-backed fields.
+        rows=conn.execute("""SELECT r.player_id,r.club_id,c.name club_name,
+            p.full_name,p.birth_date,p.primary_position,
+            x.overall,x.pace,x.shooting,x.passing,x.dribbling,x.defending,x.physicality,
+            (SELECT wc.expires FROM world_contracts wc
+             WHERE wc.player_id=r.player_id AND wc.club_id=r.club_id
+               AND wc.expires IS NOT NULL AND wc.source_url IS NOT NULL
+             ORDER BY wc.expires DESC LIMIT 1) expires,
+            (SELECT a.value FROM world_player_attributes a
+             WHERE a.player_id=r.player_id AND a.effective_season=?
+               AND a.attribute_name=? LIMIT 1) detail_attribute
+            FROM world_career_registrations r
+            JOIN world_clubs c ON c.club_id=r.club_id
+            JOIN world_players p ON p.player_id=r.player_id
+            JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
+            WHERE r.career_id=? AND x.overall BETWEEN 1 AND 99
+              AND (?=0 OR r.club_id=?)
+              AND (?='' OR lower(p.full_name) LIKE ?)
+            ORDER BY x.overall DESC,p.full_name,r.player_id""",
+            (season,attribute,dataset,career_id,int(bool(squad_only)),manager,
+             q,"%"+q.replace("%","\\%").replace("_","\\_")+"%")).fetchall()
     # Individual scoring/filter choices do not mutate club or player records.
     out=[]
     anchor=date.fromisoformat(asof)
@@ -103,8 +159,9 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             d[category] is None or d[category]<min_category):continue
         if attribute and min_attribute is not None and (
             d["detail_attribute"] is None or d["detail_attribute"]<min_attribute):continue
-        value,_=_player_reference(conn,dataset,d["player_id"])
-        d["market_value"]=value
+        # Calculate values only for the requested page unless the user sorts
+        # by value; valuing all 17,593 players per normal page is unnecessary.
+        d["market_value"]=_player_reference(conn,dataset,d["player_id"])[0] if sort_by=="market_value" else None
         d["owned"]=d["club_id"]==manager
         out.append(d)
     def sort_key(d):
@@ -113,7 +170,14 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         if sort_by=="full_name":return (v is None,str(v or "").lower())
         return (v is None,-v if descending and v is not None else v if v is not None else 0)
     out.sort(key=sort_key)
-    return out[:limit]
+    total=len(out)
+    offset=max(0,int(offset))
+    limit=max(1,int(limit))
+    page=out[offset:offset+limit]
+    if sort_by!="market_value":
+        for d in page:
+            d["market_value"]=_player_reference(conn,dataset,d["player_id"])[0]
+    return (page,total) if with_total else page
 
 
 SHORTLIST_SCHEMA="""
@@ -159,12 +223,31 @@ def player_profile(conn,*,career_id,player_id):
     ds=conn.execute("""SELECT d.season_id FROM world_datasets d
         JOIN world_career_saves c ON c.dataset_id=d.dataset_id
         WHERE c.career_id=?""",(career_id,)).fetchone()[0]
-    info["attributes"]=[dict(name=r[0],value=r[1]) for r in conn.execute("""
-        SELECT attribute_name,value FROM world_player_attributes
-        WHERE effective_season=? AND player_id=? ORDER BY attribute_name""",
-        (ds,player_id)).fetchall()]
-    info["wage_guidance"]=max(1000,min(250000,
-        round(1000*2**((info["overall"]-55)/8)/500)*500))
+    source=conn.execute("""SELECT dataset_id FROM world_career_saves
+       WHERE career_id=?""",(career_id,)).fetchone()[0]
+    if source=="fc27-warehouse-659-mens-2026-27":
+        info["attributes"]=[dict(name=r[0].removeprefix("PES2020V2:"),value=r[1])
+            for r in conn.execute("""SELECT attribute,value FROM
+                world_dataset_extended_attributes WHERE dataset_id=?
+                AND player_id=? AND attribute LIKE 'PES2020V2:%'
+                ORDER BY attribute""",(source,player_id)).fetchall()]
+        contract=conn.execute("""SELECT weekly_wage_gbp,expires_on,source_kind
+            FROM world_career_contract_snapshots WHERE career_id=?
+            AND player_id=?""",(career_id,player_id)).fetchone()
+        if contract:
+            info["source_game_wage"]=contract[0]
+            info["contract_source"]=contract[2]
+        else:
+            info["source_game_wage"]=None
+            info["contract_source"]=None
+        info["wage_guidance"]=info["source_game_wage"]
+    else:
+        info["attributes"]=[dict(name=r[0],value=r[1]) for r in conn.execute("""
+            SELECT attribute_name,value FROM world_player_attributes
+            WHERE effective_season=? AND player_id=? ORDER BY attribute_name""",
+            (ds,player_id)).fetchall()]
+        info["wage_guidance"]=max(1000,min(250000,
+            round(1000*2**((info["overall"]-55)/8)/500)*500))
     return info
 
 
