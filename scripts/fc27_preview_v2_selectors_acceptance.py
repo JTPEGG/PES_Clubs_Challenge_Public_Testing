@@ -11,6 +11,8 @@ from playwright.sync_api import sync_playwright
 from fc27_playtest_app import app,COVERAGE
 from scripts.fc27_warehouse_world_bridge import DATASET
 from world_careers import player_circumstances,career_player_policy,player_move_interest
+from world_squad_desk import squad_preview,update_squad_player
+from world_preseason_window import window_snapshot
 from world_fc27_manager_playability import approved_manager_club_ids, approved_world_competition_ids
 from world_player_decisions import evaluate_player_choice_v2
 
@@ -169,6 +171,44 @@ def run(output):
                       and context["current_role"]!="unknown"
                       and context["renewal_status"]!="unknown",
                       f"V2 cannot derive clearly-labelled autonomous source context: {context}")
+            # Real FC27 pre-start browser bug: before live-market context
+            # existed, every unconfigured player used to appear 'Rotation'.
+            with sqlite3.connect(db_path) as db:
+                db.row_factory=sqlite3.Row
+                before_roles=squad_preview(db,career_id=test_career)
+                initial={p["player_id"]:p["role"] for p in before_roles["players"]}
+                expected={"key_player","regular_starter","rotation"}
+                check(expected.issubset(set(initial.values())),
+                      "FC27 pre-start squad roles are not correctly diversified: "
+                      +str(sorted(set(initial.values()))))
+                check(len(initial)>=18,"Source manager roster unexpectedly incomplete")
+                check(window_snapshot(db,career_id=test_career)["state"]=="not_started",
+                      "Pre-start role estimation must not start the 30-minute clock")
+                # Listing without selecting a new role should preserve both
+                # an important player status and the source-game weekly wage.
+                key_player=next(p for p in before_roles["players"] if p["role"]=="key_player")
+                pid=key_player["player_id"]
+                source_wage=db.execute("""SELECT weekly_wage_gbp FROM
+                    world_career_contract_snapshots WHERE career_id=? AND player_id=?""",
+                    (test_career,pid)).fetchone()[0]
+                update_squad_player(db,career_id=test_career,player_id=pid,
+                                    role=None,listed=True)
+                saved_role=db.execute("""SELECT current_role,current_wage_weekly,
+                    transfer_listed FROM world_career_player_circumstances
+                    WHERE career_id=? AND player_id=?""",
+                    (test_career,pid)).fetchone()
+                check(tuple(saved_role)==("key_player",source_wage,1),
+                    "Listing player silently changed role or FC27 wage: "+str(tuple(saved_role)))
+                after_roles=squad_preview(db,career_id=test_career)
+                check({p["player_id"]:p["role"] for p in after_roles["players"]}==initial,
+                    "Manager action unexpectedly altered another player's role")
+            page.reload(wait_until="domcontentloaded")
+            displayed=page.locator('select[name="role"]').evaluate_all(
+                "(nodes)=>nodes.map(n=>n.value)")
+            check(len(displayed)==len(initial) and
+                  {"key_player","regular_starter","rotation"}.issubset(set(displayed)),
+                  "Real Chrome UI shows all Rotation or mismatched source squad status: "
+                  +str(displayed[:30]))
             # Exercise the ACTUAL V2 Career Desk offer-evaluation route, not
             # only the pure decision helper, against two real FC27 clubs.
             with sqlite3.connect(db_path) as db:
@@ -222,6 +262,18 @@ def run(output):
             check(page.locator('button:has-text("Start 30-minute transfer window")').count()==1,
                 "Single transfer-window start missing")
             page.screenshot(path=str(root/"02-fc27-v2-preseason-dashboard.png"),full_page=True)
+            page.locator('button:has-text("Start 30-minute transfer window")').click()
+            page.wait_for_url("**/market?notice=**",timeout=25000)
+            with sqlite3.connect(db_path) as db:
+                db.row_factory=sqlite3.Row
+                check(window_snapshot(db,career_id=test_career)["state"]=="open",
+                      "Real 30-minute window did not open")
+                active=squad_preview(db,career_id=test_career)
+                active_roles={p["player_id"]:p["role"] for p in active["players"]}
+                check(active_roles==initial,
+                      "Roles changed unexpectedly when clock started: "
+                      +str({pid:(role,active_roles.get(pid))
+                           for pid,role in initial.items() if active_roles.get(pid)!=role}))
             check(not errors,"Browser JS errors: "+repr(errors))
             browser.close()
     finally:
