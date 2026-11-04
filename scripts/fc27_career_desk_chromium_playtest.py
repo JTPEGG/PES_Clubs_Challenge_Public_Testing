@@ -65,6 +65,8 @@ def run(world,output):
     os.environ.update({
         "WORLD_MARKET_ACCESS_KEY":ACCESS,
         "WORLD_MARKET_COOKIE_SECRET":"isolated-real-chrome-only-fc27-qa-secret",
+        "FC27_PRESEASON_PLAYTEST_ENABLED":"1",
+        "FC27_PREVIEW_DATASET":DATASET,
     })
     app=Flask("fc27_visual_qa")
     # The isolated QA app has no app.py static asset wiring; browsers request
