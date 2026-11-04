@@ -55,13 +55,8 @@ def game_player_facts(conn,career_id,player_id):
     else:
         # Deterministic rank in the *same* source-rated club. Keeper depth
         # is ranked among GKs; elsewhere, rank the highest rated squad.
-        from world_career_player_profiles import fc27_club_player_rank
-        rank=fc27_club_player_rank(conn,career_id,player_id,club,pos,overall)
-        if position_family(pos)=="GK":
-            role="regular_starter" if rank==0 else "rotation" if rank==1 else "fringe"
-        else:
-            role=("key_player" if rank<3 else "regular_starter"
-                  if rank<11 else "rotation" if rank<18 else "fringe")
+        from world_career_player_profiles import fc27_source_squad_role
+        role=fc27_source_squad_role(conn,career_id,player_id,club)
         listed=bool(role=="fringe" and expires and summer and expires<=summer)
     # Renewal attitude is a game scenario based on contract horizon, NEVER a
     # claim about the club's actual decision or a current transfer request.
