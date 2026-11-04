@@ -2003,14 +2003,43 @@ def create_play_blueprint(db_path):
         check_write()
         try:
             club_id=int(request.form["manager_club_id"])
-            scale=float(request.form.get("scale","1"))
+            dataset_id=request.form["dataset_id"]
+            fc27_preview=(dataset_id=="fc27-warehouse-659-mens-2026-27"
+                and os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1")
+            # The manager should not set internal IDs, lock dates, the
+            # economy model or decision-engine version during an FC27
+            # session. Freeze those choices on the server so an outdated
+            # browser, or a forged POST, cannot change the game's rules.
+            career_id=(request.form.get("career_id","").strip()
+                or ("fc27-"+secrets.token_hex(8) if fc27_preview else ""))
             with connect() as db:
-                start_sandbox(db,career_id=request.form["career_id"],dataset_id=request.form["dataset_id"],
-                    title=request.form["title"][:80],manager_club_id=club_id,
-                    pes_lock_date=request.form["pes_lock_date"],next_summer_date=request.form["next_summer_date"],
-                    economy_version=request.form.get("economy_version","prototype-v1"),scale=scale,
-                    player_decision_version=request.form.get("player_decision_version",LEGACY_VERSION))
-            return redirect("/world/play/career/"+request.form["career_id"])
+                if fc27_preview:
+                    row=db.execute("SELECT name FROM world_clubs WHERE club_id=?",
+                                   (club_id,)).fetchone()
+                    if row is None:raise ValueError("Choose a valid manager club")
+                    # Source-identity suffix is retained in the database
+                    # but never displayed in a career title.
+                    from re import sub
+                    club_name=sub(r"\\s+\\[WH27:[0-9a-fA-F]{8,20}\\]$","",row[0])
+                    title=(request.form.get("title","").strip()
+                        or f"{club_name} · 2026/27")[:80]
+                    start_sandbox(
+                        db,career_id=career_id,dataset_id=dataset_id,
+                        title=title,manager_club_id=club_id,
+                        pes_lock_date="2026-08-01",
+                        next_summer_date="2027-07-01",
+                        economy_version="prototype-v1",scale=1.0,
+                        player_decision_version=DECISION_V2_VERSION)
+                else:
+                    start_sandbox(
+                        db,career_id=career_id,dataset_id=dataset_id,
+                        title=request.form["title"][:80],manager_club_id=club_id,
+                        pes_lock_date=request.form["pes_lock_date"],
+                        next_summer_date=request.form["next_summer_date"],
+                        economy_version=request.form.get("economy_version","prototype-v1"),
+                        scale=float(request.form.get("scale","1")),
+                        player_decision_version=request.form.get("player_decision_version",LEGACY_VERSION))
+            return redirect("/world/play/career/"+career_id)
         except (ValueError,sqlite3.Error,KeyError) as exc:return on_error(exc)
 
     @bp.get("/world/play/watch/<token>")
