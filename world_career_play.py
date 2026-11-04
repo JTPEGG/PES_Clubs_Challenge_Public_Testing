@@ -246,7 +246,7 @@ Those are game calibrations, not verified personal player motivations. Existing 
 <a href="/world/play/career/{{c['career_id']}}/market">Continue →</a></div>
 {% endfor %}</div></section>
 {% endif %}
-{% elif mode == 'career' %>
+{% elif mode == 'career' %}
 <p><a href="/world/play">← My development careers</a> ·
 <a href="/world/reputations/career/{{career['career_id']}}">Career reputation history →</a> ·
 <a href="/world/player-decisions">Player-decision scenario lab →</a> ·
