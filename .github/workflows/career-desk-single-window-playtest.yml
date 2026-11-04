@@ -43,7 +43,8 @@ jobs:
           assert 'process_live_market(db,career_id=career_id)' in ui
           assert 'window_snapshot(db,career_id=career_id)' in ui
           assert 'Final transfer window report' in ui
-          assert 'setInterval(function(){' in ui
+          assert 'setInterval(marketHeartbeat,15000)' in ui
+          assert 'def manager_market_pulse(career_id):' in ui
           print('ONE 30-MINUTE WINDOW; no separate finalisation period')
           PY
       - name: Test user-visible authenticated manager flow and deadline registration
