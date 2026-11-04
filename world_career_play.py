@@ -155,7 +155,7 @@ All deals are subject to the PES league summer registration lock. This screen ca
 <select name="player_decision_version">
 <option value="player-decisions-v2" {% if selected_dataset in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}selected{% endif %} {% if selected_dataset not in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}disabled{% endif %}>Player decisions v2 — sporting appeal, current wages, playing time, contracts and player motivations</option>
 <option value="player-decisions-v1">Player decisions v1 (old model — for comparison)</option>
-<option value="legacy-sporting-v2" {% if selected_dataset!='england-2026-27-fc27' %}selected{% endif %}>Legacy sporting-appeal only</option>
+<option value="legacy-sporting-v2" {% if selected_dataset not in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}selected{% endif %}>Legacy sporting-appeal only</option>
 </select>
 {% if selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
 <p class="muted">FC27 player decisions v2 uses <b>source-game wages and contracts</b>,
