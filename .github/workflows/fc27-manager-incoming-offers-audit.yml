@@ -1,0 +1,38 @@
+name: FC27 Bournemouth real manager incoming-offers audit
+on:
+  push:
+    paths:
+      - 'scripts/fc27_manager_inbox_offer_audit.py'
+      - '.github/workflows/fc27-manager-incoming-offers-audit.yml'
+      - 'world_live_market.py'
+      - 'world_fc27_market_schedule.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  manager-offer-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Verify immutable approved FC27 database from GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p e2e-inbox
+          gh release download fc27-playtest-world-2026-10-27-v1 \
+             --repo JTPEGG/PES_Clubs_Challenge_Public_Testing --dir e2e-inbox
+          cd e2e-inbox
+          sha256sum -c FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz.sha256
+          gzip -dc FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz > bournemouth.sqlite
+      - name: Inspect all 12 real-time checkpoints for Bournemouth
+        env:
+          WORLD_MARKET_ACCESS_KEY: disposable-only-fc27-browser-qa-access
+          WORLD_MARKET_COOKIE_SECRET: fc27-inbox-audit-disposable-only
+        run: |
+          python -u -m scripts.fc27_manager_inbox_offer_audit \
+            --world e2e-inbox/bournemouth.sqlite --club Bournemouth --seed bournemouth-a
