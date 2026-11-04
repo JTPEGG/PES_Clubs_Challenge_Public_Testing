@@ -150,7 +150,13 @@ All deals are subject to the PES league summer registration lock. This screen ca
   updateLeagues();
 })();
 </script>
+{% if selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
+<p class="muted"><b>344 manager-selectable clubs across 17 competitions.</b>
+The other 315 source clubs remain active in the AI transfer market and cannot be managed.
+Feeder clubs are non-playable. This is a pre-season transfer-window preview, not a certified PES match-ready squad.</p>
+{% else %}
 <p class="muted">The club list belongs to your selected dataset. Historical teams only appear after an independent historical season has been imported.</p>
+{% endif %}
 <label>Player and agent decision model</label>
 <select name="player_decision_version">
 <option value="player-decisions-v2" {% if selected_dataset in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}selected{% endif %} {% if selected_dataset not in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}disabled{% endif %}>Player decisions v2 — sporting appeal, current wages, playing time, contracts and player motivations</option>
@@ -1634,6 +1640,14 @@ def create_play_blueprint(db_path):
                 JOIN world_competitions co ON co.competition_id=e.competition_id
                 WHERE e.dataset_id=?
                 ORDER BY co.country,co.name,c.name""",(selected,)).fetchall()
+            # The 659-club FC27 warehouse drives ALL AI transfers. Only
+            # the 344 explicitly approved manager clubs from 17 divisions
+            # are visible in this playtest's career-creation controls.
+            if (selected=="fc27-warehouse-659-mens-2026-27"
+                    and os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1"):
+                from world_fc27_manager_playability import approved_manager_club_ids
+                approved=approved_manager_club_ids(db,dataset_id=selected)
+                clubs=[club for club in clubs if club["club_id"] in approved]
             careers=db.execute("SELECT * FROM world_career_saves WHERE state='sandbox' ORDER BY created_at DESC").fetchall()
             return page("Career Transfer Desk","index",career=None,
                         datasets=datasets,clubs=clubs,careers=careers,selected_dataset=selected)

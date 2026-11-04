@@ -10,6 +10,7 @@ from playwright.sync_api import sync_playwright
 from fc27_playtest_app import app,COVERAGE
 from scripts.fc27_warehouse_world_bridge import DATASET
 from world_careers import player_circumstances,career_player_policy,player_move_interest
+from world_fc27_manager_playability import approved_manager_club_ids, approved_world_competition_ids
 from world_player_decisions import evaluate_player_choice_v2
 
 
@@ -33,6 +34,24 @@ def run(output):
         cid,raw,league,country=tuple(club)
         league=league.replace(" [FC27-659]","")
         check(country and league and raw,"Missing source competition identity")
+        approved=approved_manager_club_ids(db,dataset_id=DATASET)
+        check(len(approved)==344,"Expected 344 user-approved manager clubs")
+        check(len(approved_world_competition_ids())==17,"Expected 17 manager competitions")
+        check(cid in approved,"Arsenal should remain manageable")
+        nonplayable=db.execute("""SELECT e.club_id,cl.name
+            FROM world_dataset_entries e
+            JOIN world_clubs cl ON cl.club_id=e.club_id
+            WHERE e.dataset_id=? AND e.club_id NOT IN (
+                SELECT e2.club_id FROM world_dataset_entries e2
+                WHERE e2.dataset_id=? AND e2.competition_id IN (
+                  """+",".join("?" for _ in approved_world_competition_ids())+""")) 
+            ORDER BY cl.name LIMIT 1""",
+            (DATASET,DATASET,*approved_world_competition_ids())).fetchone()
+        check(nonplayable is not None and nonplayable[0] not in approved,
+              "No ineligible AI-only club to verify")
+        check(db.execute("""SELECT COUNT(*) FROM world_dataset_entries
+           WHERE dataset_id=?""",(DATASET,)).fetchone()[0]==659,
+              "Restricting managers wrongly removed clubs from source market")
     server=make_server("127.0.0.1",0,app,threaded=True)
     port=server.server_port
     thread=threading.Thread(target=server.serve_forever,daemon=True)
@@ -53,7 +72,13 @@ def run(output):
             check(page.locator('#manager-country').is_visible(),"Country selector not visible")
             check(page.locator('#manager-league').is_visible(),"League selector not visible")
             check(page.locator('#manager-club').is_disabled(),"Club selectable before country/league")
-            check(page.locator('#manager-country option').count()>10,"FC27 nations missing")
+            check(page.locator('#manager-country option').count()==10,
+                  "Exactly nine playable countries plus placeholder expected")
+            check("344 manager-selectable clubs" in page.locator("body").inner_text(),
+                  "Playable scope should be explained on setup screen")
+            check(str(nonplayable[1]).split(" [WH27:")[0] not in
+                  page.locator('select[name="manager_club_id"]').inner_text(),
+                  "Non-playable AI club leaked into manager selector")
             page.locator('#manager-country').select_option(label=country)
             check(page.locator('#manager-league').is_enabled(),"League not enabled after country")
             page.locator('#manager-league').select_option(label=league)
@@ -65,6 +90,25 @@ def run(output):
             check(page.locator('select[name="player_decision_version"]').input_value()=="player-decisions-v2",
                   "Full FC27 V2 player decisions not enabled/selected")
             page.screenshot(path=str(root/"01-fc27-country-league-club-v2.png"),full_page=True)
+            # Reject forged POST with an otherwise valid (but AI-only)
+            # source club ID; browser filtering alone is insufficient.
+            with sqlite3.connect(db_path) as db:
+                db.row_factory=sqlite3.Row
+                from world_careers import start_sandbox
+                try:
+                    start_sandbox(
+                      db,career_id="fc27_closed_club_cannot_manage",
+                      dataset_id=DATASET,title="invalid closed division test",
+                      manager_club_id=int(nonplayable[0]),
+                      player_decision_version="player-decisions-v2",
+                      pes_lock_date="2026-08-01",next_summer_date="2027-07-01")
+                    raise AssertionError("Server allowed managing an AI-only FC27 club")
+                except ValueError as exc:
+                    check("not one of the 344 manager-playable" in str(exc),
+                          "Closed club rejected for the wrong reason: "+str(exc))
+                check(db.execute("""SELECT COUNT(*) FROM world_career_saves
+                    WHERE career_id='fc27_closed_club_cannot_manage'""").fetchone()[0]==0,
+                      "Failed closed-club career left partial saved state")
             form=page.locator('form[action="/world/play/create"]')
             form.locator('input[name="career_id"]').fill("fc27_v2_selector_regression")
             form.locator('input[name="title"]').fill("FC27 V2 dynamic country league club test")
@@ -150,7 +194,7 @@ def run(output):
     finally:
         server.shutdown()
         thread.join(timeout=4)
-    print(f"PASS FC27 REAL CHROME V2 SELECTORS: {country} > {league} > Arsenal, 659 club profiles, 17,593 players, actual career saved, source wage and game roles, legacy V2 strict, no JS errors",flush=True)
+    print(f"PASS FC27 REAL CHROME V2 PLAYABLE 344/659 SELECTORS: {country} > {league} > Arsenal, 659 club profiles, 17,593 players, actual career saved, source wage and game roles, legacy V2 strict, no JS errors",flush=True)
 
 
 if __name__=="__main__":
