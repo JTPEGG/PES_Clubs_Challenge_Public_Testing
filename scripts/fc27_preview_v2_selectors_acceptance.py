@@ -9,7 +9,7 @@ from playwright.sync_api import sync_playwright
 
 from fc27_playtest_app import app,COVERAGE
 from scripts.fc27_warehouse_world_bridge import DATASET
-from world_careers import player_circumstances,career_player_policy
+from world_careers import player_circumstances,career_player_policy,player_move_interest
 from world_player_decisions import evaluate_player_choice_v2
 
 
@@ -92,6 +92,37 @@ def run(output):
                       and context["current_role"]!="unknown"
                       and context["renewal_status"]!="unknown",
                       f"V2 cannot derive clearly-labelled autonomous source context: {context}")
+            # Exercise the ACTUAL V2 Career Desk offer-evaluation route, not
+            # only the pure decision helper, against two real FC27 clubs.
+            with sqlite3.connect(db_path) as db:
+                db.row_factory=sqlite3.Row
+                candidate=db.execute("""SELECT r.player_id,r.club_id,x.overall
+                    FROM world_career_registrations r
+                    JOIN world_players p ON p.player_id=r.player_id
+                    JOIN world_dataset_ratings x ON x.player_id=r.player_id
+                      AND x.dataset_id=?
+                    JOIN world_career_contract_snapshots ct ON ct.career_id=r.career_id
+                      AND ct.player_id=r.player_id
+                    WHERE r.career_id=? AND r.club_id<>? AND p.birth_date IS NOT NULL
+                      AND x.overall BETWEEN 67 AND 78
+                      AND ct.weekly_wage_gbp IS NOT NULL
+                    ORDER BY x.overall DESC LIMIT 1""",
+                    (DATASET,"fc27_v2_selector_regression",cid)).fetchone()
+                check(candidate is not None,"No FC27 cross-club candidate for real V2 scenario")
+                cur=db.execute("""INSERT INTO world_career_offers
+                    (career_id,request_key,player_id,buying_club_id,
+                     selling_club_id,offered_fee,status,agreement_date,
+                     source_rating,economy_version)
+                    VALUES(?,?,?,?,?,?,'accepted_pending_contract',?,?,'prototype-v1')""",
+                    ("fc27_v2_selector_regression","CI_FC27_V2_EVAL_ONLY",
+                     candidate["player_id"],cid,candidate["club_id"],
+                     1000000,"2026-08-01",candidate["overall"]))
+                db.commit()
+                interest=player_move_interest(db,career_id="fc27_v2_selector_regression",
+                                             offer_id=cur.lastrowid)
+                check(interest["policy_version"]=="player-decisions-v2"
+                      and interest["decision"]!="review",
+                      f"Real FC27 V2 player agent evaluation stuck in review: {interest}")
             response=evaluate_player_choice_v2(
                 buyer_tier=1,seller_tier=1,buyer_score=70,seller_score=70,
                 buyer_prestige=70,seller_prestige=70,overall=78,age=26,
