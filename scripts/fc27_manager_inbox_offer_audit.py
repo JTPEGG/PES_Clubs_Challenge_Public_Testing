@@ -9,7 +9,8 @@ from pathlib import Path
 import sqlite3
 from collections import Counter
 from datetime import datetime,timedelta
-from contextlib import closing
+from contextlib import closing,nullcontext
+from unittest.mock import patch
 
 from scripts.fc27_full_career_desk_http_playtest import (
     ACCESS,make_client,get,post,simulation_request_clock
@@ -24,7 +25,7 @@ from world_career_transfer_protocol import initialize_transfer_protocol
 from world_live_market import initialise_live_market,MARKET_MOMENTS
 from world_careers import start_sandbox
 
-def main(world,club,seed):
+def main(world,club,seed,skip_world=False):
     career="fc27_manager_offer_audit_"+seed
     db_path=str(Path(world).resolve())
     with closing(sqlite3.connect(db_path)) as db:
@@ -66,27 +67,31 @@ def main(world,club,seed):
             window=db.execute("""SELECT window_id FROM world_career_preseason_windows
                 WHERE career_id=?""",(career,)).fetchone()[0]
         print("CLUB:",club,"MANAGER CLUB:",manager,"CAREER:",career,flush=True)
-        for idx,sec in enumerate(MARKET_MOMENTS):
-            now=started+timedelta(seconds=sec+1)
-            html=get(browser,url,moment=now)
-            with closing(sqlite3.connect(db_path)) as db:
-                ours=db.execute("""SELECT COUNT(*) FROM world_career_offers o
-                    JOIN world_career_preseason_window_offers w
-                      ON w.offer_id=o.offer_id
-                    WHERE w.window_id=? AND o.career_id=?
-                      AND o.selling_club_id=? AND o.buying_club_id<>?""",
-                      (window,career,manager,manager)).fetchone()[0]
-                outcome=db.execute("""SELECT outcome FROM world_career_market_moments
-                    WHERE window_id=? AND moment_index=?""",(window,idx)).fetchone()
-                active=db.execute("""SELECT active_clubs FROM world_fc27_market_intervals
-                    WHERE window_id=? AND interval_index=?""",(window,idx)).fetchone()
-                world_signs=db.execute("""SELECT COUNT(*) FROM world_career_offer_events e
-                    JOIN world_career_offers o ON o.offer_id=e.offer_id
-                    WHERE o.career_id=? AND e.event_type='ai_world_signed'""",
-                    (career,)).fetchone()[0]
-                print("INTERVAL",idx+1,"at",sec,"seconds","managed_offers",ours,
-                  "AI search clubs",active[0] if active else None,
-                  "AI world signed",world_signs,"human outcome",outcome[0] if outcome else None,flush=True)
+        from world_fc27_market_schedule import process_fc27_market_interval
+        mode=(patch("world_fc27_market_schedule.process_fc27_market_interval",
+                    return_value=(0,0)) if skip_world else nullcontext())
+        with mode:
+            for idx,sec in enumerate(MARKET_MOMENTS):
+                now=started+timedelta(seconds=sec+1)
+                html=get(browser,url,moment=now)
+                with closing(sqlite3.connect(db_path)) as db:
+                    ours=db.execute("""SELECT COUNT(*) FROM world_career_offers o
+                        JOIN world_career_preseason_window_offers w
+                          ON w.offer_id=o.offer_id
+                        WHERE w.window_id=? AND o.career_id=?
+                          AND o.selling_club_id=? AND o.buying_club_id<>?""",
+                          (window,career,manager,manager)).fetchone()[0]
+                    outcome=db.execute("""SELECT outcome FROM world_career_market_moments
+                        WHERE window_id=? AND moment_index=?""",(window,idx)).fetchone()
+                    active=db.execute("""SELECT active_clubs FROM world_fc27_market_intervals
+                        WHERE window_id=? AND interval_index=?""",(window,idx)).fetchone()
+                    world_signs=db.execute("""SELECT COUNT(*) FROM world_career_offer_events e
+                        JOIN world_career_offers o ON o.offer_id=e.offer_id
+                        WHERE o.career_id=? AND e.event_type='ai_world_signed'""",
+                        (career,)).fetchone()[0]
+                    print("INTERVAL",idx+1,"at",sec,"seconds","managed_offers",ours,
+                      "AI search clubs",active[0] if active else None,
+                      "AI world signed",world_signs,"human outcome",outcome[0] if outcome else None,flush=True)
         with closing(sqlite3.connect(db_path)) as db:
             db.row_factory=sqlite3.Row
             outcomes=Counter(x[0] for x in db.execute(
@@ -113,7 +118,9 @@ if __name__=="__main__":
     args.add_argument("--world",required=True)
     args.add_argument("--club",default="Bournemouth")
     args.add_argument("--seed",default="bournemouth")
+    args.add_argument("--skip-world",action="store_true",
+                     help="Fast, manager offers only, without AI-to-AI activity")
     opts=args.parse_args()
     os.environ["FC27_PRESEASON_PLAYTEST_ENABLED"]="1"
     os.environ["FC27_PREVIEW_DATASET"]=DATASET
-    main(opts.world,opts.club,opts.seed)
+    main(opts.world,opts.club,opts.seed,skip_world=opts.skip_world)
