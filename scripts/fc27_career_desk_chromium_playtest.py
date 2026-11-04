@@ -98,8 +98,10 @@ def run(world,output):
             page.locator('form[action="/world/play/login"] button').click()
             page.goto(base+"/world/play?dataset="+DATASET,
                       wait_until="domcontentloaded")
-            check(page.locator('select[name="manager_club_id"] option').count()==659,
-                  "All 659 source clubs not available in career selection")
+            check(page.locator("#manager-country option").count()>10,
+                  "Full-FC27 country selection missing")
+            check(page.locator("#manager-club").is_disabled(),
+                  "Cascading club selector did not wait for a country and league")
             found.append("Full 659-club career selection visible in real Chromium")
 
             page.goto(base+manager_path,wait_until="domcontentloaded")

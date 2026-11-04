@@ -101,17 +101,72 @@ All deals are subject to the PES league summer registration lock. This screen ca
 <label>Career identifier</label><input name="career_id" required placeholder="my-test-career" pattern="[A-Za-z0-9_-]+">
 <label>Career name</label><input name="title" maxlength="80" required placeholder="2026/27 career sandbox">
 <input type="hidden" name="dataset_id" value="{{selected_dataset}}"><p class="muted">Starting snapshot: {{selected_dataset}}</p>
-<label>Manager's club</label><select name="manager_club_id">{% for c in clubs %}<option value="{{c['club_id']}}">{{c['name']|club_display}}</option>{% endfor %}</select>
+<div id="club-cascade" style="max-width:500px">
+<label for="manager-country" hidden>Country</label>
+<select id="manager-country" hidden><option value="">Choose a country</option></select>
+<label for="manager-league" hidden>League</label>
+<select id="manager-league" hidden disabled><option value="">Choose a league</option></select>
+<label for="manager-club">Manager's club</label>
+<select name="manager_club_id" id="manager-club" required>
+{% for c in clubs %}<option value="{{c['club_id']}}" data-country="{{c['country']}}" data-league-id="{{c['competition_id']}}" data-league="{{c['competition_name']|replace(' [FC27-659]','')}}">{{c['name']|club_display}}</option>{% endfor %}
+</select>
+</div>
+<script>
+(function(){
+  const club=document.getElementById('manager-club');
+  const country=document.getElementById('manager-country');
+  const league=document.getElementById('manager-league');
+  if(!club||!country||!league)return;
+  const records=Array.from(club.options).map(o=>({
+    id:o.value,name:o.textContent.trim(),country:o.dataset.country||'Unspecified',
+    leagueId:o.dataset.leagueId||'',leagueName:o.dataset.league||'Unspecified'
+  }));
+  if(!records.length)return;
+  const byName=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
+  function fill(control,records,placeholder){
+    control.replaceChildren(new Option(placeholder,''));
+    records.forEach(row=>control.add(new Option(row.name,row.id)));
+    control.value='';
+  }
+  function updateClubs(){
+    const options=records.filter(r=>r.country===country.value&&r.leagueId===league.value)
+      .sort((a,b)=>byName.compare(a.name,b.name));
+    fill(club,options,'Choose a club');
+    club.disabled=options.length===0;
+  }
+  function updateLeagues(){
+    const unique=new Map(records.filter(r=>r.country===country.value)
+      .map(r=>[r.leagueId,{id:r.leagueId,name:r.leagueName}]));
+    fill(league,Array.from(unique.values()).sort((a,b)=>byName.compare(a.name,b.name)),'Choose a league');
+    league.disabled=!country.value;
+    updateClubs();
+  }
+  const countries=Array.from(new Set(records.map(r=>r.country))).sort(byName.compare);
+  fill(country,countries.map(name=>({id:name,name})),'Choose a country');
+  country.previousElementSibling.hidden=false;country.hidden=false;
+  league.previousElementSibling.hidden=false;league.hidden=false;
+  country.addEventListener('change',updateLeagues);
+  league.addEventListener('change',updateClubs);
+  updateLeagues();
+})();
+</script>
 <p class="muted">The club list belongs to your selected dataset. Historical teams only appear after an independent historical season has been imported.</p>
 <label>Player and agent decision model</label>
 <select name="player_decision_version">
-<option value="player-decisions-v2" {% if selected_dataset=='england-2026-27-fc27' %}selected{% endif %} {% if selected_dataset!='england-2026-27-fc27' %}disabled{% endif %}>Player decisions v2 — current wages, squad role, transfer listing, contract status and club appeal</option>
+<option value="player-decisions-v2" {% if selected_dataset in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}selected{% endif %} {% if selected_dataset not in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}disabled{% endif %}>Player decisions v2 — sporting appeal, current wages, playing time, contracts and player motivations</option>
 <option value="player-decisions-v1">Player decisions v1 (old model — for comparison)</option>
-<option value="legacy-sporting-v2" {% if selected_dataset!='england-2026-27-fc27' %}selected{% endif %}>Legacy sporting-appeal only</option>
+<option value="legacy-sporting-v2" {% if selected_dataset not in ('england-2026-27-fc27','fc27-warehouse-659-mens-2026-27') %}selected{% endif %}>Legacy sporting-appeal only</option>
 </select>
-<p class="muted">The new model freezes the <b>provisional 92-club historical prestige draft</b> in this new career.
-It is a gameplay calibration, not a verified real-world player preference. Existing careers keep their original model;
-later global prestige edits do not rewrite your career's saved inputs.</p>
+{% if selected_dataset=='fc27-warehouse-659-mens-2026-27' %}
+<p class="muted">FC27 player decisions v2 uses <b>source-game wages and contracts</b>,
+simulated squad roles and transfer motivations, and the approved 659-club sporting-appeal model.
+These are game decisions, <b>not verified real-world player intentions</b>.
+Unverified European qualification carries no assumed advantage or disadvantage.
+No manual player-by-player setup is required for the model.</p>
+{% else %}
+<p class="muted">The 92-club model freezes provisional prestige rankings for each career.
+Those are game calibrations, not verified personal player motivations. Existing careers retain their saved decisions.</p>
+{% endif %}
 <p><a href="/world/player-decisions">Test hypothetical player decisions without creating a career →</a></p>
 <label>Economy model</label><select name="economy_version"><option value="prototype-v1">Prototype v1 (fictional, subject to rebalance)</option></select>
 <label>Financial scale</label><select name="scale"><option value="0.5">Conservative 0.5×</option><option value="1" selected>Baseline 1×</option><option value="1.5">Generous 1.5×</option></select>
@@ -126,12 +181,15 @@ later global prestige edits do not rewrite your career's saved inputs.</p>
 <a href="/world/play/career/{{career['career_id']}}/selling">Selling clubs and board overrides →</a></p>
 <div class="warn"><b>Player/agent rules:</b> {{decision_policy['version']}}.
 {% if decision_policy['version']=='player-decisions-v2' %}
-This career stores a fixed provisional prestige calibration and now requires
-<b>explicit current wage, current squad role, transfer listing and renewal circumstances</b>
-for each player before agent talks, plus the continental competition
-at each club. Those are user-entered <b>fictional sandbox assumptions</b>
-until independently sourced, not inferred real salaries or transfer requests.
-An elite Arsenal regular will not downgrade merely for a nominal wage offer.
+{% if career['dataset_id']=='fc27-warehouse-659-mens-2026-27' %}
+This FC27 career uses <b>source-game wages and contracts with game-model squad roles,
+listing and renewal decisions</b>. Club appeal comes from the 659-club game model;
+unknown European participation is neutral rather than invented.
+Any manual edits are optional game scenario overrides. These are not verified real club or player statements.
+{% else %}
+This career stores provisional 92-club prestige and requires explicit wages, roles,
+listing, renewal and continental circumstances before V2 can assess moves.
+{% endif %}
 {% elif decision_policy['version']=='player-decisions-v1' %}
 This existing career retains its frozen proposal prestige snapshot and earlier prestige/age model.
 Its player circumstances are not silently changed to v2.
@@ -1570,9 +1628,12 @@ def create_play_blueprint(db_path):
             datasets=db.execute("SELECT * FROM world_datasets ORDER BY season_id DESC").fetchall()
             selected=request.args.get("dataset",os.getenv("FC27_PREVIEW_DATASET","england-2026-27-fc27"))
             if selected not in {d["dataset_id"] for d in datasets}:abort(404)
-            clubs=db.execute("""SELECT c.club_id,c.name FROM world_dataset_entries e
-                JOIN world_clubs c ON c.club_id=e.club_id WHERE e.dataset_id=?
-                ORDER BY c.name""",(selected,)).fetchall()
+            clubs=db.execute("""SELECT c.club_id,c.name,co.country,co.competition_id,
+                  co.name AS competition_name FROM world_dataset_entries e
+                JOIN world_clubs c ON c.club_id=e.club_id
+                JOIN world_competitions co ON co.competition_id=e.competition_id
+                WHERE e.dataset_id=?
+                ORDER BY co.country,co.name,c.name""",(selected,)).fetchall()
             careers=db.execute("SELECT * FROM world_career_saves WHERE state='sandbox' ORDER BY created_at DESC").fetchall()
             return page("Career Transfer Desk","index",career=None,
                         datasets=datasets,clubs=clubs,careers=careers,selected_dataset=selected)

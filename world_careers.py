@@ -205,10 +205,13 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
     from world_player_decisions import LEGACY_VERSION,DECISION_VERSION,DECISION_V2_VERSION
     if player_decision_version not in (LEGACY_VERSION,DECISION_VERSION,DECISION_V2_VERSION):
         raise ValueError("Unsupported player decision policy")
-    if player_decision_version in (DECISION_VERSION,DECISION_V2_VERSION):
+    fc27_v2=(player_decision_version==DECISION_V2_VERSION
+        and dataset_id=="fc27-warehouse-659-mens-2026-27"
+        and os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1")
+    if player_decision_version in (DECISION_VERSION,DECISION_V2_VERSION) and not fc27_v2:
         from world_prestige_full import DATASET_ID,ALL_92
         if dataset_id!=DATASET_ID:
-            raise ValueError("New player decision policy needs the 2026/27 92-club prestige dataset")
+            raise ValueError("Player decision model needs a verified career-specific prestige baseline")
     if economy_version not in ECONOMIES or not 0.25<=scale<=3:
         raise ValueError("Unsupported economy version or scale")
     lock=date.fromisoformat(pes_lock_date)
@@ -287,7 +290,28 @@ def start_sandbox(conn, *, career_id, dataset_id, title, manager_club_id, pes_lo
              next_summer_date=next_summer_date)
         # Each opt-in new career receives its own frozen prestige inputs.
         # Subsequent global rebalancing cannot retroactively alter offers.
-        if player_decision_version in (DECISION_VERSION,DECISION_V2_VERSION):
+        if fc27_v2:
+            # Distinct 659-club GAME reference. The approved FC27 sporting
+            # appeal is a gameplay prestige proxy, NOT factual historic
+            # reputation or a real-world managerial/personality claim.
+            profiles=conn.execute("""SELECT club_id,sporting_appeal FROM
+                world_fc27_club_ai_context WHERE dataset_id=?
+                ORDER BY club_id""",(dataset_id,)).fetchall()
+            ids={club for club,_ in teams}
+            if (len(profiles)!=659 or {p[0] for p in profiles}!=ids
+                or any(type(p[1]) is not int or not 0<=p[1]<=100 for p in profiles)):
+                raise ValueError("FC27 player decisions V2 requires 659 source-labelled club appeal profiles")
+            version="fc27-659-source-labelled-game-appeal-v1"
+            conn.execute("""INSERT INTO world_career_player_policies
+                (career_id,decision_version,prestige_source_version)
+                VALUES(?,?,?)""",(career_id,player_decision_version,version))
+            conn.executemany("""INSERT INTO world_career_prestige_snapshots
+                (career_id,club_id,dataset_id,prestige_score,source_version,source_status)
+                VALUES(?,?,?,?,?,?)""",
+                ((career_id,club,dataset_id,appeal,version,
+                  "GAME_MODEL:FC27 source squad/club sporting appeal, not real prestige")
+                 for club,appeal in profiles))
+        elif player_decision_version in (DECISION_VERSION,DECISION_V2_VERSION):
             from world_prestige_full import ALL_92,FULL_VERSION
             ids=dict(conn.execute("""SELECT c.name,c.club_id FROM world_clubs c
                 JOIN world_dataset_entries e ON e.club_id=c.club_id
@@ -361,7 +385,8 @@ def player_circumstances(conn,career_id,player_id):
         WHERE career_id=? AND player_id=?""",(career_id,player_id))
     row=cursor.fetchone()
     if row is None:
-        return None
+        from world_fc27_player_decisions_context import game_player_facts
+        return game_player_facts(conn,career_id,player_id)
     result=dict(zip((x[0] for x in cursor.description),row))
     from world_player_decisions import canonical_role
     result["current_role"]=canonical_role(result["current_role"])
@@ -936,7 +961,7 @@ def agent_terms(conn, *, career_id, offer_id,
                           competing_bid=choice.get("competing_pressure",0)>=13))
             if adjusted is None:
                 raise ValueError("Unassessed personal-term demand")
-            demand=max(1000,adjusted)
+            demand=max(1000,demand,adjusted) if source_fc27 else max(1000,adjusted)
         conn.execute("""INSERT INTO world_career_agent_terms
             (offer_id,career_id,demanded_wage_weekly,status)
             VALUES (?,?,?,'awaiting_offer')""",(offer_id,career_id,demand))
@@ -1172,6 +1197,17 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
         if policy["version"]==DECISION_V2_VERSION:
             facts=player_circumstances(conn,career_id,row[0])
             european=offer_europe_context(conn,career_id,offer_id)
+            fc27_game=(row[3]=="fc27-warehouse-659-mens-2026-27"
+                and os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1")
+            # Legacy V2 remains strict. When the source FC27 league tier is
+            # unverified, make a *neutral* game comparison, never fabricate a
+            # divisional advantage. We still compare independent club appeal.
+            unknown_tier=(not isinstance(buyer,int) or not 1<=buyer<=4
+                          or not isinstance(seller,int) or not 1<=seller<=4)
+            fc27_neutral_tier=bool(fc27_game and unknown_tier)
+            if fc27_neutral_tier:
+                common["buyer_tier"]=1
+                common["seller_tier"]=1
             result=evaluate_player_choice_v2(
                 **common,
                 buyer_europe=european["buyer_europe"] if european else "unknown",
@@ -1180,7 +1216,15 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
                 current_role=facts["current_role"] if facts else "unknown",
                 transfer_listed=facts["transfer_listed"] if facts else None,
                 renewal_status=facts["renewal_status"] if facts else "unknown",
-                offered_wage=offered_wage)
+                offered_wage=offered_wage,
+                allow_unknown_europe_neutral=fc27_game)
+            if fc27_game:
+                result={**result,
+                    "player_context_source":facts.get("source_kind") if facts else None,
+                    "source_tier_status":"neutral_unsourced" if fc27_neutral_tier
+                                         else "source_tier",
+                    "continental_status":"unknown_no_advantage" if not european
+                                          else "user_recorded"}
         else:
             result=evaluate_player_choice(**common)
         descriptions={

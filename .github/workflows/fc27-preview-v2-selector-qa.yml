@@ -1,0 +1,55 @@
+name: FC27 V2 + country-league-club actual Chromium acceptance
+on:
+  push:
+    paths:
+      - 'world_careers.py'
+      - 'world_player_decisions.py'
+      - 'world_career_play.py'
+      - 'world_fc27_player_decisions_context.py'
+      - 'world_career_player_profiles.py'
+      - 'scripts/fc27_preview_v2_selectors_acceptance.py'
+      - '.github/workflows/fc27-preview-v2-selector-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-chrome-v2-country-league-team:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install application and real Chrome test client
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install playwright==1.55.0
+          google-chrome --version
+      - name: Fetch and authenticate immutable 659-club Render starter
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p preview-qa-output
+          gh release download fc27-playtest-world-2026-10-27-v1 \
+            --repo JTPEGG/PES_Clubs_Challenge_Public_Testing \
+            --dir preview-qa-output
+          cd preview-qa-output
+          sha256sum -c FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz.sha256
+          gzip -dc FC27_659_PRESEASON_PLAYTEST_WORLD.sqlite.gz > active_preview_qa.sqlite
+      - name: Run real Chrome FC27 V2 career and cascaded club selector
+        env:
+          DATABASE_PATH: preview-qa-output/active_preview_qa.sqlite
+          WORLD_MARKET_ACCESS_KEY: ci-fc27-v2-actual-chrome-only
+          WORLD_MARKET_COOKIE_SECRET: ci-fc27-v2-actual-chrome-signing-key
+          FC27_PRESEASON_PLAYTEST_ENABLED: '1'
+          FC27_PREVIEW_DATASET: fc27-warehouse-659-mens-2026-27
+        run: python -u -m scripts.fc27_preview_v2_selectors_acceptance --output preview-qa-output/screenshots
+      - name: Archive new UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FC27-V2-COUNTRY-LEAGUE-CLUB-REAL-CHROME
+          path: preview-qa-output/screenshots/
+          retention-days: 14
+          if-no-files-found: warn
