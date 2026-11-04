@@ -2020,7 +2020,7 @@ def create_play_blueprint(db_path):
                     # Source-identity suffix is retained in the database
                     # but never displayed in a career title.
                     from re import sub
-                    club_name=sub(r"\\s+\\[WH27:[0-9a-fA-F]{8,20}\\]$","",row[0])
+                    club_name=sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",row[0])
                     title=(request.form.get("title","").strip()
                         or f"{club_name} · 2026/27")[:80]
                     start_sandbox(
