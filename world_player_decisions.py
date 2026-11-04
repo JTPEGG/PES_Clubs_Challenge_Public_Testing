@@ -261,7 +261,8 @@ def evaluate_player_choice_v2(*,buyer_tier,seller_tier,buyer_score,seller_score,
                               transfer_listed=None,renewal_status="unknown",
                               offered_wage=None,role_promise="unspecified",
                               competitor_pressure=0,buyer_europe="unknown",
-                              seller_europe="unknown"):
+                              seller_europe="unknown",
+                              allow_unknown_europe_neutral=False):
     """Context-aware approach decision, not a statement of real consent.
 
     An unverified wage/role/listed status/renewal is NEVER silently
@@ -330,10 +331,19 @@ def evaluate_player_choice_v2(*,buyer_tier,seller_tier,buyer_score,seller_score,
         return decision("review","Current wage, present squad role and transfer-list status must be supplied; they cannot be inferred from an overall rating")
     if renewal_status=="unknown":
         return decision("review","Contract renewal intentions are unknown. Do not assume the current club will release this player")
-    if "unknown" in (buyer_europe,seller_europe):
+    if "unknown" in (buyer_europe,seller_europe) and not allow_unknown_europe_neutral:
         return decision("review",
             "Continental participation at both clubs must be explicitly recorded. "
             "A Champions League place must not be inferred from squad ability or prestige")
+    # Isolated 659-club FC27 game preview: unknown Europe carries NO
+    # advantage or penalty (not a claim that a club has no European football).
+    # Explicit European evidence still takes full effect. The conservative
+    # neutral comparison avoids blocking every autonomous deal just because
+    # the FC27 warehouse lacks validated continental qualification.
+    effective_buyer_europe=("none" if buyer_europe=="unknown"
+                            else buyer_europe)
+    effective_seller_europe=("none" if seller_europe=="unknown"
+                             else seller_europe)
     baseline=assess_player_interest(
         buyer_tier=buyer_tier,seller_tier=seller_tier,
         buyer_score=buyer_score,seller_score=seller_score,
@@ -360,7 +370,7 @@ def evaluate_player_choice_v2(*,buyer_tier,seller_tier,buyer_score,seller_score,
         ))
     if not baseline["can_negotiate"] and not playing_time_exception:
         return decision("uninterested","Severe sporting downgrade: "+baseline["reason"])
-    europe_drop=EUROPE_LEVELS[seller_europe]-EUROPE_LEVELS[buyer_europe]
+    europe_drop=EUROPE_LEVELS[effective_seller_europe]-EUROPE_LEVELS[effective_buyer_europe]
     downgrade=(sport_deficit>=5 or prestige_deficit>=12
                or tier_drop>=1 or europe_drop>=2)
     outgoing=transfer_listed or renewal_status=="not_offered"
@@ -413,7 +423,7 @@ def evaluate_player_choice_v2(*,buyer_tier,seller_tier,buyer_score,seller_score,
         overall=overall,age=age,current_role=current_role,
         transfer_listed=transfer_listed,renewal_status=renewal_status,
         competitor_pressure=competitor_pressure,
-        buyer_europe=buyer_europe,seller_europe=seller_europe,
+        buyer_europe=effective_buyer_europe,seller_europe=effective_seller_europe,
         role_promise=role_promise)
     if high_level_downgrade:
         # Even a genuine ageing, listed top-flight reserve should receive
