@@ -2039,7 +2039,7 @@ def create_play_blueprint(db_path):
                         economy_version=request.form.get("economy_version","prototype-v1"),
                         scale=float(request.form.get("scale","1")),
                         player_decision_version=request.form.get("player_decision_version",LEGACY_VERSION))
-            return redirect("/world/play/career/"+career_id)
+            return redirect("/world/play/career/"+career_id+("/market" if fc27_preview else ""))
         except (ValueError,sqlite3.Error,KeyError) as exc:return on_error(exc)
 
     @bp.get("/world/play/watch/<token>")
