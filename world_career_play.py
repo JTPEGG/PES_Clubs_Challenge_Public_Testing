@@ -10,8 +10,9 @@ import os
 import secrets
 import sqlite3
 from datetime import date
+from urllib.parse import urlencode
 from functools import wraps
-from flask import Blueprint, abort, make_response, redirect, render_template_string, request, url_for
+from flask import Blueprint, abort, make_response, redirect, render_template_string, request, url_for, jsonify
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from world_explorer import initialize_catalog
 from world_market import initialize_market
@@ -874,7 +875,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <h2 style="margin:8px 0">{{'Closed — squads locked' if snap.state=='closed'
        else 'Deadline processing' if snap.state=='deadline_reached'
        else 'Open for business'}}</h2>
-  <div class="rail"><span class="pill">📩 <b>{{unread}}</b> unread</span>
+  <div class="rail"><span class="pill">📩 <b data-inbox-unread-label>{{unread}}</b> unread</span>
   <span class="pill">🤝 <b>{{offers|length}}</b> received bids</span>
   <span class="pill">✅ <b>{{signed}}</b> agreed deals</span></div>
   <div class="budget-panel" id="budget-panel"
@@ -891,18 +892,6 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 
  </div>
 </div>
-{% if not spectator and watch_url and snap.state=='open' %}
-<div class="card desk-spectator-share">
-  <h3>Share the live transfer window</h3>
-  <p class="muted">Other players can follow the market without seeing or changing your manager decisions.</p>
-  <div class="desk-share-controls">
-    <a href="{{watch_url}}" target="_blank" rel="noopener noreferrer">Open read-only spectator view</a>
-    <input id="spectator-share-url" type="text" value="{{watch_url}}" readonly
-      aria-label="Read-only spectator link" onclick="this.select()">
-    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('spectator-share-url').value)">Copy link</button>
-  </div>
-</div>
-{% endif %}
 {% if not spectator %}
 <h2 id="recruitment">Shortlist</h2>
 <div class="card">
@@ -936,7 +925,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label>Min attribute<br><input type="number" name="scout_min_attribute" min="1" max="99" value="{{scout_min_attribute}}" style="width:80px"></label>
 <label>Contract<br><select name="scout_contract">
 <option value="">All</option><option value="expiring" {% if scout_contract=='expiring' %}selected{% endif %}>Within 12 months</option>
-<option value="known" {% if scout_contract=='known' %}selected{% endif %}>Verified expiry</option>
+<option value="known" {% if scout_contract=='known' %}selected{% endif %}>Known game expiry</option>
 <option value="unknown" {% if scout_contract=='unknown' %}selected{% endif %}>Unknown</option>
 </select></label>
 <label><input type="checkbox" name="scout_squad" value="1" {% if scout_squad %}checked{% endif %}> My squad only</label>
@@ -951,7 +940,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 </form>
 <div class="scout-table"><table>
 <thead><tr><th>Player</th><th>Club</th><th>Pos</th><th>OVR</th><th>Age</th><th>Value</th>
-<th>Contract</th><th>Years left</th><th>Pace</th><th>Shoot</th><th>Pass</th>
+<th>Contract (game)</th><th>Years left</th><th>Pace</th><th>Shoot</th><th>Pass</th>
 <th>Dribble</th><th>Defend</th><th>Physical</th>
 {% if scout_attribute %}<th>{{scout_attribute|replace('_',' ')|title}}</th>{% endif %}</tr></thead>
 <tbody>{% for p in scout_results %}
@@ -968,7 +957,15 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <td>{{p.physicality if p.physicality is not none else '—'}}</td>
 {% if scout_attribute %}<td>{{p.detail_attribute if p.detail_attribute is not none else '—'}}</td>{% endif %}
 </tr>{% endfor %}</tbody></table></div>
-<p class="time-note">{{scout_results|length}} players</p>
+<nav class="desk-scout-pager" aria-label="Scouting pages">
+ <span>Showing {{scout_first}}–{{scout_last}} of {{scout_total}} players
+ · Page {{scout_page}} of {{scout_pages}}</span>
+ <div class="desk-scout-pager-actions">
+ {% if scout_prev_url %}<a href="{{scout_prev_url}}" class="desk-page-link">← Previous</a>{% endif %}
+ {% if scout_next_url %}<a href="{{scout_next_url}}" class="desk-page-link">Next →</a>{% endif %}
+ </div>
+</nav>
+<p class="time-note">FC27 six-category ratings are calculated from the converted PES attributes. Contract dates come from the FC27 game snapshot, not independently verified player contracts.</p>
 </div>
 {% endif %}
 {% if snap.state!='not_started' %}
@@ -982,7 +979,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <tbody>{% for o in purchases %}
   <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
    <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
-   <td><a href="#inbox">{{o.status_label}}</a></td></tr>
+   <td><a href="#transfers">{{o.status_label}}</a></td></tr>
   {% endfor %}</tbody></table></div>
   {% if not purchases %}<p class="muted">No incoming bids</p>{% endif %}
  </section>
@@ -994,13 +991,13 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <tbody>{% for o in offers %}
   <tr><td>{{o.player_name}}</td><td>{{o.buyer_name|club_display}}</td>
    <td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
-   <td><a href="#inbox">{{o.status_label}}</a></td></tr>
+   <td><a href="#transfers">{{o.status_label}}</a></td></tr>
   {% endfor %}</tbody></table></div>
   {% if not offers %}<p class="muted">No outgoing bids</p>{% endif %}
  </section>
 </div>
-<h2 id="purchases">Outgoing bids — negotiations</h2>
 {% if purchases %}
+<h2 id="purchases">Incoming transfer negotiations</h2>
 <div class="grid">{% for o in purchases %}
 <div class="card offer">
 <div class="label">Buying from {{o.seller_name|club_display}} · {{o.status_label}}</div>
@@ -1074,13 +1071,13 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 {% endif %}
 </div>{% endif %}
 </div>{% endfor %}</div>
-{% else %}<div class="card"><p>No active approaches. Find players in Scouting.</p></div>{% endif %}
+{% endif %}
 {% endif %}
 <h2 id="inbox">Manager's Inbox</h2>
 {% if not spectator and unread>0 %}
-<form method="post" action="/world/play/career/{{career_id}}/market/read">
+<form method="post" action="/world/play/career/{{career_id}}/market/read" data-mark-inbox-read>
 <input type="hidden" name="csrf" value="{{csrf}}">
-<button>Mark inbox news as read</button>
+<button>Mark as read</button>
 </form>{% endif %}
 {% if offers %}
 <div class="grid">{% for o in offers %}
@@ -2069,7 +2066,6 @@ def create_play_blueprint(db_path):
         snap=window_snapshot(db,career_id=career_id)
         offers=[]
         messages=[]
-        watch_url=None
         unread=0
         signed=0
         purchases=[]
@@ -2098,12 +2094,29 @@ def create_play_blueprint(db_path):
             limit=300) if not spectator else []
         recommendations=[]  # Suggested targets intentionally hidden in the simplified scouting desk.
         squad=squad_preview(db,career_id=career_id) if not spectator else {"players":[],"departures":[]}
-        scout_results=scouting_search(db,career_id=career_id,query=scout_query,
+        scout_page=max(1,min(10000,filter_value("scout_page") or 1))
+        scout_page_size=80
+        scout_results,scout_total=(scouting_search(
+            db,career_id=career_id,query=scout_query,
             position=scout_position,min_overall=scout_min_overall,max_age=scout_max_age,
             category=scout_category,min_category=scout_min_category,
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
-            descending=scout_order=="desc",shortlist_only=scout_shortlist) if not spectator else []
+            descending=scout_order=="desc",shortlist_only=scout_shortlist,
+            limit=scout_page_size,offset=(scout_page-1)*scout_page_size,
+            with_total=True) if not spectator else ([],0))
+        scout_pages=max(1,(scout_total+scout_page_size-1)//scout_page_size)
+        scout_first=(scout_page-1)*scout_page_size+1 if scout_results else 0
+        scout_last=(scout_page-1)*scout_page_size+len(scout_results)
+        def scout_page_url(page_number):
+            params={k:v for k,v in request.args.items() if k!="scout_page"}
+            params["scout_page"]=str(page_number)
+            return ("/world/play/career/"+career_id+"/market?"+
+                    urlencode(params)+"#scouting")
+        scout_prev_url=(scout_page_url(scout_page-1)
+                         if not spectator and scout_page>1 else None)
+        scout_next_url=(scout_page_url(scout_page+1)
+                         if not spectator and scout_page<scout_pages else None)
         if snap["state"]=="open" and not spectator and len(player_search)>=2:
             targets=manager_targets(db,career_id=career_id,query=player_search)
         if snap["state"]!="not_started":
@@ -2171,9 +2184,7 @@ def create_play_blueprint(db_path):
             signed=sum(o["status"] in ("agreed_future","completed") for o in offers+purchases)
             messages=market_messages(db,career_id=career_id)
             unread=sum(m["is_read"]==0 for m in messages)
-            if not spectator:
-                token=spectator_token(db,career_id=career_id)
-                if token:watch_url=request.url_root.rstrip("/")+"/world/play/watch/"+token
+
         from world_player_morale import existing_morale
         morale=(existing_morale(db,career_id=career_id,window_id=snap["window_id"])
                 if snap["state"]!="not_started" else [])
@@ -2233,8 +2244,12 @@ def create_play_blueprint(db_path):
             spectator=spectator,snap=snap,offers=offers,
             purchases=purchases,targets=targets,player_search=player_search,
             buy_request_key="manager-buy-v1-"+secrets.token_urlsafe(14),
-            messages=messages,unread=unread,signed=signed,watch_url=watch_url,
+            messages=messages,unread=unread,signed=signed,
             scout_results=scout_results,scout_attributes=scout_attributes,
+            scout_page=scout_page,scout_pages=scout_pages,
+            scout_first=scout_first,scout_last=scout_last,
+            scout_total=scout_total,scout_prev_url=scout_prev_url,
+            scout_next_url=scout_next_url,
             shortlist=shortlist,recommendations=recommendations,squad=squad,
             scout_categories=CATEGORIES,scout_query=scout_query,
             scout_position=scout_position,scout_min_overall=scout_min_overall or "",
@@ -2466,7 +2481,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
     def manager_market_read(career_id):
         check_write()
         with connect() as db:
-            mark_market_read(db,career_id=career_id)
+            changed=mark_market_read(db,career_id=career_id)
+        if request.accept_mimetypes.best=="application/json":
+            return jsonify(ok=True,marked_read=changed,unread=0)
         return redirect("/world/play/career/"+career_id+"/market#inbox")
 
     @bp.post("/world/play/career/<career_id>/market/decision")
