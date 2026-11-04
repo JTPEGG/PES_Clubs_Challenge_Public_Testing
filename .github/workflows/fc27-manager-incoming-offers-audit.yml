@@ -35,4 +35,4 @@ jobs:
           WORLD_MARKET_COOKIE_SECRET: fc27-inbox-audit-disposable-only
         run: |
           python -u -m scripts.fc27_manager_inbox_offer_audit \
-            --world e2e-inbox/bournemouth.sqlite --club Bournemouth --seed bournemouth-a
+            --world e2e-inbox/bournemouth.sqlite --club Bournemouth --seed bournemouth-fast --skip-world
