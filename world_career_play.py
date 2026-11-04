@@ -101,7 +101,55 @@ All deals are subject to the PES league summer registration lock. This screen ca
 <label>Career identifier</label><input name="career_id" required placeholder="my-test-career" pattern="[A-Za-z0-9_-]+">
 <label>Career name</label><input name="title" maxlength="80" required placeholder="2026/27 career sandbox">
 <input type="hidden" name="dataset_id" value="{{selected_dataset}}"><p class="muted">Starting snapshot: {{selected_dataset}}</p>
-<label>Manager's club</label><select name="manager_club_id">{% for c in clubs %}<option value="{{c['club_id']}}">{{c['name']|club_display}}</option>{% endfor %}</select>
+<div id="club-cascade" style="max-width:500px">
+<label for="manager-country" hidden>Country</label>
+<select id="manager-country" hidden><option value="">Choose a country</option></select>
+<label for="manager-league" hidden>League</label>
+<select id="manager-league" hidden disabled><option value="">Choose a league</option></select>
+<label for="manager-club">Manager's club</label>
+<select name="manager_club_id" id="manager-club" required>
+{% for c in clubs %}<option value="{{c['club_id']}}" data-country="{{c['country']}}" data-league-id="{{c['competition_id']}}" data-league="{{c['competition_name']|replace(' [FC27-659]','')}}">{{c['name']|club_display}}</option>{% endfor %}
+</select>
+</div>
+<script>
+(function(){
+  const club=document.getElementById('manager-club');
+  const country=document.getElementById('manager-country');
+  const league=document.getElementById('manager-league');
+  if(!club||!country||!league)return;
+  const records=Array.from(club.options).map(o=>({
+    id:o.value,name:o.textContent.trim(),country:o.dataset.country||'Unspecified',
+    leagueId:o.dataset.leagueId||'',leagueName:o.dataset.league||'Unspecified'
+  }));
+  if(!records.length)return;
+  const byName=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
+  function fill(control,records,placeholder){
+    control.replaceChildren(new Option(placeholder,''));
+    records.forEach(row=>control.add(new Option(row.name,row.id)));
+    control.value='';
+  }
+  function updateClubs(){
+    const options=records.filter(r=>r.country===country.value&&r.leagueId===league.value)
+      .sort((a,b)=>byName.compare(a.name,b.name));
+    fill(club,options,'Choose a club');
+    club.disabled=options.length===0;
+  }
+  function updateLeagues(){
+    const unique=new Map(records.filter(r=>r.country===country.value)
+      .map(r=>[r.leagueId,{id:r.leagueId,name:r.leagueName}]));
+    fill(league,Array.from(unique.values()).sort((a,b)=>byName.compare(a.name,b.name)),'Choose a league');
+    league.disabled=!country.value;
+    updateClubs();
+  }
+  const countries=Array.from(new Set(records.map(r=>r.country))).sort(byName.compare);
+  fill(country,countries.map(name=>({id:name,name})),'Choose a country');
+  country.previousElementSibling.hidden=false;country.hidden=false;
+  league.previousElementSibling.hidden=false;league.hidden=false;
+  country.addEventListener('change',updateLeagues);
+  league.addEventListener('change',updateClubs);
+  updateLeagues();
+})();
+</script>
 <p class="muted">The club list belongs to your selected dataset. Historical teams only appear after an independent historical season has been imported.</p>
 <label>Player and agent decision model</label>
 <select name="player_decision_version">
@@ -1570,9 +1618,12 @@ def create_play_blueprint(db_path):
             datasets=db.execute("SELECT * FROM world_datasets ORDER BY season_id DESC").fetchall()
             selected=request.args.get("dataset",os.getenv("FC27_PREVIEW_DATASET","england-2026-27-fc27"))
             if selected not in {d["dataset_id"] for d in datasets}:abort(404)
-            clubs=db.execute("""SELECT c.club_id,c.name FROM world_dataset_entries e
-                JOIN world_clubs c ON c.club_id=e.club_id WHERE e.dataset_id=?
-                ORDER BY c.name""",(selected,)).fetchall()
+            clubs=db.execute("""SELECT c.club_id,c.name,co.country,co.competition_id,
+                  co.name AS competition_name FROM world_dataset_entries e
+                JOIN world_clubs c ON c.club_id=e.club_id
+                JOIN world_competitions co ON co.competition_id=e.competition_id
+                WHERE e.dataset_id=?
+                ORDER BY co.country,co.name,c.name""",(selected,)).fetchall()
             careers=db.execute("SELECT * FROM world_career_saves WHERE state='sandbox' ORDER BY created_at DESC").fetchall()
             return page("Career Transfer Desk","index",career=None,
                         datasets=datasets,clubs=clubs,careers=careers,selected_dataset=selected)
