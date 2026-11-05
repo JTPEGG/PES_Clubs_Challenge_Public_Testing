@@ -127,6 +127,26 @@ def run(world,output):
     output.mkdir(parents=True,exist_ok=False)
     manager,coverage=inspect(world)
     boot_career(world,manager)
+    # Temporary diagnostic only: verify real FC27 source player registration.
+    with closing(sqlite3.connect(world)) as verify_db:
+        rows=verify_db.execute("""SELECT p.player_id,p.full_name,
+            c.name AS club_name,x.overall,r.club_id
+            FROM world_players p
+            LEFT JOIN world_dataset_rosters r ON r.player_id=p.player_id
+                AND r.dataset_id=?
+            LEFT JOIN world_dataset_ratings x ON x.player_id=p.player_id
+                AND x.dataset_id=?
+            LEFT JOIN world_clubs c ON c.club_id=r.club_id
+            WHERE lower(p.full_name) LIKE '%sancho%'
+            ORDER BY p.full_name""",(DATASET,DATASET)).fetchall()
+        count=verify_db.execute("""SELECT COUNT(*) FROM world_dataset_rosters
+            WHERE dataset_id=?""",(DATASET,)).fetchone()[0]
+        metadata=verify_db.execute("""SELECT free_agents_excluded FROM
+            world_dataset_pes_v2_metadata WHERE dataset_id=?""",
+            (DATASET,)).fetchone()
+        print("FC27_SANCHO_DATABASE_LOOKUP",repr([tuple(row) for row in rows]),
+              "registered_roster",count,
+              "free_agent_meta",repr(metadata),flush=True)
     check_championship_move_interest(world)
     os.environ.update({
         "WORLD_MARKET_ACCESS_KEY":ACCESS,
