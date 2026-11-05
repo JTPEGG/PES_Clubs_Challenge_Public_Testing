@@ -3028,7 +3028,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             "completed":"Registered for season","withdrawn":"Withdrawn"}
         item=dict(row,status_label=status_labels.get(row["status"],row["status"]))
         before='<div class="grid">{% for o in purchases %}\n'
-        after='</div>{% endfor %}</div>\n{% endif %}\n{% endif %}\n<h2 id="inbox">'
+        after='</div>{% endfor %}</div>\n{% endif %}\n{% endif %}'
         fragment=LIVE_MARKET_PAGE.split(before,1)[1].split(after,1)[0]+'</div>'
         card_html=render_template_string(fragment,o=item,spectator=False,
             snap=snap,career_id=career_id,csrf=csrf_value(),
