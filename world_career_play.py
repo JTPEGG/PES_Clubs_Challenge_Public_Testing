@@ -1507,7 +1507,7 @@ Contract dates appear only where sourced.</p>
 <input type="hidden" name="player_id" value="{{player.player_id}}">
 <input type="hidden" name="action" value="offer">
 <label>Proposed wage (£ / week)
-<input name="weekly_wage" type="number" min="0" max="1000000" step="500"
+<input name="weekly_wage" type="number" min="0" max="1000000" step="1"
  value="{{free_offer.required_weekly_wage_gbp if free_offer and free_offer.status=='countered' else player.wage_guidance or 1000}}" required></label>
 <label>Contract years <select name="contract_years">
 {% for years in [1,2,3,4,5] %}<option value="{{years}}" {% if years==3 %}selected{% endif %}>{{years}}</option>{% endfor %}
