@@ -1774,6 +1774,33 @@ def create_play_blueprint(db_path):
     market_lock=Lock()
     market_jobs={}
     market_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-market")
+    # The source-only scouting preview can be prepared immediately after a
+    # career is created. Separate it from the AI transfer worker so a large
+    # market tick cannot hold up the interest filter's first use.
+    scout_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-scout")
+    scout_jobs={}
+    scout_jobs_lock=Lock()
+
+    def prewarm_scout_interest(career_id):
+        from world_scouting import scouting_search
+        try:
+            with closing(connect()) as db:
+                scouting_search(db,career_id=career_id,interested_only=True,
+                                limit=1)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Failed to prepare provisional career interest for %s",career_id)
+
+    def queue_scout_warm(career_id):
+        from world_scouting import interest_cache_ready
+        if interest_cache_ready(career_id):return
+        with scout_jobs_lock:
+            job=scout_jobs.get(career_id)
+            if job and not job.done():return
+            for key,old in list(scout_jobs.items()):
+                if old.done():scout_jobs.pop(key,None)
+            scout_jobs[career_id]=scout_executor.submit(
+                prewarm_scout_interest,career_id)
 
     @bp.before_request
     def measure_desk_start():
@@ -2250,6 +2277,8 @@ def create_play_blueprint(db_path):
                         economy_version=request.form.get("economy_version","prototype-v1"),
                         scale=float(request.form.get("scale","1")),
                         player_decision_version=request.form.get("player_decision_version",LEGACY_VERSION))
+            if fc27_preview:
+                queue_scout_warm(career_id)
             return redirect("/world/play/career/"+career_id+("/market" if fc27_preview else ""))
         except (ValueError,sqlite3.Error,KeyError) as exc:return on_error(exc)
 
@@ -2304,8 +2333,12 @@ def create_play_blueprint(db_path):
         if scout_order not in ("asc","desc"):scout_order="desc"
         scout_shortlist=request.args.get("scout_shortlist")=="1" if not spectator else False
         scout_attributes=scouting_attributes(db,career_id=career_id) if not spectator else []
-        shortlist=scouting_search(db,career_id=career_id,shortlist_only=True,
-            limit=300) if not spectator else []
+        shortlist=[]
+        if not spectator and db.execute("""SELECT 1 FROM
+             world_career_scout_shortlist WHERE career_id=? LIMIT 1""",
+             (career_id,)).fetchone():
+            shortlist=scouting_search(db,career_id=career_id,
+                shortlist_only=True,limit=300)
         recommendations=[]  # Suggested targets intentionally hidden in the simplified scouting desk.
         squad=squad_preview(db,career_id=career_id) if not spectator else {"players":[],"departures":[]}
         scout_page=max(1,min(10000,filter_value("scout_page") or 1))
