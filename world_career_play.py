@@ -909,7 +909,11 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 </div>
 <h2 id="scouting">Scouting &amp; squad values</h2>
 <div class="card">
-
+<div class="desk-scout-finance" aria-label="Available recruitment finances">
+ <span>Available transfer budget <b>{{money(funds)}}</b></span>
+ <span>Weekly wage headroom <b>{{money(wage_headroom)}} / week</b></span>
+</div>
+<p class="muted">Player interest is indicative, not an agreement. Wages, squad role, selling club and final negotiations still matter.</p>
 <form class="scout-filters" method="get" action="/world/play/career/{{career_id}}/market#scouting">
 <label>Name<br><input name="scout_query" value="{{scout_query}}" placeholder="Search players"></label>
 <label>Position<br><select name="scout_position">
@@ -918,6 +922,9 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 </select></label>
 <label>Min OVR<br><input name="scout_min_overall" type="number" min="1" max="99" value="{{scout_min_overall}}" style="width:80px"></label>
 <label>Max age<br><input name="scout_max_age" type="number" min="16" max="65" value="{{scout_max_age}}" style="width:80px"></label>
+<label>Maximum market value (£)<br><input name="scout_max_value" type="number" min="0" step="100000" value="{{scout_max_value}}" placeholder="No limit" style="width:160px"></label>
+<button type="button" data-scout-budget>Use available budget</button>
+<label><input type="checkbox" name="scout_interest" value="1" {% if scout_interest %}checked{% endif %}> Would consider a move</label>
 <label>Category<br><select name="scout_category"><option value="">Any</option>
 {% for cat in scout_categories %}<option value="{{cat}}" {% if scout_category==cat %}selected{% endif %}>{{cat|title}}</option>{% endfor %}</select></label>
 <label>Min category<br><input type="number" name="scout_min_category" min="1" max="99" value="{{scout_min_category}}" style="width:80px"></label>
@@ -939,7 +946,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label><input type="checkbox" name="scout_shortlist" value="1" {% if scout_shortlist %}checked{% endif %}> Shortlist only</label>
 <button>Apply filters</button>
 </form>
-<div class="scout-table"><table>
+<div class="scout-table" data-scout-scroll><table data-scout-results>
 <thead><tr><th>Player</th><th>Club</th><th>Pos</th><th>OVR</th><th>Age</th><th>Value</th>
 <th>Contract (game)</th><th>Years left</th><th>Pace</th><th>Shoot</th><th>Pass</th>
 <th>Dribble</th><th>Defend</th><th>Physical</th>
@@ -958,14 +965,10 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <td>{{p.physicality if p.physicality is not none else '—'}}</td>
 {% if scout_attribute %}<td>{{p.detail_attribute if p.detail_attribute is not none else '—'}}</td>{% endif %}
 </tr>{% endfor %}</tbody></table></div>
-<nav class="desk-scout-pager" aria-label="Scouting pages">
- <span>Showing {{scout_first}}–{{scout_last}} of {{'{:,}'.format(scout_total)}} players
- · Page {{scout_page}} of {{scout_pages}}</span>
- <div class="desk-scout-pager-actions">
- {% if scout_prev_url %}<a href="{{scout_prev_url}}" class="desk-page-link">← Previous</a>{% endif %}
- {% if scout_next_url %}<a href="{{scout_next_url}}" class="desk-page-link">Next →</a>{% endif %}
+<div class="desk-scout-pager" data-scout-progress role="status">
+ <span data-scout-count>Showing {{scout_last}} of {{'{:,}'.format(scout_total)}} players</span>
+ <span data-scout-loading aria-live="polite">Scroll to browse more players</span>
  </div>
-</nav>
 <p class="time-note">FC27 six-category ratings are calculated from the converted PES attributes. Contract dates come from the FC27 game snapshot, not independently verified player contracts.</p>
 </div>
 {% endif %}
@@ -1247,9 +1250,9 @@ Rejected and expired offers are not transfers.</p>
 </div>
 {% endif %}
 <h2>Market news</h2>
-{% if messages %}
+{% if news_feed %}
 <div class="feed">
-{% for m in messages %}
+{% for m in news_feed %}
 <div class="card"><b>{{m.headline}}</b>
 <p style="margin:5px 0">{{m.detail}}</p>
 <small>{{m.created_at}} UTC{% if m.is_read==0 %} · New{% endif %}</small>
@@ -2183,6 +2186,8 @@ def create_play_blueprint(db_path):
         scout_attribute=request.args.get("scout_attribute","") if not spectator else ""
         scout_min_attribute=filter_value("scout_min_attribute")
         scout_contract=request.args.get("scout_contract","") if not spectator else ""
+        scout_max_value=filter_value("scout_max_value")
+        scout_interest=request.args.get("scout_interest")=="1" if not spectator else False
         scout_squad=request.args.get("scout_squad")=="1" if not spectator else False
         scout_sort=request.args.get("scout_sort","overall")
         if scout_sort not in SORT_COLUMNS:scout_sort="overall"
@@ -2202,6 +2207,7 @@ def create_play_blueprint(db_path):
             category=scout_category,min_category=scout_min_category,
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
+            max_market_value=scout_max_value,interested_only=scout_interest,
             descending=scout_order=="desc",shortlist_only=scout_shortlist,
             limit=scout_page_size,offset=(scout_page-1)*scout_page_size,
             with_total=True) if not spectator else ([],0))
@@ -2286,7 +2292,32 @@ def create_play_blueprint(db_path):
                 for r in outgoing]
             signed=sum(o["status"] in ("agreed_future","completed") for o in offers+purchases)
             messages=market_messages(db,career_id=career_id)
-            unread=sum(m["is_read"]==0 for m in messages)
+            # General market news must not light up the manager's Inbox.
+            unread=sum(m["is_read"]==0 and m["offer_id"] is not None
+                       for m in messages)
+
+        world_news=[]
+        if snap["state"]!="not_started":
+            import re
+            deal_rows=db.execute("""SELECT p.full_name,sc.name,b.name,
+                 o.offered_fee,e.created_at FROM world_career_offer_events e
+                JOIN world_career_offers o ON o.offer_id=e.offer_id
+                JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
+                JOIN world_players p ON p.player_id=o.player_id
+                JOIN world_clubs sc ON sc.club_id=o.selling_club_id
+                JOIN world_clubs b ON b.club_id=o.buying_club_id
+                WHERE wo.window_id=? AND o.career_id=?
+                  AND e.event_type='ai_world_signed'
+                ORDER BY e.event_id DESC LIMIT 40""",
+                (snap["window_id"],career_id)).fetchall()
+            for name,seller,buyer,fee,when in deal_rows:
+                clean=lambda value:re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",value)
+                world_news.append(dict(headline="AI transfer agreed",
+                    detail=(name+" · "+clean(seller)+" → "+clean(buyer)+
+                        " · "+format_market_gbp(fee)),
+                    created_at=when,is_read=1))
+        news_feed=sorted([*messages,*world_news],
+            key=lambda item:str(item["created_at"]),reverse=True)
 
         from world_player_morale import existing_morale
         morale=(existing_morale(db,career_id=career_id,window_id=snap["window_id"])
@@ -2347,7 +2378,7 @@ def create_play_blueprint(db_path):
             spectator=spectator,snap=snap,offers=offers,
             purchases=purchases,targets=targets,player_search=player_search,
             buy_request_key="manager-buy-v1-"+secrets.token_urlsafe(14),
-            messages=messages,unread=unread,signed=signed,
+            messages=messages,news_feed=news_feed,unread=unread,signed=signed,
             scout_results=scout_results,scout_attributes=scout_attributes,
             scout_page=scout_page,scout_pages=scout_pages,
             scout_first=scout_first,scout_last=scout_last,
@@ -2359,7 +2390,8 @@ def create_play_blueprint(db_path):
             scout_max_age=scout_max_age or "",scout_category=scout_category,
             scout_min_category=scout_min_category or "",scout_attribute=scout_attribute,
             scout_min_attribute=scout_min_attribute or "",scout_contract=scout_contract,
-            scout_squad=scout_squad,scout_sort=scout_sort,
+            scout_max_value=scout_max_value if scout_max_value is not None else "",
+            scout_interest=scout_interest,scout_squad=scout_squad,scout_sort=scout_sort,
             scout_order=scout_order,scout_shortlist=scout_shortlist,
             summary=summary,season_tasks=season_tasks,
             player_morale=morale,season_exclusions=excluded,
@@ -2468,7 +2500,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             process_live_market(db,career_id=career_id)
             snap=window_snapshot(db,career_id=career_id)
             msg=db.execute("""SELECT COUNT(*),COALESCE(MAX(message_id),0),
-                COALESCE(SUM(CASE WHEN is_read=0 THEN 1 ELSE 0 END),0)
+                COALESCE(SUM(CASE WHEN is_read=0 AND offer_id IS NOT NULL THEN 1 ELSE 0 END),0)
                 FROM world_career_market_inbox WHERE career_id=?""",
                 (career_id,)).fetchone()
             offers=db.execute("""SELECT COUNT(*) FROM world_career_offers
