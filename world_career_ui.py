@@ -896,7 +896,20 @@ DASHBOARD_JS = r"""
     const count=outgoing?.closest('.desk-transfer-section')
       ?.querySelector('.desk-section-count');
     if(count)count.textContent=String(n);
-    const mark=views.inbox.querySelector('form[data-mark-inbox-read]');
+    let mark=views.inbox.querySelector('form[data-mark-inbox-read]');
+    if(!mark&&Number(document.body.dataset.unread||0)>0&&csrf){
+      // The Inbox initially has NO mark-read form when no bids exist.
+      // A new mid-window offer must still be acknowledged on first opening.
+      mark=document.createElement('form');
+      mark.method='post';mark.action=location.pathname+'/read';
+      mark.setAttribute('data-mark-inbox-read','');
+      const field=document.createElement('input');
+      field.type='hidden';field.name='csrf';field.value=String(csrf);
+      const button=document.createElement('button');
+      button.textContent='Mark as read';button.type='submit';
+      mark.append(field,button);
+      views.inbox.querySelector('#inbox')?.insertAdjacentElement('afterend',mark);
+    }
     if(mark&&Number(document.body.dataset.unread||0)>0)mark.hidden=false;
     const badgeText=views.dashboard.querySelector('[data-desk-tab="inbox"] small');
     if(badgeText)badgeText.textContent=n+' incoming offers · '+
