@@ -133,9 +133,10 @@ def build(original_path,warehouse_path,output_path,pages_dir=None):
                 for k,v in skills.items()}
             # Auxiliary ratings are categorical, not overall-scaled.
             for field in FIELDS[-4:]:derived[field]=skills[field]
-            dob=row["date_of_birth"]
+            dob=row["date_of_birth"] or str(2026-data["age"])+"-07-01"
             name=("Jadon Sancho" if sid=="233049" else row["player_name"])
-            provenance="prior-fifa-"+str(row["edition"])+"-pes-v2-adjusted"
+            provenance=("prior-fifa-"+str(row["edition"])+"-pes-v2-adjusted"
+                +("-modelled-dob" if not row["date_of_birth"] else ""))
             weight=row["weight_kg"]
         else:
             choices=sorted(((abs((overall or 55)-data["overall"])+
