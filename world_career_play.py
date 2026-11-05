@@ -56,6 +56,7 @@ from world_preseason_window import window_snapshot
 from world_live_market import (
     initialise_live_market,start_live_market,process_live_market,
     spectator_token,manager_respond,market_messages,mark_market_read,
+    actionable_unread_count,
 )
 from world_scouting import scouting_search,scouting_attributes,CATEGORIES,SORT_COLUMNS,set_shortlisted,player_profile,recruitment_recommendations
 from world_live_buying import (
@@ -1339,36 +1340,44 @@ Rejected and expired offers are not transfers.</p>
        }else if(badge){badge.remove();}
      });
    }
-   function updateNotice(count){
-     let notice=document.getElementById('desk-new-market-activity');
-     if(!notice){
-       notice=document.createElement('div');
-       notice.id='desk-new-market-activity';
-       notice.className='desk-global-message';
-       notice.setAttribute('role','status');
-       const title=document.createElement('strong');
-       title.id='desk-new-market-headline';
-       const button=document.createElement('button');
-       button.type='button';
-       button.textContent='Open updated Inbox';
-       button.style.marginLeft='12px';
-       button.addEventListener('click',function(){
-         history.replaceState(null,'','#inbox');location.reload();
-       });
-       notice.appendChild(title);notice.appendChild(button);
-       const anchor=document.querySelector('.desk-intro');
-       if(anchor)anchor.insertAdjacentElement('afterend',notice);
-       else document.querySelector('.desk-workspace')?.prepend(notice);
-     }
-     notice.querySelector('#desk-new-market-headline').textContent=
-       count+' unread market notification'+(count===1?'':'s');
+   // News receives its own unobtrusive tab count. Inbox badges are ONLY
+   // for real actions the manager can take; AI-to-AI deals are not email.
+   const newsPanel=document.getElementById('desk-view-news');
+   let newestWorldEvent=Math.max(0,...Array.from(
+     document.querySelectorAll('[data-world-event-id]'),
+     el=>Number(el.dataset.worldEventId)||0));
+   let unseenMarketNews=0;
+   function refreshNewsBadge(){
+     const onNews=newsPanel&&!newsPanel.hidden;
+     if(onNews)unseenMarketNews=0;
+     document.querySelectorAll('[data-desk-tab="news"]').forEach(function(nav){
+       let badge=nav.querySelector('.desk-nav-count');
+       if(unseenMarketNews>0){
+         if(!badge){
+           badge=document.createElement('span');
+           badge.className='desk-nav-count';
+           nav.appendChild(badge);
+         }
+         badge.textContent=String(unseenMarketNews);
+       }else if(badge)badge.remove();
+     });
    }
+   document.addEventListener('click',function(e){
+     if(e.target.closest('[data-desk-tab="news"]')){
+       unseenMarketNews=0;refreshNewsBadge();
+     }
+   });
    function marketHeartbeat(){
      if(marketPulseBusy)return;
      marketPulseBusy=true;
      fetch(marketPath,{credentials:'same-origin',cache:'no-store',
          headers:{'Accept':'application/json'}})
        .then(function(response){
+         if(response.status===410||response.status===404){
+           window.location.assign('/world/play?error='+
+             encodeURIComponent('This test career is no longer available following a deployment. Please create a new career.'));
+           throw new Error('Test career no longer available');
+         }
          if(!response.ok)throw new Error('Market heartbeat rejected');
          return response.json();
        })
@@ -1386,6 +1395,8 @@ Rejected and expired offers are not transfers.</p>
              const id=Number(item.event_id);
              if(!Number.isSafeInteger(id))return;
              if(marketFeed.querySelector('[data-world-event-id="'+id+'"]'))return;
+             if(id>newestWorldEvent && newsPanel.hidden)unseenMarketNews++;
+             newestWorldEvent=Math.max(newestWorldEvent,id);
              const card=document.createElement('div');
              card.className='card';card.dataset.worldEventId=String(id);
              const heading=document.createElement('b');
@@ -1397,11 +1408,11 @@ Rejected and expired offers are not transfers.</p>
              card.append(heading,summary,when);
              marketFeed.prepend(card);
            });
+           refreshNewsBadge();
          }
          if(current>lastInboxMessage){
            lastInboxMessage=current;
            document.body.dataset.lastMessageId=String(current);
-           if(unread>0)updateNotice(unread);
          }
        })
        .catch(function(){
@@ -2376,8 +2387,7 @@ def create_play_blueprint(db_path):
             signed=sum(o["status"] in ("agreed_future","completed") for o in offers+purchases)
             messages=market_messages(db,career_id=career_id)
             # General market news must not light up the manager's Inbox.
-            unread=sum(m["is_read"]==0 and m["offer_id"] is not None
-                       for m in messages)
+            unread=actionable_unread_count(db,career_id=career_id)
 
         world_news=[]
         if snap["state"]!="not_started":
@@ -2590,7 +2600,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     interested_only=request.args.get("scout_interest")=="1",
                     limit=page_size,offset=(page-1)*page_size,
                     with_total=True)
-            except ValueError:abort(404)
+            except ValueError:
+                return jsonify(error="career_not_found",detail=
+                    "This test career is no longer on the server. Return to the career list and create a new test."),410
         data=[]
         for p in results:
             data.append(dict(
@@ -2617,6 +2629,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
     def manager_market(career_id):
         if not authenticated():return redirect("/world/play")
         with connect() as db:
+            exists=db.execute("""SELECT 1 FROM world_career_saves
+                WHERE career_id=? AND state='sandbox'""",(career_id,)).fetchone()
+            if exists is None:
+                return redirect("/world/play?error=This+test+career+is+no+longer+available.+A+deployment+may+have+reset+it.")
             snap=window_snapshot(db,career_id=career_id)
             if snap["state"]!="not_started":
                 queue_market_tick(career_id)
@@ -2635,13 +2651,15 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         with connect() as db:
             career=db.execute("""SELECT manager_club_id FROM world_career_saves
                 WHERE career_id=? AND state='sandbox'""",(career_id,)).fetchone()
-            if career is None:abort(404)
+            if career is None:
+                return jsonify(error="career_not_found",
+                    detail="This test career no longer exists on the server, likely after a deployment. Please create a new career."),410
             queue_market_tick(career_id)
             snap=window_snapshot(db,career_id=career_id)
-            msg=db.execute("""SELECT COUNT(*),COALESCE(MAX(message_id),0),
-                COALESCE(SUM(CASE WHEN is_read=0 AND offer_id IS NOT NULL THEN 1 ELSE 0 END),0)
+            msg=db.execute("""SELECT COUNT(*),COALESCE(MAX(message_id),0)
                 FROM world_career_market_inbox WHERE career_id=?""",
                 (career_id,)).fetchone()
+            unread=actionable_unread_count(db,career_id=career_id)
             offers=db.execute("""SELECT COUNT(*) FROM world_career_offers
                 WHERE career_id=? AND selling_club_id=?
                   AND buying_club_id<>?""",
@@ -2665,7 +2683,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                         " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
                 for eid,name,seller,buyer,fee,when in recent]
             payload=dict(state=snap["state"],latest_message_id=msg[1],
-                unread=msg[2],incoming_offers=offers,world_updates=world_updates,
+                unread=unread,incoming_offers=offers,world_updates=world_updates,
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
         response.headers["Cache-Control"]="private, no-store"
