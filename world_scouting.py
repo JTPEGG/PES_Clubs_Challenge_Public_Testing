@@ -5,7 +5,9 @@ Never guesses a contract expiry or individual PES attribute. Approximate
 market values come from the existing labelled economy model.
 """
 from datetime import date
-from world_careers import _player_reference
+from collections import defaultdict
+from world_careers import _player_reference, age_on
+from world_valuation import model_value, fc27_game_reference_value
 
 SORT_COLUMNS=frozenset(('overall','age','market_value','pace','shooting','passing','dribbling','defending','physicality','years_left','full_name'))
 
@@ -35,7 +37,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     max_age=None, category="", min_category=None,
                     attribute="", min_attribute=None, contract="",
                     squad_only=False, limit=80, sort_by='overall', descending=True,
-                    shortlist_only=False, offset=0, with_total=False):
+                    shortlist_only=False, offset=0, with_total=False,
+                    max_market_value=None, interested_only=False):
     from world_ai_bidding import position_family
     save=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=? AND state='sandbox'""",
@@ -54,6 +57,9 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     min_category=max(1,min(99,int(min_category))) if min_category is not None else None
     min_attribute=max(1,min(99,int(min_attribute))) if min_attribute is not None else None
     q=query.strip()[:70].lower()
+    max_market_value=(max(0,int(max_market_value))
+        if max_market_value is not None else None)
+    interested_only=bool(interested_only)
     if sort_by not in SORT_COLUMNS:sort_by='overall'
     initialise_scouting(conn)
     saved_ids={r[0] for r in conn.execute('SELECT player_id FROM world_career_scout_shortlist WHERE career_id=?',(career_id,)).fetchall()}
@@ -91,7 +97,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         SELECT r.player_id,r.club_id,c.name club_name,
           p.full_name,p.birth_date,p.primary_position,x.overall,
           a.pace,a.shooting,a.passing,a.dribbling,a.defending,a.physicality,
-          cs.expires_on AS expires,a.detail_attribute
+          cs.expires_on AS expires,cs.weekly_wage_gbp AS current_wage,
+          a.detail_attribute
         FROM world_career_registrations r
         JOIN world_clubs c ON c.club_id=r.club_id
         JOIN world_players p ON p.player_id=r.player_id
@@ -117,7 +124,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
              ORDER BY wc.expires DESC LIMIT 1) expires,
             (SELECT a.value FROM world_player_attributes a
              WHERE a.player_id=r.player_id AND a.effective_season=?
-               AND a.attribute_name=? LIMIT 1) detail_attribute
+               AND a.attribute_name=? LIMIT 1) detail_attribute,
+            NULL AS current_wage
             FROM world_career_registrations r
             JOIN world_clubs c ON c.club_id=r.club_id
             JOIN world_players p ON p.player_id=r.player_id
@@ -128,7 +136,59 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             ORDER BY x.overall DESC,p.full_name,r.player_id""",
             (season,attribute,dataset,career_id,int(bool(squad_only)),manager,
              q,"%"+q.replace("%","\\%").replace("_","\\_")+"%")).fetchall()
-    # Individual scoring/filter choices do not mutate club or player records.
+    # Market-value sorting and caps use the exact existing game model, but
+    # evaluate wages in ONE bulk read rather than 17,593 reference SQL calls.
+    require_values=(sort_by=="market_value" or max_market_value is not None)
+    source_date=None
+    source_wages={}
+    if require_values:
+        source_date=conn.execute("""SELECT source_date FROM world_datasets
+            WHERE dataset_id=?""",(dataset,)).fetchone()[0]
+        if dataset=="fc27-warehouse-659-mens-2026-27":
+            source_wages=dict(conn.execute("""SELECT player_id,weekly_wage_gbp
+                FROM world_dataset_contract_snapshots
+                WHERE dataset_id=?""",(dataset,)).fetchall())
+
+    # This is a provisional FC27 V2 *interest screen*, NOT a claim that
+    # players consent to any fee, wage, or registration. Reuse the actual
+    # player-choice decision function, source-rated club appeal and modelled
+    # squad roles rather than a hard-coded club list (e.g. Haaland/Hull).
+    interest_context=None
+    if interested_only and dataset=="fc27-warehouse-659-mens-2026-27":
+        from world_fc27_ai_recruitment import read_fc27_profiles
+        from world_player_decisions import evaluate_player_choice_v2
+        from world_ai_bidding import position_family
+        profiles=read_fc27_profiles(conn,dataset=dataset)
+        prestige=dict(conn.execute("""SELECT club_id,prestige_score
+            FROM world_career_prestige_snapshots WHERE career_id=?""",
+            (career_id,)).fetchall())
+        changes={r[0]:r for r in conn.execute(
+            """SELECT player_id,current_wage_weekly,current_role,
+               transfer_listed,renewal_status
+               FROM world_career_player_circumstances WHERE career_id=?""",
+            (career_id,)).fetchall()}
+        next_summer=conn.execute("""SELECT next_summer_date
+            FROM world_career_saves WHERE career_id=?""",(career_id,)).fetchone()[0]
+        ranks=defaultdict(int)
+        goalie_ranks=defaultdict(int)
+        roles={}
+        for player in sorted(rows,key=lambda r:(r["club_id"],-r["overall"],r["player_id"])):
+            club=player["club_id"]
+            rank=ranks[club]
+            ranks[club]+=1
+            if position_family(player["primary_position"])=="GK":
+                gk_rank=goalie_ranks[club]
+                goalie_ranks[club]+=1
+                role=("key_player" if gk_rank==0 and rank<3 else
+                      "regular_starter" if gk_rank==0 else
+                      "rotation" if gk_rank==1 else "fringe")
+            else:
+                role=("key_player" if rank<3 else "regular_starter"
+                      if rank<11 else "rotation" if rank<18 else "fringe")
+            roles[player["player_id"]]=role
+        interest_context=(profiles,prestige,changes,roles,next_summer,
+                          evaluate_player_choice_v2)
+
     out=[]
     anchor=date.fromisoformat(asof)
     for r in rows:
@@ -159,10 +219,48 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             d[category] is None or d[category]<min_category):continue
         if attribute and min_attribute is not None and (
             d["detail_attribute"] is None or d["detail_attribute"]<min_attribute):continue
-        # Calculate values only for the requested page unless the user sorts
-        # by value; valuing all 17,593 players per normal page is unnecessary.
-        d["market_value"]=_player_reference(conn,dataset,d["player_id"])[0] if sort_by=="market_value" else None
         d["owned"]=d["club_id"]==manager
+        if interested_only and not d["owned"] and interest_context is not None:
+            profiles,prestige,changes,roles,next_summer,evaluate=interest_context
+            seller=profiles.get(d["club_id"])
+            buyer=profiles.get(manager)
+            changed=changes.get(d["player_id"])
+            current_role=changed[2] if changed else roles.get(d["player_id"],"unknown")
+            listed=(bool(changed[3]) if changed else
+                    current_role=="fringe" and bool(d["expires"])
+                    and d["expires"]<=next_summer)
+            renewal=(changed[4] if changed else
+                     "not_offered" if listed else "renewal_offered")
+            wage=(changed[1] if changed and changed[1] is not None
+                  else d["current_wage"])
+            if not buyer or not seller or d["age"] is None or wage is None:
+                continue  # Not enough evidence to positively signal interest.
+            choice=evaluate(
+                buyer_tier=1,seller_tier=1,  # FC27 source tiers remain unknown.
+                buyer_score=int(buyer["sporting_appeal"]),
+                seller_score=int(seller["sporting_appeal"]),
+                buyer_prestige=int(prestige.get(manager) or buyer["sporting_appeal"]),
+                seller_prestige=int(prestige.get(d["club_id"]) or seller["sporting_appeal"]),
+                overall=d["overall"],age=d["age"],current_wage=int(wage),
+                current_role=current_role,transfer_listed=listed,
+                renewal_status=renewal,offered_wage=None,
+                role_promise="regular_starter",
+                allow_unknown_europe_neutral=True)
+            if not choice["can_negotiate"]:
+                continue
+        if require_values:
+            baseline=model_value(d["overall"],age_on(d["birth_date"],source_date),
+                                 d["primary_position"])
+            if dataset=="fc27-warehouse-659-mens-2026-27" and baseline is not None:
+                baseline=fc27_game_reference_value(
+                    baseline=baseline,overall=d["overall"],
+                    weekly_wage=source_wages.get(d["player_id"]))
+            d["market_value"]=baseline
+            if max_market_value is not None and (
+                    baseline is None or baseline>max_market_value):
+                continue
+        else:
+            d["market_value"]=None
         out.append(d)
     def sort_key(d):
         v=d.get(sort_by)
