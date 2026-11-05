@@ -2695,6 +2695,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             if exists is None:
                 return redirect("/world/play?error=This+test+career+is+no+longer+available.+A+deployment+may+have+reset+it.")
             snap=window_snapshot(db,career_id=career_id)
+            # Also covers restored/imported QA careers that did not pass
+            # through the new-career POST in this Gunicorn process.
+            queue_scout_warm(career_id)
             if snap["state"]!="not_started":
                 queue_market_tick(career_id)
             return live_market_render(db,career_id=career_id)
