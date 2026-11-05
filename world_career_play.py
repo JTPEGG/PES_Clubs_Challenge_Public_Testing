@@ -1256,7 +1256,7 @@ Rejected and expired offers are not transfers.</p>
 {% for m in news_feed %}
 <div class="card" {% if m.event_id is defined %}data-world-event-id="{{m.event_id}}"{% endif %}><b>{{m.headline}}</b>
 <p style="margin:5px 0">{{m.detail}}</p>
-<small>{{m.created_at}} UTC{% if m.is_read==0 %} · New{% endif %}</small>
+<small>{{m.created_at}} UTC</small>
 </div>{% endfor %}</div>
 {% else %}<div class="card">No news yet.</div>{% endif %}
 <p class="desk-provenance">Career market values, wages and player preferences are simulated.</p>
@@ -1342,13 +1342,14 @@ Rejected and expired offers are not transfers.</p>
    }
    // News receives its own unobtrusive tab count. Inbox badges are ONLY
    // for real actions the manager can take; AI-to-AI deals are not email.
-   const newsPanel=document.getElementById('desk-view-news');
+   const newsVisible=()=>{const panel=document.getElementById('desk-view-news');
+     return Boolean(panel&&!panel.hidden);};
    let newestWorldEvent=Math.max(0,...Array.from(
      document.querySelectorAll('[data-world-event-id]'),
      el=>Number(el.dataset.worldEventId)||0));
    let unseenMarketNews=0;
    function refreshNewsBadge(){
-     const onNews=newsPanel&&!newsPanel.hidden;
+     const onNews=newsVisible();
      if(onNews)unseenMarketNews=0;
      document.querySelectorAll('[data-desk-tab="news"]').forEach(function(nav){
        let badge=nav.querySelector('.desk-nav-count');
@@ -1395,7 +1396,7 @@ Rejected and expired offers are not transfers.</p>
              const id=Number(item.event_id);
              if(!Number.isSafeInteger(id))return;
              if(marketFeed.querySelector('[data-world-event-id="'+id+'"]'))return;
-             if(id>newestWorldEvent && newsPanel.hidden)unseenMarketNews++;
+             if(id>newestWorldEvent && !newsVisible())unseenMarketNews++;
              newestWorldEvent=Math.max(newestWorldEvent,id);
              const card=document.createElement('div');
              card.className='card';card.dataset.worldEventId=String(id);
