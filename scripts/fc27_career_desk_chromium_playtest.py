@@ -214,6 +214,46 @@ def run(world,output):
             # not stop ticking because a focused input prevents reload.
             scout_input=page.locator('input[name="scout_query"]')
             scout_input.focus()
+            # Insert one valid, auditable manager-directed proposal in this
+            # ISOLATED browser QA database. This tests transport/UI only;
+            # no extra offer is inserted into real careers or forced by AI.
+            from world_careers import propose_offer,_player_reference
+            from world_preseason_window import window_snapshot
+            from world_live_market import _message
+            from datetime import timezone
+            with closing(sqlite3.connect(world,timeout=15)) as db:
+                db.row_factory=sqlite3.Row
+                player=db.execute("""SELECT r.player_id FROM
+                    world_career_registrations r
+                    JOIN world_dataset_ratings x ON
+                      x.dataset_id=? AND x.player_id=r.player_id
+                    WHERE r.career_id=? AND r.club_id=?
+                      AND x.overall BETWEEN 60 AND 85
+                    ORDER BY x.overall,r.player_id LIMIT 1""",
+                    (DATASET,CAREER,manager)).fetchone()
+                buyer=db.execute("""SELECT club_id,transfer_budget
+                    FROM world_career_club_ledger
+                    WHERE career_id=? AND club_id<>? AND transfer_budget>2000000
+                    ORDER BY transfer_budget DESC LIMIT 1""",
+                    (CAREER,manager)).fetchone()
+                check(player and buyer,"QA needs a source player and funded AI buyer")
+                reference,_=_player_reference(db,DATASET,player[0])
+                fee=max(10000,min(int(reference or 500000),buyer[1]//3))
+                live_offer_id=propose_offer(db,career_id=CAREER,
+                    request_key="isolated-live-browser-bid",
+                    player_id=player[0],buying_club_id=buyer[0],
+                    offered_fee=fee,agreement_date="2026-07-31",
+                    ai_bid_snapshot={"fee":fee,"buyer_club_id":buyer[0]},
+                    autonomous_inbox=True)
+                snapshot=window_snapshot(db,career_id=CAREER)
+                _message(db,career_id=CAREER,
+                    window_id=snapshot["window_id"],
+                    key="offer:"+str(live_offer_id),
+                    headline="New transfer offer",
+                    detail="Isolated UI live-offer delivery regression",
+                    offer_id=live_offer_id,
+                    when=datetime.now(timezone.utc))
+                db.commit()
             with page.expect_response(
               lambda response:'/market/pulse' in response.url
                               and response.status==200,
@@ -225,6 +265,22 @@ def run(world,output):
                   "Focused-input market heartbeat did not report authoritative FC27 state")
             check(scout_input.evaluate("(el)=>document.activeElement===el"),
                   "Market progress interrupted or reset the actively edited Scouting form")
+            selector='[data-live-offer-id="'+str(live_offer_id)+'"]'
+            page.wait_for_function(
+                "(id)=>Boolean(document.querySelector('#desk-view-inbox [data-live-offer-id=\\\"'+id+'\\\"]'))",
+                arg=str(live_offer_id),timeout=12000)
+            check(page.locator("#desk-view-transfers table[data-desk-table='outgoing'] tbody "+selector).count()==1,
+                  "Real offer did not appear in live Transfers table without reloading")
+            page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
+            live_card=page.locator("#desk-view-inbox #desk-live-offer-stream "+selector)
+            check(live_card.is_visible(),"New real offer not visible in live Inbox")
+            check(live_card.locator('button[value="accept"]').count()==1 and
+                  live_card.locator('button[value="reject"]').count()==1 and
+                  live_card.locator('button[value="counter"]').count()==1,
+                  "New live offer lacks accept/reject/counter decision forms")
+            page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
+            scout_input.focus()
+            found.append("Genuine new AI bid appears live in Inbox and Transfers without page reload")
             found.append("Autonomous market heartbeat keeps ticking while manager is focused on Scouting")
             check("WH27:" not in page.locator("#desk-view-scouting").inner_text(),
                   "Internal FC27 source tags visible in scouting club labels")
@@ -354,6 +410,34 @@ def run(world,output):
             page.screenshot(path=str(output/"07-mobile-squad.png"),
                             animations="disabled",full_page=True)
             found.append("Mobile 390px Inbox/Squad navigation with no whole-page overflow")
+
+            # Advance ONLY the disposable QA DB to the real deadline. All
+            # unfinished bids must be clearly labelled as deadline-expired,
+            # and the manager must have a prominent usable next step.
+            from world_preseason_window import finalise_preseason_window
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                end=(datetime.now(timezone.utc)-timedelta(seconds=2)).isoformat()
+                db.execute("""UPDATE world_career_preseason_windows
+                    SET deadline_at=? WHERE career_id=?""",(end,CAREER))
+                db.commit()
+                finalise_preseason_window(db,career_id=CAREER)
+            page.set_viewport_size({"width":1440,"height":900})
+            page.goto(base+manager_path,wait_until="domcontentloaded")
+            check(page.locator('body').get_attribute('data-window-state')=='closed',
+                  "Finalised QA deadline not visible to Career Desk")
+            check(page.locator('#desk-view-dashboard [data-desk-tab="season-setup"]').is_visible(),
+                  "Overview has no prominent Continue to season setup action")
+            page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
+            check(page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').is_visible(),
+                  "Transfer Centre has no visible Continue action at top")
+            check('Expired at deadline' in page.locator(
+                  '#desk-view-transfers table[data-desk-table="outgoing"]').inner_text(),
+                  "Unsigned bids at deadline incorrectly labelled as voluntary withdrawals")
+            page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').click()
+            check(page.locator('#desk-view-season-setup').is_visible(),
+                  "Continue link did not navigate to season setup checklist")
+            found.append("Post-deadline offers labelled expired; Continue opens the real season setup")
 
             check(not failures,"JavaScript / browser console errors: "+repr(failures))
             browser.close()
