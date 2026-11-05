@@ -334,6 +334,18 @@ DASHBOARD_JS = r"""
     b.appendChild(strong);b.appendChild(small);quick.appendChild(b);
   });
   intro.insertAdjacentElement('afterend',quick);
+  if(state==='closed'){
+    const next=document.createElement('div');
+    next.className='card desk-post-window-next';
+    const explanation=document.createElement('strong');
+    explanation.textContent='Transfer window complete — your final squads are ready to review';
+    const continueLink=document.createElement('a');
+    continueLink.href='#season-setup';
+    continueLink.dataset.deskTab='season-setup';
+    continueLink.textContent='Continue to season setup →';
+    next.append(explanation,continueLink);
+    quick.insertAdjacentElement('beforebegin',next);
+  }
 
   // Use the authoritative budget breakdown already rendered on the page.
   const budget=document.querySelector('#budget-panel');
