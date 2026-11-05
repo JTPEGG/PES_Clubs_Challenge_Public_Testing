@@ -991,7 +991,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <div class="scout-table"><table data-desk-table="incoming">
   <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th></tr></thead>
   <tbody>{% for o in purchases %}
-  <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
+  <tr data-buy-offer-id="{{o.offer_id}}"><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
    <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
    <td><a href="#transfers">{{o.status_label}}</a></td></tr>
   {% endfor %}</tbody></table></div>
@@ -1014,7 +1014,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if purchases %}
 <h2 id="purchases">Incoming transfer negotiations</h2>
 <div class="grid">{% for o in purchases %}
-<div class="card offer">
+<div class="card offer" data-buy-offer-id="{{o.offer_id}}">
 <div class="label">Buying from {{o.seller_name|club_display}} · {{o.status_label}}</div>
 <h3 style="margin:6px 0"><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}" class="desk-player-profile">{{o.player_name}}</a></h3>
 <div class="count">{{money(o.offered_fee)}}</div>
@@ -2787,6 +2787,52 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260]))
+
+    def buy_offer_response(db,career_id,offer_id,message,existing=False):
+        """Return only the purchased player's updated negotiation card.
+
+        Render the SAME Jinja card used by the full Career Desk so agent
+        demands, club counters, signing eligibility and the actual buttons
+        cannot diverge between HTML and AJAX responses.
+        """
+        snap=window_snapshot(db,career_id=career_id)
+        row=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
+            o.demanded_fee,p.full_name AS player_name,
+            sc.name AS seller_name,t.status AS agent_status,
+            t.demanded_wage_weekly AS agent_demand
+            FROM world_career_offers o
+            JOIN world_career_saves c ON c.career_id=o.career_id
+            JOIN world_players p ON p.player_id=o.player_id
+            JOIN world_clubs sc ON sc.club_id=o.selling_club_id
+            JOIN world_career_preseason_window_offers wo
+              ON wo.offer_id=o.offer_id
+            LEFT JOIN world_career_agent_terms t ON t.offer_id=o.offer_id
+            WHERE o.offer_id=? AND o.career_id=? AND
+              o.buying_club_id=c.manager_club_id AND
+              o.selling_club_id<>c.manager_club_id AND
+              wo.window_id=?""",
+            (offer_id,career_id,snap["window_id"])).fetchone()
+        if row is None:raise ValueError("No buying negotiation exists for this offer")
+        status_labels={
+            "proposed":"Awaiting seller","countered":"Seller counteroffer",
+            "rejected":"Seller rejected offer",
+            "accepted_pending_contract":"Player/agent talks",
+            "agreed_future":"Signed — registering at deadline",
+            "completed":"Registered for season","withdrawn":"Withdrawn"}
+        item=dict(row,status_label=status_labels.get(row["status"],row["status"]))
+        before='<div class="grid">{% for o in purchases %}\n'
+        after='</div>{% endfor %}</div>\n{% endif %}\n{% endif %}\n<h2 id="inbox">'
+        fragment=LIVE_MARKET_PAGE.split(before,1)[1].split(after,1)[0]+'</div>'
+        card_html=render_template_string(fragment,o=item,spectator=False,
+            snap=snap,career_id=career_id,csrf=csrf_value(),
+            money=format_market_gbp)
+        response=jsonify(ok=True,message=message,offer_id=offer_id,
+            status=item["status"],status_label=item["status_label"],
+            offered_fee=item["offered_fee"],player_id=item["player_id"],
+            player_name=item["player_name"],seller_name=club_display(
+                item["seller_name"]),html=card_html,existing=existing)
+        response.headers["Cache-Control"]="private, no-store"
+        return response
 
     @bp.post("/world/play/career/<career_id>/market/buy")
     def manager_market_buy(career_id):
