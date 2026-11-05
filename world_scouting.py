@@ -192,6 +192,14 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         prestige=dict(conn.execute("""SELECT club_id,prestige_score
             FROM world_career_prestige_snapshots WHERE career_id=?""",
             (career_id,)).fetchall())
+        # The approved FC27 warehouse contains actual domestic competition
+        # levels. Treating every club as tier 1 admitted elite players into
+        # Championship/League One searches despite a clear sporting decline.
+        # These are source divisions, not inferred from reputation.
+        club_tiers=dict(conn.execute("""SELECT e.club_id,c.tier
+            FROM world_dataset_entries e
+            JOIN world_competitions c ON c.competition_id=e.competition_id
+            WHERE e.dataset_id=?""",(dataset,)).fetchall())
         changes={r[0]:r for r in conn.execute(
             """SELECT player_id,current_wage_weekly,current_role,
                transfer_listed,renewal_status
@@ -217,7 +225,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                       if rank<11 else "rotation" if rank<18 else "fringe")
             roles[player["player_id"]]=role
         interest_context=(profiles,prestige,changes,roles,next_summer,
-                          evaluate_player_choice_v2)
+                          evaluate_player_choice_v2,club_tiers)
 
     out=[]
     anchor=date.fromisoformat(asof)
@@ -253,9 +261,11 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             d["detail_attribute"] is None or d["detail_attribute"]<min_attribute):continue
         d["owned"]=d["club_id"]==manager
         if interested_only and not d["owned"] and interest_context is not None:
-            profiles,prestige,changes,roles,next_summer,evaluate=interest_context
+            profiles,prestige,changes,roles,next_summer,evaluate,club_tiers=interest_context
             seller=profiles.get(d["club_id"])
             buyer=profiles.get(manager)
+            buyer_tier=club_tiers.get(manager)
+            seller_tier=club_tiers.get(d["club_id"])
             changed=changes.get(d["player_id"])
             current_role=changed[2] if changed else roles.get(d["player_id"],"unknown")
             listed=(bool(changed[3]) if changed else
@@ -265,10 +275,12 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                      "not_offered" if listed else "renewal_offered")
             wage=(changed[1] if changed and changed[1] is not None
                   else d["current_wage"])
-            if not buyer or not seller or d["age"] is None or wage is None:
-                continue  # Not enough evidence to positively signal interest.
+            if (not buyer or not seller or d["age"] is None or wage is None
+                    or not isinstance(buyer_tier,int) or not 1<=buyer_tier<=4
+                    or not isinstance(seller_tier,int) or not 1<=seller_tier<=4):
+                continue  # Missing competition evidence cannot imply interest.
             choice=evaluate(
-                buyer_tier=1,seller_tier=1,  # FC27 source tiers remain unknown.
+                buyer_tier=buyer_tier,seller_tier=seller_tier,
                 buyer_score=int(buyer["sporting_appeal"]),
                 seller_score=int(seller["sporting_appeal"]),
                 buyer_prestige=int(prestige.get(manager) or buyer["sporting_appeal"]),
