@@ -764,7 +764,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
  </nav>
  {% endif %}
  {% if error %}<div class="desk-global-message alert" role="alert">{{error}}</div>{% endif %}
- {% if notice %}<div class="desk-global-message" role="status">{{notice}}</div>{% endif %}
+ {% if notice and notice != 'The 30-minute pre-season market has started' %}<div class="desk-global-message" role="status">{{notice}}</div>{% endif %}
  {% if snap.state=='closed' %}
  <div class="desk-global-message" role="status"><strong>The 30-minute window has closed.</strong>
  <a href="#transfers" data-desk-tab="transfers">View transfer summary</a>
@@ -2680,8 +2680,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             with connect() as db:
                 state=start_live_market(db,career_id=career_id)
             queue_market_tick(career_id)
-            return redirect("/world/play/career/"+career_id+"/market?notice="+
-                            "The+30-minute+pre-season+market+has+started")
+            # The active timer and manager overview already confirm the
+            # window state. A repeated full-width message steals space on
+            # every Career Desk tab; do not persist one in the URL.
+            return redirect("/world/play/career/"+career_id+"/market")
         except (ValueError,sqlite3.Error) as exc:
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
