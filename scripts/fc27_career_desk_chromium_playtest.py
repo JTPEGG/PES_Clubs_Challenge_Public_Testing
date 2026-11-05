@@ -71,7 +71,7 @@ def check_championship_move_interest(world):
             FROM world_dataset_entries e
             JOIN world_competitions c ON c.competition_id=e.competition_id
             JOIN world_clubs cl ON cl.club_id=e.club_id
-            WHERE e.dataset_id=? AND cl.name LIKE 'West Ham United%'
+            WHERE e.dataset_id=? AND lower(cl.name) LIKE 'west ham%'
             LIMIT 1""",(DATASET,)).fetchone()
         kane=db.execute("""SELECT p.player_id,c.tier,r.overall
             FROM world_players p
