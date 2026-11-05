@@ -92,6 +92,10 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-view-header h2{margin:9px 0 0}
 .desk-view-header .muted{margin:3px 0}
 .desk-inbox-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:10px 0 20px}
+.desk-live-offer-stream:not([hidden]){display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:14px 0 18px}
+.desk-live-offer-stream .offer{margin:0;border-color:#4384a4}
+.desk-live-offer-stream .actions{display:flex;flex-wrap:wrap;gap:8px}
+.desk-offer-toast{position:fixed;bottom:24px;right:24px;max-width:min(420px,calc(100vw - 30px));z-index:90;border:1px solid #62b6d6;border-radius:10px;padding:15px 18px;background:#173d56;box-shadow:0 12px 35px #000a;color:white;font-weight:750;text-align:left;cursor:pointer}
 .desk-inbox-tools input{flex:1 1 225px;max-width:320px;font-size:13px;padding:9px 11px}
 .desk-filter-button{padding:8px 12px!important;font-size:12px!important;border-radius:7px;background:#1b3148;color:#b6cbdc;border:1px solid #426076;cursor:pointer;font-weight:650}
 .desk-filter-button:hover{background:#2b5068;color:#fff}
@@ -758,12 +762,134 @@ DASHBOARD_JS = r"""
           .forEach(function(item){item.textContent='0';});
         const desc=views.dashboard.querySelector('[data-desk-tab="inbox"] small');
         if(desc)desc.textContent=numOffers+' incoming offers · 0 unread';
-        form.remove();
+        // Keep the POST capability when a NEW bid arrives after this visit.
+        form.hidden=true;
       })
       .catch(function(){/* Keep badge if server did not confirm the POST. */})
       .finally(function(){inboxMarkInProgress=false;});
   }
 
+  // Live transfer bids arrive on the authenticated market heartbeat.
+  // Never wait for a full page refresh: by that time the 30-minute window
+  // may have expired and the manager cannot act.
+  const stream=views.inbox.querySelector('#desk-live-offer-stream');
+  const outgoing=views.transfers.querySelector('table[data-desk-table="outgoing"]');
+  const seen=new Set(Array.from(views.inbox.querySelectorAll('[data-live-offer-id]'),
+      el=>Number(el.dataset.liveOfferId)));
+  const pound=n=>{
+    n=Number(n)||0;const abs=Math.abs(n);
+    return (n<0?'-':'')+'£'+(abs>=1e6?(abs/1e6).toFixed(2)+'m':
+      abs>=1e3?Math.round(abs/1e3)+'k':Math.round(abs).toLocaleString('en-GB'));
+  };
+  const labels={
+    proposed:'New offer',countered:'Awaiting buyer',
+    accepted_pending_contract:'Player/agent talks',
+    agreed_future:'Signed — registering at deadline',
+    completed:'Registered for season',
+    withdrawn:'Withdrawn',rejected:'Declined'
+  };
+  function formFor(offer,verb,csrf){
+    const form=document.createElement('form');
+    form.method='post';
+    form.action=location.pathname+'/decision';
+    for(const [name,value] of [['csrf',csrf],['offer_id',offer.offer_id]]){
+      const input=document.createElement('input');
+      input.type='hidden';input.name=name;input.value=String(value);
+      form.appendChild(input);
+    }
+    if(verb==='counter'){
+      const label=document.createElement('label');
+      label.textContent='Asking fee (£) ';
+      const input=document.createElement('input');
+      input.type='number';input.name='counter_fee';
+      input.min=String(Number(offer.fee)+1);
+      input.max=String(Math.min(Number(offer.fee)*2,1000000000));
+      input.value=String(Math.min(Math.floor(Number(offer.fee)*1.10),1000000000));
+      input.required=true;label.appendChild(input);form.appendChild(label);
+    }
+    const btn=document.createElement('button');
+    btn.name='decision';btn.value=verb;
+    btn.textContent=verb==='accept'?'Accept fee':
+      verb==='reject'?'Reject':'Counter';
+    if(verb==='reject')btn.className='danger';
+    form.appendChild(btn);return form;
+  }
+  function alertOfNewOffer(offer){
+    if(!views.inbox.hidden)return;
+    let toast=document.getElementById('desk-offer-toast');
+    if(!toast){
+      toast=document.createElement('button');
+      toast.id='desk-offer-toast';toast.type='button';
+      toast.className='desk-offer-toast';toast.dataset.deskTab='inbox';
+      document.body.appendChild(toast);
+    }
+    toast.textContent='New bid: '+offer.player+' · '+pound(offer.fee)+
+      ' · Open Inbox to respond';
+  }
+  window.fc27SyncIncomingOffers=function(items,csrf){
+    if(!Array.isArray(items))return;
+    for(const o of items.slice().reverse()){
+      const id=Number(o.offer_id);
+      if(!Number.isSafeInteger(id)||id<=0)continue;
+      if(!seen.has(id)&&stream){
+        seen.add(id);
+        const card=document.createElement('div');
+        card.className='card offer';card.dataset.liveOfferId=String(id);
+        card.dataset.deskPlayer=String(o.player_id);
+        card.dataset.deskPlayerName=o.player;card.dataset.deskStatus=o.status;
+        card.dataset.deskBuyer=o.buyer;
+        const label=document.createElement('div');
+        label.className='label';
+        label.textContent=o.buyer+' · '+(labels[o.status]||o.status);
+        const heading=document.createElement('h3');
+        heading.textContent=o.player;
+        const amount=document.createElement('div');
+        amount.className='count';amount.textContent=pound(o.fee);
+        const time=document.createElement('p');time.className='muted';
+        time.textContent='Received '+String(o.received_at||'').slice(11,16)+' UTC';
+        card.append(label,heading,amount,time);
+        if(o.status==='proposed'){
+          const actions=document.createElement('div');actions.className='actions';
+          for(const verb of ['accept','reject','counter'])
+            actions.appendChild(formFor(o,verb,csrf));
+          card.appendChild(actions);
+          alertOfNewOffer(o);
+        }else{
+          const note=document.createElement('p');note.className='muted';
+          note.textContent='Open the updated Inbox for further negotiation details.';
+          card.appendChild(note);
+        }
+        stream.hidden=false;stream.prepend(card);
+        const empty=views.inbox.querySelector('#desk-inbox-no-offers');
+        if(empty)empty.hidden=true;
+      }
+      if(outgoing){
+        const tableBody=outgoing.tBodies[0];
+        let row=Array.from(tableBody.querySelectorAll('[data-live-offer-id]'))
+          .find(el=>Number(el.dataset.liveOfferId)===id);
+        if(!row){
+          row=document.createElement('tr');row.dataset.liveOfferId=String(id);
+          for(let k=0;k<5;k++)row.appendChild(document.createElement('td'));
+          tableBody.prepend(row);
+        }
+        row.cells[0].textContent=o.player;row.cells[1].textContent=o.buyer;
+        row.cells[2].textContent=pound(o.fee);
+        row.cells[2].dataset.sortValue=String(o.fee);
+        row.cells[3].textContent=labels[o.status]||o.status;
+        row.cells[4].textContent=String(o.received_at||'').slice(11,16)+' UTC';
+      }
+    }
+    const n=outgoing?.tBodies[0].rows.length||0;
+    document.body.dataset.incomingOffers=String(n);
+    const count=outgoing?.closest('.desk-transfer-section')
+      ?.querySelector('.desk-section-count');
+    if(count)count.textContent=String(n);
+    const mark=views.inbox.querySelector('form[data-mark-inbox-read]');
+    if(mark&&Number(document.body.dataset.unread||0)>0)mark.hidden=false;
+    const badgeText=views.dashboard.querySelector('[data-desk-tab="inbox"] small');
+    if(badgeText)badgeText.textContent=n+' incoming offers · '+
+      (Number(document.body.dataset.unread)||0)+' unread';
+  };
   // Sidebar, mobile bar, overview buttons and legacy #section links use
   // the same one-page view switcher; no cross-page navigation is required.
   function switchView(name,changeUrl){
@@ -779,7 +905,10 @@ DASHBOARD_JS = r"""
     if(changeUrl&&location.hash!=='#'+name){
       history.pushState(null,'','#'+name);
     }
-    if(name==='inbox')markInboxViewed();
+    if(name==='inbox'){
+      document.getElementById('desk-offer-toast')?.remove();
+      markInboxViewed();
+    }
     window.scrollTo({top:0,behavior:'auto'});
   }
   document.addEventListener('click',function(e){
