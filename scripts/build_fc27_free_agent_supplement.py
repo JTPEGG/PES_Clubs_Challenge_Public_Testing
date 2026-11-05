@@ -166,7 +166,7 @@ def build(original_path,warehouse_path,output_path,pages_dir=None):
     payload=dict(version="FC27-free-agents-v1",source=SOURCE,
         source_snapshot=PROFILE_DATE,official_659_clubs_unchanged=True,
         excluded_isl_players_not_free_agents=256,players=result)
-    raw=(json.dumps(payload,ensure_ascii=False,separators=(",",":"),sort_keys=True)+"\\n").encode()
+    raw=(json.dumps(payload,ensure_ascii=False,separators=(",",":"),sort_keys=True)+"\n").encode()
     with gzip.open(output,"wb",compresslevel=9) as target:target.write(raw)
     print(json.dumps(dict(source_list=len(records),imported=len(result),
         prior_fifa=sum(p["ratings_provenance"].startswith("prior") for p in result),
