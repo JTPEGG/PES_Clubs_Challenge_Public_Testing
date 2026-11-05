@@ -1177,8 +1177,8 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
         buyer_profile=buyer_profile or historical_buyer
         seller_profile=seller_profile or historical_seller
         # Applies only when a REAL PES-V2 historical squad source exists.
-        # In FC27 the source tier is unknown; strength-only fallback must
-        # not assign the club a fictional division level.
+        # FC27 must use its registered source competition tier; never
+        # manufacture a divisional level from squad strength or prestige.
         game_historical_appeal=bool(historical_buyer or historical_seller)
     tiers=dict(conn.execute("SELECT competition_id,tier FROM world_competitions").fetchall())
     buyer=tiers.get(buyer_profile["competition_id"]) if buyer_profile else None
@@ -1210,15 +1210,25 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
             european=offer_europe_context(conn,career_id,offer_id)
             fc27_game=(row[3]=="fc27-warehouse-659-mens-2026-27"
                 and os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED")=="1")
-            # Legacy V2 remains strict. When the source FC27 league tier is
-            # unverified, make a *neutral* game comparison, never fabricate a
-            # divisional advantage. We still compare independent club appeal.
-            unknown_tier=(not isinstance(buyer,int) or not 1<=buyer<=4
-                          or not isinstance(seller,int) or not 1<=seller<=4)
-            fc27_neutral_tier=bool(fc27_game and unknown_tier)
-            if fc27_neutral_tier:
-                common["buyer_tier"]=1
-                common["seller_tier"]=1
+            # FC27's immutable warehouse supplies a real source division
+            # for each registered club. Honour it for actual negotiations as
+            # well as the scouting preview (e.g. Championship West Ham vs
+            # Bayern). An unverified source tier forces review, not tier-1
+            # neutrality that can make implausible elite deals possible.
+            if fc27_game:
+                source_tiers=dict(conn.execute("""SELECT e.club_id,co.tier
+                    FROM world_dataset_entries e
+                    JOIN world_competitions co
+                      ON co.competition_id=e.competition_id
+                    WHERE e.dataset_id=? AND e.club_id IN (?,?)""",
+                    (row[3],row[1],row[2])).fetchall())
+                common["buyer_tier"]=source_tiers.get(row[1])
+                common["seller_tier"]=source_tiers.get(row[2])
+            fc27_source_tier_known=bool(fc27_game and
+                isinstance(common["buyer_tier"],int)
+                and 1<=common["buyer_tier"]<=4
+                and isinstance(common["seller_tier"],int)
+                and 1<=common["seller_tier"]<=4)
             result=evaluate_player_choice_v2(
                 **common,
                 buyer_europe=european["buyer_europe"] if european else "unknown",
@@ -1232,8 +1242,8 @@ def player_move_interest(conn, *, career_id, offer_id, role_promise="unspecified
             if fc27_game:
                 result={**result,
                     "player_context_source":facts.get("source_kind") if facts else None,
-                    "source_tier_status":"neutral_unsourced" if fc27_neutral_tier
-                                         else "source_tier",
+                    "source_tier_status":("source_fc27_competition"
+                        if fc27_source_tier_known else "unverified_review"),
                     "continental_status":"unknown_no_advantage" if not european
                                           else "user_recorded"}
         else:
