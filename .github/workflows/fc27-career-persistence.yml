@@ -1,0 +1,25 @@
+name: FC27 career persistence regression
+
+on:
+  pull_request:
+    paths:
+      - "fc27_career_storage.py"
+      - "fc27_playtest_app.py"
+      - "world_career_play.py"
+      - "test_fc27_career_storage.py"
+      - ".github/workflows/fc27-career-persistence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  career-overlay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Test offline FC27 save safety
+        run: python -m unittest test_fc27_career_storage.py -v
