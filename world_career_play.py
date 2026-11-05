@@ -2837,19 +2837,27 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
     @bp.post("/world/play/career/<career_id>/market/buy")
     def manager_market_buy(career_id):
         check_write()
+        wants_json=request.accept_mimetypes.best=="application/json"
         try:
             with connect() as db:
                 result=submit_buy_offer(db,career_id=career_id,
                     player_id=int(request.form["player_id"]),
                     offered_fee=int(request.form["offered_fee"]),
                     request_key=request.form["request_key"])
-            text=("Offer already recorded" if result["existing"] else
-                  "Transfer bid submitted; selling club response: "+
-                  result["status"].replace("_"," "))
+                message=("Offer already recorded" if result["existing"] else
+                    "Transfer bid submitted; selling club response: "+
+                    result["status"].replace("_"," "))
+                if wants_json:
+                    return buy_offer_response(db,career_id,result["offer_id"],
+                        message,existing=result["existing"])
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
-                "/market?notice="+quote(text)+"#purchases")
+                "/market?notice="+quote(message)+"#purchases")
         except (ValueError,sqlite3.Error,KeyError) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#buy-players")
@@ -2857,6 +2865,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
     @bp.post("/world/play/career/<career_id>/market/buy/rebid")
     def manager_market_rebid(career_id):
         check_write()
+        wants_json=request.accept_mimetypes.best=="application/json"
         from urllib.parse import quote
         try:
             original_id=int(request.form["offer_id"])
@@ -2881,31 +2890,45 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 result=submit_buy_offer(db,career_id=career_id,
                     player_id=old["player_id"],offered_fee=revised,
                     request_key="manager-buy-v1-rebid-"+secrets.token_urlsafe(14))
+                message="Revised offer submitted: "+result["status"].replace("_"," ")
+                if wants_json:
+                    return buy_offer_response(db,career_id,result["offer_id"],message)
             return redirect("/world/play/career/"+career_id+
-                "/market?notice="+quote("Revised offer submitted: "+
-                    result["status"].replace("_"," "))+"#inbox")
+                "/market?notice="+quote(message)+"#inbox")
         except (ValueError,KeyError,sqlite3.Error) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#inbox")
 
     @bp.post("/world/play/career/<career_id>/market/buy/decision")
     def manager_market_buy_decision(career_id):
         check_write()
+        wants_json=request.accept_mimetypes.best=="application/json"
         try:
             action=request.form.get("decision","")
+            offer_id=int(request.form["offer_id"])
             with connect() as db:
                 result=act_on_buy_offer(db,career_id=career_id,
-                    offer_id=int(request.form["offer_id"]),action=action,
+                    offer_id=offer_id,action=action,
                     weekly_wage=(int(request.form["weekly_wage"])
                           if action=="terms" else None),
                     contract_years=int(request.form.get("contract_years","3")),
                     role_promise=request.form.get("role_promise","regular_starter"),
                     negotiated_fee=(int(request.form["negotiated_fee"])
                         if action=="negotiate_counter" else None))
+                if wants_json:
+                    return buy_offer_response(db,career_id,offer_id,result)
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?notice="+quote(result)+"#purchases")
         except (ValueError,sqlite3.Error,KeyError) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#purchases")
