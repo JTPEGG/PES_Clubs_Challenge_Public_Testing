@@ -1733,7 +1733,7 @@ Promotion/relegation is treated contextually, not as a separate +20/−22 award.
 <div><label>Source note</label><input name="source_note" placeholder="Required for source-backed"></div></div>
 <button>Record contract</button></form></div></main></body></html>"""
 
-def create_play_blueprint(db_path):
+def create_play_blueprint(db_path, on_career_commit=None):
     bp=Blueprint("world_play",__name__)
     # The manager's HTTP requests must NEVER wait for a 659-club AI market
     # simulation. Run autonomous ticks on a dedicated daemon executor, with
@@ -1823,10 +1823,40 @@ def create_play_blueprint(db_path):
             with connect() as db:
                 if window_snapshot(db,career_id=requested)["state"]!="not_started":
                     abort(403,"Use the autonomous Manager Inbox for timed careers")
+    class CareerPersistingConnection(sqlite3.Connection):
+        """Queue a small state snapshot only after a successful SQLite commit."""
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._persist_ready = False
+            self._committed_changes = self.total_changes
+
+        def _notify_if_changed(self):
+            changes = self.total_changes
+            if changes <= self._committed_changes:
+                return
+            self._committed_changes = changes
+            if self._persist_ready and on_career_commit is not None:
+                on_career_commit()
+
+        def commit(self):
+            super().commit()
+            self._notify_if_changed()
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            outcome = super().__exit__(exc_type, exc_value, traceback)
+            if exc_type is None:
+                self._notify_if_changed()
+            return outcome
+
     def connect():
         nonlocal schema_ready
         from world_v2 import initialize_world
-        conn=sqlite3.connect(str(db_path),timeout=2)
+        conn=sqlite3.connect(
+            str(db_path),timeout=2,
+            factory=CareerPersistingConnection if on_career_commit else sqlite3.Connection
+        )
+        if on_career_commit:
+            conn._persist_ready = schema_ready
         conn.row_factory=sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=2000")
@@ -1855,6 +1885,8 @@ def create_play_blueprint(db_path):
             except Exception:
                 conn.close()
                 raise
+        if on_career_commit:
+            conn._persist_ready = True
         return conn
     def page(title, mode, **kwargs):
         return render_template_string(HTML,title=title,mode=mode,authenticated=True,
