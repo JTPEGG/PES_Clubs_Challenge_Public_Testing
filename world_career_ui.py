@@ -661,7 +661,15 @@ DASHBOARD_JS = r"""
         const response=await fetch(feedUrl+'?'+params.toString(),{
           credentials:'same-origin',cache:'no-store',
           headers:{'Accept':'application/json'},signal:controller.signal});
-        if(!response.ok)throw new Error('Scouting feed unavailable');
+        if(response.status===410||response.status===404){
+          window.location.assign('/world/play?error='+encodeURIComponent(
+            'This test career is no longer on the server following a deployment. Please create a new career.'));
+          return;
+        }
+        if(!response.ok){
+          const detail=await response.json().catch(()=>null);
+          throw new Error((detail&&detail.detail)||'Scouting feed unavailable');
+        }
         const data=await response.json();
         if(requestId!==generation)return;
         if(reset)tableBody.replaceChildren();
@@ -676,7 +684,8 @@ DASHBOARD_JS = r"""
       }catch(error){
         if(error.name==='AbortError')return;
         if(requestId===generation)status.textContent=
-          'Unable to load players. Scroll again or change a filter to retry.';
+          'Unable to load players: '+String(error.message||error)+
+          '. Change a filter to retry.';
       }finally{
         if(active===controller)active=null;
       }

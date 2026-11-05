@@ -22,7 +22,7 @@ CATEGORIES=("pace","shooting","passing","dribbling","defending","physicality")
 # every click. Limit retained careers/attributes so memory stays bounded.
 _SCOUT_CACHE=OrderedDict()
 _SCOUT_CACHE_LOCK=Lock()
-_SCOUT_CACHE_TTL=90
+_SCOUT_CACHE_TTL=1800
 _SCOUT_CACHE_LIMIT=4
 
 def _cached_scout_rows(key):
@@ -102,46 +102,78 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         base_key=(career_id,attribute)
         rows=_cached_scout_rows(base_key)
         if rows is None:
-            rows=conn.execute("""WITH fc27 AS (
-          SELECT player_id,
-          CAST(ROUND(AVG(CASE WHEN attribute IN (
-            'PES2020V2:speed','PES2020V2:acceleration') THEN value END)) AS INT) pace,
-          CAST(ROUND(AVG(CASE WHEN attribute IN (
-            'PES2020V2:finishing','PES2020V2:kicking_power',
-            'PES2020V2:offensive_awareness') THEN value END)) AS INT) shooting,
-          CAST(ROUND(AVG(CASE WHEN attribute IN (
-            'PES2020V2:low_pass','PES2020V2:lofted_pass') THEN value END)) AS INT) passing,
-          CAST(ROUND(AVG(CASE WHEN attribute IN (
-            'PES2020V2:ball_control','PES2020V2:dribbling',
-            'PES2020V2:tight_possession') THEN value END)) AS INT) dribbling,
-          CAST(ROUND(AVG(CASE WHEN attribute IN (
-            'PES2020V2:defensive_awareness','PES2020V2:ball_winning',
-            'PES2020V2:aggression') THEN value END)) AS INT) defending,
-          CAST(ROUND(AVG(CASE WHEN attribute IN (
-            'PES2020V2:physical_contact','PES2020V2:balance',
-            'PES2020V2:stamina','PES2020V2:jump') THEN value END)) AS INT) physicality,
-          MAX(CASE WHEN attribute=? THEN value END) detail_attribute
-          FROM world_dataset_extended_attributes WHERE dataset_id=?
-          GROUP BY player_id
-        )
-        SELECT r.player_id,r.club_id,c.name club_name,
-          p.full_name,p.birth_date,p.primary_position,x.overall,
-          a.pace,a.shooting,a.passing,a.dribbling,a.defending,a.physicality,
-          cs.expires_on AS expires,cs.weekly_wage_gbp AS current_wage,
-          a.detail_attribute
-        FROM world_career_registrations r
-        JOIN world_clubs c ON c.club_id=r.club_id
-        JOIN world_players p ON p.player_id=r.player_id
-        JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
-        LEFT JOIN fc27 a ON a.player_id=r.player_id
-        LEFT JOIN world_career_contract_snapshots cs
-          ON cs.career_id=r.career_id AND cs.player_id=r.player_id
-        WHERE r.career_id=? AND x.overall BETWEEN 1 AND 99
-          AND (?=0 OR r.club_id=?)
-          AND (?='' OR lower(p.full_name) LIKE ?)
-        ORDER BY x.overall DESC,p.full_name,r.player_id""",
-        ("PES2020V2:"+attribute if attribute else "",
-         dataset,dataset,career_id,0,manager,"","%")).fetchall()
+            # Render's release bootstrap provides a validated projection of
+            # the immutable FC27 ratings. Other isolated QA/historical worlds
+            # still use the exact original aggregation below as a fallback.
+            has_projection=conn.execute("""SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='world_fc27_scout_categories'""").fetchone()
+            if has_projection:
+                rows=conn.execute("""SELECT r.player_id,r.club_id,
+                    c.name club_name,p.full_name,p.birth_date,
+                    p.primary_position,x.overall,
+                    a.pace,a.shooting,a.passing,a.dribbling,a.defending,
+                    a.physicality,
+                    cs.expires_on AS expires,
+                    cs.weekly_wage_gbp AS current_wage,
+                    detail.value AS detail_attribute
+                    FROM world_career_registrations r
+                    JOIN world_clubs c ON c.club_id=r.club_id
+                    JOIN world_players p ON p.player_id=r.player_id
+                    JOIN world_dataset_ratings x
+                      ON x.dataset_id=? AND x.player_id=r.player_id
+                    LEFT JOIN world_fc27_scout_categories a
+                      ON a.player_id=r.player_id
+                    LEFT JOIN world_career_contract_snapshots cs
+                      ON cs.career_id=r.career_id AND cs.player_id=r.player_id
+                    LEFT JOIN world_dataset_extended_attributes detail
+                      ON detail.dataset_id=? AND detail.player_id=r.player_id
+                      AND detail.attribute=?
+                    WHERE r.career_id=? AND x.overall BETWEEN 1 AND 99
+                    ORDER BY x.overall DESC,p.full_name,r.player_id""",
+                    (dataset,dataset,
+                     "PES2020V2:"+attribute if attribute else "",
+                     career_id)).fetchall()
+            else:
+                rows=conn.execute("""WITH fc27 AS (
+              SELECT player_id,
+              CAST(ROUND(AVG(CASE WHEN attribute IN (
+                'PES2020V2:speed','PES2020V2:acceleration') THEN value END)) AS INT) pace,
+              CAST(ROUND(AVG(CASE WHEN attribute IN (
+                'PES2020V2:finishing','PES2020V2:kicking_power',
+                'PES2020V2:offensive_awareness') THEN value END)) AS INT) shooting,
+              CAST(ROUND(AVG(CASE WHEN attribute IN (
+                'PES2020V2:low_pass','PES2020V2:lofted_pass') THEN value END)) AS INT) passing,
+              CAST(ROUND(AVG(CASE WHEN attribute IN (
+                'PES2020V2:ball_control','PES2020V2:dribbling',
+                'PES2020V2:tight_possession') THEN value END)) AS INT) dribbling,
+              CAST(ROUND(AVG(CASE WHEN attribute IN (
+                'PES2020V2:defensive_awareness','PES2020V2:ball_winning',
+                'PES2020V2:aggression') THEN value END)) AS INT) defending,
+              CAST(ROUND(AVG(CASE WHEN attribute IN (
+                'PES2020V2:physical_contact','PES2020V2:balance',
+                'PES2020V2:stamina','PES2020V2:jump') THEN value END)) AS INT) physicality,
+              MAX(CASE WHEN attribute=? THEN value END) detail_attribute
+              FROM world_dataset_extended_attributes WHERE dataset_id=?
+              GROUP BY player_id
+            )
+            SELECT r.player_id,r.club_id,c.name club_name,
+              p.full_name,p.birth_date,p.primary_position,x.overall,
+              a.pace,a.shooting,a.passing,a.dribbling,a.defending,a.physicality,
+              cs.expires_on AS expires,cs.weekly_wage_gbp AS current_wage,
+              a.detail_attribute
+            FROM world_career_registrations r
+            JOIN world_clubs c ON c.club_id=r.club_id
+            JOIN world_players p ON p.player_id=r.player_id
+            JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
+            LEFT JOIN fc27 a ON a.player_id=r.player_id
+            LEFT JOIN world_career_contract_snapshots cs
+              ON cs.career_id=r.career_id AND cs.player_id=r.player_id
+            WHERE r.career_id=? AND x.overall BETWEEN 1 AND 99
+              AND (?=0 OR r.club_id=?)
+              AND (?='' OR lower(p.full_name) LIKE ?)
+            ORDER BY x.overall DESC,p.full_name,r.player_id""",
+            ("PES2020V2:"+attribute if attribute else "",
+             dataset,dataset,career_id,0,manager,"","%")).fetchall()
             _remember_scout_rows(base_key,rows)
     else:
         # Older datasets preserve their own documented source-backed fields.
