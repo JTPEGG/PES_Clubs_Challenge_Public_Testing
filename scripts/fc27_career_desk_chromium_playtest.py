@@ -200,6 +200,63 @@ def run(world,output):
                             animations="disabled",full_page=True)
             found.append("Real Start POST opened exactly one live 30-minute clock")
 
+            # Real sourced Jadon Sancho is not in the 659 club roster: he is
+            # an independent, fully rated game-model free agent.
+            with closing(sqlite3.connect(world)) as db:
+                count=db.execute("""SELECT COUNT(*) FROM world_fc27_free_agent_pool
+                    WHERE dataset_id=?""",(DATASET,)).fetchone()[0]
+                free=db.execute("""SELECT f.player_id,f.reference_weekly_wage_gbp
+                    FROM world_fc27_free_agent_pool f
+                    WHERE f.dataset_id=? AND f.source_ea_id='233049'""",
+                    (DATASET,)).fetchone()
+                before=db.execute("""SELECT COUNT(*) FROM world_career_registrations
+                    WHERE career_id=?""",(CAREER,)).fetchone()[0]
+            check(count==211 and free is not None and before==17593,
+                  "Expected 211 independent free agents and unchanged 17,593 source registrations")
+            page.goto(base+manager_path+"/player/"+str(free[0]),
+                wait_until="domcontentloaded")
+            check(page.locator('#fa-contract').is_visible() and
+                  page.locator('#scout-buy').count()==0,
+                  "Sancho cannot be signed free or is incorrectly charged a fee")
+            check("FREE" in page.get_by_text("Transfer fee").first.inner_text()
+                  or "Transfer fee: £0" in page.locator("body").inner_text(),
+                  "Unattached signing should show £0 fee")
+            page.locator('#fa-contract select[name="role_promise"]').select_option("key_player")
+            page.locator('#fa-contract input[name="weekly_wage"]').fill(
+                str(max(90000,int(free[1])*2)))
+            with page.expect_response(
+                lambda response:response.url.endswith('/market/free-agent')
+                    and response.request.method=='POST',timeout=20000
+            ) as agent_response:
+                page.locator('#fa-contract button[type=submit]').click()
+            offer_data=agent_response.value.json()
+            check(offer_data.get('ok') and offer_data.get('status')=='terms_accepted',
+                  "Sancho's modelled player/agent terms were not accepted in free-agent flow")
+            page.wait_for_function(
+                "()=>!document.querySelector('#fa-confirm').hidden",
+                timeout=12000)
+            with page.expect_response(
+                lambda response:response.url.endswith('/market/free-agent')
+                    and response.request.method=='POST',timeout=16000
+            ) as signing_response:
+                page.locator('#fa-confirm button[type=submit]').click()
+            signing=signing_response.value.json()
+            check(signing.get('ok') and signing.get('status')=='agreed_future',
+                  "Manager could not confirm agreed Sancho wage-only signing")
+            with closing(sqlite3.connect(world)) as db:
+                signed_status=db.execute("""SELECT status FROM
+                    world_fc27_free_agent_offers
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,free[0])).fetchone()[0]
+                registered=db.execute("""SELECT COUNT(*) FROM
+                    world_career_registrations
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,free[0])).fetchone()[0]
+            check(signed_status=='agreed_future' and registered==0,
+                  "Free agent registered before deadline or terms not saved")
+            found.append("Sancho available, £0 transfer fee, agent wage agreed, manager signed, not registered early")
+            page.goto(base+manager_path,wait_until="domcontentloaded")
+
             for name in ["squad","inbox","scouting","transfers","finances"]:
                 page.locator(f'.desk-sidebar [data-desk-tab="{name}"]').click()
                 check(page.locator(f'#desk-view-{name}').is_visible(),
@@ -518,6 +575,15 @@ def run(world,output):
                     SET deadline_at=? WHERE career_id=?""",(end,CAREER))
                 db.commit()
                 finalise_preseason_window(db,career_id=CAREER)
+                moved=db.execute("""SELECT club_id FROM world_career_registrations
+                  WHERE career_id=? AND player_id=?""",
+                  (CAREER,free[0])).fetchone()
+                signed=db.execute("""SELECT status FROM
+                    world_fc27_free_agent_offers WHERE career_id=?
+                    AND player_id=?""",(CAREER,free[0])).fetchone()
+                check(moved and moved[0]==manager and signed[0]=='completed',
+                      "Fee-free Sancho signing did not register at real deadline")
+            found.append("Sancho registered at 30-minute deadline with no transfer fee")
             page.set_viewport_size({"width":1440,"height":900})
             page.goto(base+manager_path,wait_until="domcontentloaded")
             check(page.locator('body').get_attribute('data-window-state')=='closed',
