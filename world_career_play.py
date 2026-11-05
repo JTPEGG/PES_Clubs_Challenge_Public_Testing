@@ -1501,6 +1501,70 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
    label.textContent='After this proposed bid: '+fmt(remaining)+
      (remaining<0?' — exceeds your remaining budget':'');}
  input.addEventListener('input',refresh);refresh();
+ const form=document.getElementById('scout-buy');
+ const resultArea=document.createElement('div');
+ resultArea.id='scout-buy-result';
+ form.insertAdjacentElement('afterend',resultArea);
+ function feedback(message,error){
+   let note=resultArea.querySelector('[data-scout-buy-feedback]');
+   if(!note){
+     note=document.createElement('p');
+     note.setAttribute('data-scout-buy-feedback','');
+     note.setAttribute('role','status');
+     resultArea.prepend(note);
+   }
+   note.style.color=error?'#ffb5a5':'#b9e5ed';
+   note.textContent=message;
+ }
+ async function saveAction(actionForm,button){
+   if(actionForm.dataset.saving==='1')return;
+   const data=new FormData(actionForm);
+   if(button&&button.name)data.set(button.name,button.value);
+   const buttons=Array.from(actionForm.querySelectorAll('button'));
+   buttons.forEach(b=>b.disabled=true);
+   actionForm.dataset.saving='1';
+   feedback('Saving your transfer decision…',false);
+   try{
+     const response=await fetch(actionForm.action,{
+       method:'POST',body:data,credentials:'same-origin',
+       headers:{'Accept':'application/json'},cache:'no-store'});
+     const saved=await response.json().catch(()=>null);
+     if(!response.ok||!saved?.ok)
+       throw new Error(saved?.error||'The decision could not be saved');
+     const template=document.createElement('template');
+     template.innerHTML=saved.html||'';
+     const latest=template.content.querySelector('[data-buy-offer-id]');
+     if(!latest)throw new Error('Saved, but updated negotiation details are unavailable');
+     if(actionForm===form){
+       form.hidden=true;
+       resultArea.appendChild(latest);
+       const link=document.createElement('a');
+       link.href=window.location.pathname.split('/player/')[0]+'#transfers';
+       link.textContent='Open Transfer Centre';
+       resultArea.appendChild(link);
+     }else if(actionForm.action.endsWith('/buy/rebid')){
+       resultArea.querySelector('[data-buy-offer-id]')?.insertAdjacentElement('beforebegin',latest);
+     }else{
+       actionForm.closest('[data-buy-offer-id]')?.replaceWith(latest);
+     }
+     feedback(saved.message,false);
+   }catch(error){
+     feedback(String(error.message||error),true);
+   }finally{
+     actionForm.dataset.saving='0';
+     buttons.forEach(b=>{if(b.isConnected)b.disabled=false;});
+   }
+ }
+ form.addEventListener('submit',function(e){
+   e.preventDefault();saveAction(form,e.submitter);
+ });
+ resultArea.addEventListener('submit',function(e){
+   const target=e.target;
+   if(!(target instanceof HTMLFormElement))return;
+   if(!target.action.endsWith('/buy/decision')&&
+      !target.action.endsWith('/buy/rebid'))return;
+   e.preventDefault();saveAction(target,e.submitter);
+ });
 })();
 </script>
 {% else %}<p class="muted">The 30-minute market must be open before you can make a transfer offer. You can still shortlist the player.</p>{% endif %}
