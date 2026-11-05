@@ -80,6 +80,47 @@ def run(destination):
                     "FROM fc27_warehouse_import_audit WHERE dataset_id=?",(DATASET,)).fetchone()
             if counts!=(659,17593,53) or audit!=(659,17593,53) or health!="ok":
                 raise ValueError(f"Unapproved or corrupt FC27 DB: {counts}, {audit}, {health}")
+            # Build a read-optimised, reproducible projection of the FC27
+            # PES attributes once during release bootstrap. On the live site
+            # a 17,593-player scouting filter must not rescan ~500k ratings.
+            # This is an immutable derived index, NOT a modification to the
+            # approved source ratings or any saved career.
+            with sqlite3.connect(staged) as db:
+                db.execute("""CREATE TABLE world_fc27_scout_categories AS
+                    SELECT player_id,
+                      CAST(ROUND(AVG(CASE WHEN attribute IN
+                        ('PES2020V2:speed','PES2020V2:acceleration')
+                        THEN value END)) AS INT) pace,
+                      CAST(ROUND(AVG(CASE WHEN attribute IN
+                        ('PES2020V2:finishing','PES2020V2:kicking_power',
+                         'PES2020V2:offensive_awareness')
+                        THEN value END)) AS INT) shooting,
+                      CAST(ROUND(AVG(CASE WHEN attribute IN
+                        ('PES2020V2:low_pass','PES2020V2:lofted_pass')
+                        THEN value END)) AS INT) passing,
+                      CAST(ROUND(AVG(CASE WHEN attribute IN
+                        ('PES2020V2:ball_control','PES2020V2:dribbling',
+                         'PES2020V2:tight_possession')
+                        THEN value END)) AS INT) dribbling,
+                      CAST(ROUND(AVG(CASE WHEN attribute IN
+                        ('PES2020V2:defensive_awareness','PES2020V2:ball_winning',
+                         'PES2020V2:aggression')
+                        THEN value END)) AS INT) defending,
+                      CAST(ROUND(AVG(CASE WHEN attribute IN
+                        ('PES2020V2:physical_contact','PES2020V2:balance',
+                         'PES2020V2:stamina','PES2020V2:jump')
+                        THEN value END)) AS INT) physicality
+                    FROM world_dataset_extended_attributes
+                    WHERE dataset_id=?
+                    GROUP BY player_id""",(DATASET,))
+                db.execute("""CREATE UNIQUE INDEX fc27_scout_player_idx
+                              ON world_fc27_scout_categories(player_id)""")
+                count=db.execute("""SELECT COUNT(*) FROM
+                    world_fc27_scout_categories""").fetchone()[0]
+                if count!=17593:
+                    raise ValueError("Incomplete precomputed FC27 scouting ratings: "
+                                     +str(count))
+                db.commit()
             staged.rename(target)
         finally:
             if staged.exists():staged.unlink()
