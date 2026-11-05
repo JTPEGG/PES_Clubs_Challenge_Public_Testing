@@ -1735,6 +1735,58 @@ Promotion/relegation is treated contextually, not as a separate +20/−22 award.
 
 def create_play_blueprint(db_path):
     bp=Blueprint("world_play",__name__)
+    # The manager's HTTP requests must NEVER wait for a 659-club AI market
+    # simulation. Run autonomous ticks on a dedicated daemon executor, with
+    # one in-flight tick per career and replay-safe database intents.
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Lock
+    from contextlib import closing
+    from time import perf_counter
+    import logging
+    schema_lock=Lock()
+    schema_ready=False
+    market_lock=Lock()
+    market_jobs={}
+    market_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-market")
+
+    @bp.before_request
+    def measure_desk_start():
+        from flask import g
+        g.desk_request_started=perf_counter()
+
+    @bp.after_request
+    def measure_desk_finish(response):
+        from flask import g
+        elapsed=(perf_counter()-g.desk_request_started)*1000
+        response.headers["Server-Timing"]=f"desk;dur={elapsed:.1f}"
+        if elapsed>1500:
+            logging.getLogger(__name__).warning(
+                "Slow Career Desk request %s %s: %.0f ms",
+                request.method,request.path,elapsed)
+        return response
+
+    def run_market_tick(career_id):
+        started=perf_counter()
+        try:
+            with closing(connect()) as db:
+                outcome=process_live_market(db,career_id=career_id)
+                db.commit()
+            logging.getLogger(__name__).info(
+                "career-market tick %s completed in %.2fs (changed=%s)",
+                career_id,perf_counter()-started,outcome.get("changed"))
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "career-market tick failed for %s",career_id)
+
+    def queue_market_tick(career_id):
+        # The one background worker naturally serialises world writes.
+        # Never queue duplicates while the previous tick is still running.
+        with market_lock:
+            previous=market_jobs.get(career_id)
+            if previous is not None and not previous.done():return
+            for key,job in list(market_jobs.items()):
+                if job.done():market_jobs.pop(key,None)
+            market_jobs[career_id]=market_executor.submit(run_market_tick,career_id)
     @bp.app_template_filter("club_display")
     def club_display(value):
         """Remove internal warehouse IDs from presentation only, never source keys."""
@@ -1772,23 +1824,37 @@ def create_play_blueprint(db_path):
                 if window_snapshot(db,career_id=requested)["state"]!="not_started":
                     abort(403,"Use the autonomous Manager Inbox for timed careers")
     def connect():
+        nonlocal schema_ready
         from world_v2 import initialize_world
-        conn=sqlite3.connect(str(db_path))  # Batch initial seed in transactions; autocommit caused 30s timeouts
+        conn=sqlite3.connect(str(db_path),timeout=2)
         conn.row_factory=sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
-        initialize_world(conn)
-        initialize_catalog(conn)
-        initialize_market(conn)
-        initialize_career_engine(conn)
-        initialize_career_management(conn)
-        initialize_board_objectives(conn)
-        initialize_career_board_policy(conn)
-        initialize_career_selling(conn)
-        initialize_incoming_approaches(conn)
-        initialize_transfer_protocol(conn)
-        initialise_live_market(conn)
-        from world_reputation_v2 import initialize_pyramid
-        initialize_pyramid(conn)
+        conn.execute("PRAGMA busy_timeout=2000")
+        # Previously every browser filter/page visit reran ALL application
+        # schema initialisers (DDL/commits). Initialise once per process.
+        if not schema_ready:
+            try:
+                with schema_lock:
+                    if not schema_ready:
+                        conn.execute("PRAGMA journal_mode=WAL")
+                        initialize_world(conn)
+                        initialize_catalog(conn)
+                        initialize_market(conn)
+                        initialize_career_engine(conn)
+                        initialize_career_management(conn)
+                        initialize_board_objectives(conn)
+                        initialize_career_board_policy(conn)
+                        initialize_career_selling(conn)
+                        initialize_incoming_approaches(conn)
+                        initialize_transfer_protocol(conn)
+                        initialise_live_market(conn)
+                        from world_reputation_v2 import initialize_pyramid
+                        initialize_pyramid(conn)
+                        conn.commit()
+                        schema_ready=True
+            except Exception:
+                conn.close()
+                raise
         return conn
     def page(title, mode, **kwargs):
         return render_template_string(HTML,title=title,mode=mode,authenticated=True,
@@ -2172,9 +2238,7 @@ def create_play_blueprint(db_path):
             if row is None:abort(404)
             career_id=row[0]
             snap=window_snapshot(db,career_id=career_id)
-            result=process_live_market(db,career_id=career_id)
-            if result.get("changed"):
-                request.environ["career_live_market_dirty"]=True
+            queue_market_tick(career_id)
             return live_market_render(db,career_id=career_id,
                                       spectator=True)
 
@@ -2555,9 +2619,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         with connect() as db:
             snap=window_snapshot(db,career_id=career_id)
             if snap["state"]!="not_started":
-                result=process_live_market(db,career_id=career_id)
-                if result.get("changed"):
-                    request.environ["career_live_market_dirty"]=True
+                queue_market_tick(career_id)
             return live_market_render(db,career_id=career_id)
 
     @bp.get("/world/play/career/<career_id>/market/pulse")
@@ -2574,7 +2636,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             career=db.execute("""SELECT manager_club_id FROM world_career_saves
                 WHERE career_id=? AND state='sandbox'""",(career_id,)).fetchone()
             if career is None:abort(404)
-            process_live_market(db,career_id=career_id)
+            queue_market_tick(career_id)
             snap=window_snapshot(db,career_id=career_id)
             msg=db.execute("""SELECT COUNT(*),COALESCE(MAX(message_id),0),
                 COALESCE(SUM(CASE WHEN is_read=0 AND offer_id IS NOT NULL THEN 1 ELSE 0 END),0)
@@ -2617,6 +2679,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 raise ValueError("Confirm that the manager is ready for the 30-minute session")
             with connect() as db:
                 state=start_live_market(db,career_id=career_id)
+            queue_market_tick(career_id)
             return redirect("/world/play/career/"+career_id+"/market?notice="+
                             "The+30-minute+pre-season+market+has+started")
         except (ValueError,sqlite3.Error) as exc:

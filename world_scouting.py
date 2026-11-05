@@ -5,7 +5,9 @@ Never guesses a contract expiry or individual PES attribute. Approximate
 market values come from the existing labelled economy model.
 """
 from datetime import date
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
+from threading import Lock
+from time import monotonic
 from world_careers import _player_reference, age_on
 from world_valuation import model_value, fc27_game_reference_value
 
@@ -14,6 +16,31 @@ SORT_COLUMNS=frozenset(('overall','age','market_value','pace','shooting','passin
 
 GROUPS={"GK":"GK","DEF":"DEF","MID":"MID","FWD":"FWD"}
 CATEGORIES=("pace","shooting","passing","dribbling","defending","physicality")
+
+# The source attribute aggregation scans half a million ratings. Cache its
+# immutable base rows across filter changes, rather than scanning SQLite for
+# every click. Limit retained careers/attributes so memory stays bounded.
+_SCOUT_CACHE=OrderedDict()
+_SCOUT_CACHE_LOCK=Lock()
+_SCOUT_CACHE_TTL=90
+_SCOUT_CACHE_LIMIT=4
+
+def _cached_scout_rows(key):
+    with _SCOUT_CACHE_LOCK:
+        entry=_SCOUT_CACHE.get(key)
+        if not entry:return None
+        if monotonic()-entry[0]>_SCOUT_CACHE_TTL:
+            del _SCOUT_CACHE[key]
+            return None
+        _SCOUT_CACHE.move_to_end(key)
+        return entry[1]
+
+def _remember_scout_rows(key,rows):
+    with _SCOUT_CACHE_LOCK:
+        _SCOUT_CACHE[key]=(monotonic(),rows)
+        _SCOUT_CACHE.move_to_end(key)
+        while len(_SCOUT_CACHE)>_SCOUT_CACHE_LIMIT:
+            _SCOUT_CACHE.popitem(last=False)
 
 
 def scouting_attributes(conn, *, career_id):
@@ -72,7 +99,10 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         # Clearly derived *game* six-category averages: these are not
         # additional independently sourced FC27 ratings. All components
         # come from the approved 29-attribute PES2020 V2 conversion.
-        rows=conn.execute("""WITH fc27 AS (
+        base_key=(career_id,attribute)
+        rows=_cached_scout_rows(base_key)
+        if rows is None:
+            rows=conn.execute("""WITH fc27 AS (
           SELECT player_id,
           CAST(ROUND(AVG(CASE WHEN attribute IN (
             'PES2020V2:speed','PES2020V2:acceleration') THEN value END)) AS INT) pace,
@@ -111,8 +141,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
           AND (?='' OR lower(p.full_name) LIKE ?)
         ORDER BY x.overall DESC,p.full_name,r.player_id""",
         ("PES2020V2:"+attribute if attribute else "",
-         dataset,dataset,career_id,int(bool(squad_only)),manager,
-         q,"%"+q.replace("%","\\%").replace("_","\\_")+"%")).fetchall()
+         dataset,dataset,career_id,0,manager,"","%")).fetchall()
+            _remember_scout_rows(base_key,rows)
     else:
         # Older datasets preserve their own documented source-backed fields.
         rows=conn.execute("""SELECT r.player_id,r.club_id,c.name club_name,
@@ -193,6 +223,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     anchor=date.fromisoformat(asof)
     for r in rows:
         d=dict(r)
+        if q and q not in d["full_name"].lower():continue
+        if squad_only and d["club_id"]!=manager:continue
         d["shortlisted"]=d["player_id"] in saved_ids
         if shortlist_only and not d["shortlisted"]:continue
         if position and position_family(d["primary_position"])!=position:
@@ -289,7 +321,10 @@ CREATE TABLE IF NOT EXISTS world_career_scout_shortlist(
 
 
 def initialise_scouting(conn):
-    conn.executescript(SHORTLIST_SCHEMA)
+    # Avoid executescript's implicit transaction commit on every filter click.
+    if conn.execute("""SELECT 1 FROM sqlite_master
+        WHERE type='table' AND name='world_career_scout_shortlist'""").fetchone() is None:
+        conn.executescript(SHORTLIST_SCHEMA)
     conn.commit()
 
 
