@@ -161,26 +161,37 @@ def run(world,output):
             check("WH27:" not in page.locator("#desk-view-scouting").inner_text(),
                   "Internal FC27 source tags visible in scouting club labels")
             check(page.locator("#desk-view-scouting .desk-scout-pager").is_visible(),
-                  "Scouting has no server-powered pagination")
+                  "Scouting infinite-scroll counter is missing")
             check("17,593" in page.locator(".desk-scout-pager").inner_text(),
                   "Scouting total does not cover the FC27 registered roster")
             first=page.locator('#desk-view-scouting table tbody tr').first.inner_text()
-            check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()==80,
-                  "First FC27 scouting page should show exactly 80 source players")
+            check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()>=80,
+                  "FC27 scouting did not render its first 80 players")
             first_pace=page.locator("#desk-view-scouting .scout-table table tbody tr").first.locator("td").nth(8).inner_text()
             check(first_pace.isdigit(),"FC27 six-category scouting source data is missing")
             attrs=page.locator('select[name="scout_attribute"] option').count()
             check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
+            check(page.locator('input[name="scout_max_value"]').is_visible(),
+                  "Budget-aware scouting value filter missing")
+            check(page.locator('input[name="scout_interest"]').is_visible(),
+                  "Player move-interest scouting filter missing")
             page.screenshot(path=str(output/"03-desktop-scouting.png"),
                             animations="disabled",full_page=True)
-            page.locator(".desk-scout-pager a:has-text('Next')").click()
-            page.wait_for_url("**/market?scout_page=2#scouting",timeout=35000)
-            check("Page 2 of" in page.locator(".desk-scout-pager").inner_text(),
-                  "Second page did not load")
-            page2_first=page.locator("#desk-view-scouting .scout-table table tbody tr").first.inner_text()
-            check(page2_first!=first,"Scouting page two repeats original players")
-            check(page.locator("#desk-view-scouting").is_visible(),
-                  "Pagination did not return to the Scouting view")
+            page.locator('[data-scout-progress]').scroll_into_view_if_needed()
+            page.wait_for_function(
+                'document.querySelectorAll("#desk-view-scouting [data-scout-results] tbody tr").length>80',
+                timeout=35000)
+            check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()>80,
+                  "Automatic infinite scrolling did not load subsequent players")
+            check(page.locator("#desk-view-scouting .scout-table table tbody tr").first.inner_text()==first,
+                  "Infinite scrolling replaced the first page instead of appending")
+            page.locator('input[name="scout_squad"]').check()
+            page.wait_for_function(
+                'document.querySelector("#desk-view-scouting [data-scout-count]").textContent.includes(" of ") && document.querySelectorAll("#desk-view-scouting [data-scout-results] tbody tr").length<80',
+                timeout=35000)
+            check(page.locator('#desk-view-scouting [data-scout-results] tbody tr').count()<80,
+                  "My squad filter did not narrow the scouting results")
+            page.locator('input[name="scout_squad"]').uncheck()
             found.append("Desktop navigation: Squad, Inbox, Scouting, Transfers, Finances")
 
             target,ref_value=select_target(world,manager)

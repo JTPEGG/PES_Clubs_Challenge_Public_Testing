@@ -610,10 +610,19 @@ def process_live_market(conn,*,career_id,now=None,
             WHERE window_id=? AND moment_index=?""",(win,index)).fetchone()
         if seen:
             if fc27_club_led:
-                # Recovery if a process died after recording the real-time
-                # interval but before clearing the durable club activity plan.
-                process_fc27_market_interval(conn,career_id=career_id,
-                    window_id=win,interval_index=index,when=t,activity_scale_qa=fc27_activity_scale_qa)
+                # A heartbeat completes one bounded batch at a time. The
+                # persisted, deterministic pending intents recover after a
+                # request timeout/restart without repeating completed deals.
+                pending=conn.execute("""SELECT 1 FROM world_fc27_market_club_intents
+                    WHERE window_id=? AND interval_index=? AND processed=0
+                    LIMIT 1""",(win,index)).fetchone()
+                if pending:
+                    process_fc27_market_interval(conn,career_id=career_id,
+                        window_id=win,interval_index=index,when=t,
+                        activity_scale_qa=fc27_activity_scale_qa,
+                        work_budget_seconds=8)
+                    changed=True
+                    break
             continue
         # Deal with accepted human fee decisions and manager counters on
         # each market moment, not on each page refresh.
@@ -663,7 +672,8 @@ def process_live_market(conn,*,career_id,now=None,
             # There is no "112 opportunities" formula for FC27 worlds.
             process_fc27_market_interval(conn,career_id=career_id,
                 window_id=win,interval_index=index,when=t,
-                activity_scale_qa=fc27_activity_scale_qa)
+                activity_scale_qa=fc27_activity_scale_qa,
+                work_budget_seconds=8)
         else:
             # IMMUTABLE older careers use their original replay-safe moment
             # keys and original 112 checks. Do not renumber historical slots.
@@ -688,6 +698,11 @@ def process_live_market(conn,*,career_id,now=None,
         conn.commit()
         changed=True
         if offer_id:new_offers+=1
+        # Do not run every due FC27 checkpoint in one web request. The
+        # 15-second heartbeat will resume the next checkpoint, with no
+        # global cap on real transfer opportunities.
+        if fc27_club_led:
+            break
     # Freshly accepted agent terms from a due market moment begin their
     # own confirmation timer immediately, not on the next browser visit.
     newly_ready=reconcile_confirmations(conn,career_id=career_id,now=t)
