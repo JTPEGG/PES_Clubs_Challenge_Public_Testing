@@ -53,7 +53,7 @@ def records_from_pages(pages_dir=None):
             link=tr.select_one('a[href^="/player/"]')
             cells=tr.select("td")
             if not link or len(cells)<15:continue
-            sid=re.search(r"/player/(\\d+)/",link.get("href",""))
+            sid=re.search(r"/player/(\d+)/",link.get("href",""))
             if not sid:continue
             sid=sid.group(1)
             name=link.get_text(" ",strip=True)
@@ -68,7 +68,7 @@ def records_from_pages(pages_dir=None):
             eur_value=(float(wages.group(1).replace(",",""))*
                 {"":1,"K":1000,"M":1000000}[wages.group(2)]
                 if wages else 0)
-            height=re.search(r"(\\d+)cm",cells[12].get_text(" ",strip=True))
+            height=re.search(r"(\d+)cm",cells[12].get_text(" ",strip=True))
             foot=cells[6].get("title","")
             flag=tr.select_one(".pl-flag img")
             nationality=flag.get("title","Unknown") if flag else "Unknown"
