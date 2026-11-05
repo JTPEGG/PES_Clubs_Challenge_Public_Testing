@@ -2875,17 +2875,39 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
     @bp.post("/world/play/career/<career_id>/market/decision")
     def manager_market_decision(career_id):
         check_write()
+        # Normal HTML form submissions remain supported for accessibility
+        # and existing non-JavaScript clients. Live Career Desk submissions
+        # receive just the authoritative saved decision, not a redirect that
+        # rebuilds 17,593 scouting players and the entire manager dashboard.
+        wants_json=request.accept_mimetypes.best=="application/json"
         try:
             action=request.form.get("decision","")
             fee=(int(request.form["counter_fee"]) if action=="counter" else None)
+            offer_id=int(request.form["offer_id"])
             with connect() as db:
                 result=manager_respond(db,career_id=career_id,
-                    offer_id=int(request.form["offer_id"]),action=action,
-                    counter_fee=fee)
+                    offer_id=offer_id,action=action,counter_fee=fee)
+                if wants_json:
+                    row=db.execute("""SELECT status,demanded_fee
+                        FROM world_career_offers
+                        WHERE career_id=? AND offer_id=?""",
+                        (career_id,offer_id)).fetchone()
+                    if row is None:
+                        raise ValueError("Offer no longer exists in this career")
+                    unread=actionable_unread_count(db,career_id=career_id)
+                    response=jsonify(ok=True,message=result,offer_id=offer_id,
+                        status=row["status"],demanded_fee=row["demanded_fee"],
+                        unread=unread)
+                    response.headers["Cache-Control"]="private, no-store"
+                    return response
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?notice="+quote(result) +"#inbox")
         except (ValueError,KeyError,sqlite3.Error) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#inbox")
