@@ -27,19 +27,11 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install playwright==1.55.0
           google-chrome --version
-      - name: Fetch already-approved immutable 659-club FC27 source
-        uses: actions/download-artifact@v4
-        with:
-          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
-          run-id: 39616187183
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: immutable-input/
-      - name: Build disposable FC27 world, keep original dataset read-only
+      - name: Download and validate pristine 659-club world plus additive free agents
         run: |
           mkdir -p e2e
-          python -u -m scripts.fc27_warehouse_world_bridge \
-            --warehouse immutable-input/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
-            --target e2e/FC27_CHROMIUM_DISPOSABLE_WORLD.sqlite
+          python -u -m scripts.fc27_preview_bootstrap \
+            --destination e2e/FC27_CHROMIUM_DISPOSABLE_WORLD.sqlite
       - name: Browser-test desktop / mobile Career Desk and screenshot real screens
         run: |
           python -u -m scripts.fc27_career_desk_chromium_playtest \
