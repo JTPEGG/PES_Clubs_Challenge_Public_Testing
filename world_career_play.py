@@ -2688,11 +2688,14 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             unread=actionable_unread_count(db,career_id=career_id)
             offer_rows=db.execute("""SELECT o.offer_id,o.player_id,
                     o.status,o.offered_fee,p.full_name,b.name,
-                    wo.tagged_at
+                    wo.tagged_at,ia.status AS agent_status,
+                    o.demanded_fee
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
                 JOIN world_clubs b ON b.club_id=o.buying_club_id
+                LEFT JOIN world_career_incoming_approaches ia
+                  ON ia.offer_id=o.offer_id
                 WHERE wo.window_id=? AND o.career_id=?
                   AND o.selling_club_id=? AND o.buying_club_id<>?
                 ORDER BY o.offer_id DESC LIMIT 100""",
@@ -2702,8 +2705,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             clean_buyer=lambda value:re.sub(r"\\s+\\[WH27:[0-9a-fA-F]{8,20}\\]$","",value)
             live_offers=[dict(offer_id=oid,player_id=pid,status=status,
                 fee=fee,player=name,buyer=clean_buyer(buyer),
-                received_at=received)
-                for oid,pid,status,fee,name,buyer,received in offer_rows]
+                received_at=received,agent_status=agent,
+                demanded_fee=demanded)
+                for oid,pid,status,fee,name,buyer,received,agent,demanded in offer_rows]
             recent=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
                 o.offered_fee,e.created_at FROM world_career_offer_events e
                 JOIN world_career_offers o ON o.offer_id=e.offer_id
@@ -2875,17 +2879,39 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
     @bp.post("/world/play/career/<career_id>/market/decision")
     def manager_market_decision(career_id):
         check_write()
+        # Normal HTML form submissions remain supported for accessibility
+        # and existing non-JavaScript clients. Live Career Desk submissions
+        # receive just the authoritative saved decision, not a redirect that
+        # rebuilds 17,593 scouting players and the entire manager dashboard.
+        wants_json=request.accept_mimetypes.best=="application/json"
         try:
             action=request.form.get("decision","")
             fee=(int(request.form["counter_fee"]) if action=="counter" else None)
+            offer_id=int(request.form["offer_id"])
             with connect() as db:
                 result=manager_respond(db,career_id=career_id,
-                    offer_id=int(request.form["offer_id"]),action=action,
-                    counter_fee=fee)
+                    offer_id=offer_id,action=action,counter_fee=fee)
+                if wants_json:
+                    row=db.execute("""SELECT status,demanded_fee
+                        FROM world_career_offers
+                        WHERE career_id=? AND offer_id=?""",
+                        (career_id,offer_id)).fetchone()
+                    if row is None:
+                        raise ValueError("Offer no longer exists in this career")
+                    unread=actionable_unread_count(db,career_id=career_id)
+                    response=jsonify(ok=True,message=result,offer_id=offer_id,
+                        status=row["status"],demanded_fee=row["demanded_fee"],
+                        unread=unread)
+                    response.headers["Cache-Control"]="private, no-store"
+                    return response
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?notice="+quote(result) +"#inbox")
         except (ValueError,KeyError,sqlite3.Error) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#inbox")

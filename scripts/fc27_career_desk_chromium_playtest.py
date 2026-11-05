@@ -278,6 +278,38 @@ def run(world,output):
                   live_card.locator('button[value="reject"]').count()==1 and
                   live_card.locator('button[value="counter"]').count()==1,
                   "New live offer lacks accept/reject/counter decision forms")
+            # A real manager decision must be saved by the authoritative
+            # endpoint and reflected in the existing card with NO expensive
+            # 17k-player manager dashboard reload.
+            original_url=page.url
+            started=perf_counter()
+            with page.expect_response(
+                lambda response:response.url.endswith('/market/decision')
+                  and response.request.method=='POST',timeout=16000
+            ) as decision_response:
+                live_card.locator('button[value="accept"]').click()
+            response=decision_response.value
+            accepted=response.json()
+            elapsed=perf_counter()-started
+            check(response.status==200 and accepted.get('ok') is True
+                  and accepted.get('status')=='accepted_pending_contract',
+                  "Fee acceptance did not return an authoritative JSON decision")
+            page.wait_for_function("""(id)=>!document.querySelector(
+                '#desk-view-inbox [data-live-offer-id="'+id+'"] button[value="accept"]')""",
+                arg=str(live_offer_id),timeout=12000)
+            check(page.url==original_url,
+                  "Accepting a fee unexpectedly reloaded the full manager dashboard")
+            check('Fee accepted' in live_card.inner_text(),
+                  "Fee acceptance did not update the visible offer card")
+            with closing(sqlite3.connect(world)) as db:
+                recorded=db.execute("""SELECT status FROM world_career_offers
+                  WHERE offer_id=? AND career_id=?""",
+                  (live_offer_id,CAREER)).fetchone()[0]
+            check(recorded=='accepted_pending_contract',
+                  "In-browser fee acceptance did not persist in the SQLite career")
+            check(elapsed<5.0,
+                  f"Ajax fee decision took {elapsed:.2f}s; expected no full-page render")
+            found.append(f"Manager accepted genuine incoming bid in {elapsed:.2f}s with no reload")
             page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
             scout_input.focus()
             found.append("Genuine new AI bid appears live in Inbox and Transfers without page reload")
