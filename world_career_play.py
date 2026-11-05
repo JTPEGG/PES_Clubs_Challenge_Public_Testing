@@ -1965,6 +1965,8 @@ def create_play_blueprint(db_path):
                         initialize_incoming_approaches(conn)
                         initialize_transfer_protocol(conn)
                         initialise_live_market(conn)
+                        from world_fc27_free_agents import initialize_free_agent_schema
+                        initialize_free_agent_schema(conn)
                         from world_reputation_v2 import initialize_pyramid
                         initialize_pyramid(conn)
                         conn.commit()
@@ -2671,6 +2673,39 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             request_key="manager-buy-v1-"+secrets.token_urlsafe(14)))
         response.headers["Cache-Control"]="private, no-store"
         return response
+
+    @bp.post("/world/play/career/<career_id>/market/free-agent")
+    def manager_free_agent(career_id):
+        """Fee-free player / agent negotiation; deadline-safe and CSRF-checked."""
+        check_write()
+        from world_fc27_free_agents import offer_free_agent
+        wants_json=request.accept_mimetypes.best=="application/json"
+        try:
+            action=request.form.get("action","offer")
+            player_id=int(request.form["player_id"])
+            with connect() as db:
+                result=offer_free_agent(db,career_id=career_id,
+                    player_id=player_id,
+                    weekly_wage=int(request.form.get("weekly_wage","0")),
+                    years=int(request.form.get("contract_years","3")),
+                    role=request.form.get("role_promise","regular_starter"),
+                    action=action)
+            if wants_json:
+                response=jsonify(ok=True,**result)
+                response.headers["Cache-Control"]="private, no-store"
+                return response
+            from urllib.parse import quote
+            return redirect("/world/play/career/"+career_id+
+                "/market/player/"+str(player_id)+"?notice="+
+                quote(result["message"]))
+        except (ValueError,KeyError,sqlite3.Error) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
+            from urllib.parse import quote
+            return redirect("/world/play/career/"+career_id+
+                "/market?error="+quote(str(exc)[:260])+"#scouting")
 
     @bp.post("/world/play/career/<career_id>/market/shortlist")
     def scout_shortlist(career_id):
