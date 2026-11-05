@@ -51,6 +51,17 @@ def _remember_interest(key,ids):
         while len(_INTEREST_CACHE)>6:
             _INTEREST_CACHE.popitem(last=False)
 
+def invalidate_scout_for_career(career_id):
+    """After registration changes, cached free-agent rows are no longer valid."""
+    with _SCOUT_CACHE_LOCK:
+        for key in list(_SCOUT_CACHE):
+            if key[0]==career_id:
+                _SCOUT_CACHE.pop(key,None)
+    with _INTEREST_LOCK:
+        for key in list(_INTEREST_CACHE):
+            if key[0]==career_id:
+                _INTEREST_CACHE.pop(key,None)
+
 def interest_cache_ready(career_id):
     with _INTEREST_LOCK:
         return any(k[0]==career_id and monotonic()-v[0]<_INTEREST_TTL
