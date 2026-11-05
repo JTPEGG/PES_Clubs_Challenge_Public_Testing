@@ -1842,10 +1842,17 @@ def create_play_blueprint(db_path, on_career_commit=None):
             super().commit()
             self._notify_if_changed()
 
+        def rollback(self):
+            super().rollback()
+            # SQLite's total_changes also counts writes later rolled back.
+            self._committed_changes = self.total_changes
+
         def __exit__(self, exc_type, exc_value, traceback):
             outcome = super().__exit__(exc_type, exc_value, traceback)
             if exc_type is None:
                 self._notify_if_changed()
+            else:
+                self._committed_changes = self.total_changes
             return outcome
 
     def connect():
