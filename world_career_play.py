@@ -1253,7 +1253,7 @@ Rejected and expired offers are not transfers.</p>
 {% if news_feed %}
 <div class="feed">
 {% for m in news_feed %}
-<div class="card"><b>{{m.headline}}</b>
+<div class="card" {% if m.event_id is defined %}data-world-event-id="{{m.event_id}}"{% endif %}><b>{{m.headline}}</b>
 <p style="margin:5px 0">{{m.detail}}</p>
 <small>{{m.created_at}} UTC{% if m.is_read==0 %} · New{% endif %}</small>
 </div>{% endfor %}</div>
@@ -1379,6 +1379,25 @@ Rejected and expired offers are not transfers.</p>
          const current=Number(state.latest_message_id||0);
          const unread=Number(state.unread||0);
          refreshUnread(unread);
+         const marketFeed=document.querySelector('#desk-view-news .feed');
+         if(marketFeed&&Array.isArray(state.world_updates)){
+           // Received from the saved AI deal ledger; never fabricate news.
+           state.world_updates.slice().reverse().forEach(function(item){
+             const id=Number(item.event_id);
+             if(!Number.isSafeInteger(id))return;
+             if(marketFeed.querySelector('[data-world-event-id="'+id+'"]'))return;
+             const card=document.createElement('div');
+             card.className='card';card.dataset.worldEventId=String(id);
+             const heading=document.createElement('b');
+             heading.textContent=item.headline;
+             const summary=document.createElement('p');
+             summary.style.margin='5px 0';summary.textContent=item.detail;
+             const when=document.createElement('small');
+             when.textContent=item.created_at;
+             card.append(heading,summary,when);
+             marketFeed.prepend(card);
+           });
+         }
          if(current>lastInboxMessage){
            lastInboxMessage=current;
            document.body.dataset.lastMessageId=String(current);
@@ -2299,7 +2318,7 @@ def create_play_blueprint(db_path):
         world_news=[]
         if snap["state"]!="not_started":
             import re
-            deal_rows=db.execute("""SELECT p.full_name,sc.name,b.name,
+            deal_rows=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
                  o.offered_fee,e.created_at FROM world_career_offer_events e
                 JOIN world_career_offers o ON o.offer_id=e.offer_id
                 JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
@@ -2310,9 +2329,9 @@ def create_play_blueprint(db_path):
                   AND e.event_type='ai_world_signed'
                 ORDER BY e.event_id DESC LIMIT 40""",
                 (snap["window_id"],career_id)).fetchall()
-            for name,seller,buyer,fee,when in deal_rows:
+            for event_id,name,seller,buyer,fee,when in deal_rows:
                 clean=lambda value:re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",value)
-                world_news.append(dict(headline="AI transfer agreed",
+                world_news.append(dict(event_id=event_id,headline="AI transfer agreed",
                     detail=(name+" · "+clean(seller)+" → "+clean(buyer)+
                         " · "+format_market_gbp(fee)),
                     created_at=when,is_read=1))
@@ -2565,8 +2584,26 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 WHERE career_id=? AND selling_club_id=?
                   AND buying_club_id<>?""",
                 (career_id,career[0],career[0])).fetchone()[0]
+            recent=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
+                o.offered_fee,e.created_at FROM world_career_offer_events e
+                JOIN world_career_offers o ON o.offer_id=e.offer_id
+                JOIN world_career_preseason_window_offers wo ON wo.offer_id=o.offer_id
+                JOIN world_players p ON p.player_id=o.player_id
+                JOIN world_clubs sc ON sc.club_id=o.selling_club_id
+                JOIN world_clubs b ON b.club_id=o.buying_club_id
+                WHERE wo.window_id=? AND o.career_id=?
+                  AND e.event_type='ai_world_signed'
+                ORDER BY e.event_id DESC LIMIT 20""",
+                (snap["window_id"],career_id)).fetchall() if snap["window_id"] else []
+            import re
+            def clean_club(v):
+                return re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",v)
+            world_updates=[dict(event_id=eid,headline="AI transfer agreed",
+                detail=(name+" · "+clean_club(seller)+" → "+clean_club(buyer)+
+                        " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
+                for eid,name,seller,buyer,fee,when in recent]
             payload=dict(state=snap["state"],latest_message_id=msg[1],
-                unread=msg[2],incoming_offers=offers,
+                unread=msg[2],incoming_offers=offers,world_updates=world_updates,
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
         response.headers["Cache-Control"]="private, no-store"
