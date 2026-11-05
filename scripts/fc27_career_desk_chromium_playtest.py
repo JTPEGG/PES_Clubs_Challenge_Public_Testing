@@ -296,10 +296,17 @@ def run(world,output):
                   "Inbox badge did not clear on Inbox open")
             check(page.locator("#desk-view-inbox #purchases").count()==0,
                   "Redundant buying negotiations still displayed in Inbox")
+            from world_live_market import actionable_unread_count
             with closing(sqlite3.connect(world)) as db:
-                unread_db=db.execute("""SELECT COUNT(*) FROM world_career_market_inbox
-                    WHERE career_id=? AND is_read=0""",(CAREER,)).fetchone()[0]
-            check(unread_db==0,"Clicking Inbox only hid badge; notification remained unread server-side")
+                actionable=actionable_unread_count(db,career_id=CAREER)
+                news_messages=db.execute("""SELECT COUNT(*)
+                    FROM world_career_market_inbox
+                    WHERE career_id=? AND offer_id IS NULL""",
+                    (CAREER,)).fetchone()[0]
+            check(actionable==0,
+                  "Inbox still has unread actionable offers after being viewed")
+            check(news_messages>=1,
+                  "General market announcements must remain in Market News, not Inbox")
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator("#desk-view-transfers #purchases").count()==1,
                   "Buy-side negotiation forms not available from Transfers")
