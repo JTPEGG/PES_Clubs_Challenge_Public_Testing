@@ -141,7 +141,7 @@ def run(world,output):
             ORDER BY p.full_name""",(DATASET,DATASET)).fetchall()
         count=verify_db.execute("""SELECT COUNT(*) FROM world_dataset_rosters
             WHERE dataset_id=?""",(DATASET,)).fetchone()[0]
-        metadata=verify_db.execute("""SELECT free_agents_excluded FROM
+        metadata=verify_db.execute("""SELECT * FROM
             world_dataset_pes_v2_metadata WHERE dataset_id=?""",
             (DATASET,)).fetchone()
         print("FC27_SANCHO_DATABASE_LOOKUP",repr([tuple(row) for row in rows]),
