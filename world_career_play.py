@@ -991,7 +991,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <div class="scout-table"><table data-desk-table="incoming">
   <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th></tr></thead>
   <tbody>{% for o in purchases %}
-  <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
+  <tr data-buy-offer-id="{{o.offer_id}}"><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
    <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
    <td><a href="#transfers">{{o.status_label}}</a></td></tr>
   {% endfor %}</tbody></table></div>
@@ -1014,7 +1014,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if purchases %}
 <h2 id="purchases">Incoming transfer negotiations</h2>
 <div class="grid">{% for o in purchases %}
-<div class="card offer">
+<div class="card offer" data-buy-offer-id="{{o.offer_id}}">
 <div class="label">Buying from {{o.seller_name|club_display}} · {{o.status_label}}</div>
 <h3 style="margin:6px 0"><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}" class="desk-player-profile">{{o.player_name}}</a></h3>
 <div class="count">{{money(o.offered_fee)}}</div>
@@ -1501,6 +1501,70 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
    label.textContent='After this proposed bid: '+fmt(remaining)+
      (remaining<0?' — exceeds your remaining budget':'');}
  input.addEventListener('input',refresh);refresh();
+ const form=document.getElementById('scout-buy');
+ const resultArea=document.createElement('div');
+ resultArea.id='scout-buy-result';
+ form.insertAdjacentElement('afterend',resultArea);
+ function feedback(message,error){
+   let note=resultArea.querySelector('[data-scout-buy-feedback]');
+   if(!note){
+     note=document.createElement('p');
+     note.setAttribute('data-scout-buy-feedback','');
+     note.setAttribute('role','status');
+     resultArea.prepend(note);
+   }
+   note.style.color=error?'#ffb5a5':'#b9e5ed';
+   note.textContent=message;
+ }
+ async function saveAction(actionForm,button){
+   if(actionForm.dataset.saving==='1')return;
+   const data=new FormData(actionForm);
+   if(button&&button.name)data.set(button.name,button.value);
+   const buttons=Array.from(actionForm.querySelectorAll('button'));
+   buttons.forEach(b=>b.disabled=true);
+   actionForm.dataset.saving='1';
+   feedback('Saving your transfer decision…',false);
+   try{
+     const response=await fetch(actionForm.action,{
+       method:'POST',body:data,credentials:'same-origin',
+       headers:{'Accept':'application/json'},cache:'no-store'});
+     const saved=await response.json().catch(()=>null);
+     if(!response.ok||!saved?.ok)
+       throw new Error(saved?.error||'The decision could not be saved');
+     const template=document.createElement('template');
+     template.innerHTML=saved.html||'';
+     const latest=template.content.querySelector('[data-buy-offer-id]');
+     if(!latest)throw new Error('Saved, but updated negotiation details are unavailable');
+     if(actionForm===form){
+       form.hidden=true;
+       resultArea.appendChild(latest);
+       const link=document.createElement('a');
+       link.href=window.location.pathname.split('/player/')[0]+'#transfers';
+       link.textContent='Open Transfer Centre';
+       resultArea.appendChild(link);
+     }else if(actionForm.action.endsWith('/buy/rebid')){
+       resultArea.querySelector('[data-buy-offer-id]')?.insertAdjacentElement('beforebegin',latest);
+     }else{
+       actionForm.closest('[data-buy-offer-id]')?.replaceWith(latest);
+     }
+     feedback(saved.message,false);
+   }catch(error){
+     feedback(String(error.message||error),true);
+   }finally{
+     actionForm.dataset.saving='0';
+     buttons.forEach(b=>{if(b.isConnected)b.disabled=false;});
+   }
+ }
+ form.addEventListener('submit',function(e){
+   e.preventDefault();saveAction(form,e.submitter);
+ });
+ resultArea.addEventListener('submit',function(e){
+   const target=e.target;
+   if(!(target instanceof HTMLFormElement))return;
+   if(!target.action.endsWith('/buy/decision')&&
+      !target.action.endsWith('/buy/rebid'))return;
+   e.preventDefault();saveAction(target,e.submitter);
+ });
 })();
 </script>
 {% else %}<p class="muted">The 30-minute market must be open before you can make a transfer offer. You can still shortlist the player.</p>{% endif %}
@@ -1774,6 +1838,33 @@ def create_play_blueprint(db_path):
     market_lock=Lock()
     market_jobs={}
     market_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-market")
+    # The source-only scouting preview can be prepared immediately after a
+    # career is created. Separate it from the AI transfer worker so a large
+    # market tick cannot hold up the interest filter's first use.
+    scout_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-scout")
+    scout_jobs={}
+    scout_jobs_lock=Lock()
+
+    def prewarm_scout_interest(career_id):
+        from world_scouting import scouting_search
+        try:
+            with closing(connect()) as db:
+                scouting_search(db,career_id=career_id,interested_only=True,
+                                limit=1)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Failed to prepare provisional career interest for %s",career_id)
+
+    def queue_scout_warm(career_id):
+        from world_scouting import interest_cache_ready
+        if interest_cache_ready(career_id):return
+        with scout_jobs_lock:
+            job=scout_jobs.get(career_id)
+            if job and not job.done():return
+            for key,old in list(scout_jobs.items()):
+                if old.done():scout_jobs.pop(key,None)
+            scout_jobs[career_id]=scout_executor.submit(
+                prewarm_scout_interest,career_id)
 
     @bp.before_request
     def measure_desk_start():
@@ -2250,6 +2341,8 @@ def create_play_blueprint(db_path):
                         economy_version=request.form.get("economy_version","prototype-v1"),
                         scale=float(request.form.get("scale","1")),
                         player_decision_version=request.form.get("player_decision_version",LEGACY_VERSION))
+            if fc27_preview:
+                queue_scout_warm(career_id)
             return redirect("/world/play/career/"+career_id+("/market" if fc27_preview else ""))
         except (ValueError,sqlite3.Error,KeyError) as exc:return on_error(exc)
 
@@ -2304,8 +2397,14 @@ def create_play_blueprint(db_path):
         if scout_order not in ("asc","desc"):scout_order="desc"
         scout_shortlist=request.args.get("scout_shortlist")=="1" if not spectator else False
         scout_attributes=scouting_attributes(db,career_id=career_id) if not spectator else []
-        shortlist=scouting_search(db,career_id=career_id,shortlist_only=True,
-            limit=300) if not spectator else []
+        shortlist=[]
+        if (not spectator and
+            db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+                 AND name='world_career_scout_shortlist'""").fetchone()
+            and db.execute("""SELECT 1 FROM world_career_scout_shortlist
+                 WHERE career_id=? LIMIT 1""",(career_id,)).fetchone()):
+            shortlist=scouting_search(db,career_id=career_id,
+                shortlist_only=True,limit=300)
         recommendations=[]  # Suggested targets intentionally hidden in the simplified scouting desk.
         squad=squad_preview(db,career_id=career_id) if not spectator else {"players":[],"departures":[]}
         scout_page=max(1,min(10000,filter_value("scout_page") or 1))
@@ -2660,6 +2759,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             if exists is None:
                 return redirect("/world/play?error=This+test+career+is+no+longer+available.+A+deployment+may+have+reset+it.")
             snap=window_snapshot(db,career_id=career_id)
+            # Also covers restored/imported QA careers that did not pass
+            # through the new-career POST in this Gunicorn process.
+            queue_scout_warm(career_id)
             if snap["state"]!="not_started":
                 queue_market_tick(career_id)
             return live_market_render(db,career_id=career_id)
@@ -2753,22 +2855,76 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260]))
 
+    def buy_offer_response(db,career_id,offer_id,message,existing=False):
+        """Return only the purchased player's updated negotiation card.
+
+        Render the SAME Jinja card used by the full Career Desk so agent
+        demands, club counters, signing eligibility and the actual buttons
+        cannot diverge between HTML and AJAX responses.
+        """
+        snap=window_snapshot(db,career_id=career_id)
+        row=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
+            o.demanded_fee,p.full_name AS player_name,
+            sc.name AS seller_name,t.status AS agent_status,
+            t.demanded_wage_weekly AS agent_demand
+            FROM world_career_offers o
+            JOIN world_career_saves c ON c.career_id=o.career_id
+            JOIN world_players p ON p.player_id=o.player_id
+            JOIN world_clubs sc ON sc.club_id=o.selling_club_id
+            JOIN world_career_preseason_window_offers wo
+              ON wo.offer_id=o.offer_id
+            LEFT JOIN world_career_agent_terms t ON t.offer_id=o.offer_id
+            WHERE o.offer_id=? AND o.career_id=? AND
+              o.buying_club_id=c.manager_club_id AND
+              o.selling_club_id<>c.manager_club_id AND
+              wo.window_id=?""",
+            (offer_id,career_id,snap["window_id"])).fetchone()
+        if row is None:raise ValueError("No buying negotiation exists for this offer")
+        status_labels={
+            "proposed":"Awaiting seller","countered":"Seller counteroffer",
+            "rejected":"Seller rejected offer",
+            "accepted_pending_contract":"Player/agent talks",
+            "agreed_future":"Signed — registering at deadline",
+            "completed":"Registered for season","withdrawn":"Withdrawn"}
+        item=dict(row,status_label=status_labels.get(row["status"],row["status"]))
+        before='<div class="grid">{% for o in purchases %}\n'
+        after='</div>{% endfor %}</div>\n{% endif %}\n{% endif %}\n<h2 id="inbox">'
+        fragment=LIVE_MARKET_PAGE.split(before,1)[1].split(after,1)[0]+'</div>'
+        card_html=render_template_string(fragment,o=item,spectator=False,
+            snap=snap,career_id=career_id,csrf=csrf_value(),
+            money=format_market_gbp)
+        response=jsonify(ok=True,message=message,offer_id=offer_id,
+            status=item["status"],status_label=item["status_label"],
+            offered_fee=item["offered_fee"],player_id=item["player_id"],
+            player_name=item["player_name"],seller_name=club_display(
+                item["seller_name"]),html=card_html,existing=existing)
+        response.headers["Cache-Control"]="private, no-store"
+        return response
+
     @bp.post("/world/play/career/<career_id>/market/buy")
     def manager_market_buy(career_id):
         check_write()
+        wants_json=request.accept_mimetypes.best=="application/json"
         try:
             with connect() as db:
                 result=submit_buy_offer(db,career_id=career_id,
                     player_id=int(request.form["player_id"]),
                     offered_fee=int(request.form["offered_fee"]),
                     request_key=request.form["request_key"])
-            text=("Offer already recorded" if result["existing"] else
-                  "Transfer bid submitted; selling club response: "+
-                  result["status"].replace("_"," "))
+                message=("Offer already recorded" if result["existing"] else
+                    "Transfer bid submitted; selling club response: "+
+                    result["status"].replace("_"," "))
+                if wants_json:
+                    return buy_offer_response(db,career_id,result["offer_id"],
+                        message,existing=result["existing"])
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
-                "/market?notice="+quote(text)+"#purchases")
+                "/market?notice="+quote(message)+"#purchases")
         except (ValueError,sqlite3.Error,KeyError) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#buy-players")
@@ -2776,6 +2932,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
     @bp.post("/world/play/career/<career_id>/market/buy/rebid")
     def manager_market_rebid(career_id):
         check_write()
+        wants_json=request.accept_mimetypes.best=="application/json"
         from urllib.parse import quote
         try:
             original_id=int(request.form["offer_id"])
@@ -2800,31 +2957,45 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 result=submit_buy_offer(db,career_id=career_id,
                     player_id=old["player_id"],offered_fee=revised,
                     request_key="manager-buy-v1-rebid-"+secrets.token_urlsafe(14))
+                message="Revised offer submitted: "+result["status"].replace("_"," ")
+                if wants_json:
+                    return buy_offer_response(db,career_id,result["offer_id"],message)
             return redirect("/world/play/career/"+career_id+
-                "/market?notice="+quote("Revised offer submitted: "+
-                    result["status"].replace("_"," "))+"#inbox")
+                "/market?notice="+quote(message)+"#inbox")
         except (ValueError,KeyError,sqlite3.Error) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#inbox")
 
     @bp.post("/world/play/career/<career_id>/market/buy/decision")
     def manager_market_buy_decision(career_id):
         check_write()
+        wants_json=request.accept_mimetypes.best=="application/json"
         try:
             action=request.form.get("decision","")
+            offer_id=int(request.form["offer_id"])
             with connect() as db:
                 result=act_on_buy_offer(db,career_id=career_id,
-                    offer_id=int(request.form["offer_id"]),action=action,
+                    offer_id=offer_id,action=action,
                     weekly_wage=(int(request.form["weekly_wage"])
                           if action=="terms" else None),
                     contract_years=int(request.form.get("contract_years","3")),
                     role_promise=request.form.get("role_promise","regular_starter"),
                     negotiated_fee=(int(request.form["negotiated_fee"])
                         if action=="negotiate_counter" else None))
+                if wants_json:
+                    return buy_offer_response(db,career_id,offer_id,result)
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?notice="+quote(result)+"#purchases")
         except (ValueError,sqlite3.Error,KeyError) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#purchases")

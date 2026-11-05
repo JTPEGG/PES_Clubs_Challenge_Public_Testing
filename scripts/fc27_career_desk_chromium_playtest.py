@@ -361,6 +361,21 @@ def run(world,output):
             check(page.locator('#desk-view-scouting [data-scout-results] tbody tr').count()<80,
                   "My squad filter did not narrow the scouting results")
             page.locator('input[name="scout_squad"]').uncheck()
+            from world_scouting import interest_cache_ready
+            check(interest_cache_ready(CAREER),
+                  "Interest preview was not prewarmed during the initial career session")
+            interest_started=perf_counter()
+            with page.expect_response(
+                lambda response:"/market/scout-feed?" in response.url
+                    and "scout_interest=1" in response.url
+                    and response.status==200,
+                timeout=15000) as interest_response:
+                page.locator('input[name="scout_interest"]').check()
+            interest_seconds=perf_counter()-interest_started
+            check(interest_seconds<3.0,
+                  f"Cached FC27 interest filter took {interest_seconds:.2f}s")
+            found.append(f"Prewarmed would-consider-a-move response {interest_seconds:.2f}s")
+            page.locator('input[name="scout_interest"]').uncheck()
             found.append("Desktop navigation: Squad, Inbox, Scouting, Transfers, Finances")
 
             target,ref_value=select_target(world,manager)
@@ -370,8 +385,23 @@ def run(world,output):
                   "Cannot bid from a full FC27 player's scouting report")
             offered=round(ref_value*1.6)
             page.locator("#scout-fee").fill(str(offered))
-            page.locator("#scout-buy button").click()
-            page.wait_for_url("**/market?notice=**",timeout=25000)
+            player_url=page.url
+            with page.expect_response(
+                lambda response:response.url.endswith('/market/buy')
+                    and response.request.method=='POST',
+                timeout=20000) as buy_response:
+                page.locator("#scout-buy button").click()
+            saved_buy=buy_response.value.json()
+            check(buy_response.value.status==200 and saved_buy.get('ok')
+                  and 'data-buy-offer-id' in saved_buy.get('html',''),
+                  "Player-profile buy did not return a server-validated card")
+            check(page.url==player_url,
+                  "Submitting a bid unexpectedly reloaded the entire dashboard")
+            page.wait_for_function("""()=>Boolean(
+                document.querySelector('#scout-buy-result [data-buy-offer-id]'))""",
+                timeout=12000)
+            found.append("Buying offer confirmed in player report without full dashboard reload")
+            page.goto(base+manager_path,wait_until="domcontentloaded")
             with closing(sqlite3.connect(world)) as db:
                 count=db.execute("""SELECT COUNT(*) FROM world_career_offers
                      WHERE career_id=? AND player_id=?
@@ -398,6 +428,38 @@ def run(world,output):
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator("#desk-view-transfers #purchases").count()==1,
                   "Buy-side negotiation forms not available from Transfers")
+            outgoing_card=page.locator(
+                '#desk-view-transfers [data-buy-offer-id].offer').first
+            check(outgoing_card.count()==1,
+                  "Buyer-side negotiation card missing for saved offer")
+            old_url=page.url
+            original_card_id=outgoing_card.get_attribute("data-buy-offer-id")
+            withdraw=outgoing_card.locator('button[value="withdraw"]')
+            if withdraw.count()==1:
+                with page.expect_response(
+                    lambda response:response.url.endswith('/market/buy/decision')
+                        and response.request.method=='POST',
+                    timeout=15000) as buy_action:
+                    withdraw.click()
+            else:
+                rebid=outgoing_card.locator('form[action$="/market/buy/rebid"] button')
+                check(rebid.count()==1,
+                      "No valid withdrawal or rebid action for buying negotiation")
+                with page.expect_response(
+                    lambda response:response.url.endswith('/market/buy/rebid')
+                        and response.request.method=='POST',
+                    timeout=20000) as buy_action:
+                    rebid.click()
+            result=buy_action.value.json()
+            check(buy_action.value.status==200 and result.get("ok") is True
+                  and 'data-buy-offer-id' in result.get('html',''),
+                  "Buyer negotiation did not return a saved replacement card")
+            check(page.url==old_url,
+                  "Buyer negotiation unexpectedly reloaded the entire Career Desk")
+            page.wait_for_function(
+                "(id)=>Boolean(document.querySelector('#desk-view-transfers .offer[data-buy-offer-id=\\\"'+id+'\\\"]'))",
+                arg=str(result['offer_id']),timeout=12000)
+            found.append("Buyer negotiation updates its own card without full Career Desk navigation")
             page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
             page.screenshot(path=str(output/"04-desktop-inbox-after-bid.png"),
                             animations="disabled",full_page=True)

@@ -24,6 +24,51 @@ _SCOUT_CACHE=OrderedDict()
 _SCOUT_CACHE_LOCK=Lock()
 _SCOUT_CACHE_TTL=1800
 _SCOUT_CACHE_LIMIT=4
+# FC27 player willingness is an indicative snapshot of the starting squads.
+# Transfers register at the deadline; the official player decision function
+# still rechecks actual negotiations. Preparing the preview once when a
+# career is created removes a 17,593-player decision pass on each toggle.
+_INTEREST_CACHE=OrderedDict()
+_INTEREST_LOCK=Lock()
+_INTEREST_TTL=1800
+_WAGE_CACHE=OrderedDict()
+_WAGE_LOCK=Lock()
+_SOURCE_ATTR_CACHE={}
+
+def _cached_interest(key):
+    with _INTEREST_LOCK:
+        entry=_INTEREST_CACHE.get(key)
+        if entry and monotonic()-entry[0]<_INTEREST_TTL:
+            _INTEREST_CACHE.move_to_end(key)
+            return entry[1]
+        _INTEREST_CACHE.pop(key,None)
+        return None
+
+def _remember_interest(key,ids):
+    with _INTEREST_LOCK:
+        _INTEREST_CACHE[key]=(monotonic(),frozenset(ids))
+        _INTEREST_CACHE.move_to_end(key)
+        while len(_INTEREST_CACHE)>6:
+            _INTEREST_CACHE.popitem(last=False)
+
+def interest_cache_ready(career_id):
+    with _INTEREST_LOCK:
+        return any(k[0]==career_id and monotonic()-v[0]<_INTEREST_TTL
+                   for k,v in _INTEREST_CACHE.items())
+
+def _source_wages(conn,dataset):
+    with _WAGE_LOCK:
+        entry=_WAGE_CACHE.get(dataset)
+        if entry and monotonic()-entry[0]<1800:
+            return entry[1]
+    wages=dict(conn.execute("""SELECT player_id,weekly_wage_gbp
+        FROM world_dataset_contract_snapshots WHERE dataset_id=?""",
+        (dataset,)).fetchall())
+    with _WAGE_LOCK:
+        _WAGE_CACHE[dataset]=(monotonic(),wages)
+        _WAGE_CACHE.move_to_end(dataset)
+        while len(_WAGE_CACHE)>2:_WAGE_CACHE.popitem(last=False)
+    return wages
 
 def _cached_scout_rows(key):
     with _SCOUT_CACHE_LOCK:
@@ -51,10 +96,16 @@ def scouting_attributes(conn, *, career_id):
     source=conn.execute("""SELECT dataset_id FROM world_career_saves
         WHERE career_id=?""",(career_id,)).fetchone()
     if source and source[0]=="fc27-warehouse-659-mens-2026-27":
-        return [r[0].removeprefix("PES2020V2:") for r in conn.execute(
+        dataset=source[0]
+        with _WAGE_LOCK:
+            cached=_SOURCE_ATTR_CACHE.get(dataset)
+        if cached is not None:return list(cached)
+        values=tuple(r[0].removeprefix("PES2020V2:") for r in conn.execute(
             """SELECT DISTINCT attribute FROM world_dataset_extended_attributes
             WHERE dataset_id=? AND attribute LIKE 'PES2020V2:%'
-            ORDER BY attribute""",(source[0],)).fetchall()]
+            ORDER BY attribute""",(dataset,)).fetchall())
+        with _WAGE_LOCK:_SOURCE_ATTR_CACHE[dataset]=values
+        return list(values)
     return [r[0] for r in conn.execute("""SELECT DISTINCT attribute_name
         FROM world_player_attributes WHERE effective_season=?
         ORDER BY attribute_name""",(row[0],)).fetchall()]
@@ -203,20 +254,21 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     require_values=(sort_by=="market_value" or max_market_value is not None)
     source_date=None
     source_wages={}
-    if require_values:
+    if require_values or dataset=="fc27-warehouse-659-mens-2026-27":
         source_date=conn.execute("""SELECT source_date FROM world_datasets
             WHERE dataset_id=?""",(dataset,)).fetchone()[0]
         if dataset=="fc27-warehouse-659-mens-2026-27":
-            source_wages=dict(conn.execute("""SELECT player_id,weekly_wage_gbp
-                FROM world_dataset_contract_snapshots
-                WHERE dataset_id=?""",(dataset,)).fetchall())
+            source_wages=_source_wages(conn,dataset)
 
     # This is a provisional FC27 V2 *interest screen*, NOT a claim that
     # players consent to any fee, wage, or registration. Reuse the actual
     # player-choice decision function, source-rated club appeal and modelled
     # squad roles rather than a hard-coded club list (e.g. Haaland/Hull).
     interest_context=None
-    if interested_only and dataset=="fc27-warehouse-659-mens-2026-27":
+    interest_key=(career_id,manager,dataset)
+    cached_interest=(_cached_interest(interest_key) if interested_only else None)
+    if (interested_only and cached_interest is None and
+            dataset=="fc27-warehouse-659-mens-2026-27"):
         from world_fc27_ai_recruitment import read_fc27_profiles
         from world_player_decisions import evaluate_player_choice_v2
         from world_ai_bidding import position_family
@@ -292,7 +344,9 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         if attribute and min_attribute is not None and (
             d["detail_attribute"] is None or d["detail_attribute"]<min_attribute):continue
         d["owned"]=d["club_id"]==manager
-        if interested_only and not d["owned"] and interest_context is not None:
+        if interested_only and not d["owned"] and cached_interest is not None:
+            if d["player_id"] not in cached_interest:continue
+        elif interested_only and not d["owned"] and interest_context is not None:
             profiles,prestige,changes,roles,next_summer,evaluate,club_tiers=interest_context
             seller=profiles.get(d["club_id"])
             buyer=profiles.get(manager)
@@ -344,13 +398,32 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         if sort_by=="full_name":return (v is None,str(v or "").lower())
         return (v is None,-v if descending and v is not None else v if v is not None else 0)
     out.sort(key=sort_key)
+    # Only a wholly unrestricted interest pass can populate the full
+    # provisional whitelist. Never cache a filtered/paginated subset as
+    # the complete pool. The warm job always uses these exact defaults.
+    if (interested_only and cached_interest is None
+        and interest_context is not None
+        and not q and not position and min_overall is None and max_age is None
+        and not category and min_category is None
+        and not attribute and min_attribute is None and not contract
+        and not squad_only and not shortlist_only and max_market_value is None):
+        _remember_interest(interest_key,(d["player_id"] for d in out))
     total=len(out)
     offset=max(0,int(offset))
     limit=max(1,int(limit))
     page=out[offset:offset+limit]
     if sort_by!="market_value":
         for d in page:
-            d["market_value"]=_player_reference(conn,dataset,d["player_id"])[0]
+            if dataset=="fc27-warehouse-659-mens-2026-27":
+                baseline=model_value(
+                    d["overall"],age_on(d["birth_date"],source_date),
+                    d["primary_position"])
+                d["market_value"]=(fc27_game_reference_value(
+                    baseline=baseline,overall=d["overall"],
+                    weekly_wage=source_wages.get(d["player_id"]))
+                    if baseline is not None else None)
+            else:
+                d["market_value"]=_player_reference(conn,dataset,d["player_id"])[0]
     return (page,total) if with_total else page
 
 

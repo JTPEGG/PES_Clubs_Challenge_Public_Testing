@@ -918,6 +918,79 @@ DASHBOARD_JS = r"""
     if(row&&row.cells.length>3)
       row.cells[3].textContent=labels[offer.status]||offer.status;
   }
+  // A buying-club decision uses the same server-side agent and transfer
+  // checks as the native form, but refreshes ONLY the affected buying card.
+  // This avoids rebuilding the 17,593-player dashboard after every wage or
+  // seller-counter click.
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||!views.transfers.contains(form))return;
+    const buyingAction=form.action.endsWith('/market/buy/decision');
+    const rebid=form.action.endsWith('/market/buy/rebid');
+    if(!buyingAction&&!rebid)return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    const submit=event.submitter;
+    const data=new FormData(form);
+    if(buyingAction&&submit?.name==='decision')
+      data.set('decision',submit.value);
+    const oldCard=form.closest('[data-buy-offer-id]');
+    const host=oldCard?.parentElement;
+    const buttons=Array.from(form.querySelectorAll('button'));
+    const status=document.createElement('p');
+    status.className='desk-decision-feedback';
+    status.setAttribute('role','status');
+    status.textContent='Saving negotiation…';
+    oldCard?.appendChild(status);
+    form.dataset.saving='1';buttons.forEach(b=>b.disabled=true);
+    try{
+      const response=await fetch(form.action,{method:'POST',body:data,
+        headers:{'Accept':'application/json'},credentials:'same-origin',
+        cache:'no-store'});
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'Negotiation could not be saved');
+      const template=document.createElement('template');
+      template.innerHTML=result.html||'';
+      const newCard=template.content.querySelector('[data-buy-offer-id]');
+      if(!newCard)throw new Error('Saved, but updated negotiation card is unavailable');
+      if(rebid){
+        host?.prepend(newCard);
+        status.textContent=result.message;
+      }else{
+        oldCard?.replaceWith(newCard);
+        const info=document.createElement('p');
+        info.className='desk-decision-feedback';
+        info.setAttribute('role','status');info.textContent=result.message;
+        newCard.appendChild(info);
+      }
+      const table=views.transfers.querySelector('[data-desk-table="incoming"]');
+      if(table){
+        let row=table.tBodies[0].querySelector(
+          '[data-buy-offer-id="'+result.offer_id+'"]');
+        if(!row){
+          row=document.createElement('tr');
+          row.dataset.buyOfferId=String(result.offer_id);
+          for(let i=0;i<4;i++)row.appendChild(document.createElement('td'));
+          table.tBodies[0].prepend(row);
+        }
+        row.cells[0].textContent=result.player_name;
+        row.cells[1].textContent=result.seller_name;
+        row.cells[2].textContent=pound(result.offered_fee);
+        row.cells[2].dataset.sortValue=String(result.offered_fee);
+        row.cells[3].textContent=result.status_label;
+        const count=table.closest('.desk-transfer-section')
+           ?.querySelector('.desk-section-count');
+        if(count)count.textContent=String(table.tBodies[0].rows.length);
+      }
+    }catch(error){
+      status.textContent=String(error.message||error);
+      status.dataset.error='1';
+    }finally{
+      form.dataset.saving='0';
+      buttons.forEach(b=>{if(b.isConnected)b.disabled=false});
+    }
+  },true);
   // The browser submits every human Inbox decision via the existing secure,
   // server-validated endpoint, but avoids downloading/re-rendering all 659
   // clubs and 17,593 players after an ordinary Accept/Reject/Counter click.
