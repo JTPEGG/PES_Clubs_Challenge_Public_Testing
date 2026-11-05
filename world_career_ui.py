@@ -69,6 +69,12 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-page-link{display:inline-flex;align-items:center;justify-content:center;min-width:90px;padding:9px 12px;border:1px solid #4d839e;background:#214962;border-radius:8px;color:#e7f7ff;text-decoration:none;font-weight:700}
 .desk-page-link:hover,.desk-page-link:focus-visible{background:#2d6683;color:#fff}
 .desk-view[data-view="scouting"] .desk-scout-pager{position:relative;z-index:1}
+.desk-scout-finance{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 12px}
+.desk-scout-finance span{border:1px solid #426982;background:#213b54;border-radius:8px;padding:10px 14px;color:#c5e1f2}
+.desk-scout-finance b{display:block;color:#fff;font-size:18px;margin-top:3px}
+.desk-view[data-view="scouting"] .scout-table{max-height:none;overflow-y:visible}
+.desk-view[data-view="scouting"] [data-scout-results] td{white-space:nowrap}
+.desk-view[data-view="scouting"] [data-scout-progress]{padding:12px 0 20px}
 .desk-view .scout-table tbody tr:hover{background:#28415a}
 .desk-view .scout-table a{color:#bce6ff}
 .desk-view .pill{background:#294660}
@@ -587,27 +593,136 @@ DASHBOARD_JS = r"""
       });
     });
   });
-  // Scouting's server-backed search spans more players than the first table
-  // page. Automatically submit changed dropdowns; keep the hash on Scouting.
+  // Server-backed infinite scrolling: no Next button, no 80-player cap,
+  // no full Career Desk reload and no duplicate market tick on filter changes.
   const scoutForm=views.scouting.querySelector('form.scout-filters');
-  if(scoutForm){
-    let searchTimer;
-    scoutForm.addEventListener('change',function(event){
-      const el=event.target;
-      if(el.matches('select,input[type=checkbox]'))scoutForm.requestSubmit();
-    });
-    scoutForm.querySelectorAll('input[type=text],input:not([type]),input[type=number]').forEach(function(input){
-      input.addEventListener('input',function(){
-        clearTimeout(searchTimer);
-        searchTimer=setTimeout(function(){
-          if(input.value===''||input.value.length>=2)scoutForm.requestSubmit();
-        },550);
+  const scoutTable=views.scouting.querySelector('table[data-scout-results]');
+  const scoutProgress=views.scouting.querySelector('[data-scout-progress]');
+  if(scoutForm&&scoutTable&&scoutProgress){
+    const tableBody=scoutTable.tBodies[0];
+    const counter=scoutProgress.querySelector('[data-scout-count]');
+    const status=scoutProgress.querySelector('[data-scout-loading]');
+    const limitControl=scoutForm.querySelector('[data-scout-budget]');
+    const valueControl=scoutForm.querySelector('[name="scout_max_value"]');
+    let page=1;
+    let shown=tableBody.rows.length;
+    let total=Number((scoutProgress.dataset.total||'').replace(/,/g,''))||0;
+    let hasMore=shown<total;
+    let generation=0,active=null;
+    const feedUrl=window.location.pathname+'/scout-feed';
+    function display(v){return v===null||v===undefined||v===''?'—':String(v);}
+    function appendRows(players){
+      const fragment=document.createDocumentFragment();
+      players.forEach(function(player){
+        const row=document.createElement('tr');
+        if(player.owned)row.className='owned';
+        const first=document.createElement('td');
+        const link=document.createElement('a');
+        link.href=window.location.pathname+'/player/'+encodeURIComponent(player.player_id);
+        link.textContent=player.name;
+        first.appendChild(link);
+        if(player.shortlisted)first.appendChild(document.createTextNode(' ★'));
+        row.appendChild(first);
+        const fields=[player.club,player.position,player.overall,player.age,
+          player.value,player.contract,player.years_left,player.pace,
+          player.shooting,player.passing,player.dribbling,
+          player.defending,player.physicality];
+        if(scoutForm.elements.scout_attribute.value)
+          fields.push(player.detail_attribute);
+        fields.forEach(function(value){
+          const cell=document.createElement('td');
+          cell.textContent=display(value);
+          row.appendChild(cell);
+        });
+        fragment.appendChild(row);
       });
+      tableBody.appendChild(fragment);
+    }
+    async function loadScout(reset){
+      if(reset){
+        generation++;
+        if(active)active.abort();
+        active=null;
+        page=0;shown=0;hasMore=true;
+        status.textContent='Applying filters…';
+        const search=new URLSearchParams(new FormData(scoutForm));
+        history.replaceState(null,'',window.location.pathname+'?'+
+          search.toString()+'#scouting');
+      }
+      if(active||!hasMore)return;
+      const requestId=generation;
+      const next=page+1;
+      const params=new URLSearchParams(new FormData(scoutForm));
+      params.set('scout_page',String(next));
+      const controller=new AbortController();
+      active=controller;
+      status.textContent='Loading players…';
+      try{
+        const response=await fetch(feedUrl+'?'+params.toString(),{
+          credentials:'same-origin',cache:'no-store',
+          headers:{'Accept':'application/json'},signal:controller.signal});
+        if(!response.ok)throw new Error('Scouting feed unavailable');
+        const data=await response.json();
+        if(requestId!==generation)return;
+        if(reset)tableBody.replaceChildren();
+        appendRows(data.players);
+        shown+=data.players.length;
+        total=data.total;
+        page=next;hasMore=Boolean(data.has_more);
+        counter.textContent='Showing '+shown.toLocaleString('en-GB')+
+          ' of '+total.toLocaleString('en-GB')+' players';
+        status.textContent=hasMore?'Scroll to see more players':
+          (total===0?'No players match these filters':'All matching players loaded');
+      }catch(error){
+        if(error.name==='AbortError')return;
+        if(requestId===generation)status.textContent=
+          'Unable to load players. Scroll again or change a filter to retry.';
+      }finally{
+        if(active===controller)active=null;
+      }
+    }
+    if(limitControl&&valueControl){
+      limitControl.addEventListener('click',function(){
+        valueControl.value=String(Math.max(0,Math.floor(
+          Number(document.body.dataset.feeRemaining)||0)));
+        scoutForm.requestSubmit();
+      });
+    }
+    scoutForm.addEventListener('submit',function(event){
+      event.preventDefault();
+      loadScout(true);
     });
+    scoutForm.addEventListener('change',function(event){
+      if(event.target.matches('select,input[type=checkbox]'))
+        scoutForm.requestSubmit();
+    });
+    let searchTimer;
+    scoutForm.querySelectorAll('input[type=text],input:not([type]),input[type=number]')
+      .forEach(function(input){
+        input.addEventListener('input',function(){
+          clearTimeout(searchTimer);
+          searchTimer=setTimeout(function(){
+            if(input.value===''||input.value.length>=2)scoutForm.requestSubmit();
+          },550);
+        });
+      });
     const applyButton=Array.from(scoutForm.querySelectorAll('button')).find(
-      function(b){return /apply filter|search players|filter/i.test(b.textContent);}
+      function(button){return /apply filter|search players|filter/i.test(button.textContent);}
     );
     if(applyButton)applyButton.hidden=true;
+    if('IntersectionObserver' in window){
+      const observer=new IntersectionObserver(function(entries){
+        if(entries.some(function(entry){return entry.isIntersecting;}))
+          loadScout(false);
+      },{rootMargin:'500px'});
+      observer.observe(scoutProgress);
+    }else{
+      window.addEventListener('scroll',function(){
+        const box=scoutProgress.getBoundingClientRect();
+        if(!views.scouting.hidden&&box.top<window.innerHeight+500)
+          loadScout(false);
+      });
+    }
   }
 
   // Opening Inbox acknowledges server-side unread messages. This is a
