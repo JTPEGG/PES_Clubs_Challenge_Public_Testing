@@ -975,6 +975,15 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% endif %}
 {% if snap.state!='not_started' %}
 <h2 id="transfer-centre">Transfer Centre</h2>
+{% if snap.state=='closed' %}
+<div class="card desk-post-window-next" data-post-window-continue>
+ <strong>The transfer window has closed. Your results are ready.</strong>
+ <a href="#season-setup" data-desk-tab="season-setup">Continue to season setup →</a>
+</div>
+{% elif snap.state=='deadline_reached' %}
+<div class="card"><strong>Finalising the 30-minute transfer window</strong>
+ <p class="muted">Only transfers fully agreed before the deadline can register.</p></div>
+{% endif %}
 <div class="desk-transfer-split">
  <section class="card desk-transfer-section">
   <h3><span class="desk-direction in" aria-label="Incoming transfers">↙</span>
@@ -992,11 +1001,12 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <h3><span class="desk-direction out" aria-label="Outgoing transfers">↗</span>
    Outgoing <span class="desk-section-count">{{offers|length}}</span></h3>
   <div class="scout-table"><table data-desk-table="outgoing">
-  <thead><tr><th>Player</th><th>To</th><th data-sort-type="number">Fee</th><th>Status</th></tr></thead>
+  <thead><tr><th>Player</th><th>To</th><th data-sort-type="number">Fee</th><th>Status</th><th>Received</th></tr></thead>
   <tbody>{% for o in offers %}
-  <tr><td>{{o.player_name}}</td><td>{{o.buyer_name|club_display}}</td>
+  <tr data-live-offer-id="{{o.offer_id}}"><td>{{o.player_name}}</td><td>{{o.buyer_name|club_display}}</td>
    <td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
-   <td><a href="#transfers">{{o.status_label}}</a></td></tr>
+   <td><a href="#transfers">{{o.status_label}}</a></td>
+   <td>{{o.received_at[11:16] if o.received_at else '—'}} UTC</td></tr>
   {% endfor %}</tbody></table></div>
   {% if not offers %}<p class="muted">No outgoing bids</p>{% endif %}
  </section>
@@ -1079,6 +1089,8 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 {% endif %}
 {% endif %}
 <h2 id="inbox">Manager's Inbox</h2>
+<div id="desk-live-offer-stream" class="desk-live-offer-stream" hidden
+ aria-live="polite" aria-label="New incoming transfer offers"></div>
 {% if not spectator and unread>0 %}
 <form method="post" action="/world/play/career/{{career_id}}/market/read" data-mark-inbox-read>
 <input type="hidden" name="csrf" value="{{csrf}}">
@@ -1086,7 +1098,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 </form>{% endif %}
 {% if offers %}
 <div class="grid">{% for o in offers %}
-<div class="card offer" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
+<div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
  data-desk-buyer="{{o.buyer_name|club_display}}">
  <div class="label">{{o.buyer_name|club_display}} · {{o.status_label}}</div>
@@ -1157,7 +1169,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  {% endif %}
  </div>{% endif %}
 </div>{% endfor %}</div>
-{% else %}<div class="card"><p>No offers have arrived yet. The world is evaluating its squads;
+{% else %}<div class="card" id="desk-inbox-no-offers"><p>No offers have arrived yet. The world is evaluating its squads;
 a quiet market is possible. No transfers will be invented to fill the inbox.</p></div>{% endif %}
 {% if snap.state=='closed' %}
 <h2 id="window-summary">Final transfer window report</h2>
@@ -2325,6 +2337,10 @@ def create_play_blueprint(db_path):
             targets=manager_targets(db,career_id=career_id,query=player_search)
         if snap["state"]!="not_started":
             rows=db.execute("""SELECT o.offer_id,o.status,o.offered_fee,
+                wo.tagged_at AS received_at,
+                EXISTS(SELECT 1 FROM world_career_offer_events ev
+                  WHERE ev.offer_id=o.offer_id
+                    AND ev.event_type='preseason_deadline_expired') AS deadline_expired,
                 o.demanded_fee,o.player_id,p.full_name player_name,
                 bc.name buyer_name,ia.status player_status,
                 ia.decision_reason player_reason,
@@ -2353,9 +2369,11 @@ def create_play_blueprint(db_path):
             from world_offer_deadlines import confirmation_state
             for r in rows:
                 item=dict(r,status_label=labels.get(r["status"],r["status"]))
+                if r["status"]=="withdrawn" and r["deadline_expired"]:
+                    item["status_label"]="Expired at deadline — not agreed"
                 item["confirmation"]=confirmation_state(
                     db,career_id=career_id,offer_id=r["offer_id"])
-                if r["status"]=="withdrawn" and item["confirmation"] and item["confirmation"]["expired_at"]:
+                if r["status"]=="withdrawn" and not r["deadline_expired"] and item["confirmation"] and item["confirmation"]["expired_at"]:
                     item["status_label"]="Buyer withdrew — decision time expired"
                 valuation,_=_player_reference(db,dataset,r["player_id"])
                 item["market_value"]=valuation
@@ -2666,10 +2684,24 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 FROM world_career_market_inbox WHERE career_id=?""",
                 (career_id,)).fetchone()
             unread=actionable_unread_count(db,career_id=career_id)
-            offers=db.execute("""SELECT COUNT(*) FROM world_career_offers
-                WHERE career_id=? AND selling_club_id=?
-                  AND buying_club_id<>?""",
-                (career_id,career[0],career[0])).fetchone()[0]
+            offer_rows=db.execute("""SELECT o.offer_id,o.player_id,
+                    o.status,o.offered_fee,p.full_name,b.name,
+                    wo.tagged_at
+                FROM world_career_preseason_window_offers wo
+                JOIN world_career_offers o ON o.offer_id=wo.offer_id
+                JOIN world_players p ON p.player_id=o.player_id
+                JOIN world_clubs b ON b.club_id=o.buying_club_id
+                WHERE wo.window_id=? AND o.career_id=?
+                  AND o.selling_club_id=? AND o.buying_club_id<>?
+                ORDER BY o.offer_id DESC LIMIT 100""",
+                (snap["window_id"],career_id,career[0],career[0])).fetchall() if snap["window_id"] else []
+            offers=len(offer_rows)
+            import re
+            clean_buyer=lambda value:re.sub(r"\\s+\\[WH27:[0-9a-fA-F]{8,20}\\]$","",value)
+            live_offers=[dict(offer_id=oid,player_id=pid,status=status,
+                fee=fee,player=name,buyer=clean_buyer(buyer),
+                received_at=received)
+                for oid,pid,status,fee,name,buyer,received in offer_rows]
             recent=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
                 o.offered_fee,e.created_at FROM world_career_offer_events e
                 JOIN world_career_offers o ON o.offer_id=e.offer_id
@@ -2689,7 +2721,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                         " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
                 for eid,name,seller,buyer,fee,when in recent]
             payload=dict(state=snap["state"],latest_message_id=msg[1],
-                unread=unread,incoming_offers=offers,world_updates=world_updates,
+                unread=unread,incoming_offers=offers,
+                offer_updates=live_offers,csrf=csrf_value(),
+                world_updates=world_updates,
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
         response.headers["Cache-Control"]="private, no-store"
