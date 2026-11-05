@@ -1545,7 +1545,10 @@ Contract dates appear only where sourced.</p>
      form.dataset.busy='1';button.disabled=true;
      status.textContent='Checking player and agent response…';
      try{
-       const response=await fetch(form.action,{method:'POST',
+       // The hidden input named "action" shadows HTMLFormElement.action
+       // in some browsers. Read the literal URL attribute to avoid a
+       // failed client-side request with no server POST.
+       const response=await fetch(form.getAttribute('action'),{method:'POST',
          body:new FormData(form),credentials:'same-origin',
          headers:{Accept:'application/json'},cache:'no-store'});
        const payload=await response.json().catch(()=>null);
