@@ -230,8 +230,10 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             # Unattached players are NOT fictional 660th-club registrations.
             # Supplement entries have no club or transfer fee and are
             # excluded once registered to a club in this career.
-            if conn.execute("""SELECT 1 FROM sqlite_master
-                WHERE type='table' AND name='world_fc27_free_agent_pool'""").fetchone():
+            if (has_projection and conn.execute("""SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='world_fc27_free_agent_pool'""").fetchone()
+                and conn.execute("""SELECT 1 FROM world_fc27_free_agent_pool
+                    WHERE dataset_id=? LIMIT 1""",(dataset,)).fetchone()):
                 free_rows=conn.execute("""SELECT fa.player_id,
                     NULL AS club_id,'Free agent' AS club_name,
                     p.full_name,p.birth_date,p.primary_position,
