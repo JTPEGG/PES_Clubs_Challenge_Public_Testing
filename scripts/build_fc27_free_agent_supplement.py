@@ -91,7 +91,7 @@ def build(original_path,warehouse_path,output_path,pages_dir=None):
         "SELECT source_player_id FROM wh_fc27_players WHERE edition=2027")}
     historical={}
     peers=[]
-    for r in source.execute("""SELECT edition,source_player_id,player_name,
+    for r in source.execute("""SELECT player_key,edition,source_player_id,player_name,
           date_of_birth,primary_position,source_overall,pes_abilities_json,
           pes_additional_json,preferred_foot,nationality,height_cm,weight_kg
           FROM players WHERE edition BETWEEN 2017 AND 2027 ORDER BY edition DESC"""):
