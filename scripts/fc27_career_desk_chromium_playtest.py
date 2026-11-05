@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import sqlite3
 import threading
+from time import perf_counter
 from datetime import datetime,timedelta
 from contextlib import closing
 from urllib.parse import urlparse
@@ -185,7 +186,20 @@ def run(world,output):
                   "Automatic infinite scrolling did not load subsequent players")
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").first.inner_text()==first,
                   "Infinite scrolling replaced the first page instead of appending")
-            page.locator('input[name="scout_squad"]').check()
+            # A warmed filter must return promptly even while autonomous
+            # FC27 market jobs run in the background. This measures the
+            # actual live browser -> authenticated Flask JSON response.
+            filter_started=perf_counter()
+            with page.expect_response(
+                lambda response:"/market/scout-feed?" in response.url
+                     and "scout_squad=1" in response.url
+                     and response.status==200,
+                timeout=15000) as filtered_response:
+                page.locator('input[name="scout_squad"]').check()
+            filter_seconds=perf_counter()-filter_started
+            check(filter_seconds<4.0,
+                  f"Scouting filter response took {filter_seconds:.2f}s; HTTP must not await AI work")
+            found.append(f"Warmed scouting filter responds in {filter_seconds:.2f}s under live market")
             page.wait_for_function(
                 'document.querySelector("#desk-view-scouting [data-scout-count]").textContent.includes(" of ") && document.querySelectorAll("#desk-view-scouting [data-scout-results] tbody tr").length<80',
                 timeout=35000)
