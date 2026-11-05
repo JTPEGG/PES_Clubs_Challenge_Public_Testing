@@ -86,6 +86,8 @@ def run(destination):
             # This is an immutable derived index, NOT a modification to the
             # approved source ratings or any saved career.
             with sqlite3.connect(staged) as db:
+                db.execute("""CREATE INDEX IF NOT EXISTS fc27_scout_detail_lookup
+                    ON world_dataset_extended_attributes(dataset_id,player_id,attribute)""")
                 db.execute("""CREATE TABLE world_fc27_scout_categories AS
                     SELECT player_id,
                       CAST(ROUND(AVG(CASE WHEN attribute IN
