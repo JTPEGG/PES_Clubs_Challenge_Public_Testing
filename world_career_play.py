@@ -2472,6 +2472,64 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         except (ValueError,KeyError,sqlite3.Error):
             return redirect(f"/world/play/career/{career_id}/market#scouting")
 
+    @bp.get("/world/play/career/<career_id>/market/scout-feed")
+    def manager_scout_feed(career_id):
+        """Lightweight, authenticated scouting rows for seamless scrolling.
+
+        Unlike /market this GET deliberately does not run market negotiations;
+        the separate heartbeat owns autonomous transfer processing.
+        """
+        if not authenticated():return jsonify(error="Authentication required"),401
+        import re
+        def positive_number(key):
+            value=request.args.get(key,"").strip()
+            return int(value) if value.isdigit() else None
+        page=max(1,min(10000,positive_number("scout_page") or 1))
+        page_size=80
+        with connect() as db:
+            try:
+                results,total=scouting_search(
+                    db,career_id=career_id,
+                    query=request.args.get("scout_query","")[:70],
+                    position=request.args.get("scout_position",""),
+                    min_overall=positive_number("scout_min_overall"),
+                    max_age=positive_number("scout_max_age"),
+                    category=request.args.get("scout_category",""),
+                    min_category=positive_number("scout_min_category"),
+                    attribute=request.args.get("scout_attribute",""),
+                    min_attribute=positive_number("scout_min_attribute"),
+                    contract=request.args.get("scout_contract",""),
+                    squad_only=request.args.get("scout_squad")=="1",
+                    shortlist_only=request.args.get("scout_shortlist")=="1",
+                    sort_by=request.args.get("scout_sort","overall"),
+                    descending=request.args.get("scout_order","desc")!="asc",
+                    max_market_value=positive_number("scout_max_value"),
+                    interested_only=request.args.get("scout_interest")=="1",
+                    limit=page_size,offset=(page-1)*page_size,
+                    with_total=True)
+            except ValueError:abort(404)
+        data=[]
+        for p in results:
+            data.append(dict(
+                player_id=p["player_id"],name=p["full_name"],
+                club=re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",p["club_name"]),
+                position=p["primary_position"] or "—",
+                overall=p["overall"],age=p["age"],
+                value=(format_market_gbp(p["market_value"])
+                       if p["market_value"] is not None else "—"),
+                contract=p["expires"] or "—",
+                years_left=p["years_left"],
+                pace=p["pace"],shooting=p["shooting"],
+                passing=p["passing"],dribbling=p["dribbling"],
+                defending=p["defending"],physicality=p["physicality"],
+                detail_attribute=p["detail_attribute"],
+                shortlisted=bool(p["shortlisted"]),
+                owned=bool(p["owned"])))
+        response=jsonify(players=data,total=total,page=page,
+                         has_more=(page*page_size<total))
+        response.headers["Cache-Control"]="private, no-store"
+        return response
+
     @bp.get("/world/play/career/<career_id>/market")
     def manager_market(career_id):
         if not authenticated():return redirect("/world/play")
