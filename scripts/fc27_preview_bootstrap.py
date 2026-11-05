@@ -29,7 +29,7 @@ DESTINATION="fc27_playtest_world.sqlite"
 EXPECTED_SHA256="03a7b5075eee79ccf5f7ca8b898949ce5d42cc0fc999bdb0a92a17f163bcde7c"
 FA_RELEASE_BASE="https://github.com/JTPEGG/PES_Clubs_Challenge_Public_Testing/releases/download/fc27-free-agents-2026-11-05-v1"
 FA_RELEASE_FILE="FC27_FREE_AGENTS_ADDITIVE_V1.json.gz"
-FA_RELEASE_SHA256="REPLACE_WITH_GITHUB_RELEASE_DIGEST_AFTER_QA"
+FA_RELEASE_SHA256="bf18b1ea4b7d441b357ea6cfdbdfe6af6e5ae80241e03afaa57ec7829ab327cd"
 
 def fetch(url):
     req=Request(url,headers={"User-Agent":"PES-FC27-Manual-Preview/1.0"})
