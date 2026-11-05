@@ -33,13 +33,21 @@ jobs:
           run-id: 39616187183
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: source-fc27/
+      - name: Fetch pinned 212 free-agent listings from independent dated audit
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-FREE-AGENTS-HTML-SOURCE-QA
+          run-id: 42109913272
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-html/
       - name: Build supplement and print source reconciliation
         run: |
           mkdir -p output
           python -u -m scripts.build_fc27_free_agent_supplement \
             --original source-history/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite \
             --warehouse source-fc27/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
-            --output output/FC27_FREE_AGENTS_ADDITIVE_V1.json.gz
+            --output output/FC27_FREE_AGENTS_ADDITIVE_V1.json.gz \
+            --pages-dir source-html/
       - name: Validate PES source and Sancho provenance
         run: |
           python - <<'PY'
