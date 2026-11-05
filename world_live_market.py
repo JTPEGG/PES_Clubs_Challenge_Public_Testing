@@ -817,6 +817,30 @@ def mark_market_read(conn,*,career_id):
     return cur.rowcount
 
 
+def actionable_unread_count(conn,*,career_id):
+    """Count distinct offers needing a manager decision, not market news.
+
+    AI world signings, price changes, your own recorded actions and informational
+    agent updates never trigger the Inbox badge. One offer creates at most one
+    badge, regardless of how many updates were recorded against it.
+    """
+    return conn.execute("""SELECT COUNT(DISTINCT m.offer_id)
+        FROM world_career_market_inbox m
+        JOIN world_career_offers o
+          ON o.offer_id=m.offer_id AND o.career_id=m.career_id
+        JOIN world_career_saves c ON c.career_id=m.career_id
+        LEFT JOIN world_career_incoming_approaches ia
+          ON ia.offer_id=o.offer_id
+        WHERE m.career_id=? AND m.is_read=0
+          AND o.selling_club_id=c.manager_club_id
+          AND o.buying_club_id<>c.manager_club_id
+          AND ((o.status='proposed' AND m.message_key LIKE 'offer:%')
+            OR (o.status='accepted_pending_contract'
+                AND ia.status='terms_accepted'
+                AND m.message_key LIKE 'agent:%'))""",
+        (career_id,)).fetchone()[0]
+
+
 def market_messages(conn,*,career_id):
     rows=conn.execute("""SELECT m.message_id,m.headline,m.detail,m.created_at,
         m.is_read,m.offer_id,p.full_name AS player_name,
