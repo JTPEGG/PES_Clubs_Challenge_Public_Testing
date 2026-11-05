@@ -10,6 +10,7 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect
 from scripts.fc27_warehouse_world_bridge import DATASET
 from world_career_play import create_play_blueprint
+from fc27_career_storage import CareerSaveStore
 
 if os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED") != "1":
     raise RuntimeError("Explicit FC27_PRESEASON_PLAYTEST_ENABLED=1 required")
@@ -39,9 +40,13 @@ def source_coverage():
         raise RuntimeError(f"FC27 source validation failed: {clubs,players,leagues,metadata}")
     return dict(clubs=clubs,players=players,competitions=leagues)
 
+CAREER_STORAGE=CareerSaveStore(db_path)
+CAREER_STORAGE.restore()
 COVERAGE=source_coverage()
 app=Flask("fc27_dedicated_manual_playtest")
-app.register_blueprint(create_play_blueprint(db_path))
+app.register_blueprint(create_play_blueprint(
+    db_path, on_career_commit=CAREER_STORAGE.schedule_upload if CAREER_STORAGE.url else None
+))
 
 @app.get("/")
 def root():
@@ -49,7 +54,7 @@ def root():
 
 @app.get("/healthz")
 def healthz():
-    return jsonify(status="ready",dataset=DATASET,**COVERAGE)
+    return jsonify(status="ready",dataset=DATASET,career_storage=CAREER_STORAGE.status(),**COVERAGE)
 
 # The full challenge app is intentionally not mounted; route legacy links back
 # into the isolated Career Desk rather than 404ing or exposing production saves.
