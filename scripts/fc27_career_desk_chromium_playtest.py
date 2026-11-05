@@ -385,8 +385,23 @@ def run(world,output):
                   "Cannot bid from a full FC27 player's scouting report")
             offered=round(ref_value*1.6)
             page.locator("#scout-fee").fill(str(offered))
-            page.locator("#scout-buy button").click()
-            page.wait_for_url("**/market?notice=**",timeout=25000)
+            player_url=page.url
+            with page.expect_response(
+                lambda response:response.url.endswith('/market/buy')
+                    and response.request.method=='POST',
+                timeout=20000) as buy_response:
+                page.locator("#scout-buy button").click()
+            saved_buy=buy_response.value.json()
+            check(buy_response.value.status==200 and saved_buy.get('ok')
+                  and 'data-buy-offer-id' in saved_buy.get('html',''),
+                  "Player-profile buy did not return a server-validated card")
+            check(page.url==player_url,
+                  "Submitting a bid unexpectedly reloaded the entire dashboard")
+            page.wait_for_function("""()=>Boolean(
+                document.querySelector('#scout-buy-result [data-buy-offer-id]'))""",
+                timeout=12000)
+            found.append("Buying offer confirmed in player report without full dashboard reload")
+            page.goto(base+manager_path,wait_until="domcontentloaded")
             with closing(sqlite3.connect(world)) as db:
                 count=db.execute("""SELECT COUNT(*) FROM world_career_offers
                      WHERE career_id=? AND player_id=?
