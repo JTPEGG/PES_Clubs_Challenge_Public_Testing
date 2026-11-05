@@ -926,6 +926,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label>Maximum market value (£)<br><input name="scout_max_value" type="number" min="0" step="100000" value="{{scout_max_value}}" placeholder="No limit" style="width:160px"></label>
 <button type="button" data-scout-budget>Use available budget</button>
 <label><input type="checkbox" name="scout_interest" value="1" {% if scout_interest %}checked{% endif %}> Would consider a move</label>
+<label><input type="checkbox" name="scout_free_only" value="1" {% if scout_free_only %}checked{% endif %}> Free agents only (£0 fee)</label>
 <label>Category<br><select name="scout_category"><option value="">Any</option>
 {% for cat in scout_categories %}<option value="{{cat}}" {% if scout_category==cat %}selected{% endif %}>{{cat|title}}</option>{% endfor %}</select></label>
 <label>Min category<br><input type="number" name="scout_min_category" min="1" max="99" value="{{scout_min_category}}" style="width:80px"></label>
@@ -956,8 +957,8 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <tr class="{{'owned' if p.owned else ''}}">
 <td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
-<td>{{money(p.market_value) if p.market_value is not none else '—'}}</td>
-<td>{{p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
+<td>{{'FREE' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
+<td>{{'Unattached' if p.free_agent else p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
 <td>{{p.pace if p.pace is not none else '—'}}</td>
 <td>{{p.shooting if p.shooting is not none else '—'}}</td>
 <td>{{p.passing if p.passing is not none else '—'}}</td>
@@ -2392,6 +2393,7 @@ def create_play_blueprint(db_path):
         scout_contract=request.args.get("scout_contract","") if not spectator else ""
         scout_max_value=filter_value("scout_max_value")
         scout_interest=request.args.get("scout_interest")=="1" if not spectator else False
+        scout_free_only=request.args.get("scout_free_only")=="1" if not spectator else False
         scout_squad=request.args.get("scout_squad")=="1" if not spectator else False
         scout_sort=request.args.get("scout_sort","overall")
         if scout_sort not in SORT_COLUMNS:scout_sort="overall"
@@ -2418,7 +2420,7 @@ def create_play_blueprint(db_path):
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
             max_market_value=scout_max_value,interested_only=scout_interest,
-            descending=scout_order=="desc",shortlist_only=scout_shortlist,
+            free_only=scout_free_only,descending=scout_order=="desc",shortlist_only=scout_shortlist,
             limit=scout_page_size,offset=(scout_page-1)*scout_page_size,
             with_total=True) if not spectator else ([],0))
         scout_pages=max(1,(scout_total+scout_page_size-1)//scout_page_size)
@@ -2608,6 +2610,7 @@ def create_play_blueprint(db_path):
             scout_max_value=scout_max_value if scout_max_value is not None else "",
             scout_interest=scout_interest,scout_squad=scout_squad,scout_sort=scout_sort,
             scout_order=scout_order,scout_shortlist=scout_shortlist,
+            scout_free_only=scout_free_only,
             summary=summary,season_tasks=season_tasks,
             player_morale=morale,season_exclusions=excluded,
             money=format_market_gbp,
@@ -2758,6 +2761,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     descending=request.args.get("scout_order","desc")!="asc",
                     max_market_value=positive_number("scout_max_value"),
                     interested_only=request.args.get("scout_interest")=="1",
+                    free_only=request.args.get("scout_free_only")=="1",
                     limit=page_size,offset=(page-1)*page_size,
                     with_total=True)
             except ValueError as exc:
