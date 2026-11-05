@@ -2688,11 +2688,14 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             unread=actionable_unread_count(db,career_id=career_id)
             offer_rows=db.execute("""SELECT o.offer_id,o.player_id,
                     o.status,o.offered_fee,p.full_name,b.name,
-                    wo.tagged_at
+                    wo.tagged_at,ia.status AS agent_status,
+                    o.demanded_fee
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
                 JOIN world_clubs b ON b.club_id=o.buying_club_id
+                LEFT JOIN world_career_incoming_approaches ia
+                  ON ia.offer_id=o.offer_id
                 WHERE wo.window_id=? AND o.career_id=?
                   AND o.selling_club_id=? AND o.buying_club_id<>?
                 ORDER BY o.offer_id DESC LIMIT 100""",
@@ -2702,8 +2705,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             clean_buyer=lambda value:re.sub(r"\\s+\\[WH27:[0-9a-fA-F]{8,20}\\]$","",value)
             live_offers=[dict(offer_id=oid,player_id=pid,status=status,
                 fee=fee,player=name,buyer=clean_buyer(buyer),
-                received_at=received)
-                for oid,pid,status,fee,name,buyer,received in offer_rows]
+                received_at=received,agent_status=agent,
+                demanded_fee=demanded)
+                for oid,pid,status,fee,name,buyer,received,agent,demanded in offer_rows]
             recent=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
                 o.offered_fee,e.created_at FROM world_career_offer_events e
                 JOIN world_career_offers o ON o.offer_id=e.offer_id
