@@ -33,6 +33,7 @@ _INTEREST_LOCK=Lock()
 _INTEREST_TTL=1800
 _WAGE_CACHE=OrderedDict()
 _WAGE_LOCK=Lock()
+_SOURCE_ATTR_CACHE={}
 
 def _cached_interest(key):
     with _INTEREST_LOCK:
@@ -95,10 +96,16 @@ def scouting_attributes(conn, *, career_id):
     source=conn.execute("""SELECT dataset_id FROM world_career_saves
         WHERE career_id=?""",(career_id,)).fetchone()
     if source and source[0]=="fc27-warehouse-659-mens-2026-27":
-        return [r[0].removeprefix("PES2020V2:") for r in conn.execute(
+        dataset=source[0]
+        with _WAGE_LOCK:
+            cached=_SOURCE_ATTR_CACHE.get(dataset)
+        if cached is not None:return list(cached)
+        values=tuple(r[0].removeprefix("PES2020V2:") for r in conn.execute(
             """SELECT DISTINCT attribute FROM world_dataset_extended_attributes
             WHERE dataset_id=? AND attribute LIKE 'PES2020V2:%'
-            ORDER BY attribute""",(source[0],)).fetchall()]
+            ORDER BY attribute""",(dataset,)).fetchall())
+        with _WAGE_LOCK:_SOURCE_ATTR_CACHE[dataset]=values
+        return list(values)
     return [r[0] for r in conn.execute("""SELECT DISTINCT attribute_name
         FROM world_player_attributes WHERE effective_season=?
         ORDER BY attribute_name""",(row[0],)).fetchall()]
