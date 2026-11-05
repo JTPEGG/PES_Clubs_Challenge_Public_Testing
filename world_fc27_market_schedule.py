@@ -7,6 +7,7 @@ restarts neither regenerate opportunity rolls nor duplicate transfers.
 No global 112-market-attempt scheduler is used for FC27.
 """
 from collections import defaultdict
+from time import monotonic
 
 from world_ai_tactics import preferred_formation,tactical_needs
 from world_fc27_ai_recruitment import (
@@ -219,8 +220,14 @@ def plan_fc27_market_interval(conn,*,career_id,window_id,interval_index,
     conn.commit()
 
 def process_fc27_market_interval(conn,*,career_id,window_id,
-                                 interval_index,when,activity_scale_qa=1):
-    """Execute every planned club-led search, without a transaction quota."""
+                                 interval_index,when,activity_scale_qa=1,
+                                 work_budget_seconds=None):
+    """Resume persisted club-led searches within a bounded HTTP work budget.
+
+    This controls per-request processing cost, NOT which clubs may recruit or
+    how many transfers they may make. Pending club intents survive and resume.
+    Isolated QA runs without a budget still process the entire interval.
+    """
     from world_ai_world import consider_ai_world_deal
     plan_fc27_market_interval(conn,career_id=career_id,window_id=window_id,
         interval_index=interval_index,when=when,
@@ -229,7 +236,11 @@ def process_fc27_market_interval(conn,*,career_id,window_id,
        WHERE window_id=? AND interval_index=? AND processed=0
        ORDER BY source_priority DESC,club_id""",
        (window_id,interval_index)).fetchall()
+    stop_at=(monotonic()+work_budget_seconds
+             if work_budget_seconds is not None else None)
     for (club,) in pending:
+        if stop_at is not None and monotonic()>=stop_at:
+            break
         offered=consider_ai_world_deal(conn,career_id=career_id,
             window_id=window_id,slot=fc27_market_slot(interval_index,club),
             now=when,buying_club_id=club)
