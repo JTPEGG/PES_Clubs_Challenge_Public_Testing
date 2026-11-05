@@ -71,7 +71,7 @@ def check_championship_move_interest(world):
             FROM world_dataset_entries e
             JOIN world_competitions c ON c.competition_id=e.competition_id
             JOIN world_clubs cl ON cl.club_id=e.club_id
-            WHERE e.dataset_id=? AND cl.name LIKE 'West Ham United%'
+            WHERE e.dataset_id=? AND lower(cl.name) LIKE 'west ham%'
             LIMIT 1""",(DATASET,)).fetchone()
         kane=db.execute("""SELECT p.player_id,c.tier,r.overall
             FROM world_players p
@@ -83,6 +83,16 @@ def check_championship_move_interest(world):
                 AND e.dataset_id=r.dataset_id
             JOIN world_competitions c ON c.competition_id=e.competition_id
             WHERE p.full_name='Harry Kane'""",(DATASET,)).fetchone()
+        possible_west=db.execute("""SELECT cl.name,c.name,c.tier,e.club_id
+            FROM world_dataset_entries e
+            JOIN world_competitions c ON c.competition_id=e.competition_id
+            JOIN world_clubs cl ON cl.club_id=e.club_id
+            WHERE e.dataset_id=? AND lower(cl.name) LIKE '%west%ham%'""",
+            (DATASET,)).fetchall()
+        print("FC27_MOVE_INTEREST_DIAGNOSTIC West Ham:",
+              [tuple(x) for x in possible_west],
+              "chosen:",tuple(west) if west else None,
+              "Kane:",tuple(kane) if kane else None,flush=True)
         check(west is not None and west["tier"]==2,
               "2026/27 source must register West Ham as Championship (tier 2)")
         check(kane is not None and kane["tier"]==1

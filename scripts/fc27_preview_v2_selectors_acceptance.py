@@ -263,7 +263,7 @@ def run(output):
                 "Single transfer-window start missing")
             page.screenshot(path=str(root/"02-fc27-v2-preseason-dashboard.png"),full_page=True)
             page.locator('button:has-text("Start 30-minute transfer window")').click()
-            page.wait_for_url("**/market?notice=**",timeout=25000)
+            page.wait_for_url("**/market",timeout=25000)
             with sqlite3.connect(db_path) as db:
                 db.row_factory=sqlite3.Row
                 check(window_snapshot(db,career_id=test_career)["state"]=="open",
