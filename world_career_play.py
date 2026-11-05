@@ -1089,6 +1089,22 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 </div>{% endfor %}</div>
 {% endif %}
 {% endif %}
+{% if free_signings %}
+<h2 id="free-signings">Free-agent contract negotiations</h2>
+<div class="scout-table"><table>
+<thead><tr><th>Player</th><th>Transfer fee</th><th>Weekly wage</th>
+<th>Contract</th><th>Status</th></tr></thead>
+<tbody>{% for s in free_signings %}
+<tr><td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
+<td><strong>FREE — £0</strong></td>
+<td>{{money(s.proposed_weekly_wage_gbp)}} / wk</td>
+<td>{{s.contract_years}} years</td>
+<td>{{'Signed — registers at deadline' if s.status=='agreed_future'
+else 'Registered' if s.status=='completed'
+else 'Awaiting your confirmation' if s.status=='terms_accepted'
+else 'Agent counteroffer' if s.status=='countered' else 'Cancelled'}}</td>
+</tr>{% endfor %}</tbody></table></div>
+{% endif %}
 <h2 id="inbox">Manager's Inbox</h2>
 <div id="desk-live-offer-stream" class="desk-live-offer-stream" hidden
  aria-live="polite" aria-label="New incoming transfer offers"></div>
@@ -2448,6 +2464,14 @@ def create_play_blueprint(db_path):
         snap=window_snapshot(db,career_id=career_id)
         offers=[]
         messages=[]
+        free_signings=[]
+        if not spectator and db.execute("""SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='world_fc27_free_agent_offers'""").fetchone():
+            free_signings=db.execute("""SELECT f.*,p.full_name
+                FROM world_fc27_free_agent_offers f
+                JOIN world_players p ON p.player_id=f.player_id
+                WHERE f.career_id=? ORDER BY f.signing_id DESC""",
+                (career_id,)).fetchall()
         unread=0
         signed=0
         purchases=[]
@@ -2684,7 +2708,7 @@ def create_play_blueprint(db_path):
             scout_max_value=scout_max_value if scout_max_value is not None else "",
             scout_interest=scout_interest,scout_squad=scout_squad,scout_sort=scout_sort,
             scout_order=scout_order,scout_shortlist=scout_shortlist,
-            scout_free_only=scout_free_only,
+            scout_free_only=scout_free_only,free_signings=free_signings,
             summary=summary,season_tasks=season_tasks,
             player_morale=morale,season_exclusions=excluded,
             money=format_market_gbp,
