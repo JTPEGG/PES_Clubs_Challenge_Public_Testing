@@ -2581,6 +2581,11 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         page=max(1,min(10000,positive_number("scout_page") or 1))
         page_size=80
         with connect() as db:
+            exists=db.execute("""SELECT 1 FROM world_career_saves
+                WHERE career_id=? AND state='sandbox'""",(career_id,)).fetchone()
+            if exists is None:
+                return jsonify(error="career_not_found",
+                    detail="This test career is no longer on the server."),410
             try:
                 results,total=scouting_search(
                     db,career_id=career_id,
@@ -2601,9 +2606,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     interested_only=request.args.get("scout_interest")=="1",
                     limit=page_size,offset=(page-1)*page_size,
                     with_total=True)
-            except ValueError:
-                return jsonify(error="career_not_found",detail=
-                    "This test career is no longer on the server. Return to the career list and create a new test."),410
+            except ValueError as exc:
+                return jsonify(error="invalid_scout_filter",
+                    detail=str(exc)[:220]),400
         data=[]
         for p in results:
             data.append(dict(
