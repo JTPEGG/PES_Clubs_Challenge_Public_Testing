@@ -111,10 +111,14 @@ def build(original_path,warehouse_path,output_path,pages_dir=None):
     # Jadon was independently reported unattached in September 2026, and
     # has an FC26 PES V2 source. Never label him an official FC27 rating.
     jadon=historical["233049"][0]
+    wage_record=source.execute("""SELECT model_weekly_wage_gbp
+        FROM starting_player_finances WHERE edition=?
+        AND player_key=?""",(jadon["edition"],jadon["player_key"])).fetchone()
+    sancho_wage=int(wage_record[0]) if wage_record and wage_record[0] else 20000
     records["233049"]=dict(source_id="233049",name="Jadon Sancho",
       position=jadon["primary_position"],source_position="LM",
       overall=jadon["source_overall"],age=26,
-      wage_game_gbp=0,height_cm=int(jadon["height_cm"] or 0) or None,
+      wage_game_gbp=sancho_wage,height_cm=int(jadon["height_cm"] or 0) or None,
       preferred_foot=jadon["preferred_foot"],
       nationality=jadon["nationality"],
       source_url="https://www.skysports.com/football/news/13580813/free-agents-jadon-sancho-paul-pogba-and-dele-alli-among-players-available-on-free-transfer-after-summer-window-shuts",
