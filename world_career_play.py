@@ -1401,6 +1401,8 @@ Rejected and expired offers are not transfers.</p>
          const current=Number(state.latest_message_id||0);
          const unread=Number(state.unread||0);
          refreshUnread(unread);
+         if(typeof window.fc27SyncIncomingOffers==='function')
+           window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
          const marketFeed=document.querySelector('#desk-view-news .feed');
          if(marketFeed&&Array.isArray(state.world_updates)){
            // Received from the saved AI deal ledger; never fabricate news.
