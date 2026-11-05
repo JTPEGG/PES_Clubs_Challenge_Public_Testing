@@ -965,7 +965,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <td>{{p.physicality if p.physicality is not none else '—'}}</td>
 {% if scout_attribute %}<td>{{p.detail_attribute if p.detail_attribute is not none else '—'}}</td>{% endif %}
 </tr>{% endfor %}</tbody></table></div>
-<div class="desk-scout-pager" data-scout-progress role="status">
+<div class="desk-scout-pager" data-scout-progress data-total="{{scout_total}}" role="status">
  <span data-scout-count>Showing {{scout_last}} of {{'{:,}'.format(scout_total)}} players</span>
  <span data-scout-loading aria-live="polite">Scroll to browse more players</span>
  </div>
