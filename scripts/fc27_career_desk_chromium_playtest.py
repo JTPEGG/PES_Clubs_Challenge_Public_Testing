@@ -318,8 +318,8 @@ def run(world,output):
                   "Internal FC27 source tags visible in scouting club labels")
             check(page.locator("#desk-view-scouting .desk-scout-pager").is_visible(),
                   "Scouting infinite-scroll counter is missing")
-            check("17,593" in page.locator(".desk-scout-pager").inner_text(),
-                  "Scouting total does not cover the FC27 registered roster")
+            check("17,804" in page.locator(".desk-scout-pager").inner_text(),
+                  "Scouting total must include all 17,593 club players plus 211 true free agents")
             first=page.locator('#desk-view-scouting table tbody tr').first.inner_text()
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()>=80,
                   "FC27 scouting did not render its first 80 players")
@@ -331,6 +331,8 @@ def run(world,output):
                   "Budget-aware scouting value filter missing")
             check(page.locator('input[name="scout_interest"]').is_visible(),
                   "Player move-interest scouting filter missing")
+            check(page.locator('input[name="scout_free_only"]').is_visible(),
+                  "Independent free-agent-only scouting control missing")
             page.screenshot(path=str(output/"03-desktop-scouting.png"),
                             animations="disabled",full_page=True)
             page.locator('[data-scout-progress]').scroll_into_view_if_needed()
