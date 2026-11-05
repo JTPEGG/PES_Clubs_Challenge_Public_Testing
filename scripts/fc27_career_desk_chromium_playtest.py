@@ -411,6 +411,34 @@ def run(world,output):
                             animations="disabled",full_page=True)
             found.append("Mobile 390px Inbox/Squad navigation with no whole-page overflow")
 
+            # Advance ONLY the disposable QA DB to the real deadline. All
+            # unfinished bids must be clearly labelled as deadline-expired,
+            # and the manager must have a prominent usable next step.
+            from world_preseason_window import finalise_preseason_window
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                end=(datetime.now(timezone.utc)-timedelta(seconds=2)).isoformat()
+                db.execute("""UPDATE world_career_preseason_windows
+                    SET deadline_at=? WHERE career_id=?""",(end,CAREER))
+                db.commit()
+                finalise_preseason_window(db,career_id=CAREER)
+            page.set_viewport_size({"width":1440,"height":900})
+            page.goto(base+manager_path,wait_until="domcontentloaded")
+            check(page.locator('body').get_attribute('data-window-state')=='closed',
+                  "Finalised QA deadline not visible to Career Desk")
+            check(page.locator('#desk-view-dashboard [data-desk-tab="season-setup"]').is_visible(),
+                  "Overview has no prominent Continue to season setup action")
+            page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
+            check(page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').is_visible(),
+                  "Transfer Centre has no visible Continue action at top")
+            check('Expired at deadline' in page.locator(
+                  '#desk-view-transfers table[data-desk-table="outgoing"]').inner_text(),
+                  "Unsigned bids at deadline incorrectly labelled as voluntary withdrawals")
+            page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').click()
+            check(page.locator('#desk-view-season-setup').is_visible(),
+                  "Continue link did not navigate to season setup checklist")
+            found.append("Post-deadline offers labelled expired; Continue opens the real season setup")
+
             check(not failures,"JavaScript / browser console errors: "+repr(failures))
             browser.close()
     finally:
