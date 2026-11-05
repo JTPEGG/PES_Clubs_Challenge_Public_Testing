@@ -508,7 +508,10 @@ def set_shortlisted(conn,*,career_id,player_id,save):
         JOIN world_career_saves c ON c.career_id=r.career_id
         WHERE r.career_id=? AND r.player_id=? AND c.state='sandbox'""",
         (career_id,player_id)).fetchone()
-    if player is None:raise ValueError("Player not found in this career")
+    if player is None:
+        from world_fc27_free_agents import pool_player
+        if pool_player(conn,career_id,player_id) is None:
+            raise ValueError("Player not found in this career")
     if save:
         conn.execute("""INSERT OR IGNORE INTO world_career_scout_shortlist
             (career_id,player_id) VALUES(?,?)""",(career_id,player_id))
@@ -523,7 +526,11 @@ def player_profile(conn,*,career_id,player_id):
         JOIN world_career_registrations r ON r.player_id=p.player_id
         WHERE r.career_id=? AND p.player_id=?""",
         (career_id,player_id)).fetchone()
-    if name is None:raise ValueError("Player not registered in this career")
+    if name is None:
+        from world_fc27_free_agents import pool_player
+        free=pool_player(conn,career_id,player_id)
+        if free is None:raise ValueError("Player not registered or available in this career")
+        name=(free["full_name"],)
     result=scouting_search(conn,career_id=career_id,limit=100,
                            query=name[0],sort_by="overall")
     info=next((row for row in result if row["player_id"]==player_id),None)
@@ -548,6 +555,12 @@ def player_profile(conn,*,career_id,player_id):
         else:
             info["source_game_wage"]=None
             info["contract_source"]=None
+        if info["free_agent"]:
+            from world_fc27_free_agents import pool_player
+            free=pool_player(conn,career_id,player_id)
+            if free:
+                info["source_game_wage"]=free["reference_weekly_wage_gbp"]
+                info["contract_source"]=free["ratings_provenance"]
         info["wage_guidance"]=info["source_game_wage"]
     else:
         info["attributes"]=[dict(name=r[0],value=r[1]) for r in conn.execute("""
