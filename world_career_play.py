@@ -2334,9 +2334,11 @@ def create_play_blueprint(db_path):
         scout_shortlist=request.args.get("scout_shortlist")=="1" if not spectator else False
         scout_attributes=scouting_attributes(db,career_id=career_id) if not spectator else []
         shortlist=[]
-        if not spectator and db.execute("""SELECT 1 FROM
-             world_career_scout_shortlist WHERE career_id=? LIMIT 1""",
-             (career_id,)).fetchone():
+        if (not spectator and
+            db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+                 AND name='world_career_scout_shortlist'""").fetchone()
+            and db.execute("""SELECT 1 FROM world_career_scout_shortlist
+                 WHERE career_id=? LIMIT 1""",(career_id,)).fetchone()):
             shortlist=scouting_search(db,career_id=career_id,
                 shortlist_only=True,limit=300)
         recommendations=[]  # Suggested targets intentionally hidden in the simplified scouting desk.
