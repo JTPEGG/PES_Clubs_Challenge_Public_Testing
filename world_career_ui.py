@@ -661,6 +661,11 @@ DASHBOARD_JS = r"""
         const response=await fetch(feedUrl+'?'+params.toString(),{
           credentials:'same-origin',cache:'no-store',
           headers:{'Accept':'application/json'},signal:controller.signal});
+        if(response.status===410||response.status===404){
+          window.location.assign('/world/play?error='+encodeURIComponent(
+            'This test career is no longer on the server following a deployment. Please create a new career.'));
+          return;
+        }
         if(!response.ok)throw new Error('Scouting feed unavailable');
         const data=await response.json();
         if(requestId!==generation)return;
