@@ -95,6 +95,10 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-live-offer-stream:not([hidden]){display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:14px 0 18px}
 .desk-live-offer-stream .offer{margin:0;border-color:#4384a4}
 .desk-live-offer-stream .actions{display:flex;flex-wrap:wrap;gap:8px}
+.desk-decision-feedback{margin:9px 0 2px;font-size:13px;font-weight:650;color:#b9e5ed}
+.desk-decision-feedback[data-error="1"]{color:#ffb5a5}
+.desk-inline-agent-note{margin:9px 0 3px;color:#bad7e5;font-size:12px}
+.desk-ui .offer form button:disabled{opacity:.62;cursor:wait}
 .desk-offer-toast{position:fixed;bottom:24px;right:24px;max-width:min(420px,calc(100vw - 30px));z-index:90;border:1px solid #62b6d6;border-radius:10px;padding:15px 18px;background:#173d56;box-shadow:0 12px 35px #000a;color:white;font-weight:750;text-align:left;cursor:pointer}
 .desk-inbox-tools input{flex:1 1 225px;max-width:320px;font-size:13px;padding:9px 11px}
 .desk-filter-button{padding:8px 12px!important;font-size:12px!important;border-radius:7px;background:#1b3148;color:#b6cbdc;border:1px solid #426076;cursor:pointer;font-weight:650}
@@ -822,8 +826,11 @@ DASHBOARD_JS = r"""
     const btn=document.createElement('button');
     btn.name='decision';btn.value=verb;
     btn.textContent=verb==='accept'?'Accept fee':
-      verb==='reject'?'Reject':'Counter';
-    if(verb==='reject')btn.className='danger';
+      verb==='reject'?'Reject':
+      verb==='finalise'?'Finalise transfer':
+      verb==='cancel'?'Cancel transfer':
+      verb==='delay'?'Request more time':'Counter';
+    if(verb==='reject'||verb==='cancel')btn.className='danger';
     form.appendChild(btn);return form;
   }
   function alertOfNewOffer(offer){
@@ -838,6 +845,127 @@ DASHBOARD_JS = r"""
     toast.textContent='New bid: '+offer.player+' · '+pound(offer.fee)+
       ' · Open Inbox to respond';
   }
+  function showDecisionFeedback(card,message,error){
+    if(!card)return;
+    let p=card.querySelector('[data-decision-feedback]');
+    if(!p){
+      p=document.createElement('p');
+      p.className='desk-decision-feedback';
+      p.dataset.decisionFeedback='';
+      card.appendChild(p);
+    }
+    p.dataset.error=error?'1':'0';
+    p.textContent=message;
+  }
+  function updateIncomingCard(offer,csrf){
+    const id=Number(offer.offer_id);
+    const status=offer.status;
+    const agent=offer.agent_status;
+    for(const card of views.inbox.querySelectorAll('[data-live-offer-id="'+id+'"]')){
+      card.dataset.deskStatus=status;
+      const label=card.querySelector('.label');
+      if(label)label.textContent=(card.dataset.deskBuyer||offer.buyer||'Buying club')+
+        ' · '+(labels[status]||status);
+      if(status==='proposed')continue;
+      let actions=card.querySelector('.actions');
+      if(actions){
+        // Never leave stale Accept buttons usable after an authoritative
+        // decision; the server still validates every status and deadline.
+        for(const form of actions.querySelectorAll('form[action$="/market/decision"]')){
+          const verbs=Array.from(form.querySelectorAll('button[name="decision"]'),
+            button=>button.value);
+          const allowed=status==='accepted_pending_contract'?
+            (agent==='terms_accepted'?['finalise','cancel','delay']:['cancel']):
+            status==='countered'?['cancel']:[];
+          if(!verbs.some(v=>allowed.includes(v)))form.remove();
+        }
+      }
+      const needsActions=status==='countered'||status==='accepted_pending_contract';
+      if(needsActions){
+        if(!actions){
+          actions=document.createElement('div');
+          actions.className='actions';
+          card.appendChild(actions);
+        }
+        const values=Array.from(actions.querySelectorAll('button[name="decision"]'),
+          button=>button.value);
+        if(status==='accepted_pending_contract'&&agent==='terms_accepted'&&
+           !values.includes('finalise'))
+          actions.prepend(formFor(offer,'finalise',csrf));
+        if(!values.includes('cancel'))actions.appendChild(formFor(offer,'cancel',csrf));
+      }
+      let note=card.querySelector('[data-inline-agent-note]');
+      if(!note){
+        note=document.createElement('p');
+        note.className='desk-inline-agent-note';note.dataset.inlineAgentNote='';
+        card.appendChild(note);
+      }
+      note.textContent=status==='accepted_pending_contract'?
+        (agent==='terms_accepted'?
+          'Player and agent terms agreed — finalise the transfer before the deadline.':
+          'Fee accepted — player/agent talks are in progress.'):
+        status==='countered'?'Counter sent — awaiting the buying club.':
+        status==='agreed_future'?'Signed — registering at the deadline.':
+        status==='rejected'?'Offer rejected.':
+        status==='withdrawn'?'Negotiation withdrawn.':
+        status==='completed'?'Transfer registered.':'';
+    }
+  }
+  function updateOfferRow(offer){
+    if(!outgoing)return;
+    const row=outgoing.tBodies[0].querySelector(
+      '[data-live-offer-id="'+Number(offer.offer_id)+'"]');
+    if(row&&row.cells.length>3)
+      row.cells[3].textContent=labels[offer.status]||offer.status;
+  }
+  // The browser submits every human Inbox decision via the existing secure,
+  // server-validated endpoint, but avoids downloading/re-rendering all 659
+  // clubs and 17,593 players after an ordinary Accept/Reject/Counter click.
+  // Native POST+redirect remains the fallback when JavaScript is disabled.
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||!views.inbox.contains(form)||
+       !form.action.endsWith('/market/decision'))return;
+    const button=event.submitter;
+    if(!button||!button.name||button.name!=='decision')return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    const data=new FormData(form);
+    data.set('decision',button.value);
+    const id=Number(data.get('offer_id'));
+    const card=form.closest('[data-live-offer-id]');
+    form.dataset.saving='1';
+    const buttons=Array.from(form.querySelectorAll('button'));
+    buttons.forEach(b=>b.disabled=true);
+    showDecisionFeedback(card,'Saving your '+button.value+' decision…',false);
+    try{
+      const response=await fetch(form.action,{
+        method:'POST',body:data,credentials:'same-origin',
+        headers:{'Accept':'application/json'},cache:'no-store'
+      });
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'The decision could not be saved. Please retry.');
+      const offer={offer_id:id,status:result.status,
+        agent_status:null,buyer:card?.dataset.deskBuyer};
+      updateIncomingCard(offer,String(data.get('csrf')||''));
+      updateOfferRow(offer);
+      showDecisionFeedback(card,result.message,false);
+      if(Number.isFinite(Number(result.unread))){
+        document.body.dataset.unread=String(result.unread);
+        document.querySelectorAll('[data-desk-tab="inbox"] .desk-nav-count')
+          .forEach(badge=>{
+            if(!Number(result.unread))badge.remove();
+            else badge.textContent=String(result.unread);
+          });
+      }
+    }catch(error){
+      showDecisionFeedback(card,String(error.message||error),true);
+    }finally{
+      form.dataset.saving='0';
+      buttons.forEach(b=>{if(b.isConnected)b.disabled=false;});
+    }
+  },true);
   window.fc27SyncIncomingOffers=function(items,csrf){
     if(!Array.isArray(items))return;
     for(const o of items.slice().reverse()){
@@ -875,6 +1003,7 @@ DASHBOARD_JS = r"""
         const empty=views.inbox.querySelector('#desk-inbox-no-offers');
         if(empty)empty.hidden=true;
       }
+      updateIncomingCard(o,csrf);
       if(outgoing){
         const tableBody=outgoing.tBodies[0];
         let row=Array.from(tableBody.querySelectorAll('[data-live-offer-id]'))
