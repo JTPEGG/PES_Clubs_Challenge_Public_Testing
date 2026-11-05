@@ -57,12 +57,67 @@ def select_target(world,manager):
     raise AssertionError("No source-rated affordable scouting target")
 
 
+def check_championship_move_interest(world):
+    """FC27 league source levels must veto routine elite->Championship moves.
+
+    The same named player remains fully visible without the optional interest
+    filter. We temporarily set the test manager to Championship West Ham,
+    then restore the fixture career before any browser interaction.
+    """
+    from world_scouting import scouting_search
+    with closing(sqlite3.connect(world)) as db:
+        db.row_factory=sqlite3.Row
+        west=db.execute("""SELECT e.club_id,c.tier
+            FROM world_dataset_entries e
+            JOIN world_competitions c ON c.competition_id=e.competition_id
+            JOIN world_clubs cl ON cl.club_id=e.club_id
+            WHERE e.dataset_id=? AND cl.name LIKE 'West Ham United%'
+            LIMIT 1""",(DATASET,)).fetchone()
+        kane=db.execute("""SELECT p.player_id,c.tier,r.overall
+            FROM world_players p
+            JOIN world_dataset_ratings r ON r.player_id=p.player_id
+                AND r.dataset_id=?
+            JOIN world_dataset_rosters ro ON ro.player_id=p.player_id
+                AND ro.dataset_id=r.dataset_id
+            JOIN world_dataset_entries e ON e.club_id=ro.club_id
+                AND e.dataset_id=r.dataset_id
+            JOIN world_competitions c ON c.competition_id=e.competition_id
+            WHERE p.full_name='Harry Kane'""",(DATASET,)).fetchone()
+        check(west is not None and west["tier"]==2,
+              "2026/27 source must register West Ham as Championship (tier 2)")
+        check(kane is not None and kane["tier"]==1
+              and kane["overall"]>=79,
+              "2026/27 source must register Harry Kane as a top-flight elite player")
+        original=db.execute("""SELECT manager_club_id FROM world_career_saves
+            WHERE career_id=?""",(CAREER,)).fetchone()[0]
+        try:
+            db.execute("""UPDATE world_career_saves SET manager_club_id=?
+                WHERE career_id=?""",(west["club_id"],CAREER))
+            db.commit()
+            unrestricted=scouting_search(db,career_id=CAREER,query="Harry Kane",
+                                          limit=30)
+            filtered=scouting_search(db,career_id=CAREER,query="Harry Kane",
+                                     interested_only=True,limit=30)
+            check(any(p["player_id"]==kane["player_id"] for p in unrestricted),
+                  "Unrestricted scouting unexpectedly hides Harry Kane")
+            check(not any(p["player_id"]==kane["player_id"] for p in filtered),
+                  "Championship West Ham incorrectly attracts top-flight Harry Kane")
+            check(scouting_search(db,career_id=CAREER,interested_only=True,
+                                  limit=3),
+                  "Interest filter should still find viable targets, not remove everyone")
+        finally:
+            db.execute("""UPDATE world_career_saves SET manager_club_id=?
+                WHERE career_id=?""",(original,CAREER))
+            db.commit()
+
+
 def run(world,output):
     world=Path(world).resolve()
     output=Path(output).resolve()
     output.mkdir(parents=True,exist_ok=False)
     manager,coverage=inspect(world)
     boot_career(world,manager)
+    check_championship_move_interest(world)
     os.environ.update({
         "WORLD_MARKET_ACCESS_KEY":ACCESS,
         "WORLD_MARKET_COOKIE_SECRET":"isolated-real-chrome-only-fc27-qa-secret",
@@ -117,7 +172,9 @@ def run(world,output):
             found.append("Pre-start dashboard and single-window button")
 
             page.locator('button:has-text("Start 30-minute transfer window")').click()
-            page.wait_for_url("**/market?notice=**",timeout=25000)
+            page.wait_for_url("**/market",timeout=25000)
+            check(page.get_by_text("The 30-minute pre-season market has started").count()==0,
+                  "Redundant window-start notice must not appear on every tab")
             check(page.locator("body").get_attribute("data-window-state")=="open",
                   "Clicked Start but real Career Desk did not open")
             header=page.locator("#desk-header-clock")
