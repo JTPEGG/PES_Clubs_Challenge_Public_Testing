@@ -1749,6 +1749,22 @@ def create_play_blueprint(db_path):
     market_jobs={}
     market_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-market")
 
+    @bp.before_request
+    def measure_desk_start():
+        from flask import g
+        g.desk_request_started=perf_counter()
+
+    @bp.after_request
+    def measure_desk_finish(response):
+        from flask import g
+        elapsed=(perf_counter()-g.desk_request_started)*1000
+        response.headers["Server-Timing"]=f"desk;dur={elapsed:.1f}"
+        if elapsed>1500:
+            logging.getLogger(__name__).warning(
+                "Slow Career Desk request %s %s: %.0f ms",
+                request.method,request.path,elapsed)
+        return response
+
     def run_market_tick(career_id):
         started=perf_counter()
         try:
