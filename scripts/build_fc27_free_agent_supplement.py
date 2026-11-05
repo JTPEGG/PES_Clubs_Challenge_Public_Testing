@@ -31,20 +31,23 @@ def family(pos):
     return "FWD"
 def bound(value,lo=1,hi=99):
     return min(hi,max(lo,int(round(value))))
-def records_from_pages():
+def records_from_pages(pages_dir=None):
     records={}
     for page in range(1,9):
         url=SOURCE+("?page="+str(page) if page>1 else "")
-        for attempt in range(4):
-            try:
-                req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0"})
-                with urllib.request.urlopen(req,timeout=25) as response:
-                    page_html=response.read()
-                break
-            except Exception:
-                if attempt==3:raise
-                import time
-                time.sleep(1+attempt*2)
+        if pages_dir:
+            page_html=(Path(pages_dir)/f"page{page}.html").read_bytes()
+        else:
+            for attempt in range(4):
+                try:
+                    req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0"})
+                    with urllib.request.urlopen(req,timeout=25) as response:
+                        page_html=response.read()
+                    break
+                except Exception:
+                    if attempt==3:raise
+                    import time
+                    time.sleep(1+attempt*2)
         document=BeautifulSoup(page_html,"html.parser")
         for tr in document.select("tr.player-row"):
             link=tr.select_one('a[href^="/player/"]')
@@ -79,11 +82,11 @@ def records_from_pages():
         raise ValueError("Public FC27 free-agent source changed: "+str(len(records)))
     return records
 
-def build(original_path,warehouse_path,output_path):
+def build(original_path,warehouse_path,output_path,pages_dir=None):
     source=sqlite3.connect(original_path)
     warehouse=sqlite3.connect(warehouse_path)
     source.row_factory=sqlite3.Row
-    records=records_from_pages()
+    records=records_from_pages(pages_dir)
     active_ids={str(x[0]) for x in warehouse.execute(
         "SELECT source_player_id FROM wh_fc27_players WHERE edition=2027")}
     historical={}
@@ -175,5 +178,6 @@ if __name__=="__main__":
     p.add_argument("--original",required=True)
     p.add_argument("--warehouse",required=True)
     p.add_argument("--output",required=True)
+    p.add_argument("--pages-dir")
     args=p.parse_args()
-    build(args.original,args.warehouse,args.output)
+    build(args.original,args.warehouse,args.output,args.pages_dir)
