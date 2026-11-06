@@ -203,6 +203,75 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
  .desk-view .grid{grid-template-columns:minmax(0,1fr)}
  .desk-view input[type=number]{width:132px}
 }
+
+/* Squad controls: one calm, fixed-height row; player instructions separate. */
+.desk-squad-switch{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0 15px}
+.desk-squad-switch button{padding:9px 17px;background:#182a3d;border:1px solid #36536e;border-radius:7px;color:#bad3e5;font-size:13px;font-weight:730;cursor:pointer}
+.desk-squad-switch button[aria-pressed="true"]{background:#205878;border-color:#69c5e5;color:white}
+.desk-squad-count{margin-left:auto;font-size:12px;color:#97b4c8}
+.desk-view .desk-compact-squad{padding:11px 13px;margin:0}
+.desk-compact-squad .scout-table{max-height:none!important;overflow:auto}
+.desk-compact-squad table{margin:0!important;min-width:860px!important;table-layout:auto;border-collapse:collapse}
+.desk-compact-squad thead th{position:sticky;top:0;z-index:2;text-align:left}
+.desk-compact-squad td,.desk-compact-squad th{padding:5px 8px!important;line-height:1.18!important;white-space:nowrap!important;vertical-align:middle!important;height:37px}
+.desk-compact-squad .desk-table-filter-row th{height:31px}
+.desk-compact-squad .desk-squad-name{min-width:180px;max-width:300px;font-weight:680}
+.desk-compact-squad .desk-squad-name a{text-decoration:none;color:#eef8ff}
+.desk-compact-squad .desk-squad-name a:hover{text-decoration:underline}
+.desk-compact-squad .desk-squad-arrival,.desk-compact-squad .desk-squad-request{font-size:10px;margin-left:6px;border:1px solid #397d86;border-radius:5px;padding:2px 5px;color:#b5e8d9;font-weight:700}
+.desk-compact-squad .desk-squad-request{border-color:#9b714a;color:#f8cf9b}
+.desk-compact-squad td select{width:136px!important;max-width:136px!important;height:27px;padding:3px 6px!important;font-size:11px!important;border-radius:5px}
+.desk-compact-squad .desk-squad-listed label{display:inline-flex!important;align-items:center;gap:7px;margin:0!important;white-space:nowrap}
+.desk-compact-squad .desk-squad-listed input{width:15px;height:15px;accent-color:#68cbdf;padding:0}
+.desk-compact-squad .desk-squad-actions form{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;margin:0;padding:0}
+.desk-compact-squad .desk-squad-actions button{font-size:11px!important;padding:5px 9px!important;line-height:1.2!important;white-space:nowrap;border-radius:5px}
+.desk-compact-squad .desk-squad-offer{background:#183b52;border-color:#437a94}
+.desk-squad-extras{margin:8px 4px 0;color:#b3cade;font-size:13px}
+.desk-squad-extras summary{cursor:pointer;padding:8px 0}
+.desk-squad-notice{padding:7px 12px;margin:4px 0;color:#b9eccc;font-size:12px}
+.desk-tactics-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#15283c;border:1px solid #334c65;border-radius:10px;padding:13px 15px;margin-bottom:14px}
+.desk-tactics-toolbar label{display:flex;align-items:center;gap:9px;margin:0;color:#cbdbe8;font-size:13px;font-weight:720}
+.desk-tactics-toolbar select{padding:7px 10px;font-size:13px}
+.desk-tactics-toolbar .muted{font-size:11px;flex:1 1 200px}
+.desk-tactics-toolbar button{padding:8px 13px;border-radius:7px;font-size:12px;font-weight:750}
+.desk-tactics-toolbar [data-tactics-save]{background:#2780a8;border-color:#4bb7d7}
+.desk-tactics-save-status{min-width:80px;color:#a9ddce;font-size:12px}
+.desk-tactics-layout{display:grid;grid-template-columns:minmax(390px,1.5fr) minmax(245px,1fr);gap:16px;align-items:start}
+.desk-pitch-wrap{border:1px solid #375266;border-radius:12px;padding:12px;background:#13243a;min-width:0}
+.desk-pitch{position:relative;aspect-ratio:1.2 / 1;max-height:650px;border-radius:6px;overflow:hidden;background:repeating-linear-gradient(to bottom,#194d40 0%,#194d40 12.5%,#215845 12.5%,#215845 25%);border:2px solid #60977c;touch-action:pan-y}
+.desk-pitch-boundary{position:absolute;inset:5%;border:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-midline{position:absolute;left:5%;right:5%;top:50%;border-top:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-circle{position:absolute;left:41%;top:39%;width:18%;aspect-ratio:1;border:1.5px solid #b5d5b7a6;border-radius:100%;pointer-events:none}
+.desk-pitch-box{position:absolute;left:25%;width:50%;height:17%;border:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-box-top{top:5%}.desk-pitch-box-bottom{bottom:5%}
+.desk-pitch-goal{position:absolute;left:40%;width:20%;height:4%;border:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-goal-top{top:1%}.desk-pitch-goal-bottom{bottom:1%}
+.desk-pitch-spot{position:absolute;left:49.5%;width:1%;aspect-ratio:1;border-radius:50%;background:#b5d5b7;pointer-events:none}
+.desk-pitch-spot-top{top:15%}.desk-pitch-spot-bottom{bottom:15%}
+.desk-pitch [data-pitch-players]{position:absolute;inset:0;pointer-events:none}
+.desk-pitch-token{position:absolute;transform:translate(-50%,-50%);width:110px;max-width:21%;display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent!important;border:0!important;padding:2px!important;color:white;cursor:grab;pointer-events:auto;touch-action:none;z-index:4}
+.desk-pitch-token:active{cursor:grabbing}
+.desk-pitch-token .desk-player-disc{display:grid;place-items:center;width:31px;height:31px;flex:none;border-radius:50%;background:#112878;border:2px solid #eac746;box-shadow:0 2px 9px #06131f9c;color:#fff5b0;font-size:12px;font-weight:850}
+.desk-pitch-token .desk-player-name{max-width:100%;font-size:10px;line-height:1.2;font-weight:750;text-shadow:0 2px 4px #07190e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:white}
+.desk-pitch-token .desk-player-position{font-size:9px;color:#e5f3dd}
+.desk-pitch-token[data-selected="true"] .desk-player-disc{border-color:white;box-shadow:0 0 0 4px #8ce9cf88}
+.desk-pitch-caption{margin:10px 2px 0;text-align:center;font-size:12px;color:#b6cfdf;font-weight:750}
+.desk-tactics-roster{display:grid;gap:12px;min-width:0}
+.desk-tactics-group{background:#15293e;border:1px solid #37536d;border-radius:10px;min-width:0;overflow:hidden}
+.desk-tactics-group>header{position:static;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#203a53;padding:12px 13px;font-size:13px;border-bottom:1px solid #3c5b70}
+.desk-tactics-group header span{color:#98c7d4;font-size:12px}
+.desk-tactics-player-list{padding:9px;min-height:70px;display:grid;gap:5px}
+.desk-tactics-player{display:flex;gap:8px;align-items:center;background:#1c354b;border:1px solid #35536c;border-radius:7px;padding:6px 7px;min-width:0;cursor:grab}
+.desk-tactics-player[data-selected="true"]{border-color:#94e2d2;background:#264c5e}
+.desk-tactics-player strong{font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desk-tactics-player .desk-tactics-pos{font-size:10px;color:#aacfe2;min-width:30px}
+.desk-tactics-player .desk-tactics-ovr{font-size:12px;color:#a9e8c4;font-variant-numeric:tabular-nums}
+.desk-tactics-player select{max-width:87px;font-size:10px;padding:4px 3px;border-radius:4px}
+.desk-tactics-group .desk-drop-action{display:block;margin:0 9px 9px;padding:6px 9px;background:#1b4559;border:1px dashed #5b8aa3;font-size:11px;color:#d3eaf3}
+.desk-tactics-hint{font-size:12px;color:#9eb6c6;line-height:1.5;margin:12px 0 0}
+@media(max-width:930px){.desk-tactics-layout{grid-template-columns:minmax(0,1fr)}.desk-pitch-wrap{max-width:680px;margin:0 auto;width:100%}.desk-tactics-roster{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.desk-tactics-roster{grid-template-columns:1fr}.desk-tactics-toolbar{gap:8px}.desk-pitch-token{width:81px}.desk-pitch-token .desk-player-name{font-size:9px}.desk-pitch-token .desk-player-disc{width:27px;height:27px;font-size:11px}}
+
 """
 
 DASHBOARD_JS = r"""
