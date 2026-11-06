@@ -1189,8 +1189,10 @@ DASHBOARD_JS = r"""
   const squadNotice=squadPanel.querySelector('[data-squad-list-feedback]');
   squadPanel.addEventListener('submit',async function(event){
     const form=event.target;
+    // An input/button named "action" shadows HTMLFormElement.action.
+    // Use the literal URL attribute, as with the free-agent forms.
     if(!(form instanceof HTMLFormElement)||
-       !form.action.endsWith('/market/squad/decision'))return;
+       !(form.getAttribute('action')||'').endsWith('/market/squad/decision'))return;
     const submit=event.submitter;
     if(!submit||submit.name!=='action')return;
     event.preventDefault();
@@ -1206,7 +1208,7 @@ DASHBOARD_JS = r"""
       squadNotice.style.color='#b9eccc';
     }
     try{
-      const res=await fetch(form.action,{method:'POST',body:data,
+      const res=await fetch(form.getAttribute('action'),{method:'POST',body:data,
         credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'});
       const result=await res.json().catch(()=>null);
       if(!res.ok||!result?.ok)throw new Error(result?.error||'Squad instruction was not saved');
