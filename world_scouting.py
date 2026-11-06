@@ -51,6 +51,17 @@ def _remember_interest(key,ids):
         while len(_INTEREST_CACHE)>6:
             _INTEREST_CACHE.popitem(last=False)
 
+def invalidate_scout_for_career(career_id):
+    """After registration changes, cached free-agent rows are no longer valid."""
+    with _SCOUT_CACHE_LOCK:
+        for key in list(_SCOUT_CACHE):
+            if key[0]==career_id:
+                _SCOUT_CACHE.pop(key,None)
+    with _INTEREST_LOCK:
+        for key in list(_INTEREST_CACHE):
+            if key[0]==career_id:
+                _INTEREST_CACHE.pop(key,None)
+
 def interest_cache_ready(career_id):
     with _INTEREST_LOCK:
         return any(k[0]==career_id and monotonic()-v[0]<_INTEREST_TTL
@@ -116,7 +127,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     attribute="", min_attribute=None, contract="",
                     squad_only=False, limit=80, sort_by='overall', descending=True,
                     shortlist_only=False, offset=0, with_total=False,
-                    max_market_value=None, interested_only=False):
+                    max_market_value=None, interested_only=False,
+                    free_only=False):
     from world_ai_bidding import position_family
     save=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=? AND state='sandbox'""",
@@ -138,6 +150,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     max_market_value=(max(0,int(max_market_value))
         if max_market_value is not None else None)
     interested_only=bool(interested_only)
+    free_only=bool(free_only)
     if sort_by not in SORT_COLUMNS:sort_by='overall'
     initialise_scouting(conn)
     saved_ids={r[0] for r in conn.execute('SELECT player_id FROM world_career_scout_shortlist WHERE career_id=?',(career_id,)).fetchall()}
@@ -225,6 +238,38 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             ORDER BY x.overall DESC,p.full_name,r.player_id""",
             ("PES2020V2:"+attribute if attribute else "",
              dataset,dataset,career_id,0,manager,"","%")).fetchall()
+            # Unattached players are NOT fictional 660th-club registrations.
+            # Supplement entries have no club or transfer fee and are
+            # excluded once registered to a club in this career.
+            if (has_projection and conn.execute("""SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='world_fc27_free_agent_pool'""").fetchone()
+                and conn.execute("""SELECT 1 FROM world_fc27_free_agent_pool
+                    WHERE dataset_id=? LIMIT 1""",(dataset,)).fetchone()):
+                free_rows=conn.execute("""SELECT fa.player_id,
+                    NULL AS club_id,'Free agent' AS club_name,
+                    p.full_name,p.birth_date,p.primary_position,
+                    x.overall,
+                    cat.pace,cat.shooting,cat.passing,cat.dribbling,
+                    cat.defending,cat.physicality,
+                    NULL AS expires,
+                    fa.reference_weekly_wage_gbp AS current_wage,
+                    detail.value AS detail_attribute
+                    FROM world_fc27_free_agent_pool fa
+                    JOIN world_players p ON p.player_id=fa.player_id
+                    JOIN world_dataset_ratings x
+                      ON x.player_id=fa.player_id AND x.dataset_id=fa.dataset_id
+                    LEFT JOIN world_fc27_scout_categories cat
+                      ON cat.player_id=fa.player_id
+                    LEFT JOIN world_dataset_extended_attributes detail
+                      ON detail.dataset_id=fa.dataset_id
+                      AND detail.player_id=fa.player_id AND detail.attribute=?
+                    WHERE fa.dataset_id=?
+                    AND NOT EXISTS(SELECT 1 FROM world_career_registrations r
+                       WHERE r.career_id=? AND r.player_id=fa.player_id)
+                    ORDER BY x.overall DESC,p.full_name""",
+                    ("PES2020V2:"+attribute if attribute else "",
+                    dataset,career_id)).fetchall()
+                rows=list(rows)+free_rows
             _remember_scout_rows(base_key,rows)
     else:
         # Older datasets preserve their own documented source-backed fields.
@@ -294,7 +339,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         ranks=defaultdict(int)
         goalie_ranks=defaultdict(int)
         roles={}
-        for player in sorted(rows,key=lambda r:(r["club_id"],-r["overall"],r["player_id"])):
+        for player in sorted(rows,key=lambda r:(r["club_id"] or -1,-r["overall"],r["player_id"])):
             club=player["club_id"]
             rank=ranks[club]
             ranks[club]+=1
@@ -315,6 +360,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     anchor=date.fromisoformat(asof)
     for r in rows:
         d=dict(r)
+        d["free_agent"]=(d["club_id"] is None)
+        if free_only and not d["free_agent"]:continue
         if q and q not in d["full_name"].lower():continue
         if squad_only and d["club_id"]!=manager:continue
         d["shortlisted"]=d["player_id"] in saved_ids
@@ -348,13 +395,28 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             if d["player_id"] not in cached_interest:continue
         elif interested_only and not d["owned"] and interest_context is not None:
             profiles,prestige,changes,roles,next_summer,evaluate,club_tiers=interest_context
-            seller=profiles.get(d["club_id"])
+            if d["free_agent"]:
+                # No seller exists. The availability screen estimates
+                # willingness using the player's source OVR and sporting
+                # stature of the prospective club; salary/role remain
+                # subject to actual agent negotiation.
+                buyer=profiles.get(manager)
+                if not buyer:continue
+                reference=max(40,min(92,round(35+max(0,d["overall"]-61)*2)))
+                if buyer["sporting_appeal"]+28<reference:continue
+                # Don't fabricate a selling club for unattached players.
+                continue_free_agent=True
+            else:
+                continue_free_agent=False
+            seller=profiles.get(d["club_id"]) if not continue_free_agent else profiles.get(manager)
             buyer=profiles.get(manager)
             buyer_tier=club_tiers.get(manager)
-            seller_tier=club_tiers.get(d["club_id"])
+            seller_tier=club_tiers.get(d["club_id"]) if not continue_free_agent else buyer_tier
             changed=changes.get(d["player_id"])
-            current_role=changed[2] if changed else roles.get(d["player_id"],"unknown")
+            current_role=changed[2] if changed else (
+                "fringe" if continue_free_agent else roles.get(d["player_id"],"unknown"))
             listed=(bool(changed[3]) if changed else
+                    True if continue_free_agent else
                     current_role=="fringe" and bool(d["expires"])
                     and d["expires"]<=next_summer)
             renewal=(changed[4] if changed else
@@ -378,6 +440,11 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                 allow_unknown_europe_neutral=True)
             if not choice["can_negotiate"]:
                 continue
+        if d["free_agent"]:
+            d["market_value"]=0
+            if max_market_value is not None and max_market_value<0:continue
+            out.append(d)
+            continue
         if require_values:
             baseline=model_value(d["overall"],age_on(d["birth_date"],source_date),
                                  d["primary_position"])
@@ -406,7 +473,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         and not q and not position and min_overall is None and max_age is None
         and not category and min_category is None
         and not attribute and min_attribute is None and not contract
-        and not squad_only and not shortlist_only and max_market_value is None):
+        and not squad_only and not shortlist_only and not free_only
+        and max_market_value is None):
         _remember_interest(interest_key,(d["player_id"] for d in out))
     total=len(out)
     offset=max(0,int(offset))
@@ -414,6 +482,9 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     page=out[offset:offset+limit]
     if sort_by!="market_value":
         for d in page:
+            if d["free_agent"]:
+                d["market_value"]=0
+                continue
             if dataset=="fc27-warehouse-659-mens-2026-27":
                 baseline=model_value(
                     d["overall"],age_on(d["birth_date"],source_date),
@@ -450,7 +521,10 @@ def set_shortlisted(conn,*,career_id,player_id,save):
         JOIN world_career_saves c ON c.career_id=r.career_id
         WHERE r.career_id=? AND r.player_id=? AND c.state='sandbox'""",
         (career_id,player_id)).fetchone()
-    if player is None:raise ValueError("Player not found in this career")
+    if player is None:
+        from world_fc27_free_agents import pool_player
+        if pool_player(conn,career_id,player_id) is None:
+            raise ValueError("Player not found in this career")
     if save:
         conn.execute("""INSERT OR IGNORE INTO world_career_scout_shortlist
             (career_id,player_id) VALUES(?,?)""",(career_id,player_id))
@@ -465,7 +539,11 @@ def player_profile(conn,*,career_id,player_id):
         JOIN world_career_registrations r ON r.player_id=p.player_id
         WHERE r.career_id=? AND p.player_id=?""",
         (career_id,player_id)).fetchone()
-    if name is None:raise ValueError("Player not registered in this career")
+    if name is None:
+        from world_fc27_free_agents import pool_player
+        free=pool_player(conn,career_id,player_id)
+        if free is None:raise ValueError("Player not registered or available in this career")
+        name=(free["full_name"],)
     result=scouting_search(conn,career_id=career_id,limit=100,
                            query=name[0],sort_by="overall")
     info=next((row for row in result if row["player_id"]==player_id),None)
@@ -490,6 +568,12 @@ def player_profile(conn,*,career_id,player_id):
         else:
             info["source_game_wage"]=None
             info["contract_source"]=None
+        if info["free_agent"]:
+            from world_fc27_free_agents import pool_player
+            free=pool_player(conn,career_id,player_id)
+            if free:
+                info["source_game_wage"]=free["reference_weekly_wage_gbp"]
+                info["contract_source"]=free["ratings_provenance"]
         info["wage_guidance"]=info["source_game_wage"]
     else:
         info["attributes"]=[dict(name=r[0],value=r[1]) for r in conn.execute("""

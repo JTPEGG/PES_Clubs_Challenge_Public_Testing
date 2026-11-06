@@ -926,6 +926,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label>Maximum market value (£)<br><input name="scout_max_value" type="number" min="0" step="100000" value="{{scout_max_value}}" placeholder="No limit" style="width:160px"></label>
 <button type="button" data-scout-budget>Use available budget</button>
 <label><input type="checkbox" name="scout_interest" value="1" {% if scout_interest %}checked{% endif %}> Would consider a move</label>
+<label><input type="checkbox" name="scout_free_only" value="1" {% if scout_free_only %}checked{% endif %}> Free agents only (£0 fee)</label>
 <label>Category<br><select name="scout_category"><option value="">Any</option>
 {% for cat in scout_categories %}<option value="{{cat}}" {% if scout_category==cat %}selected{% endif %}>{{cat|title}}</option>{% endfor %}</select></label>
 <label>Min category<br><input type="number" name="scout_min_category" min="1" max="99" value="{{scout_min_category}}" style="width:80px"></label>
@@ -956,8 +957,8 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <tr class="{{'owned' if p.owned else ''}}">
 <td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
-<td>{{money(p.market_value) if p.market_value is not none else '—'}}</td>
-<td>{{p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
+<td>{{'FREE' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
+<td>{{'Unattached' if p.free_agent else p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
 <td>{{p.pace if p.pace is not none else '—'}}</td>
 <td>{{p.shooting if p.shooting is not none else '—'}}</td>
 <td>{{p.passing if p.passing is not none else '—'}}</td>
@@ -1087,6 +1088,22 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 </div>{% endif %}
 </div>{% endfor %}</div>
 {% endif %}
+{% endif %}
+{% if free_signings %}
+<h2 id="free-signings">Free-agent contract negotiations</h2>
+<div class="scout-table"><table>
+<thead><tr><th>Player</th><th>Transfer fee</th><th>Weekly wage</th>
+<th>Contract</th><th>Status</th></tr></thead>
+<tbody>{% for s in free_signings %}
+<tr><td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
+<td><strong>FREE — £0</strong></td>
+<td>{{money(s.proposed_weekly_wage_gbp)}} / wk</td>
+<td>{{s.contract_years}} years</td>
+<td>{{'Signed — registers at deadline' if s.status=='agreed_future'
+else 'Registered' if s.status=='completed'
+else 'Awaiting your confirmation' if s.status=='terms_accepted'
+else 'Agent counteroffer' if s.status=='countered' else 'Cancelled'}}</td>
+</tr>{% endfor %}</tbody></table></div>
 {% endif %}
 <h2 id="inbox">Manager's Inbox</h2>
 <div id="desk-live-offer-stream" class="desk-live-offer-stream" hidden
@@ -1462,9 +1479,9 @@ table{width:100%;border-collapse:collapse}td{padding:8px;border-bottom:1px solid
 Age {{player.age if player.age is not none else 'unknown'}}</p>
 <div class="grid">
 <div class="card">Overall<br><b>{{player.overall}}</b></div>
-<div class="card">Indicative market value<br><b>{{money(player.market_value) if player.market_value is not none else 'Unknown'}}</b></div>
+<div class="card">Transfer fee<br><b>{{'FREE — £0' if player.free_agent else money(player.market_value) if player.market_value is not none else 'Unknown'}}</b></div>
 <div class="card">Estimated weekly wage expectation<br><b>{{money(player.wage_guidance)}}/week</b></div>
-<div class="card">Contract expires<br><b>{{player.expires or 'Unknown'}}</b>
+<div class="card">Contract expires<br><b>{{'Unattached' if player.free_agent else player.expires or 'Unknown'}}</b>
 <p class="muted">Years remaining: {{player.years_left if player.years_left is not none else 'Unknown'}}</p></div>
 </div>
 <p class="muted">Transfer valuation and wage expectation are fictional game-model estimates, not actual demands.
@@ -1475,9 +1492,85 @@ Contract dates appear only where sourced.</p>
 <button name="action" value="{{'remove' if player.shortlisted else 'save'}}">
 {{'Remove from shortlist' if player.shortlisted else 'Add to shortlist'}}</button></form>
 {% if not player.owned %}
-<h2>Approach to buy</h2>
+<h2>{{'Free-agent contract negotiation' if player.free_agent else 'Approach to buy'}}</h2>
 <div class="card">
 {% if market_open %}
+{% if player.free_agent %}
+<p><strong>Transfer fee: £0</strong> — negotiate directly with the player and agent.
+ No selling-club payment is required. The squad role and weekly wage still matter.</p>
+<p class="muted">Agent wage guidance: {{money(player.wage_guidance)}} per week.
+ This is a modelled FC27 game value; {{player.contract_source}}.</p>
+<form id="fa-contract" data-fa-action method="post"
+ action="/world/play/career/{{career_id}}/market/free-agent"
+ {% if free_offer and free_offer.status in ['agreed_future','completed'] %}hidden{% endif %}>
+<input type="hidden" name="csrf" value="{{csrf}}">
+<input type="hidden" name="player_id" value="{{player.player_id}}">
+<input type="hidden" name="action" value="offer">
+<label>Proposed wage (£ / week)
+<input name="weekly_wage" type="number" min="0" max="1000000" step="1"
+ value="{{free_offer.required_weekly_wage_gbp if free_offer and free_offer.status=='countered' else player.wage_guidance or 1000}}" required></label>
+<label>Contract years <select name="contract_years">
+{% for years in [1,2,3,4,5] %}<option value="{{years}}" {% if years==3 %}selected{% endif %}>{{years}}</option>{% endfor %}
+</select></label>
+<label>Squad role <select name="role_promise">
+<option value="regular_starter">Regular Starter</option>
+<option value="key_player">Key Player</option>
+<option value="rotation">Rotation</option>
+<option value="fringe">Fringe</option>
+</select></label>
+<button type="submit">Offer contract terms</button>
+</form>
+<form id="fa-confirm" data-fa-action method="post"
+ action="/world/play/career/{{career_id}}/market/free-agent"
+ {% if not free_offer or free_offer.status!='terms_accepted' %}hidden{% endif %}>
+<input type="hidden" name="csrf" value="{{csrf}}">
+<input type="hidden" name="player_id" value="{{player.player_id}}">
+<input type="hidden" name="action" value="confirm">
+<button type="submit">Confirm free-agent signing</button>
+</form>
+<p id="fa-status" role="status">{{free_offer.agent_reason if free_offer else 'No contract proposal submitted yet.'}}</p>
+{% if free_offer and free_offer.status in ['agreed_future','completed'] %}
+<p><strong>Signing agreed:</strong> {{'Registers at the deadline' if free_offer.status=='agreed_future' else 'Registered in your squad'}}.</p>
+{% endif %}
+<script>
+(function(){
+ const host=document.getElementById('fa-contract');
+ const confirm=document.getElementById('fa-confirm');
+ const status=document.getElementById('fa-status');
+ for(const form of [host,confirm]){
+   form.addEventListener('submit',async function(e){
+     e.preventDefault();
+     if(form.dataset.busy==='1')return;
+     const button=form.querySelector('button[type=submit]');
+     form.dataset.busy='1';button.disabled=true;
+     status.textContent='Checking player and agent response…';
+     try{
+       // The hidden input named "action" shadows HTMLFormElement.action
+       // in some browsers. Read the literal URL attribute to avoid a
+       // failed client-side request with no server POST.
+       const response=await fetch(form.getAttribute('action'),{method:'POST',
+         body:new FormData(form),credentials:'same-origin',
+         headers:{Accept:'application/json'},cache:'no-store'});
+       const payload=await response.json().catch(()=>null);
+       if(!response.ok||!payload?.ok)
+         throw new Error(payload?.error||'Signing could not be saved');
+       status.textContent=payload.message;
+       status.style.color='#aee5d7';
+       if(payload.status==='countered' && payload.required_weekly_wage_gbp)
+         host.elements.weekly_wage.value=String(payload.required_weekly_wage_gbp);
+       if(payload.status==='terms_accepted')confirm.hidden=false;
+       if(payload.status==='agreed_future'){
+         host.hidden=true;confirm.hidden=true;
+       }
+     }catch(error){
+       status.style.color='#ffb7b0';
+       status.textContent=String(error.message||error);
+     }finally{form.dataset.busy='0';button.disabled=false}
+   });
+ }
+})();
+</script>
+{% else %}
 <p class="muted">Bid directly for this player. The selling club, player and agent make their own decisions. The indicative value is not a guaranteed asking price.</p>
 <form method="post" action="/world/play/career/{{career_id}}/market/buy" id="scout-buy">
 <input type="hidden" name="csrf" value="{{csrf}}">
@@ -1567,6 +1660,7 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
  });
 })();
 </script>
+{% endif %}
 {% else %}<p class="muted">The 30-minute market must be open before you can make a transfer offer. You can still shortlist the player.</p>{% endif %}
 </div>
 {% endif %}
@@ -1965,6 +2059,8 @@ def create_play_blueprint(db_path):
                         initialize_incoming_approaches(conn)
                         initialize_transfer_protocol(conn)
                         initialise_live_market(conn)
+                        from world_fc27_free_agents import initialize_free_agent_schema
+                        initialize_free_agent_schema(conn)
                         from world_reputation_v2 import initialize_pyramid
                         initialize_pyramid(conn)
                         conn.commit()
@@ -2371,6 +2467,14 @@ def create_play_blueprint(db_path):
         snap=window_snapshot(db,career_id=career_id)
         offers=[]
         messages=[]
+        free_signings=[]
+        if not spectator and db.execute("""SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='world_fc27_free_agent_offers'""").fetchone():
+            free_signings=db.execute("""SELECT f.*,p.full_name
+                FROM world_fc27_free_agent_offers f
+                JOIN world_players p ON p.player_id=f.player_id
+                WHERE f.career_id=? ORDER BY f.signing_id DESC""",
+                (career_id,)).fetchall()
         unread=0
         signed=0
         purchases=[]
@@ -2390,6 +2494,7 @@ def create_play_blueprint(db_path):
         scout_contract=request.args.get("scout_contract","") if not spectator else ""
         scout_max_value=filter_value("scout_max_value")
         scout_interest=request.args.get("scout_interest")=="1" if not spectator else False
+        scout_free_only=request.args.get("scout_free_only")=="1" if not spectator else False
         scout_squad=request.args.get("scout_squad")=="1" if not spectator else False
         scout_sort=request.args.get("scout_sort","overall")
         if scout_sort not in SORT_COLUMNS:scout_sort="overall"
@@ -2416,7 +2521,7 @@ def create_play_blueprint(db_path):
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
             max_market_value=scout_max_value,interested_only=scout_interest,
-            descending=scout_order=="desc",shortlist_only=scout_shortlist,
+            free_only=scout_free_only,descending=scout_order=="desc",shortlist_only=scout_shortlist,
             limit=scout_page_size,offset=(scout_page-1)*scout_page_size,
             with_total=True) if not spectator else ([],0))
         scout_pages=max(1,(scout_total+scout_page_size-1)//scout_page_size)
@@ -2606,6 +2711,7 @@ def create_play_blueprint(db_path):
             scout_max_value=scout_max_value if scout_max_value is not None else "",
             scout_interest=scout_interest,scout_squad=scout_squad,scout_sort=scout_sort,
             scout_order=scout_order,scout_shortlist=scout_shortlist,
+            scout_free_only=scout_free_only,free_signings=free_signings,
             summary=summary,season_tasks=season_tasks,
             player_morale=morale,season_exclusions=excluded,
             money=format_market_gbp,
@@ -2668,9 +2774,45 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         response=make_response(render_template_string(SCOUT_PLAYER_PAGE,
             player=player,career_id=career_id,csrf=csrf_value(),money=format_market_gbp,
             market_open=market_open,funds=funds,
+            free_offer=(db.execute("""SELECT * FROM world_fc27_free_agent_offers
+                 WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
+                 if player["free_agent"] else None),
             request_key="manager-buy-v1-"+secrets.token_urlsafe(14)))
         response.headers["Cache-Control"]="private, no-store"
         return response
+
+    @bp.post("/world/play/career/<career_id>/market/free-agent")
+    def manager_free_agent(career_id):
+        """Fee-free player / agent negotiation; deadline-safe and CSRF-checked."""
+        check_write()
+        from world_fc27_free_agents import offer_free_agent
+        wants_json=request.accept_mimetypes.best=="application/json"
+        try:
+            action=request.form.get("action","offer")
+            player_id=int(request.form["player_id"])
+            with connect() as db:
+                result=offer_free_agent(db,career_id=career_id,
+                    player_id=player_id,
+                    weekly_wage=int(request.form.get("weekly_wage","0")),
+                    years=int(request.form.get("contract_years","3")),
+                    role=request.form.get("role_promise","regular_starter"),
+                    action=action)
+            if wants_json:
+                response=jsonify(ok=True,**result)
+                response.headers["Cache-Control"]="private, no-store"
+                return response
+            from urllib.parse import quote
+            return redirect("/world/play/career/"+career_id+
+                "/market/player/"+str(player_id)+"?notice="+
+                quote(result["message"]))
+        except (ValueError,KeyError,sqlite3.Error) as exc:
+            if wants_json:
+                response=jsonify(ok=False,error=str(exc)[:260])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
+            from urllib.parse import quote
+            return redirect("/world/play/career/"+career_id+
+                "/market?error="+quote(str(exc)[:260])+"#scouting")
 
     @bp.post("/world/play/career/<career_id>/market/shortlist")
     def scout_shortlist(career_id):
@@ -2723,6 +2865,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     descending=request.args.get("scout_order","desc")!="asc",
                     max_market_value=positive_number("scout_max_value"),
                     interested_only=request.args.get("scout_interest")=="1",
+                    free_only=request.args.get("scout_free_only")=="1",
                     limit=page_size,offset=(page-1)*page_size,
                     with_total=True)
             except ValueError as exc:
@@ -2888,7 +3031,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             "completed":"Registered for season","withdrawn":"Withdrawn"}
         item=dict(row,status_label=status_labels.get(row["status"],row["status"]))
         before='<div class="grid">{% for o in purchases %}\n'
-        after='</div>{% endfor %}</div>\n{% endif %}\n{% endif %}\n<h2 id="inbox">'
+        after='</div>{% endfor %}</div>\n{% endif %}\n{% endif %}'
         fragment=LIVE_MARKET_PAGE.split(before,1)[1].split(after,1)[0]+'</div>'
         card_html=render_template_string(fragment,o=item,spectator=False,
             snap=snap,career_id=career_id,csrf=csrf_value(),

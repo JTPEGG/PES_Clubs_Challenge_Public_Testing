@@ -527,6 +527,12 @@ def wage_budget_breakdown(conn, career_id, club_id):
         FROM world_career_offers
         WHERE career_id=? AND buying_club_id=? AND status='agreed_future'""",
         (career_id,club_id))[0]
+    if conn.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='world_fc27_free_agent_offers'""").fetchone():
+        future+=_one(conn,"""SELECT COALESCE(SUM(proposed_weekly_wage_gbp),0)
+           FROM world_fc27_free_agent_offers
+           WHERE career_id=? AND buying_club_id=? AND status='agreed_future'""",
+           (career_id,club_id))[0]
     total, committed = row
     return {
         "total": total,

@@ -285,6 +285,13 @@ def finalise_preseason_window(conn, *, career_id, season_index=1, now=None):
         # deadline; none may collide with a signed permanent transfer.
         from world_career_lifecycle import activate_agreed_loans
         activate_agreed_loans(conn,career_id=career_id,effective_date=c[0])
+        # Real unattached players have no selling club and no transfer fee.
+        # Register them under the SAME final atomic deadline transaction.
+        if conn.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+             AND name='world_fc27_free_agent_offers'""").fetchone():
+            from world_fc27_free_agents import finalise_signed_free_agents
+            finalise_signed_free_agents(conn,career_id=career_id,
+                                        effective_date=c[0])
         conn.execute("""UPDATE world_career_preseason_windows
             SET status='closed',closed_at=? WHERE window_id=? AND status='open'""",
             (_iso(t),snap["window_id"]))

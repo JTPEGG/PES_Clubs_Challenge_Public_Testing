@@ -1,0 +1,88 @@
+name: Build independent FC27 free-agent supplement
+on:
+  push:
+    paths:
+      - 'scripts/build_fc27_free_agent_supplement.py'
+      - '.github/workflows/fc27-free-agent-supplement-release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install source parser
+        run: pip install beautifulsoup4
+      - name: Fetch full historical FIFA source
+        uses: actions/download-artifact@v4
+        with:
+          name: PES-V2-MENS-22-EDITION-STARTING-WAGES-CONTRACTS-LOANS
+          run-id: 39423495384
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-history/
+      - name: Fetch approved FC27 frozen reference
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-POPULATED-UNIFIED-REFERENCE-WAREHOUSE-V1
+          run-id: 39616187183
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-fc27/
+      - name: Fetch pinned 212 free-agent listings from independent dated audit
+        uses: actions/download-artifact@v4
+        with:
+          name: FC27-FREE-AGENTS-HTML-SOURCE-QA
+          run-id: 42109913272
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-html/
+      - name: Build supplement and print source reconciliation
+        run: |
+          mkdir -p output
+          python -u -m scripts.build_fc27_free_agent_supplement \
+            --original source-history/PES_V2_MENS_22_EDITION_CONTRACTS_AND_LOANS.sqlite \
+            --warehouse source-fc27/FC27_UNIFIED_REFERENCE_WAREHOUSE_AI_DIMENSIONS_V2.sqlite \
+            --output output/FC27_FREE_AGENTS_ADDITIVE_V1.json.gz \
+            --pages-dir source-html/
+      - name: Validate PES source and Sancho provenance
+        run: |
+          python - <<'PY'
+          import gzip,json
+          from collections import Counter
+          with gzip.open('output/FC27_FREE_AGENTS_ADDITIVE_V1.json.gz','rt',encoding='utf-8') as f:
+            data=json.load(f)
+          players=data['players']
+          assert len(players)>=195,len(players)
+          assert len({p['source_id'] for p in players})==len(players)
+          sancho=[p for p in players if p['source_id']=='233049']
+          assert len(sancho)==1 and sancho[0]['name']=='Jadon Sancho'
+          assert len(sancho[0]['pes_attributes'])==29
+          assert all(len(p['pes_attributes'])==29 for p in players)
+          assert all(p['wage_game_gbp']>=0 for p in players)
+          print('FC27_FREE_AGENT_VALIDATED',len(players),Counter(p['ratings_provenance'] for p in players))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FC27-ADD-SOURCE-BACKED-FREE-AGENTS-V1
+          path: output/FC27_FREE_AGENTS_ADDITIVE_V1.json.gz
+          retention-days: 30
+      - name: Publish checksum-pinned isolated free-agent supplement
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd output
+          sha256sum FC27_FREE_AGENTS_ADDITIVE_V1.json.gz > FC27_FREE_AGENTS_ADDITIVE_V1.json.gz.sha256
+          if gh release view fc27-free-agents-2026-11-05-v1 >/dev/null 2>&1; then
+            echo 'Versioned supplement already published; refusing overwrite'
+          else
+            gh release create fc27-free-agents-2026-11-05-v1 \
+              FC27_FREE_AGENTS_ADDITIVE_V1.json.gz \
+              FC27_FREE_AGENTS_ADDITIVE_V1.json.gz.sha256 \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "FC27 separately sourced free-agent game supplement v1" \
+              --notes "Dated FC27 free agent game list; excluded Indian Super League players stay excluded. Jadon Sancho added from explicitly labelled FC26 source with all 29 PES ratings. 659-club starting rosters not modified."
+          fi
