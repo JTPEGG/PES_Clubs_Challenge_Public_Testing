@@ -439,19 +439,15 @@ DASHBOARD_JS = r"""
       const label=document.createElement('div');label.className='label';label.textContent=entry.name;
       const val=document.createElement('div');val.className='desk-finance-value';
       val.textContent=gbp(entry.remaining);
-      const sub=document.createElement('p');sub.className='muted';
-      sub.textContent=entry.suffix+' · '+gbp(entry.total)+' modelled allocation';
       const track=document.createElement('div');track.className='desk-finance-track';
       const fill=document.createElement('div');fill.className='desk-finance-fill';
       fill.style.width=Math.min(100,Math.max(0,entry.remaining/Math.max(1,entry.total)*100))+'%';
       track.appendChild(fill);
-      card.appendChild(label);card.appendChild(val);card.appendChild(track);card.appendChild(sub);
+      card.appendChild(label);card.appendChild(val);card.appendChild(track);
       grid.appendChild(card);
     });
     views.finances.appendChild(grid);
-    const caption=document.createElement('p');caption.className='muted';
-    caption.textContent='Figures include funds reserved for active negotiations and signed deals. Proposals are only indicative until agreed.';
-    views.finances.appendChild(caption);
+
   }else{
     views.finances.appendChild(emptyPanel(
       'Budget breakdown is not yet active',
