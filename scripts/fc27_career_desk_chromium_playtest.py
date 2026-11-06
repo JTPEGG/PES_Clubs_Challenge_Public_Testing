@@ -261,8 +261,62 @@ def run(world,output):
                 page.locator(f'.desk-sidebar [data-desk-tab="{name}"]').click()
                 check(page.locator(f'#desk-view-{name}').is_visible(),
                       "Clicked "+name+" but its panel is not visible")
-                check(page.locator('#desk-current-view').inner_text().strip(),
-                      "No navigation heading on "+name)
+                check(page.locator(f'#desk-view-{name}').get_attribute('aria-label'),
+                      "No accessible panel heading on "+name)
+            check(page.locator('.desk-intro').count()==0,
+                  "Repeated career title wastes space on every page")
+            page.locator('.desk-sidebar [data-desk-tab="squad"]').click()
+            check(page.locator('[data-squad-pane="list"]').is_visible(),
+                  "Compact squad list should be the default view")
+            row=page.locator('#desk-view-squad .desk-compact-squad tbody tr').first
+            check(row.locator('td').count()==7,
+                  "Squad status, transfer listing and actions must be separate columns")
+            check(row.locator('select[name="role"]').count()==1
+                  and row.locator('input[name="listed"]').count()==1
+                  and row.locator('button[value="update"]').count()==1,
+                  "Compact squad row has missing management controls")
+            original_url=page.url
+            with page.expect_response(
+                lambda response:response.url.endswith('/market/squad/decision')
+                    and response.request.method=='POST',timeout=15000
+            ) as squad_response:
+                row.locator('button[value="update"]').click()
+            check(squad_response.value.status==200 and squad_response.value.json().get('ok'),
+                  "Compact squad role/availability did not save")
+            check(page.url==original_url,
+                  "Updating a player's status unexpectedly reloaded the whole Career Desk")
+            page.locator('[data-squad-mode="tactics"]').click()
+            check(page.locator('[data-squad-pane="tactics"]').is_visible(),
+                  "Tactics board did not open")
+            check(page.locator('[data-pitch-players] .desk-pitch-token').count()==11,
+                  "Tactical pitch must start with 11 real players")
+            check(page.locator('[data-roster-list="bench"] .desk-tactics-player').count()==7,
+                  "Tactics view must have seven substitutes")
+            check(page.locator('[data-roster-list="reserves"] .desk-tactics-player').count()>=1,
+                  "Tactics view must display remaining reserves")
+            bench_player=page.locator('[data-roster-list="bench"] .desk-tactics-player').first
+            moving_id=bench_player.get_attribute('data-player-id')
+            bench_player.locator('select').select_option('xi')
+            check(page.locator('[data-pitch-players] .desk-pitch-token[data-player-id="'+moving_id+'"]').count()==1,
+                  "Bench player could not move into starting XI")
+            check(page.locator('[data-pitch-players] .desk-pitch-token').count()==11,
+                  "Moving a substitute created an invalid XI")
+            page.locator('[data-tactics-formation]').select_option('4-3-3')
+            with page.expect_response(
+                lambda response:response.url.endswith('/market/tactics/save')
+                    and response.request.method=='POST',timeout=18000
+            ) as tactics_response:
+                page.locator('[data-tactics-save]').click()
+            check(tactics_response.value.status==200
+                  and tactics_response.value.json().get('ok'),
+                  "Valid XI, substitutes and reserves were not saved")
+            page.reload(wait_until="domcontentloaded")
+            page.locator('.desk-sidebar [data-desk-tab="squad"]').click()
+            page.locator('[data-squad-mode="tactics"]').click()
+            check(page.locator('[data-tactics-formation]').input_value()=='4-3-3'
+                  and page.locator('[data-pitch-players] .desk-pitch-token[data-player-id="'+moving_id+'"]').count()==1,
+                  "Tactical plan not persisted across a full reload")
+            found.append("Compact one-line squad rows; role save without reload; 11-pitch, 7-subs, reserves and persisted player move")
             page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
             check(page.locator('form.scout-filters').is_visible(),
                   "Scouting form absent on full FC27 source")
