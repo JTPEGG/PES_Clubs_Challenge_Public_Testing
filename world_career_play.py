@@ -2108,6 +2108,8 @@ def create_play_blueprint(db_path):
                         initialise_live_market(conn)
                         from world_fc27_free_agents import initialize_free_agent_schema
                         initialize_free_agent_schema(conn)
+                        from world_career_tactics import initialize_tactics
+                        initialize_tactics(conn)
                         from world_reputation_v2 import initialize_pyramid
                         initialize_pyramid(conn)
                         conn.commit()
@@ -2559,6 +2561,10 @@ def create_play_blueprint(db_path):
                 shortlist_only=True,limit=300)
         recommendations=[]  # Suggested targets intentionally hidden in the simplified scouting desk.
         squad=squad_preview(db,career_id=career_id) if not spectator else {"players":[],"departures":[]}
+        from world_career_tactics import prepare_tactics
+        tactics=(prepare_tactics(db,career_id=career_id,
+                                players=squad["players"]) if not spectator
+                 else None)
         scout_page=max(1,min(10000,filter_value("scout_page") or 1))
         scout_page_size=80
         scout_results,scout_total=(scouting_search(
@@ -2750,6 +2756,7 @@ def create_play_blueprint(db_path):
             scout_total=scout_total,scout_prev_url=scout_prev_url,
             scout_next_url=scout_next_url,
             shortlist=shortlist,recommendations=recommendations,squad=squad,
+            tactics=tactics,
             scout_categories=CATEGORIES,scout_query=scout_query,
             scout_position=scout_position,scout_min_overall=scout_min_overall or "",
             scout_max_age=scout_max_age or "",scout_category=scout_category,
@@ -3208,6 +3215,27 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             return redirect("/world/play/career/"+career_id+
                             "/market?error="+quote(str(exc)[:260])+"#season-setup")
 
+    @bp.post("/world/play/career/<career_id>/market/tactics/save")
+    def manager_tactics_save(career_id):
+        # A visual squad plan is not a PES export and never mutates the
+        # transfer market, squad role, availability or player contracts.
+        check_write()
+        from world_career_tactics import save_tactics
+        try:
+            raw=request.form.get("layout","")
+            if len(raw)>18000:raise ValueError("Tactical layout is too large")
+            layout=json.loads(raw)
+            with connect() as db:
+                saved=save_tactics(db,career_id=career_id,payload=layout)
+            response=jsonify(ok=True,message="Tactics saved to this career",
+                             formation=saved["formation"])
+            response.headers["Cache-Control"]="private, no-store"
+            return response
+        except (ValueError,KeyError,TypeError,sqlite3.Error) as exc:
+            response=jsonify(ok=False,error=str(exc)[:220])
+            response.headers["Cache-Control"]="private, no-store"
+            return response,400
+
     @bp.post("/world/play/career/<career_id>/market/squad/decision")
     def manager_squad_decision(career_id):
         check_write()
@@ -3222,9 +3250,17 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 message=update_squad_player(db,career_id=career_id,
                     player_id=int(request.form["player_id"]),
                     role=role,listed=listed,offer_to_clubs=action=="offer")
+            if request.accept_mimetypes.best=="application/json":
+                response=jsonify(ok=True,message=message,
+                    player_id=int(request.form["player_id"]),
+                    role=role,listed=listed,action=action)
+                response.headers["Cache-Control"]="private, no-store"
+                return response
             return redirect("/world/play/career/"+career_id+
                 "/market?notice="+quote(message)+"#squad")
         except (ValueError,KeyError,sqlite3.Error) as exc:
+            if request.accept_mimetypes.best=="application/json":
+                return jsonify(ok=False,error=str(exc)[:260]),400
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#squad")
 
