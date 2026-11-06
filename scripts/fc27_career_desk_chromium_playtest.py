@@ -587,8 +587,10 @@ def run(world,output):
             view=spectator.new_page()
             view.on("pageerror",lambda e:failures.append("spectator: "+str(e)))
             view.goto(base+"/world/play/watch/"+token,wait_until="domcontentloaded")
-            check("Spectator" in view.locator("body").inner_text(),
-                  "Spectator view not rendered")
+            check(view.locator("body").get_attribute("data-spectator")=="true",
+                  "Spectator view not rendered as read-only")
+            check(view.locator(".desk-intro").count()==0,
+                  "Repeated career heading should not appear on spectator pages")
             check(view.locator('form[action$="/market/decision"]').count()==0,
                   "Spectator sees privileged decision form")
             spectator_width=view.locator(".desk-workspace").bounding_box()["width"]
