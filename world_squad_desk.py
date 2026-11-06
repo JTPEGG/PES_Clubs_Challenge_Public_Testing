@@ -103,6 +103,32 @@ def squad_preview(conn,*,career_id):
             unavailable.append(data)
         elif departure:sales.append(data)
         else:results.append(data)
+    # The visual squad also includes wage-only free-agent signings that
+    # are confirmed but not formally registered until the deadline.
+    # Keep these in projected XI / bench selections without altering the
+    # authoritative world registrations or transfer fee ledger.
+    if conn.execute("""SELECT 1 FROM sqlite_master
+         WHERE type='table' AND name='world_fc27_free_agent_offers'""").fetchone():
+        committed=conn.execute("""SELECT f.player_id,p.full_name,
+            p.primary_position,x.overall
+            FROM world_fc27_free_agent_offers f
+            JOIN world_players p ON p.player_id=f.player_id
+            JOIN world_dataset_ratings x ON x.dataset_id=?
+                AND x.player_id=f.player_id
+            WHERE f.career_id=? AND f.buying_club_id=?
+                AND f.status='agreed_future'
+                AND NOT EXISTS(SELECT 1 FROM world_career_registrations r
+                  WHERE r.career_id=f.career_id AND r.player_id=f.player_id)""",
+            (dataset,career_id,manager)).fetchall()
+        for player,name,pos,overall in committed:
+            value,_=_player_reference(conn,dataset,player)
+            results.append(dict(player_id=player,club_id=manager,
+                full_name=name,position=pos,overall=overall,
+                market_value=0 if value is None else value,
+                role="regular_starter",listed=False,incoming=True,
+                departing=False,from_club="Free agent",
+                morale_status=None,morale_reason=None))
+    results.sort(key=lambda p:(-int(p["overall"] or 0),p["full_name"]))
     return {"players":results,"departures":sales,"unavailable":unavailable,
             "manager_club_id":manager,"window_state":window["state"]}
 
