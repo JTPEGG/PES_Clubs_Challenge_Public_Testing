@@ -742,13 +742,6 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 </aside>
 {% endif %}
 <div class="desk-workspace">
- <div class="desk-intro">
-  <div>
-   <div class="desk-section-kicker" id="desk-current-view">Manager overview</div>
-   <h1>{{title}}</h1>
-   <p class="muted">{{manager_name|club_display}} · {{'30-minute window active' if snap.state=='open' else 'Transfer window closed' if snap.state=='closed' else 'Pre-season planning'}}{% if spectator %} · Read only · Spectator{% endif %}</p>
-  </div>
- </div>
  {% if not spectator %}
  <nav class="desk-mobile-tabs" aria-label="Transfer Desk mobile sections">
   <a class="desk-tab" href="#dashboard" data-desk-tab="dashboard"><span class="desk-nav-icon">⌂</span> Overview</a>
@@ -782,59 +775,114 @@ small{color:#b4cadb}form.inline{display:inline-flex}
  <div id="desk-view-host"></div>
  <div id="desk-screen-source">
 {% if not spectator %}
-<h2 id="squad">Current squad &amp; live signings</h2>
-<div class="card">
-
-<div class="scout-table desk-squad-table"><table data-desk-table="squad"><thead>
-<tr><th>Player</th><th>Position</th><th data-sort-type="number">OVR</th><th data-sort-type="number">Market value</th>
-<th>Squad status</th><th>Transfer list / availability</th></tr></thead><tbody>
-{% for p in squad.players %}
-<tr>
-<td><strong>{{p.full_name}}</strong>
-{% if p.incoming %}<span class="pill">Agreed signing</span>{% endif %}
-{% if p.morale_status=='transfer_requested' %}
-<span class="pill" title="{{p.morale_reason}}">Transfer request</span>{% endif %}</td>
-<td>{{p.position or '—'}}</td><td data-sort-value="{{p.overall}}">{{p.overall}}</td>
-<td data-sort-value="{{p.market_value or 0}}">{{money(p.market_value) if p.market_value is not none else '—'}}</td>
-<td>
-{% if not p.incoming and snap.state in ('not_started','open') %}
-<form method="post" action="/world/play/career/{{career_id}}/market/squad/decision">
-<input type="hidden" name="csrf" value="{{csrf}}">
-<input type="hidden" name="player_id" value="{{p.player_id}}">
-<select name="role" aria-label="Squad role for {{p.full_name}}">
-<option value="key_player" {% if p.role=='key_player' %}selected{% endif %}>Key Player</option>
-<option value="regular_starter" {% if p.role=='regular_starter' %}selected{% endif %}>Regular Starter</option>
-<option value="rotation" {% if p.role=='rotation' %}selected{% endif %}>Rotation</option>
-<option value="fringe" {% if p.role=='fringe' %}selected{% endif %}>Backup / Fringe</option>
-</select>
-<label><input type="checkbox" name="listed" value="1" {% if p.listed %}checked{% endif %}>
- Transfer listed</label>
-<button name="action" value="update">Update</button>
-{% if snap.state=='open' %}
-<button name="action" value="offer" title="Circulate this player to interested AI clubs during remaining market moments">Offer to clubs</button>
-{% endif %}
-</form>
-{% else %}
-{{p.role|replace('_',' ')|title}}
-{% endif %}
-</td>
-<td>{{'Listed' if p.listed else 'Not listed'}}
-{% if p.incoming %} · Joining at deadline{% endif %}</td>
-</tr>
-{% endfor %}
-</tbody></table></div>
-{% if squad.departures %}
-<h3>Agreed departures</h3>
-<p class="muted">{% for p in squad.departures %}{{p.full_name}}{% if not loop.last %} · {% endif %}{% endfor %}</p>
-{% endif %}
-{% if squad.unavailable %}
-<h3>Unavailable for the PES season</h3>
-<div class="desk-unavailable-list">{% for p in squad.unavailable %}
-<div><strong>{{p.full_name}}</strong> <span class="pill">Refusing to play</span></div>
-{% endfor %}</div>
-{% endif %}
-
+<h2 id="squad">Squad</h2>
+<div class="desk-squad-switch" role="group" aria-label="Squad display">
+ <button type="button" data-squad-mode="list" aria-pressed="true">List view</button>
+ <button type="button" data-squad-mode="tactics" aria-pressed="false">Tactics board</button>
+ <span class="desk-squad-count">{{squad.players|length}} available players{% if squad.departures %} · {{squad.departures|length}} agreed departures{% endif %}</span>
 </div>
+<div data-squad-pane="list">
+ <div class="card desk-compact-squad">
+  <div class="scout-table desk-squad-table"><table data-desk-table="squad">
+  <thead><tr>
+   <th>Player</th><th>Pos.</th><th data-sort-type="number">OVR</th>
+   <th data-sort-type="number">Value</th><th>Squad status</th>
+   <th>Transfer list</th><th>Actions</th>
+  </tr></thead><tbody>
+  {% for p in squad.players %}
+  <tr data-squad-player-id="{{p.player_id}}">
+   <td class="desk-squad-name"><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>
+     {% if p.incoming %}<span class="desk-squad-arrival" title="Joining at the transfer deadline">Arriving</span>{% endif %}
+     {% if p.morale_status=='transfer_requested' %}<span class="desk-squad-request" title="{{p.morale_reason}}">Transfer requested</span>{% endif %}
+   </td>
+   <td>{{p.position or '—'}}</td>
+   <td data-sort-value="{{p.overall}}">{{p.overall}}</td>
+   <td data-sort-value="{{p.market_value or 0}}">{{money(p.market_value) if p.market_value is not none else '—'}}</td>
+   {% if not p.incoming and snap.state in ('not_started','open') %}
+   <td>
+    <select name="role" form="squad-row-{{p.player_id}}" aria-label="Squad role for {{p.full_name}}">
+     <option value="key_player" {% if p.role=='key_player' %}selected{% endif %}>Key Player</option>
+     <option value="regular_starter" {% if p.role=='regular_starter' %}selected{% endif %}>Regular Starter</option>
+     <option value="rotation" {% if p.role=='rotation' %}selected{% endif %}>Rotation</option>
+     <option value="fringe" {% if p.role=='fringe' %}selected{% endif %}>Backup / Fringe</option>
+    </select>
+   </td>
+   <td class="desk-squad-listed">
+    <label><input type="checkbox" name="listed" value="1"
+      form="squad-row-{{p.player_id}}" {% if p.listed %}checked{% endif %}>
+     <span>{{'Listed' if p.listed else 'Available'}}</span></label>
+   </td>
+   <td class="desk-squad-actions">
+    <form id="squad-row-{{p.player_id}}" method="post"
+      action="/world/play/career/{{career_id}}/market/squad/decision">
+     <input type="hidden" name="csrf" value="{{csrf}}">
+     <input type="hidden" name="player_id" value="{{p.player_id}}">
+     <button name="action" value="update" type="submit">Save</button>
+     {% if snap.state=='open' %}
+     <button name="action" value="offer" type="submit" class="desk-squad-offer"
+       title="Circulate this transfer-listed player to AI clubs">Offer to clubs</button>
+     {% endif %}
+    </form>
+   </td>
+   {% else %}
+    <td>{{p.role|replace('_',' ')|title}}</td>
+    <td>{{'Listed' if p.listed else '—'}}</td>
+    <td class="muted">{{'Pending registration' if p.incoming else 'Locked'}}</td>
+   {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody></table></div>
+  <p class="desk-squad-notice" data-squad-list-feedback role="status" hidden></p>
+ </div>
+ {% if squad.departures %}
+ <details class="desk-squad-extras"><summary>Agreed departures ({{squad.departures|length}})</summary>
+ <p>{% for p in squad.departures %}{{p.full_name}}{% if not loop.last %} · {% endif %}{% endfor %}</p></details>
+ {% endif %}
+ {% if squad.unavailable %}
+ <details class="desk-squad-extras"><summary>Unavailable for the PES season ({{squad.unavailable|length}})</summary>
+ <p>{% for p in squad.unavailable %}{{p.full_name}} — refusing to play{% if not loop.last %} · {% endif %}{% endfor %}</p></details>
+ {% endif %}
+</div>
+<div data-squad-pane="tactics" hidden>
+ <div class="desk-tactics-toolbar">
+   <label>Formation <select data-tactics-formation>
+    {% for formation in ['4-4-2','4-3-3','4-2-3-1','3-5-2'] %}
+     <option value="{{formation}}" {% if formation==tactics.formation %}selected{% endif %}>{{formation}}</option>
+    {% endfor %}
+   </select></label>
+   <span class="muted">Drag players onto the pitch, bench or reserves. Drag on the pitch to reposition.</span>
+   <button type="button" data-tactics-reset>Reset formation</button>
+   <button type="button" data-tactics-save>Save tactics</button>
+   <span class="desk-tactics-save-status" data-tactics-status role="status"></span>
+ </div>
+ <div class="desk-tactics-layout">
+  <div class="desk-pitch-wrap">
+   <div class="desk-pitch" data-tactics-pitch role="group" aria-label="Starting eleven tactical pitch">
+    <div class="desk-pitch-boundary"></div><div class="desk-pitch-midline"></div>
+    <div class="desk-pitch-circle"></div><div class="desk-pitch-box desk-pitch-box-top"></div>
+    <div class="desk-pitch-box desk-pitch-box-bottom"></div>
+    <div class="desk-pitch-goal desk-pitch-goal-top"></div>
+    <div class="desk-pitch-goal desk-pitch-goal-bottom"></div>
+    <div class="desk-pitch-spot desk-pitch-spot-top"></div>
+    <div class="desk-pitch-spot desk-pitch-spot-bottom"></div>
+    <div data-pitch-players></div>
+   </div>
+   <p class="desk-pitch-caption">Starting XI · <span data-xi-count>11</span>/11</p>
+  </div>
+  <div class="desk-tactics-roster">
+   <section class="desk-tactics-group" data-roster-group="bench">
+    <header><strong>Substitutes</strong><span data-bench-count></span></header>
+    <div class="desk-tactics-player-list" data-roster-list="bench"></div>
+   </section>
+   <section class="desk-tactics-group" data-roster-group="reserves">
+    <header><strong>Reserves</strong><span data-reserve-count></span></header>
+    <div class="desk-tactics-player-list" data-roster-list="reserves"></div>
+   </section>
+  </div>
+ </div>
+ <p class="desk-tactics-hint">Select a player, then select another player or a space to swap. Keyboard users can also use the Move to menu. Tactics are a visual plan only; PES lineups must still be applied in-game.</p>
+</div>
+<script id="desk-tactics-data" type="application/json">{{tactics|tojson}}</script>
 {% endif %}
 <h2 id="overview-anchor" hidden>Overview</h2>
 {% if snap.state=='not_started' %}
@@ -885,11 +933,10 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
        data-wage-remaining="{{wage_headroom}}" data-wage-total="{{wage_total}}">
     <div>Transfer budget · <b id="fee-current">{{money(funds)}}</b> available</div>
     <div class="budget-track"><div class="budget-fill" id="fee-bar" style="width:{{(100*funds/[budget_total,1]|max)|round(1)}}%"></div></div>
-    <div class="preview-text" id="fee-preview">Adjust your bid to preview the remaining balance.</div>
+    <div id="fee-preview" hidden></div>
     <div style="margin-top:14px">Weekly wage budget · <b id="wage-current">{{money(wage_headroom)}}</b> available</div>
     <div class="budget-track"><div class="budget-fill" id="wage-bar" style="width:{{(100*wage_headroom/[wage_total,1]|max)|round(1)}}%"></div></div>
-    <div class="preview-text" id="wage-preview">Enter contract wages to preview remaining headroom.</div>
-    <p class="time-note">Indicative only. Open offers and signed deals are already reserved in the balances shown.</p>
+    <div id="wage-preview" hidden></div>
   </div>
 
  </div>
@@ -2061,6 +2108,8 @@ def create_play_blueprint(db_path):
                         initialise_live_market(conn)
                         from world_fc27_free_agents import initialize_free_agent_schema
                         initialize_free_agent_schema(conn)
+                        from world_career_tactics import initialize_tactics
+                        initialize_tactics(conn)
                         from world_reputation_v2 import initialize_pyramid
                         initialize_pyramid(conn)
                         conn.commit()
@@ -2512,6 +2561,10 @@ def create_play_blueprint(db_path):
                 shortlist_only=True,limit=300)
         recommendations=[]  # Suggested targets intentionally hidden in the simplified scouting desk.
         squad=squad_preview(db,career_id=career_id) if not spectator else {"players":[],"departures":[]}
+        from world_career_tactics import prepare_tactics
+        tactics=(prepare_tactics(db,career_id=career_id,
+                                players=squad["players"]) if not spectator
+                 else None)
         scout_page=max(1,min(10000,filter_value("scout_page") or 1))
         scout_page_size=80
         scout_results,scout_total=(scouting_search(
@@ -2703,6 +2756,7 @@ def create_play_blueprint(db_path):
             scout_total=scout_total,scout_prev_url=scout_prev_url,
             scout_next_url=scout_next_url,
             shortlist=shortlist,recommendations=recommendations,squad=squad,
+            tactics=tactics,
             scout_categories=CATEGORIES,scout_query=scout_query,
             scout_position=scout_position,scout_min_overall=scout_min_overall or "",
             scout_max_age=scout_max_age or "",scout_category=scout_category,
@@ -3161,6 +3215,27 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             return redirect("/world/play/career/"+career_id+
                             "/market?error="+quote(str(exc)[:260])+"#season-setup")
 
+    @bp.post("/world/play/career/<career_id>/market/tactics/save")
+    def manager_tactics_save(career_id):
+        # A visual squad plan is not a PES export and never mutates the
+        # transfer market, squad role, availability or player contracts.
+        check_write()
+        from world_career_tactics import save_tactics
+        try:
+            raw=request.form.get("layout","")
+            if len(raw)>18000:raise ValueError("Tactical layout is too large")
+            layout=json.loads(raw)
+            with connect() as db:
+                saved=save_tactics(db,career_id=career_id,payload=layout)
+            response=jsonify(ok=True,message="Tactics saved to this career",
+                             formation=saved["formation"])
+            response.headers["Cache-Control"]="private, no-store"
+            return response
+        except (ValueError,KeyError,TypeError,sqlite3.Error) as exc:
+            response=jsonify(ok=False,error=str(exc)[:220])
+            response.headers["Cache-Control"]="private, no-store"
+            return response,400
+
     @bp.post("/world/play/career/<career_id>/market/squad/decision")
     def manager_squad_decision(career_id):
         check_write()
@@ -3175,9 +3250,17 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 message=update_squad_player(db,career_id=career_id,
                     player_id=int(request.form["player_id"]),
                     role=role,listed=listed,offer_to_clubs=action=="offer")
+            if request.accept_mimetypes.best=="application/json":
+                response=jsonify(ok=True,message=message,
+                    player_id=int(request.form["player_id"]),
+                    role=role,listed=listed,action=action)
+                response.headers["Cache-Control"]="private, no-store"
+                return response
             return redirect("/world/play/career/"+career_id+
                 "/market?notice="+quote(message)+"#squad")
         except (ValueError,KeyError,sqlite3.Error) as exc:
+            if request.accept_mimetypes.best=="application/json":
+                return jsonify(ok=False,error=str(exc)[:260]),400
             return redirect("/world/play/career/"+career_id+
                 "/market?error="+quote(str(exc)[:260])+"#squad")
 

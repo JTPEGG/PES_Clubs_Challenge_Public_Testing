@@ -203,6 +203,75 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
  .desk-view .grid{grid-template-columns:minmax(0,1fr)}
  .desk-view input[type=number]{width:132px}
 }
+
+/* Squad controls: one calm, fixed-height row; player instructions separate. */
+.desk-squad-switch{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:10px 0 15px}
+.desk-squad-switch button{padding:9px 17px;background:#182a3d;border:1px solid #36536e;border-radius:7px;color:#bad3e5;font-size:13px;font-weight:730;cursor:pointer}
+.desk-squad-switch button[aria-pressed="true"]{background:#205878;border-color:#69c5e5;color:white}
+.desk-squad-count{margin-left:auto;font-size:12px;color:#97b4c8}
+.desk-view .desk-compact-squad{padding:11px 13px;margin:0}
+.desk-compact-squad .scout-table{max-height:none!important;overflow:auto}
+.desk-compact-squad table{margin:0!important;min-width:860px!important;table-layout:auto;border-collapse:collapse}
+.desk-compact-squad thead th{position:sticky;top:0;z-index:2;text-align:left}
+.desk-compact-squad td,.desk-compact-squad th{padding:5px 8px!important;line-height:1.18!important;white-space:nowrap!important;vertical-align:middle!important;height:37px}
+.desk-compact-squad .desk-table-filter-row th{height:31px}
+.desk-compact-squad .desk-squad-name{min-width:180px;max-width:300px;font-weight:680}
+.desk-compact-squad .desk-squad-name a{text-decoration:none;color:#eef8ff}
+.desk-compact-squad .desk-squad-name a:hover{text-decoration:underline}
+.desk-compact-squad .desk-squad-arrival,.desk-compact-squad .desk-squad-request{font-size:10px;margin-left:6px;border:1px solid #397d86;border-radius:5px;padding:2px 5px;color:#b5e8d9;font-weight:700}
+.desk-compact-squad .desk-squad-request{border-color:#9b714a;color:#f8cf9b}
+.desk-compact-squad td select{width:136px!important;max-width:136px!important;height:27px;padding:3px 6px!important;font-size:11px!important;border-radius:5px}
+.desk-compact-squad .desk-squad-listed label{display:inline-flex!important;align-items:center;gap:7px;margin:0!important;white-space:nowrap}
+.desk-compact-squad .desk-squad-listed input{width:15px;height:15px;accent-color:#68cbdf;padding:0}
+.desk-compact-squad .desk-squad-actions form{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;margin:0;padding:0}
+.desk-compact-squad .desk-squad-actions button{font-size:11px!important;padding:5px 9px!important;line-height:1.2!important;white-space:nowrap;border-radius:5px}
+.desk-compact-squad .desk-squad-offer{background:#183b52;border-color:#437a94}
+.desk-squad-extras{margin:8px 4px 0;color:#b3cade;font-size:13px}
+.desk-squad-extras summary{cursor:pointer;padding:8px 0}
+.desk-squad-notice{padding:7px 12px;margin:4px 0;color:#b9eccc;font-size:12px}
+.desk-tactics-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#15283c;border:1px solid #334c65;border-radius:10px;padding:13px 15px;margin-bottom:14px}
+.desk-tactics-toolbar label{display:flex;align-items:center;gap:9px;margin:0;color:#cbdbe8;font-size:13px;font-weight:720}
+.desk-tactics-toolbar select{padding:7px 10px;font-size:13px}
+.desk-tactics-toolbar .muted{font-size:11px;flex:1 1 200px}
+.desk-tactics-toolbar button{padding:8px 13px;border-radius:7px;font-size:12px;font-weight:750}
+.desk-tactics-toolbar [data-tactics-save]{background:#2780a8;border-color:#4bb7d7}
+.desk-tactics-save-status{min-width:80px;color:#a9ddce;font-size:12px}
+.desk-tactics-layout{display:grid;grid-template-columns:minmax(390px,1.5fr) minmax(245px,1fr);gap:16px;align-items:start}
+.desk-pitch-wrap{border:1px solid #375266;border-radius:12px;padding:12px;background:#13243a;min-width:0}
+.desk-pitch{position:relative;aspect-ratio:1.2 / 1;max-height:650px;border-radius:6px;overflow:hidden;background:repeating-linear-gradient(to bottom,#194d40 0%,#194d40 12.5%,#215845 12.5%,#215845 25%);border:2px solid #60977c;touch-action:pan-y}
+.desk-pitch-boundary{position:absolute;inset:5%;border:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-midline{position:absolute;left:5%;right:5%;top:50%;border-top:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-circle{position:absolute;left:41%;top:39%;width:18%;aspect-ratio:1;border:1.5px solid #b5d5b7a6;border-radius:100%;pointer-events:none}
+.desk-pitch-box{position:absolute;left:25%;width:50%;height:17%;border:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-box-top{top:5%}.desk-pitch-box-bottom{bottom:5%}
+.desk-pitch-goal{position:absolute;left:40%;width:20%;height:4%;border:1.5px solid #b5d5b7a6;pointer-events:none}
+.desk-pitch-goal-top{top:1%}.desk-pitch-goal-bottom{bottom:1%}
+.desk-pitch-spot{position:absolute;left:49.5%;width:1%;aspect-ratio:1;border-radius:50%;background:#b5d5b7;pointer-events:none}
+.desk-pitch-spot-top{top:15%}.desk-pitch-spot-bottom{bottom:15%}
+.desk-pitch [data-pitch-players]{position:absolute;inset:0;pointer-events:none}
+.desk-pitch-token{position:absolute;transform:translate(-50%,-50%);width:110px;max-width:21%;display:flex;flex-direction:column;align-items:center;gap:3px;background:transparent!important;border:0!important;padding:2px!important;color:white;cursor:grab;pointer-events:auto;touch-action:none;z-index:4}
+.desk-pitch-token:active{cursor:grabbing}
+.desk-pitch-token .desk-player-disc{display:grid;place-items:center;width:31px;height:31px;flex:none;border-radius:50%;background:#112878;border:2px solid #eac746;box-shadow:0 2px 9px #06131f9c;color:#fff5b0;font-size:12px;font-weight:850}
+.desk-pitch-token .desk-player-name{max-width:100%;font-size:10px;line-height:1.2;font-weight:750;text-shadow:0 2px 4px #07190e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:white}
+.desk-pitch-token .desk-player-position{font-size:9px;color:#e5f3dd}
+.desk-pitch-token[data-selected="true"] .desk-player-disc{border-color:white;box-shadow:0 0 0 4px #8ce9cf88}
+.desk-pitch-caption{margin:10px 2px 0;text-align:center;font-size:12px;color:#b6cfdf;font-weight:750}
+.desk-tactics-roster{display:grid;gap:12px;min-width:0}
+.desk-tactics-group{background:#15293e;border:1px solid #37536d;border-radius:10px;min-width:0;overflow:hidden}
+.desk-tactics-group>header{position:static;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#203a53;padding:12px 13px;font-size:13px;border-bottom:1px solid #3c5b70}
+.desk-tactics-group header span{color:#98c7d4;font-size:12px}
+.desk-tactics-player-list{padding:9px;min-height:70px;display:grid;gap:5px}
+.desk-tactics-player{display:flex;gap:8px;align-items:center;background:#1c354b;border:1px solid #35536c;border-radius:7px;padding:6px 7px;min-width:0;cursor:grab}
+.desk-tactics-player[data-selected="true"]{border-color:#94e2d2;background:#264c5e}
+.desk-tactics-player strong{font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desk-tactics-player .desk-tactics-pos{font-size:10px;color:#aacfe2;min-width:30px}
+.desk-tactics-player .desk-tactics-ovr{font-size:12px;color:#a9e8c4;font-variant-numeric:tabular-nums}
+.desk-tactics-player select{max-width:87px;font-size:10px;padding:4px 3px;border-radius:4px}
+.desk-tactics-group .desk-drop-action{display:block;margin:0 9px 9px;padding:6px 9px;background:#1b4559;border:1px dashed #5b8aa3;font-size:11px;color:#d3eaf3}
+.desk-tactics-hint{font-size:12px;color:#9eb6c6;line-height:1.5;margin:12px 0 0}
+@media(max-width:930px){.desk-tactics-layout{grid-template-columns:minmax(0,1fr)}.desk-pitch-wrap{max-width:680px;margin:0 auto;width:100%}.desk-tactics-roster{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.desk-tactics-roster{grid-template-columns:1fr}.desk-tactics-toolbar{gap:8px}.desk-pitch-token{width:81px}.desk-pitch-token .desk-player-name{font-size:9px}.desk-pitch-token .desk-player-disc{width:27px;height:27px;font-size:11px}}
+
 """
 
 DASHBOARD_JS = r"""
@@ -370,19 +439,15 @@ DASHBOARD_JS = r"""
       const label=document.createElement('div');label.className='label';label.textContent=entry.name;
       const val=document.createElement('div');val.className='desk-finance-value';
       val.textContent=gbp(entry.remaining);
-      const sub=document.createElement('p');sub.className='muted';
-      sub.textContent=entry.suffix+' · '+gbp(entry.total)+' modelled allocation';
       const track=document.createElement('div');track.className='desk-finance-track';
       const fill=document.createElement('div');fill.className='desk-finance-fill';
       fill.style.width=Math.min(100,Math.max(0,entry.remaining/Math.max(1,entry.total)*100))+'%';
       track.appendChild(fill);
-      card.appendChild(label);card.appendChild(val);card.appendChild(track);card.appendChild(sub);
+      card.appendChild(label);card.appendChild(val);card.appendChild(track);
       grid.appendChild(card);
     });
     views.finances.appendChild(grid);
-    const caption=document.createElement('p');caption.className='muted';
-    caption.textContent='Figures include funds reserved for active negotiations and signed deals. Proposals are only indicative until agreed.';
-    views.finances.appendChild(caption);
+
   }else{
     views.finances.appendChild(emptyPanel(
       'Budget breakdown is not yet active',
@@ -1117,6 +1182,360 @@ DASHBOARD_JS = r"""
     if(badgeText)badgeText.textContent=n+' incoming offers · '+
       (Number(document.body.dataset.unread)||0)+' unread';
   };
+
+  // Compact squad management uses the same validated manager instructions
+  // as the previous page, without paying for a full scouting dashboard reload.
+  const squadPanel=views.squad;
+  const squadNotice=squadPanel.querySelector('[data-squad-list-feedback]');
+  squadPanel.addEventListener('submit',async function(event){
+    const form=event.target;
+    // An input/button named "action" shadows HTMLFormElement.action.
+    // Use the literal URL attribute, as with the free-agent forms.
+    if(!(form instanceof HTMLFormElement)||
+       !(form.getAttribute('action')||'').endsWith('/market/squad/decision'))return;
+    const submit=event.submitter;
+    if(!submit||submit.name!=='action')return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    const data=new FormData(form);
+    data.set('action',submit.value);
+    form.dataset.saving='1';
+    const buttons=Array.from(form.querySelectorAll('button'));
+    buttons.forEach(b=>b.disabled=true);
+    if(squadNotice){
+      squadNotice.hidden=false;
+      squadNotice.textContent='Saving squad instruction…';
+      squadNotice.style.color='#b9eccc';
+    }
+    try{
+      const res=await fetch(form.getAttribute('action'),{method:'POST',body:data,
+        credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'});
+      const result=await res.json().catch(()=>null);
+      if(!res.ok||!result?.ok)throw new Error(result?.error||'Squad instruction was not saved');
+      const line=form.closest('tr');
+      const checkbox=line?.querySelector('input[name="listed"]');
+      const description=checkbox?.closest('label')?.querySelector('span');
+      if(description)description.textContent=result.listed?'Listed':'Available';
+      if(squadNotice)squadNotice.textContent=result.message;
+    }catch(error){
+      if(squadNotice){
+        squadNotice.textContent=String(error.message||error);
+        squadNotice.style.color='#ffb6aa';
+      }
+    }finally{
+      form.dataset.saving='0';
+      buttons.forEach(b=>{if(b.isConnected)b.disabled=false;});
+    }
+  },true);
+
+  const squadModeButtons=Array.from(squadPanel.querySelectorAll('[data-squad-mode]'));
+  const squadListPane=squadPanel.querySelector('[data-squad-pane="list"]');
+  const squadTacticsPane=squadPanel.querySelector('[data-squad-pane="tactics"]');
+  function showSquadMode(mode){
+    if(squadListPane)squadListPane.hidden=mode!=='list';
+    if(squadTacticsPane)squadTacticsPane.hidden=mode!=='tactics';
+    squadModeButtons.forEach(b=>b.setAttribute('aria-pressed',String(
+      b.dataset.squadMode===mode)));
+  }
+  squadModeButtons.forEach(b=>b.addEventListener('click',()=>showSquadMode(b.dataset.squadMode)));
+  showSquadMode('list');
+
+  const tacticsData=squadPanel.querySelector('#desk-tactics-data');
+  if(tacticsData&&squadTacticsPane){
+    let initial=null;
+    try{initial=JSON.parse(tacticsData.textContent);}catch(_){}
+    if(initial&&Array.isArray(initial.players)){
+      const players=new Map(initial.players.map(p=>[Number(p.player_id),p]));
+      const slots=initial.formations||{};
+      const benchLimit=Number(initial.bench_limit)||7;
+      let formation=initial.formation;
+      let xi=initial.xi.map(p=>({player_id:Number(p.player_id),x:Number(p.x),y:Number(p.y)}));
+      let bench=initial.bench.map(Number);
+      let reserves=initial.reserves.map(Number);
+      let selected=null;
+      let isSaving=false;
+      const pitch=squadTacticsPane.querySelector('[data-tactics-pitch]');
+      const pitchLayer=squadTacticsPane.querySelector('[data-pitch-players]');
+      const benchList=squadTacticsPane.querySelector('[data-roster-list="bench"]');
+      const reserveList=squadTacticsPane.querySelector('[data-roster-list="reserves"]');
+      const formationSelect=squadTacticsPane.querySelector('[data-tactics-formation]');
+      const status=squadTacticsPane.querySelector('[data-tactics-status]');
+      const saveButton=squadTacticsPane.querySelector('[data-tactics-save]');
+      const resetButton=squadTacticsPane.querySelector('[data-tactics-reset]');
+      const clamp=(v,minimum,maximum)=>Math.min(maximum,Math.max(minimum,v));
+      function where(id){
+        const j=xi.findIndex(e=>e.player_id===id);
+        if(j>=0)return {group:'xi',index:j,entry:xi[j]};
+        const k=bench.indexOf(id);
+        if(k>=0)return {group:'bench',index:k};
+        const m=reserves.indexOf(id);
+        return m>=0?{group:'reserves',index:m}:null;
+      }
+      function point(event){
+        const rect=pitch.getBoundingClientRect();
+        return {x:clamp((event.clientX-rect.left)*100/rect.width,7,93),
+                y:clamp((event.clientY-rect.top)*100/rect.height,8,94)};
+      }
+      function note(text,error){
+        status.textContent=text;
+        status.style.color=error?'#ffb6aa':'#aee0ce';
+      }
+      function dirty(){note('Unsaved changes',false);}
+      function nameOf(id){return players.get(id)?.name||'Player';}
+      function nearest(x,y){
+        let closest=0,distance=Infinity;
+        xi.forEach((e,i)=>{
+          const d=(e.x-x)**2+(e.y-y)**2;
+          if(d<distance){distance=d;closest=i;}
+        });
+        return closest;
+      }
+      function move(id,to,x,y,swapId){
+        const origin=where(id);
+        if(!origin||!['xi','bench','reserves'].includes(to))return;
+        if(to==='xi'&&origin.group==='xi'&&swapId===undefined){
+          origin.entry.x=clamp(x??origin.entry.x,7,93);
+          origin.entry.y=clamp(y??origin.entry.y,8,94);
+          dirty();draw();return;
+        }
+        if(to===origin.group&&swapId===undefined)return;
+        const former=origin.group==='xi'?{...origin.entry}:null;
+        if(origin.group==='xi')xi.splice(origin.index,1);
+        else if(origin.group==='bench')bench.splice(origin.index,1);
+        else reserves.splice(origin.index,1);
+        if(to==='xi'){
+          const position={x:clamp(Number(x??50),7,93),y:clamp(Number(y??50),8,94)};
+          let index=xi.findIndex(e=>e.player_id===swapId);
+          if(index<0&&xi.length>=11)index=nearest(position.x,position.y);
+          if(index>=0){
+            const displaced=xi.splice(index,1)[0];
+            position.x=displaced.x;position.y=displaced.y;
+            if(origin.group==='bench')bench.splice(origin.index,0,displaced.player_id);
+            else if(origin.group==='reserves')reserves.splice(origin.index,0,displaced.player_id);
+            else xi.push({player_id:displaced.player_id,x:former.x,y:former.y});
+          }
+          xi.push({player_id:id,x:position.x,y:position.y});
+        }else if(to==='bench'){
+          if(bench.length>=benchLimit){
+            const displaced=bench.shift();
+            if(origin.group==='xi')xi.push({...former,player_id:displaced});
+            else if(origin.group==='reserves')reserves.splice(origin.index,0,displaced);
+            else bench.push(displaced);
+          }else if(origin.group==='xi'){
+            // Keep a full starting XI while moving a player to the bench.
+            const replacement=reserves.length?reserves.shift():null;
+            if(replacement!==null)xi.push({...former,player_id:replacement});
+          }
+          bench.push(id);
+        }else{
+          if(origin.group==='xi'){
+            const replacement=bench.length?bench.shift():reserves.length?reserves.shift():null;
+            if(replacement!==null)xi.push({...former,player_id:replacement});
+          }
+          reserves.push(id);
+        }
+        selected=null;dirty();draw();
+      }
+      function select(id){
+        if(selected===id){selected=null;draw();return;}
+        if(selected!==null&&where(id)&&where(selected)){
+          const a=where(selected),b=where(id);
+          if(a.group==='xi'){
+            move(id,'xi',a.entry.x,a.entry.y,selected);
+          }else if(b.group==='xi'){
+            move(selected,'xi',b.entry.x,b.entry.y,id);
+          }else{
+            // Switch a bench player with a reserve without losing anyone.
+            const old=a.group==='bench'?bench:reserves;
+            const other=b.group==='bench'?bench:reserves;
+            if(a.group!==b.group){
+              old[a.index]=id;other[b.index]=selected;
+              selected=null;dirty();draw();
+            }else{selected=id;draw();}
+          }
+          return;
+        }
+        selected=id;note('Selected '+nameOf(id)+' — choose a destination',false);draw();
+      }
+      function makeChip(id,group){
+        const player=players.get(id);
+        const row=document.createElement('div');
+        row.className='desk-tactics-player';
+        row.draggable=true;row.tabIndex=0;row.setAttribute('role','button');
+        row.setAttribute('aria-label','Select '+nameOf(id));
+        row.dataset.playerId=String(id);row.dataset.selected=String(selected===id);
+        const pos=document.createElement('span');pos.className='desk-tactics-pos';
+        pos.textContent=player?.position||'—';
+        const name=document.createElement('strong');name.textContent=nameOf(id);
+        name.title=nameOf(id);
+        const rating=document.createElement('span');rating.className='desk-tactics-ovr';
+        rating.textContent=String(player?.overall||'—');
+        const action=document.createElement('select');
+        action.setAttribute('aria-label','Move '+nameOf(id)+' to');
+        for(const [value,label] of [['','Move to…'],['xi','Starting XI'],
+                                    ['bench','Subs'],['reserves','Reserves']]){
+          const option=document.createElement('option');
+          option.value=value;option.textContent=label;action.appendChild(option);
+        }
+        action.addEventListener('change',e=>{
+          const destination=e.target.value;
+          if(destination==='xi'){
+            const coords=slots[formation]?.[xi.length]||{x:50,y:50};
+            const x=Array.isArray(coords)?coords[0]:50;
+            const y=Array.isArray(coords)?coords[1]:50;
+            move(id,'xi',x,y);
+          }else if(destination)move(id,destination);
+        });
+        row.addEventListener('click',e=>{if(e.target.closest('select'))return;select(id);});
+        row.addEventListener('keydown',e=>{
+          if(e.target!==row)return;
+          if(e.key==='Enter'||e.key===' '){e.preventDefault();select(id);}
+        });
+        row.addEventListener('dragstart',e=>{
+          e.dataTransfer.setData('text/plain',String(id));
+          e.dataTransfer.effectAllowed='move';
+          selected=id;
+        });
+        row.append(pos,name,rating,action);
+        return row;
+      }
+      function makePitchPlayer(entry){
+        const id=entry.player_id,p=players.get(id);
+        const token=document.createElement('button');
+        token.type='button';token.className='desk-pitch-token';
+        token.style.left=entry.x+'%';token.style.top=entry.y+'%';
+        token.draggable=true;token.dataset.selected=String(selected===id);
+        token.dataset.playerId=String(id);
+        token.setAttribute('aria-label',nameOf(id)+' '+(p?.position||'')+
+          ', click to select or drag to change position');
+        const disc=document.createElement('span');disc.className='desk-player-disc';
+        disc.textContent=String(p?.overall||'—');
+        const name=document.createElement('span');name.className='desk-player-name';
+        name.textContent=nameOf(id);
+        const pos=document.createElement('span');pos.className='desk-player-position';
+        pos.textContent=p?.position||'';
+        token.append(disc,name,pos);
+        let drag=null;
+        token.addEventListener('pointerdown',e=>{
+          if(e.pointerType==='mouse'&&e.button!==0)return;
+          drag={id:e.pointerId,startX:e.clientX,startY:e.clientY,
+                moved:false};
+          try{token.setPointerCapture(e.pointerId);}catch(_){}
+        });
+        token.addEventListener('pointermove',e=>{
+          if(!drag||drag.id!==e.pointerId)return;
+          if(Math.hypot(e.clientX-drag.startX,e.clientY-drag.startY)>7){
+            drag.moved=true;
+            const p=point(e);
+            token.style.left=p.x+'%';token.style.top=p.y+'%';
+          }
+        });
+        token.addEventListener('pointerup',e=>{
+          if(!drag||drag.id!==e.pointerId)return;
+          if(drag.moved){
+            const p=point(e);drag=null;
+            move(id,'xi',p.x,p.y);return;
+          }
+          drag=null;
+        });
+        token.addEventListener('dragstart',e=>{
+          e.dataTransfer.setData('text/plain',String(id));
+          e.dataTransfer.effectAllowed='move';selected=id;
+        });
+        token.addEventListener('click',e=>{
+          e.stopPropagation();
+          if(drag?.moved)return;
+          select(id);
+        });
+        return token;
+      }
+      function draw(){
+        pitchLayer.replaceChildren();
+        xi.forEach(entry=>pitchLayer.appendChild(makePitchPlayer(entry)));
+        benchList.replaceChildren(...bench.map(id=>makeChip(id,'bench')));
+        reserveList.replaceChildren(...reserves.map(id=>makeChip(id,'reserves')));
+        squadTacticsPane.querySelector('[data-xi-count]').textContent=String(xi.length);
+        squadTacticsPane.querySelector('[data-bench-count]').textContent=bench.length+'/'+benchLimit;
+        squadTacticsPane.querySelector('[data-reserve-count]').textContent=String(reserves.length);
+      }
+      function attachDrop(target,group){
+        target.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='move';});
+        target.addEventListener('drop',e=>{
+          e.preventDefault();
+          const id=Number(e.dataTransfer.getData('text/plain'));
+          if(!players.has(id))return;
+          if(group==='xi'){
+            const p=point(e);move(id,'xi',p.x,p.y);
+          }else move(id,group);
+        });
+      }
+      attachDrop(pitch,'xi');
+      for(const group of ['bench','reserves']){
+        const section=squadTacticsPane.querySelector('[data-roster-group="'+group+'"]');
+        attachDrop(section,group);
+        const button=document.createElement('button');
+        button.type='button';button.className='desk-drop-action';
+        button.textContent='Move selected here';
+        button.addEventListener('click',()=>{
+          if(selected!==null)move(selected,group);
+          else note('Select a player first',true);
+        });
+        section.appendChild(button);
+      }
+      pitch.addEventListener('click',e=>{
+        if(e.target.closest('.desk-pitch-token'))return;
+        if(selected!==null){const p=point(e);move(selected,'xi',p.x,p.y);}
+      });
+      formationSelect.addEventListener('change',()=>{
+        formation=formationSelect.value;
+        const target=slots[formation]||[];
+        xi=xi.map((entry,i)=>({
+          player_id:entry.player_id,
+          x:target[i]?.[0]??entry.x,
+          y:target[i]?.[1]??entry.y
+        }));
+        dirty();draw();
+      });
+      resetButton.addEventListener('click',()=>{
+        if(!window.confirm('Reset all player positions to this formation?'))return;
+        const target=slots[formation]||[];
+        xi=xi.map((entry,i)=>({
+          player_id:entry.player_id,
+          x:target[i]?.[0]??entry.x,
+          y:target[i]?.[1]??entry.y
+        }));
+        dirty();draw();
+      });
+      saveButton.addEventListener('click',async ()=>{
+        if(isSaving)return;
+        if(xi.length!==11){
+          note('Select exactly 11 starting players before saving',true);return;
+        }
+        if(bench.length>benchLimit){
+          note('Too many players on the bench',true);return;
+        }
+        isSaving=true;saveButton.disabled=true;note('Saving tactics…',false);
+        try{
+          const form=new FormData();
+          const csrf=squadPanel.querySelector('input[name="csrf"]')?.value;
+          if(!csrf)throw new Error('Session expired; reload the Career Desk');
+          form.set('csrf',csrf);
+          form.set('layout',JSON.stringify({formation,xi,bench,reserves}));
+          const response=await fetch(location.pathname+'/tactics/save',{
+            method:'POST',body:form,credentials:'same-origin',
+            headers:{Accept:'application/json'},cache:'no-store'
+          });
+          const result=await response.json().catch(()=>null);
+          if(!response.ok||!result?.ok)
+            throw new Error(result?.error||'Unable to save tactics');
+          note('Tactics saved to this career',false);
+        }catch(error){note(String(error.message||error),true);}
+        finally{isSaving=false;saveButton.disabled=false;}
+      });
+      draw();
+    }
+  }
+
   // Sidebar, mobile bar, overview buttons and legacy #section links use
   // the same one-page view switcher; no cross-page navigation is required.
   function switchView(name,changeUrl){
