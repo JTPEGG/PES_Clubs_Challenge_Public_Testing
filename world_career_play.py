@@ -930,6 +930,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <span class="pill">✅ <b>{{signed}}</b> agreed deals</span></div>
   <div class="budget-panel" id="budget-panel"
        data-fee-remaining="{{funds}}" data-fee-total="{{budget_total}}"
+       data-reinvested="{{board_reinvestment}}" data-board-retained="{{board_withheld}}"
        data-wage-remaining="{{wage_headroom}}" data-wage-total="{{wage_total}}">
     <div>Transfer budget · <b id="fee-current">{{money(funds)}}</b> available</div>
     <div class="budget-track"><div class="budget-fill" id="fee-bar" style="width:{{(100*funds/[budget_total,1]|max)|round(1)}}%"></div></div>
@@ -2537,6 +2538,14 @@ def create_play_blueprint(db_path):
                 (career_id,)).fetchall()
         unread=0
         signed=0
+        sale_totals=(db.execute("""SELECT COALESCE(SUM(allocated_gbp),0),
+            COALESCE(SUM(withheld_gbp),0)
+            FROM world_career_sale_budget_credits
+            WHERE career_id=? AND seller_club_id=?""",
+            (career_id,c["manager_club_id"])).fetchone()
+            if db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+                AND name='world_career_sale_budget_credits'""").fetchone()
+            else (0,0))
         purchases=[]
         player_search=request.args.get("player_search","").strip()[:70] if not spectator else ""
         targets=[]
@@ -2781,6 +2790,7 @@ def create_play_blueprint(db_path):
             player_morale=morale,season_exclusions=excluded,
             money=format_market_gbp,
             funds=budget_remaining(db,career_id,c["manager_club_id"]),
+            board_reinvestment=sale_totals[0],board_withheld=sale_totals[1],
             budget_total=db.execute("""SELECT transfer_budget FROM world_career_club_ledger
                 WHERE career_id=? AND club_id=?""",(career_id,c["manager_club_id"])).fetchone()[0],
             wage_total=wage_budget_breakdown(db,career_id,c["manager_club_id"])["total"],
@@ -3310,12 +3320,24 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     if row is None:
                         raise ValueError("Offer no longer exists in this career")
                     unread=actionable_unread_count(db,career_id=career_id)
+                    manager_id=db.execute("""SELECT manager_club_id
+                        FROM world_career_saves WHERE career_id=?""",
+                        (career_id,)).fetchone()[0]
+                    sale_totals=(db.execute("""SELECT
+                            COALESCE(SUM(allocated_gbp),0),COALESCE(SUM(withheld_gbp),0)
+                        FROM world_career_sale_budget_credits
+                        WHERE career_id=? AND seller_club_id=?""",
+                        (career_id,manager_id)).fetchone()
+                        if db.execute("""SELECT 1 FROM sqlite_master
+                            WHERE type='table' AND name='world_career_sale_budget_credits'""").fetchone()
+                        else (0,0))
                     response=jsonify(ok=True,message=result,offer_id=offer_id,
                         status=row["status"],demanded_fee=row["demanded_fee"],
                         unread=unread,
+                        sale_budget_allocated=sale_totals[0],
+                        sale_board_withheld=sale_totals[1],
                         available_transfer_budget=budget_remaining(db,career_id,
-                           db.execute("SELECT manager_club_id FROM world_career_saves WHERE career_id=?",
-                             (career_id,)).fetchone()[0]),
+                            manager_id),
                         total_transfer_budget=db.execute("""SELECT transfer_budget
                              FROM world_career_club_ledger
                              WHERE career_id=? AND club_id=(SELECT manager_club_id
