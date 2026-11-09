@@ -88,6 +88,8 @@ def initialise_live_market(conn):
     initialise_confirmation_deadlines(conn)
     from world_player_morale import initialise_player_morale
     initialise_player_morale(conn)
+    from world_fc27_contract_renewals import initialise_contract_renewals
+    initialise_contract_renewals(conn)
     conn.commit()
 
 def _market_money(value):
@@ -645,6 +647,8 @@ def process_live_market(conn,*,career_id,now=None,
         return {"state":"closed","changed":False,"new_offers":0}
     win=snap["window_id"]
     if snap["state"]=="open":
+        from world_fc27_contract_renewals import generate_player_requests
+        generate_player_requests(conn,career_id=career_id,now=t)
         _review_due_manager_buying_offers(conn,career_id=career_id,
             window_id=win,now=t)
     if fc27_activity_scale_qa not in (1,3):
