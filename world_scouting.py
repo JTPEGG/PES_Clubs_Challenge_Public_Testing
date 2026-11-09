@@ -127,8 +127,9 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     attribute="", min_attribute=None, contract="",
                     squad_only=False, limit=80, sort_by='overall', descending=True,
                     shortlist_only=False, offset=0, with_total=False,
-                    max_market_value=None, max_weekly_wage=None,
-                    interested_only=False,free_only=False):
+                    max_market_value=None,max_weekly_wage=None,
+                    position_codes="",exclude_manager_players=False,
+                    listed_only=False,interested_only=False,free_only=False):
     from world_ai_bidding import position_family
     save=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=? AND state='sandbox'""",
@@ -141,6 +142,21 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     if attribute not in attr_names:attribute=""
     if category not in CATEGORIES:category=""
     if position not in GROUPS:position=""
+    from world_squad_planner import lane_of
+    legal_positions={"GK","CB","LB","RB","LWB","RWB","DMF","CMF",
+        "AMF","LMF","RMF","LWF","RWF","SS","CF"}
+    selected_positions={part.upper().strip() for part in
+                        str(position_codes or "").split(",") if part.strip()}
+    if selected_positions-legal_positions:
+        raise ValueError("Unsupported detailed position selection")
+    position_alias={"DM":"DMF","CM":"CMF","AM":"AMF",
+        "LM":"LMF","RM":"RMF","LW":"LWF","RW":"RWF",
+        "ST":"CF","SW":"CB"}
+    def positional_code(raw):
+        key=str(raw or "").upper().strip()
+        return position_alias.get(key,key)
+    exclude_manager_players=bool(exclude_manager_players)
+    listed_only=bool(listed_only)
     if contract not in ("","expiring","known","unknown"):contract=""
     min_overall= max(1,min(99,int(min_overall))) if min_overall is not None else None
     max_age=max(16,min(65,int(max_age))) if max_age is not None else None
@@ -360,12 +376,31 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
 
     out=[]
     anchor=date.fromisoformat(asof)
+    # Source-club AI listings are career-relative estimates based on
+    # the same role, contract and financial profile used by the seller AI.
+    # Manager decisions override these estimates.
+    from world_fc27_transfer_list import modelled_ai_listed_ids
+    modelled_listings=(modelled_ai_listed_ids(conn,career_id=career_id,
+        dataset=dataset,manager=manager,rows=rows,asof=asof)
+        if listed_only and dataset=="fc27-warehouse-659-mens-2026-27"
+        else set())
+    manager_listings=dict(conn.execute("""SELECT player_id,transfer_listed
+        FROM world_career_player_circumstances WHERE career_id=?""",
+        (career_id,)).fetchall()) if listed_only else {}
     for r in rows:
         d=dict(r)
         d["free_agent"]=(d["club_id"] is None)
         if free_only and not d["free_agent"]:continue
         if q and q not in d["full_name"].lower():continue
         if squad_only and d["club_id"]!=manager:continue
+        if exclude_manager_players and d["club_id"]==manager:continue
+        if selected_positions and positional_code(d["primary_position"]) not in selected_positions:continue
+        if listed_only:
+            if d["free_agent"]:continue
+            if (d["player_id"] in manager_listings and
+                not bool(manager_listings[d["player_id"]])):continue
+            if (d["player_id"] not in modelled_listings and
+                not bool(manager_listings.get(d["player_id"],False))):continue
         d["shortlisted"]=d["player_id"] in saved_ids
         if shortlist_only and not d["shortlisted"]:continue
         if position and position_family(d["primary_position"])!=position:
@@ -479,6 +514,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         and not category and min_category is None
         and not attribute and min_attribute is None and not contract
         and not squad_only and not shortlist_only and not free_only
+        and not selected_positions and not exclude_manager_players
+        and not listed_only
         and max_market_value is None and max_weekly_wage is None):
         _remember_interest(interest_key,(d["player_id"] for d in out))
     total=len(out)
