@@ -3159,13 +3159,23 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             offer_rows=db.execute("""SELECT o.offer_id,o.player_id,
                     o.status,o.offered_fee,p.full_name,b.name,
                     wo.tagged_at,ia.status AS agent_status,
-                    o.demanded_fee
+                    o.demanded_fee,lc.value_gbp,p.primary_position,
+                    x.overall,COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
+                    pc.current_role
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
                 JOIN world_clubs b ON b.club_id=o.buying_club_id
                 LEFT JOIN world_career_incoming_approaches ia
                   ON ia.offer_id=o.offer_id
+                LEFT JOIN world_career_saves c ON c.career_id=o.career_id
+                LEFT JOIN world_dataset_ratings x ON x.dataset_id=c.dataset_id AND x.player_id=o.player_id
+                LEFT JOIN world_career_live_player_context lc ON lc.career_id=o.career_id
+                    AND lc.player_id=o.player_id AND lc.window_id=wo.window_id
+                LEFT JOIN world_career_player_circumstances pc ON pc.career_id=o.career_id
+                    AND pc.player_id=o.player_id
+                LEFT JOIN world_career_contract_snapshots cs ON cs.career_id=o.career_id
+                    AND cs.player_id=o.player_id
                 WHERE wo.window_id=? AND o.career_id=?
                   AND o.selling_club_id=? AND o.buying_club_id<>?
                 ORDER BY o.offer_id DESC LIMIT 100""",
@@ -3176,8 +3186,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             live_offers=[dict(offer_id=oid,player_id=pid,status=status,
                 fee=fee,player=name,buyer=clean_buyer(buyer),
                 received_at=received,agent_status=agent,
-                demanded_fee=demanded)
-                for oid,pid,status,fee,name,buyer,received,agent,demanded in offer_rows]
+                demanded_fee=demanded,valuation=valuation,
+                position=position,overall=rating,current_wage=wage,squad_role=role)
+                for (oid,pid,status,fee,name,buyer,received,agent,demanded,
+                     valuation,position,rating,wage,role) in offer_rows]
             buying_rows=db.execute("""SELECT o.offer_id,o.player_id,
                     o.status,o.offered_fee,p.full_name,sc.name,
                     t.status,t.demanded_wage_weekly,
