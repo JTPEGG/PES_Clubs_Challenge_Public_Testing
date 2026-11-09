@@ -353,6 +353,64 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-view[data-view="scouting"] .desk-scout-finance b{font-size:16px}
 @media(max-width:580px){.desk-scout-condition-grid{grid-template-columns:1fr}.desk-scout-searchbar>label{flex:1 1 135px}}
 
+/* Scouting is a clean server-backed search, not a partial client-side table */
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes){width:100%;min-width:0!important;table-layout:fixed}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) td:first-child,
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) td:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:first-child{width:21%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(2){width:17%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(3){width:7%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(4),
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(5){width:6%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(6){width:11%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(7){width:12%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(8){width:13%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(9){width:7%}
+.desk-view[data-view="scouting"] .scout-table{overflow-x:auto;max-width:100%}
+.desk-view[data-view="scouting"] .desk-scout-lead{display:none}
+.desk-view[data-view="scouting"] .desk-scout-searchbar{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(130px,.8fr) minmax(130px,.8fr) auto;align-items:end;gap:10px;padding:15px;background:#172e43;border:1px solid #365b73;border-radius:10px}
+.desk-scout-searchbar>label,.desk-scout-quick>label{display:flex;flex-direction:column;gap:5px;color:#bed7e5;font-size:11px;font-weight:690}
+.desk-scout-searchbar select,.desk-scout-searchbar input,.desk-scout-quick input[type=number]{background:#0e2236!important;border:1px solid #4b728b!important;border-radius:6px!important;min-height:37px!important;padding:7px 9px!important;color:#f5fbff!important;font-size:13px!important}
+.desk-scout-searchbar select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#9ad1e5 50%),linear-gradient(135deg,#9ad1e5 50%,transparent 50%)!important;background-position:calc(100% - 17px) 15px,calc(100% - 12px) 15px!important;background-size:5px 5px!important;background-repeat:no-repeat!important;padding-right:28px!important}
+.desk-scout-quick{grid-column:1/-1;display:flex;align-items:end;gap:9px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #34546b}
+.desk-scout-quick>label.desk-scout-quick-number{flex:0 1 170px;min-width:125px}
+.desk-scout-quick-check{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;padding:10px 12px;background:#1f3c51;border:1px solid #466b80;border-radius:7px;min-height:37px;color:#e5f6ff!important;font-size:12px!important;cursor:pointer}
+.desk-scout-quick-check input{accent-color:#62c8d9;min-width:16px;min-height:16px;cursor:pointer}
+.desk-scout-add,.desk-scout-clear{min-height:37px}
+.desk-position-chooser{grid-column:1/-1;border:1px solid #476e85;border-radius:8px;padding:13px;background:#12283c}
+.desk-position-chooser h4{font-size:13px;margin:0 0 7px}
+.desk-position-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.desk-position-grid label{display:flex!important;align-items:center;gap:7px;padding:9px!important;background:#1b3c51;border:1px solid #476c83;border-radius:6px;cursor:pointer;font-size:12px;color:#e9f8ff}
+.desk-position-grid label:has(input:checked){background:#255771;border-color:#76c4dd}
+.desk-position-grid input{accent-color:#68d0df}
+.desk-budget-available{margin-left:12px;color:#a5edcf;font-size:13px}
+.desk-offer-briefing{background:#12273b;border:1px solid #36556d;border-radius:9px;padding:15px 17px;margin:14px 0 16px}
+.desk-offer-briefing-title{display:flex;justify-content:space-between;align-items:center;gap:9px;font-size:14px;font-weight:780;padding-bottom:12px}
+.desk-offer-briefing-title span{font-size:10px;font-weight:600;letter-spacing:.04em;color:#aac1d0}
+.desk-offer-briefing-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.desk-offer-briefing-metrics>div{background:#1b354b;border:1px solid #335670;border-radius:7px;padding:11px;min-width:0}
+.desk-offer-briefing-metrics small{display:block;color:#9cbfd3;font-size:10px;line-height:1.4}
+.desk-offer-briefing-metrics strong{font-size:18px;font-weight:800;display:block;white-space:nowrap;margin-top:4px}
+.desk-positive{color:#72dfb9}.desk-negative{color:#ffbb91}
+.desk-offer-briefing-note{color:#b9cedd;font-size:12px;line-height:1.65;margin:10px 0 0}
+.desk-inbox-reader .desk-inbox-detail>.offer>.label,.desk-inbox-reader .desk-inbox-detail>.offer>h3,.desk-inbox-reader .desk-inbox-detail>.offer>.count{display:none}
+.desk-inbox-reader .desk-inbox-detail>.offer>.muted:first-of-type{font-size:11px;color:#8fa9bb}
+.desk-inbox-reader .desk-inbox-detail>.offer .actions{align-items:end;gap:10px;border-top:1px solid #2c465b;padding-top:14px;display:flex;flex-wrap:wrap}
+.desk-inbox-reader .desk-inbox-detail>.offer .actions button{font-size:12px;padding:9px 13px}
+.desk-counter-stepper{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+.desk-counter-stepper input{width:123px!important;font-size:13px!important;font-variant-numeric:tabular-nums;padding:7px!important}
+.desk-counter-stepper button{padding:7px 10px!important;min-width:32px;background:#29465d!important;border:1px solid #50768c!important}
+.desk-counter-preview{font-size:12px;color:#8ef0ce;min-width:56px;font-weight:800}
+.desk-view[data-view="news"] .desk-news-card{background:#142a40;border:1px solid #38536c;border-radius:8px;margin:0 0 9px;padding:14px}
+.desk-news-route{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;color:#e1f5ff}
+.desk-news-route .desk-news-player{font-weight:780;color:#fff}
+.desk-news-route .desk-news-arrow{color:#74d5c6;font-weight:900;font-size:18px}
+.desk-news-route .desk-news-club{color:#bad8e7}
+.desk-news-fee{color:#89e8bf;font-weight:750}
+.desk-view[data-view="news"] .desk-news-card small{color:#9aafc1}
+@media(max-width:1120px){.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:630px){.desk-position-grid{grid-template-columns:repeat(3,1fr)}.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:1fr}.desk-scout-quick>label.desk-scout-quick-number{flex:1 1 125px}}
+
 """
 
 DASHBOARD_JS = r"""
