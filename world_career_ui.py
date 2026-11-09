@@ -689,8 +689,43 @@ DASHBOARD_JS = r"""
       card.querySelector('.count')?.textContent.trim()||'—';
     holder.querySelector('.desk-inbox-state').textContent=inboxLabels[status]||status;
   }
+
+  function enhanceCounter(card){
+    if(!card)return;
+    card.querySelectorAll('input[name="counter_fee"]').forEach(input=>{
+      if(input.dataset.stepper==='1')return;
+      input.dataset.stepper='1';
+      const original=Number(input.min)||0;
+      const step=original>=10000000?250000:original>=1000000?50000:
+        original>=200000?10000:original>=20000?2500:500;
+      const wrapper=document.createElement('span');
+      wrapper.className='desk-counter-stepper';
+      input.before(wrapper);wrapper.appendChild(input);
+      const preview=document.createElement('strong');
+      preview.className='desk-counter-preview';
+      function repaint(){preview.textContent=gbp(Number(input.value)||0);}
+      function adjust(delta){
+        const low=Number(input.min)||0,high=Number(input.max)||1000000000;
+        const next=Math.max(low,Math.min(high,(Number(input.value)||low)+delta));
+        input.value=String(next);repaint();
+      }
+      const minus=document.createElement('button');
+      minus.type='button';minus.textContent='−';minus.title='Reduce counter by '+gbp(step);
+      minus.setAttribute('aria-label','Reduce counteroffer by '+gbp(step));
+      minus.addEventListener('click',()=>adjust(-step));
+      const plus=document.createElement('button');
+      plus.type='button';plus.textContent='+';plus.title='Increase counter by '+gbp(step);
+      plus.setAttribute('aria-label','Increase counteroffer by '+gbp(step));
+      plus.addEventListener('click',()=>adjust(step));
+      wrapper.append(minus,plus,preview);
+      input.addEventListener('input',repaint);
+      repaint();
+    });
+  }
+
   function makeInboxItem(card){
     if(card.closest('.desk-inbox-item'))return;
+    enhanceCounter(card);
     const item=document.createElement('details');
     item.className='desk-inbox-item';
     item.dataset.offerId=card.dataset.liveOfferId||'';
