@@ -938,7 +938,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
     <div>Transfer budget · <b id="fee-current">{{money(funds)}}</b> available</div>
     <div class="budget-track"><div class="budget-fill" id="fee-bar" style="width:{{(100*funds/[budget_total,1]|max)|round(1)}}%"></div></div>
     <div id="fee-preview" hidden></div>
-    <div style="margin-top:14px">Weekly wage budget · <b id="wage-current">{{money(wage_headroom)}}</b> available</div>
+    <div style="margin-top:14px">Total weekly wage budget · <b>{{money(wage_total)}}</b> / week <span class="desk-budget-available"><b id="wage-current">{{money(wage_headroom)}}</b> available</span></div>
     <div class="budget-track"><div class="budget-fill" id="wage-bar" style="width:{{(100*wage_headroom/[wage_total,1]|max)|round(1)}}%"></div></div>
     <div id="wage-preview" hidden></div>
   </div>
@@ -950,23 +950,23 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <div class="card">
 <p class="muted">Your saved targets are available throughout the window. Browse players in Scouting and save them from their profile.</p>
 {% if shortlist %}
-<div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th></tr></thead>
+<div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th><th>Wage / week</th><th>Contract expires</th></tr></thead>
 <tbody>{% for p in shortlist %}
 <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a></td>
 <td>{{p.club_name|club_display}}</td><td>{{p.primary_position}}</td><td>{{p.overall}}</td>
-<td>{{money(p.market_value) if p.market_value is not none else '—'}}</td></tr>
+<td>{{money(p.market_value) if p.market_value is not none else '—'}}</td>
+<td>{{money(p.current_wage) if p.current_wage is not none else '—'}}</td>
+<td>{{p.expires if p.expires else ('Unattached' if p.free_agent else '—')}}</td></tr>
 {% endfor %}</tbody></table></div>
 {% else %}<p class="muted">No shortlisted players yet.</p>{% endif %}
 </div>
 <h2 id="scouting">Scouting &amp; squad values</h2>
 <div class="card">
-<div class="desk-scout-finance" aria-label="Available recruitment finances">
- <span>Available transfer budget <b>{{money(funds)}}</b></span>
- <span>Weekly wage headroom <b>{{money(wage_headroom)}} / week</b></span>
-</div>
-<p class="muted">Player interest is indicative, not an agreement. Wages, squad role, selling club and final negotiations still matter.</p>
-<form class="scout-filters" method="get" action="/world/play/career/{{career_id}}/market#scouting">
+<p class="muted desk-scout-lead">Search the player database; add detailed conditions when needed.</p>
+<form class="scout-filters" method="get" data-club-name="{{manager_club_name}}" action="/world/play/career/{{career_id}}/market#scouting">
 <label>Name<br><input name="scout_query" value="{{scout_query}}" placeholder="Search players"></label>
+<input type="hidden" name="scout_positions" value="{{scout_positions}}" data-scout-positions>
+<input type="hidden" name="scout_hide_mine" value="{{'1' if scout_hide_mine else '0'}}" data-scout-hide-mine>
 <label>Position<br><select name="scout_position">
 <option value="">All positions</option>
 {% for role in ['GK','DEF','MID','FWD'] %}<option value="{{role}}" {% if scout_position==role %}selected{% endif %}>{{role}}</option>{% endfor %}
@@ -997,6 +997,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label>Order<br><select name="scout_order"><option value="desc" {% if scout_order=='desc' %}selected{% endif %}>Highest first</option>
 <option value="asc" {% if scout_order=='asc' %}selected{% endif %}>Lowest first</option></select></label>
 <label><input type="checkbox" name="scout_shortlist" value="1" {% if scout_shortlist %}checked{% endif %}> Shortlist only</label>
+<label><input type="checkbox" name="scout_listed" value="1" {% if scout_listed %}checked{% endif %}> Transfer-listed players</label>
 <button>Apply filters</button>
 </form>
 <div class="desk-scout-table-tools"><button type="button" data-scout-attributes-toggle aria-expanded="false">Show attributes</button></div>
@@ -1008,7 +1009,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if scout_attribute %}<th>{{scout_attribute|replace('_',' ')|title}}</th>{% endif %}</tr></thead>
 <tbody>{% for p in scout_results %}
 <tr class="{{'owned' if p.owned else ''}}">
-<td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
+<td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{'—' if p.free_agent else p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{'FREE' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
 <td title="{{'Reference game wage, not confirmed agent demand' if p.free_agent else 'Current game wage, not future agent demand'}}">{{('Est. ' if p.free_agent else '') + money(p.current_wage) if p.current_wage is not none else '—'}}</td>
@@ -1044,10 +1045,12 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <h3><span class="desk-direction in" aria-label="Incoming transfers">↙</span>
    Incoming <span class="desk-section-count">{{purchases|length + free_signings|length}}</span></h3>
   <div class="scout-table"><table data-desk-table="incoming">
-  <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th><th aria-label="Cancel unsigned deal"></th></tr></thead>
+  <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Wage / week</th><th>Contract</th><th>Status</th><th aria-label="Cancel unsigned deal"></th></tr></thead>
   <tbody>{% for o in purchases %}
   <tr data-buy-offer-id="{{o.offer_id}}"><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
    <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
+   <td data-sort-value="{{o.signed_weekly_wage or o.negotiated_wage or 0}}">{{money(o.signed_weekly_wage or o.negotiated_wage) if o.signed_weekly_wage or o.negotiated_wage else 'Awaiting terms'}}</td>
+   <td>{{(o.agreed_contract_years|string) + ' years' if o.agreed_contract_years else '—'}}</td>
    <td><a href="#transfers">{{o.status_label}}</a></td>
    <td>{% if not spectator and snap.state=='open' and o.status in ('proposed','countered','accepted_pending_contract') %}
     <form method="post" class="desk-transfer-cancel-form" action="/world/play/career/{{career_id}}/market/buy/decision">
@@ -1059,11 +1062,13 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   {% for s in free_signings %}
   <tr data-free-agent-signing-id="{{s.signing_id}}">
    <td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
-   <td>Free agent</td><td data-sort-value="0"><strong>FREE — £0</strong></td>
+   <td>—</td><td data-sort-value="0"><strong>FREE — £0</strong></td>
+   <td data-sort-value="{{s.proposed_weekly_wage_gbp}}">{{money(s.proposed_weekly_wage_gbp)}}</td>
+   <td>{{s.contract_years}} years</td>
    <td>{{'Confirmed' if s.status in ('agreed_future','completed')
          else 'Awaiting your confirmation' if s.status=='terms_accepted'
          else 'Agent counteroffer' if s.status=='countered'
-         else 'Cancelled'}} · {{money(s.proposed_weekly_wage_gbp)}}/wk · {{s.contract_years}} years</td>
+         else 'Cancelled'}}</td>
    <td>{% if not spectator and snap.state=='open' and s.status in ('terms_accepted','countered') %}
      <form method="post" class="desk-transfer-cancel-form" action="/world/play/career/{{career_id}}/market/free-agent">
       <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="player_id" value="{{s.player_id}}">
@@ -1124,7 +1129,10 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
 <input type="hidden" name="csrf" value="{{csrf}}">
 <input type="hidden" name="offer_id" value="{{o.offer_id}}">
-<button name="decision" value="sign">Sign transfer</button></form>
+<button name="decision" value="sign">Confirm transfer</button>
+{% if not o.signing_delay_used %}
+<button name="decision" value="delay_signing" type="submit">Delay decision (once)</button>
+{% endif %}</form>
 {% elif o.status=='accepted_pending_contract' and o.agent_demand is none %}
 <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
 <input type="hidden" name="csrf" value="{{csrf}}">
@@ -1176,7 +1184,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <input type="hidden" name="csrf" value="{{csrf}}">
 <button>Mark as read</button>
 </form>{% endif %}
-{% if offers %}
+{% if offers or purchases %}
 <div class="grid">{% for o in offers %}
 <div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
@@ -1185,15 +1193,27 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  <h3 style="margin:6px 0"><button type="button" class="desk-player-quickfilter"
  data-desk-filter-player="{{o.player_name}}" title="Filter offers for {{o.player_name}}">{{o.player_name}}</button></h3>
  <div class="count">{{money(o.offered_fee)}}</div>
- {% if o.market_value is not none and o.market_value>0 %}
- <p class="muted" style="margin:5px 0">Indicative market value: <b>{{money(o.market_value)}}</b></p>
- <p class="muted" style="margin:5px 0">
- Bid versus valuation:
- <b>{{'+' if o.value_difference>=0 else '−'}}{{money(o.value_difference|abs)}}</b>
- (<b>{{'+' if o.value_difference_pct>=0 else '−'}}{{'%.1f'|format(o.value_difference_pct|abs)}}%</b>)
- {{'above' if o.value_difference>=0 else 'below'}} the modelled value.
- </p>
- {% else %}<p class="muted">Indicative market value unavailable.</p>{% endif %}
+ <div class="desk-offer-briefing">
+   <div class="desk-offer-briefing-title">Decision briefing <span>Career estimates</span></div>
+   <div class="desk-offer-briefing-metrics">
+     <div><small>Offer</small><strong>{{money(o.offered_fee)}}</strong></div>
+     <div><small>Market valuation</small><strong>{{money(o.market_value) if o.market_value is not none else 'Unavailable'}}</strong></div>
+     <div><small>Offer vs value</small><strong class="{{'desk-positive' if o.value_difference is not none and o.value_difference>=0 else 'desk-negative'}}">{{('+' if o.value_difference>=0 else '−') ~ ('%.1f'|format(o.value_difference_pct|abs)) ~ '%' if o.value_difference_pct is not none else '—'}}</strong></div>
+     <div><small>Current wage / week</small><strong>{{money(o.current_wage) if o.current_wage is not none else 'Unknown'}}</strong></div>
+   </div>
+   <p class="desk-offer-briefing-note"><b>Sporting impact:</b>
+      {{o.position or 'Position unknown'}} · {{'OVR ' ~ o.overall if o.overall is not none else 'Unknown rating'}}
+      · {{o.squad_role|replace('_',' ')|title if o.squad_role else 'Squad role not recorded'}}.
+      {% if o.competing_offers %}<b>{{o.competing_offers}} competing bid(s)</b>.{% endif %}
+      A sale reduces projected positional depth until replacements are agreed.
+   </p>
+   <p class="desk-offer-briefing-note"><b>Financial impact:</b>
+      {% if o.market_value is not none and o.market_value>0 %}
+      {{money(o.value_difference|abs)}} {{'above' if o.value_difference>=0 else 'below'}} indicative valuation.
+      {% else %}A reliable value comparison is unavailable.{% endif %}
+      The board allocates its reinvestable share of the fee only once this transfer is confirmed.
+   </p>
+ </div>
  {% if o.demanded_fee is not none %}
  <p class="muted">Your counter: {{money(o.demanded_fee)}}</p>{% endif %}
  {% if o.competing_offers and o.status=='accepted_pending_contract' %}
@@ -1248,7 +1268,55 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  <button name="decision" value="cancel" class="danger">Cancel transfer</button></form>
  {% endif %}
  </div>{% endif %}
-</div>{% endfor %}</div>
+</div>{% endfor %}
+{% for o in purchases %}
+<div class="card offer desk-inbox-buy-message"
+ data-live-offer-id="buy-{{o.offer_id}}"
+ data-buy-offer-id="{{o.offer_id}}" data-desk-side="buy"
+ data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
+ data-desk-buyer="{{o.seller_name|club_display}}" data-desk-status="{{o.status}}"
+ data-desk-agent="{{'terms_accepted' if o.agent_status=='accepted' else o.agent_status or ''}}">
+ <div class="label">{{o.seller_name|club_display}} · {{o.status_label}}</div>
+ <h3>{{o.player_name}}</h3><div class="count">{{money(o.offered_fee)}}</div>
+ <div class="desk-offer-briefing">
+  <div class="desk-offer-briefing-title">Club & agent decision <span>Incoming transfer</span></div>
+  <div class="desk-offer-briefing-metrics">
+   <div><small>Agreed / offered fee</small><strong>{{money(o.offered_fee)}}</strong></div>
+   <div><small>Current agent request</small><strong>{{money(o.agent_demand) if o.agent_demand is not none else 'Awaiting terms'}}</strong></div>
+   <div><small>Weekly wage agreed</small><strong>{{money(o.signed_weekly_wage or o.negotiated_wage) if (o.signed_weekly_wage or o.negotiated_wage) else 'Not agreed'}}</strong></div>
+   <div><small>Contract</small><strong>{{(o.agreed_contract_years|string) ~ ' years' if o.agreed_contract_years else 'Pending'}}</strong></div>
+  </div>
+  <p class="desk-offer-briefing-note">
+   {% if o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
+   <b>Paperwork ready.</b> Player and agent terms are agreed, but the signing requires your confirmation.
+   {% elif o.status=='accepted_pending_contract' %}
+   <b>Fee accepted.</b> Complete personal terms with the player's agent before you can sign.
+   {% elif o.status=='countered' %}
+   <b>Seller counteroffer.</b> Review the revised fee in your transfer negotiations.
+   {% elif o.status=='rejected' %}
+   <b>Rejected.</b> The selling club declined your offer.
+   {% elif o.status in ('agreed_future','completed') %}
+   <b>Confirmed.</b> The player is included in your projected squad.
+   {% else %}{{o.status_label}}.{% endif %}
+  </p>
+ </div>
+ {% if not spectator and snap.state=='open' and o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
+ <div class="actions">
+  <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
+   <input type="hidden" name="csrf" value="{{csrf}}">
+   <input type="hidden" name="offer_id" value="{{o.offer_id}}">
+   <button name="decision" value="sign">Confirm signing</button>
+   {% if not o.signing_delay_used %}
+   <button name="decision" value="delay_signing">Delay (once)</button>
+   {% endif %}
+   <button name="decision" value="withdraw" class="danger">Cancel</button>
+  </form>
+ </div>
+ {% else %}
+ <a href="#transfers" data-desk-tab="transfers" class="desk-inbox-open-negotiation">View transfer negotiations</a>
+ {% endif %}
+</div>
+{% endfor %}</div>
 {% else %}<div class="card" id="desk-inbox-no-offers"><p>No offers have arrived yet. The world is evaluating its squads;
 a quiet market is possible. No transfers will be invented to fill the inbox.</p></div>{% endif %}
 {% if snap.state=='closed' %}
@@ -1344,11 +1412,22 @@ Rejected and expired offers are not transfers.</p>
 {% endif %}
 <h2>Market news</h2>
 {% if news_feed %}
-<div class="feed">
+<div class="feed desk-news-feed">
 {% for m in news_feed %}
-<div class="card" {% if m.event_id is defined %}data-world-event-id="{{m.event_id}}"{% endif %}><b>{{m.headline}}</b>
-<p style="margin:5px 0">{{m.detail}}</p>
-<small>{{m.created_at}} UTC</small>
+<div class="desk-news-card" {% if m.is_world is defined and m.is_world %}data-world-event-id="{{m.event_id}}"{% endif %}>
+  <b>{{m.headline}}</b>
+  {% if m.is_world is defined and m.is_world %}
+  <div class="desk-news-route">
+    <span class="desk-news-player">{{m.player}}</span>
+    <span class="desk-news-club">{{m.seller}}</span>
+    <span class="desk-news-arrow" aria-label="transferred to">→</span>
+    <span class="desk-news-club">{{m.buyer}}</span>
+    <span class="desk-news-fee">{{m.fee_display}}</span>
+  </div>
+  {% else %}
+  <p style="margin:6px 0">{{m.detail}}</p>
+  {% endif %}
+  <small>{{m.created_at}} UTC</small>
 </div>{% endfor %}</div>
 {% else %}<div class="card">No news yet.</div>{% endif %}
 <p class="desk-provenance">Career market values, wages and player preferences are simulated.</p>
@@ -1483,6 +1562,8 @@ Rejected and expired offers are not transfers.</p>
          refreshUnread(unread);
          if(typeof window.fc27SyncIncomingOffers==='function')
            window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
+         if(typeof window.fc27SyncBuyingOffers==='function')
+           window.fc27SyncBuyingOffers(state.buying_updates,state.csrf);
          if(typeof window.fc27UpdateBudget==='function')
            window.fc27UpdateBudget(state);
          const marketFeed=document.querySelector('#desk-view-news .feed');
@@ -1495,14 +1576,26 @@ Rejected and expired offers are not transfers.</p>
              if(id>newestWorldEvent && !newsVisible())unseenMarketNews++;
              newestWorldEvent=Math.max(newestWorldEvent,id);
              const card=document.createElement('div');
-             card.className='card';card.dataset.worldEventId=String(id);
+             card.className='desk-news-card';card.dataset.worldEventId=String(id);
              const heading=document.createElement('b');
              heading.textContent=item.headline;
-             const summary=document.createElement('p');
-             summary.style.margin='5px 0';summary.textContent=item.detail;
+             const route=document.createElement('div');
+             route.className='desk-news-route';
+             const parts=[
+               [item.player,'desk-news-player'],
+               [item.seller,'desk-news-club'],
+               ['→','desk-news-arrow'],
+               [item.buyer,'desk-news-club'],
+               [item.fee,'desk-news-fee']
+             ];
+             parts.forEach(function(part){
+               const span=document.createElement('span');
+               span.className=part[1];span.textContent=part[0]||'—';
+               route.appendChild(span);
+             });
              const when=document.createElement('small');
              when.textContent=item.created_at;
-             card.append(heading,summary,when);
+             card.append(heading,route,when);
              marketFeed.prepend(card);
            });
            refreshNewsBadge();
@@ -1982,7 +2075,7 @@ Promotion/relegation is treated contextually, not as a separate +20/−22 award.
 <div><label>Source note</label><input name="source_note" placeholder="Required for source-backed"></div></div>
 <button>Record contract</button></form></div></main></body></html>"""
 
-def create_play_blueprint(db_path):
+def create_play_blueprint(db_path, on_career_commit=None):
     bp=Blueprint("world_play",__name__)
     # The manager's HTTP requests must NEVER wait for a 659-club AI market
     # simulation. Run autonomous ticks on a dedicated daemon executor, with
@@ -2099,10 +2192,41 @@ def create_play_blueprint(db_path):
             with connect() as db:
                 if window_snapshot(db,career_id=requested)["state"]!="not_started":
                     abort(403,"Use the autonomous Manager Inbox for timed careers")
+    class CareerPersistingConnection(sqlite3.Connection):
+        """Notify the storage queue only when a career transaction commits."""
+        def __init__(self,*args,**kwargs):
+            super().__init__(*args,**kwargs)
+            self._persist_ready=False
+            self._committed_changes=self.total_changes
+
+        def _notify_if_changed(self):
+            changes=self.total_changes
+            if changes<=self._committed_changes:return
+            self._committed_changes=changes
+            if self._persist_ready and on_career_commit is not None:
+                on_career_commit()
+
+        def commit(self):
+            super().commit()
+            self._notify_if_changed()
+
+        def rollback(self):
+            super().rollback()
+            self._committed_changes=self.total_changes
+
+        def __exit__(self,exc_type,exc_value,traceback):
+            result=super().__exit__(exc_type,exc_value,traceback)
+            if exc_type is None:self._notify_if_changed()
+            else:self._committed_changes=self.total_changes
+            return result
+
     def connect():
         nonlocal schema_ready
         from world_v2 import initialize_world
-        conn=sqlite3.connect(str(db_path),timeout=2)
+        conn=sqlite3.connect(str(db_path),timeout=2,
+            factory=CareerPersistingConnection if on_career_commit else sqlite3.Connection)
+        if on_career_commit:
+            conn._persist_ready=schema_ready
         conn.row_factory=sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=2000")
@@ -2135,6 +2259,8 @@ def create_play_blueprint(db_path):
             except Exception:
                 conn.close()
                 raise
+        if on_career_commit:
+            conn._persist_ready=True
         return conn
     def page(title, mode, **kwargs):
         return render_template_string(HTML,title=title,mode=mode,authenticated=True,
@@ -2560,6 +2686,9 @@ def create_play_blueprint(db_path):
             return int(value) if value.isdigit() else None
         scout_query=request.args.get("scout_query","").strip()[:70] if not spectator else ""
         scout_position=request.args.get("scout_position","") if not spectator else ""
+        scout_positions=request.args.get("scout_positions","")[:160] if not spectator else ""
+        scout_hide_mine=request.args.get("scout_hide_mine")=="1" if not spectator else False
+        scout_listed=request.args.get("scout_listed")=="1" if not spectator else False
         scout_min_overall=filter_value("scout_min_overall")
         scout_max_age=filter_value("scout_max_age")
         scout_category=request.args.get("scout_category","") if not spectator else ""
@@ -2596,7 +2725,9 @@ def create_play_blueprint(db_path):
         scout_page_size=80
         scout_results,scout_total=(scouting_search(
             db,career_id=career_id,query=scout_query,
-            position=scout_position,min_overall=scout_min_overall,max_age=scout_max_age,
+            position=scout_position,position_codes=scout_positions,
+            exclude_manager_players=scout_hide_mine,listed_only=scout_listed,
+            min_overall=scout_min_overall,max_age=scout_max_age,
             category=scout_category,min_category=scout_min_category,
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
@@ -2668,11 +2799,33 @@ def create_play_blueprint(db_path):
                                           if valuation is not None else None)
                 item["value_difference_pct"]=(100*(r["offered_fee"]-valuation)/valuation
                     if valuation is not None and valuation>0 else None)
+                profile=db.execute("""SELECT p.primary_position,x.overall,
+                    COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
+                    pc.current_role
+                    FROM world_players p
+                    LEFT JOIN world_dataset_ratings x
+                      ON x.dataset_id=? AND x.player_id=p.player_id
+                    LEFT JOIN world_career_player_circumstances pc
+                      ON pc.career_id=? AND pc.player_id=p.player_id
+                    LEFT JOIN world_career_contract_snapshots cs
+                      ON cs.career_id=? AND cs.player_id=p.player_id
+                    WHERE p.player_id=?""",
+                    (dataset,career_id,career_id,r["player_id"])).fetchone()
+                item["position"]=profile[0] if profile else None
+                item["overall"]=profile[1] if profile else None
+                item["current_wage"]=profile[2] if profile else None
+                item["squad_role"]=profile[3] if profile else None
                 offers.append(item)
             outgoing=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
                 o.demanded_fee,p.full_name AS player_name,
                 sc.name AS seller_name,t.status AS agent_status,
-                t.demanded_wage_weekly AS agent_demand
+                t.demanded_wage_weekly AS agent_demand,
+                t.proposed_wage_weekly AS negotiated_wage,
+                t.contract_years AS agreed_contract_years,
+                o.offered_wage_weekly AS signed_weekly_wage,
+                EXISTS(SELECT 1 FROM world_career_offer_events e
+                    WHERE e.offer_id=o.offer_id AND e.event_type='buyer_signing_delayed')
+                    AS signing_delay_used
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
@@ -2712,10 +2865,20 @@ def create_play_blueprint(db_path):
             for event_id,name,seller,buyer,fee,when in deal_rows:
                 clean=lambda value:re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",value)
                 world_news.append(dict(event_id=event_id,headline="AI transfer agreed",
+                    player=name,seller=clean(seller),buyer=clean(buyer),
+                    fee_display=format_market_gbp(fee),is_world=True,
                     detail=(name+" · "+clean(seller)+" → "+clean(buyer)+
                         " · "+format_market_gbp(fee)),
                     created_at=when,is_read=1))
-        news_feed=sorted([*messages,*world_news],
+        import re
+        sanitise_news=lambda v:re.sub(r"\s*\[WH27:[^\]]+\]","",str(v or "")).strip()
+        clean_messages=[]
+        for m in messages:
+            entry=dict(m)
+            entry["headline"]=sanitise_news(entry.get("headline"))
+            entry["detail"]=sanitise_news(entry.get("detail"))
+            clean_messages.append(entry)
+        news_feed=sorted([*clean_messages,*world_news],
             key=lambda item:str(item["created_at"]),reverse=True)
 
         from world_player_morale import existing_morale
@@ -2786,7 +2949,11 @@ def create_play_blueprint(db_path):
             shortlist=shortlist,recommendations=recommendations,squad=squad,
             tactics=tactics,
             scout_categories=CATEGORIES,scout_query=scout_query,
-            scout_position=scout_position,scout_min_overall=scout_min_overall or "",
+            scout_position=scout_position,scout_positions=scout_positions,
+            scout_hide_mine=scout_hide_mine,scout_listed=scout_listed,
+            manager_club_name=club_display(db.execute("""SELECT name FROM world_clubs
+                WHERE club_id=?""",(c["manager_club_id"],)).fetchone()[0]),
+            scout_min_overall=scout_min_overall or "",
             scout_max_age=scout_max_age or "",scout_category=scout_category,
             scout_min_category=scout_min_category or "",scout_attribute=scout_attribute,
             scout_min_attribute=scout_min_attribute or "",scout_contract=scout_contract,
@@ -2936,6 +3103,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     db,career_id=career_id,
                     query=request.args.get("scout_query","")[:70],
                     position=request.args.get("scout_position",""),
+                    position_codes=request.args.get("scout_positions","")[:160],
+                    exclude_manager_players=request.args.get("scout_hide_mine")=="1",
+                    listed_only=request.args.get("scout_listed")=="1",
                     min_overall=positive_number("scout_min_overall"),
                     max_age=positive_number("scout_max_age"),
                     category=request.args.get("scout_category",""),
@@ -2960,7 +3130,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         for p in results:
             data.append(dict(
                 player_id=p["player_id"],name=p["full_name"],
-                club=re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",p["club_name"]),
+                club=("-" if p["free_agent"] else re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",p["club_name"])),
                 position=p["primary_position"] or "—",
                 overall=p["overall"],age=p["age"],
                 value=(format_market_gbp(p["market_value"])
@@ -3022,13 +3192,23 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             offer_rows=db.execute("""SELECT o.offer_id,o.player_id,
                     o.status,o.offered_fee,p.full_name,b.name,
                     wo.tagged_at,ia.status AS agent_status,
-                    o.demanded_fee
+                    o.demanded_fee,lc.value_gbp,p.primary_position,
+                    x.overall,COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
+                    pc.current_role
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
                 JOIN world_clubs b ON b.club_id=o.buying_club_id
                 LEFT JOIN world_career_incoming_approaches ia
                   ON ia.offer_id=o.offer_id
+                LEFT JOIN world_career_saves c ON c.career_id=o.career_id
+                LEFT JOIN world_dataset_ratings x ON x.dataset_id=c.dataset_id AND x.player_id=o.player_id
+                LEFT JOIN world_career_live_player_context lc ON lc.career_id=o.career_id
+                    AND lc.player_id=o.player_id AND lc.window_id=wo.window_id
+                LEFT JOIN world_career_player_circumstances pc ON pc.career_id=o.career_id
+                    AND pc.player_id=o.player_id
+                LEFT JOIN world_career_contract_snapshots cs ON cs.career_id=o.career_id
+                    AND cs.player_id=o.player_id
                 WHERE wo.window_id=? AND o.career_id=?
                   AND o.selling_club_id=? AND o.buying_club_id<>?
                 ORDER BY o.offer_id DESC LIMIT 100""",
@@ -3039,8 +3219,33 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             live_offers=[dict(offer_id=oid,player_id=pid,status=status,
                 fee=fee,player=name,buyer=clean_buyer(buyer),
                 received_at=received,agent_status=agent,
-                demanded_fee=demanded)
-                for oid,pid,status,fee,name,buyer,received,agent,demanded in offer_rows]
+                demanded_fee=demanded,valuation=valuation,
+                position=position,overall=rating,current_wage=wage,squad_role=role)
+                for (oid,pid,status,fee,name,buyer,received,agent,demanded,
+                     valuation,position,rating,wage,role) in offer_rows]
+            buying_rows=db.execute("""SELECT o.offer_id,o.player_id,
+                    o.status,o.offered_fee,p.full_name,sc.name,
+                    t.status,t.demanded_wage_weekly,
+                    t.proposed_wage_weekly,t.contract_years,
+                    EXISTS(SELECT 1 FROM world_career_offer_events ev
+                      WHERE ev.offer_id=o.offer_id
+                        AND ev.event_type='buyer_signing_delayed')
+                FROM world_career_preseason_window_offers wo
+                JOIN world_career_offers o ON o.offer_id=wo.offer_id
+                JOIN world_players p ON p.player_id=o.player_id
+                JOIN world_clubs sc ON sc.club_id=o.selling_club_id
+                LEFT JOIN world_career_agent_terms t ON t.offer_id=o.offer_id
+                WHERE wo.window_id=? AND o.career_id=?
+                  AND o.buying_club_id=? AND o.selling_club_id<>?
+                ORDER BY o.offer_id DESC LIMIT 100""",
+                (snap["window_id"],career_id,career[0],career[0])).fetchall() if snap["window_id"] else []
+            buying_updates=[dict(offer_id=oid,player_id=pid,status=status,
+                fee=fee,player=name,seller=clean_buyer(seller),
+                agent_status=agent,agent_demand=demanded,
+                weekly_wage=wage,contract_years=years,
+                delay_used=bool(delayed))
+                for oid,pid,status,fee,name,seller,agent,demanded,wage,years,delayed
+                in buying_rows]
             recent=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
                 o.offered_fee,e.created_at FROM world_career_offer_events e
                 JOIN world_career_offers o ON o.offer_id=e.offer_id
@@ -3056,6 +3261,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             def clean_club(v):
                 return re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",v)
             world_updates=[dict(event_id=eid,headline="AI transfer agreed",
+                player=name,seller=clean_club(seller),buyer=clean_club(buyer),
+                fee=format_market_gbp(fee),
                 detail=(name+" · "+clean_club(seller)+" → "+clean_club(buyer)+
                         " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
                 for eid,name,seller,buyer,fee,when in recent]
@@ -3076,7 +3283,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 total_transfer_budget=transfer_total,
                 sale_budget_allocated=sale_totals[0],sale_board_withheld=sale_totals[1],
                 unread=unread,incoming_offers=offers,
-                offer_updates=live_offers,csrf=csrf_value(),
+                offer_updates=live_offers,buying_updates=buying_updates,csrf=csrf_value(),
                 world_updates=world_updates,
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
@@ -3112,7 +3319,13 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         row=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
             o.demanded_fee,p.full_name AS player_name,
             sc.name AS seller_name,t.status AS agent_status,
-            t.demanded_wage_weekly AS agent_demand
+            t.demanded_wage_weekly AS agent_demand,
+            t.proposed_wage_weekly AS negotiated_wage,
+            t.contract_years AS agreed_contract_years,
+            o.offered_wage_weekly AS signed_weekly_wage,
+            EXISTS(SELECT 1 FROM world_career_offer_events e
+                WHERE e.offer_id=o.offer_id AND e.event_type='buyer_signing_delayed')
+                AS signing_delay_used
             FROM world_career_offers o
             JOIN world_career_saves c ON c.career_id=o.career_id
             JOIN world_players p ON p.player_id=o.player_id
@@ -3146,13 +3359,27 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             WHERE career_id=? AND club_id=?""",(career_id,manager_id)).fetchone()[0]
         response=jsonify(ok=True,message=message,offer_id=offer_id,
             status=item["status"],status_label=item["status_label"],
-            offered_fee=item["offered_fee"],player_id=item["player_id"],
+            offered_fee=item["offered_fee"],
+            weekly_wage=(item["signed_weekly_wage"] or item["negotiated_wage"]),
+            contract_years=item["agreed_contract_years"],
+            player_id=item["player_id"],
             player_name=item["player_name"],seller_name=club_display(
                 item["seller_name"]),html=card_html,existing=existing,
             available_transfer_budget=budget_remaining(db,career_id,manager_id),
             total_transfer_budget=transfer_total)
         response.headers["Cache-Control"]="private, no-store"
         return response
+
+    @bp.get("/world/play/career/<career_id>/market/buy/status/<int:offer_id>")
+    def manager_market_buy_status(career_id,offer_id):
+        if not authenticated():
+            return jsonify(ok=False,error="Authentication required"),401
+        try:
+            with connect() as db:
+                return buy_offer_response(db,career_id,offer_id,
+                    "Latest verified club and agent decision",existing=True)
+        except (ValueError,sqlite3.Error) as exc:
+            return jsonify(ok=False,error=str(exc)[:200]),400
 
     @bp.post("/world/play/career/<career_id>/market/buy")
     def manager_market_buy(career_id):
@@ -3165,7 +3392,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     offered_fee=int(request.form["offered_fee"]),
                     request_key=request.form["request_key"])
                 message=("Offer already recorded" if result["existing"] else
-                    "Transfer bid submitted; selling club response: "+
+                    "Offer submitted. Waiting for the autonomous selling club to review."
+                    if result["status"]=="proposed" else
+                    "Transfer bid submitted; seller response: "+
                     result["status"].replace("_"," "))
                 if wants_json:
                     return buy_offer_response(db,career_id,result["offer_id"],

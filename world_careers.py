@@ -567,7 +567,8 @@ def _player_reference(conn,ds,pid):
 
 def propose_offer(conn, *, career_id, request_key, player_id, buying_club_id,
                   offered_fee, agreement_date, seller_stance="neutral",
-                  ai_bid_snapshot=None, autonomous_inbox=False):
+                  ai_bid_snapshot=None, autonomous_inbox=False,
+                  defer_seller_review=False):
     """Idempotent proposal. Seller response is a new event; no signings yet.
 
     In an explicitly running live transfer window, autonomous buyer bids
@@ -636,12 +637,21 @@ def propose_offer(conn, *, career_id, request_key, player_id, buying_club_id,
                         (career_id,))[0]
         if autonomous_inbox and (seller!=manager_id or buying_club_id==manager_id):
             raise ValueError("Automatic manager inbox bids must target a player at the human club")
-        seller_review=(
-            {"decision":"await_manager","reason":"Unsolicited AI bid awaiting human selling manager's decision."}
-            if autonomous_inbox else
-            evaluate_career_seller_bid(conn,career_id=career_id,
-                player_id=player_id,seller_club_id=seller,offer_fee=offered_fee,
-                buying_club_id=buying_club_id))
+        if defer_seller_review:
+            if (career[0]!="fc27-warehouse-659-mens-2026-27"
+                    or buying_club_id!=manager_id or seller==manager_id
+                    or autonomous_inbox):
+                raise ValueError("Only a human FC27 buying offer can await autonomous seller review")
+            seller_review={"decision":"review",
+                "reason":"Submitted to the autonomous club for later, actual seller evaluation"}
+        else:
+            seller_review=(
+                {"decision":"await_manager",
+                 "reason":"Unsolicited AI bid awaiting human selling manager's decision."}
+                if autonomous_inbox else
+                evaluate_career_seller_bid(conn,career_id=career_id,
+                    player_id=player_id,seller_club_id=seller,offer_fee=offered_fee,
+                    buying_club_id=buying_club_id))
         if seller_review["decision"]=="await_manager":
             decision={"reason":seller_review["reason"]}
             status="proposed"

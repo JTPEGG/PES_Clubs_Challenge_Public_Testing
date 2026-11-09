@@ -563,6 +563,72 @@ def _respond_to_counter(conn,*,career_id,offer_id,window_id,t):
     conn.commit()
     return True
 
+def _review_due_manager_buying_offers(conn,*,career_id,window_id,now):
+    """Actually evaluate submitted human buy bids after the club's decision time.
+
+    This is not a UI animation: the underlying seller policy has NOT been
+    evaluated until this replay-safe server market moment.
+    """
+    from world_careers import review_pending_seller_offer
+    from world_live_buying import _agent_opening_quote
+    candidates=conn.execute("""SELECT o.offer_id,o.player_id,ev.created_at,
+        p.full_name,sc.name
+        FROM world_career_offers o
+        JOIN world_career_preseason_window_offers wt ON wt.offer_id=o.offer_id
+        JOIN world_career_offer_events ev ON ev.offer_id=o.offer_id
+           AND ev.event_type='manager_buy_queued'
+        JOIN world_players p ON p.player_id=o.player_id
+        JOIN world_clubs sc ON sc.club_id=o.selling_club_id
+        JOIN world_career_saves c ON c.career_id=o.career_id
+        WHERE o.career_id=? AND wt.window_id=? AND o.status='proposed'
+          AND o.buying_club_id=c.manager_club_id
+        ORDER BY ev.event_id LIMIT 20""",(career_id,window_id)).fetchall()
+    changed=0
+    for oid,pid,created,player,seller in candidates:
+        submitted=datetime.fromisoformat(str(created).replace(" ","T"))
+        if submitted.tzinfo is None:submitted=submitted.replace(tzinfo=timezone.utc)
+        # A club-specific pause, never a fixed percentage or fake response.
+        decision_seconds=12+_stable(career_id,oid,VERSION,"club-review")%29
+        if (now-submitted).total_seconds()<decision_seconds:continue
+        try:
+            status=review_pending_seller_offer(conn,career_id=career_id,offer_id=oid)
+        except (ValueError,sqlite3.OperationalError) as exc:
+            # Missing necessary seller evidence is not permission to invent
+            # an acceptance. Keep the real offer pending for later review.
+            _message(conn,career_id=career_id,window_id=window_id,
+                key=f"manager-buy-review-blocked:{oid}",
+                headline="Seller review still pending",
+                detail=str(exc)[:240],offer_id=oid,when=now)
+            conn.commit()
+            continue
+        headline={"accepted_pending_contract":"Selling club accepted your fee",
+            "countered":"Selling club made a counteroffer",
+            "rejected":"Selling club rejected your offer"}.get(status,
+                "Selling club responded")
+        _message(conn,career_id=career_id,window_id=window_id,
+            key=f"manager-buy-review:{oid}",
+            headline=headline,
+            detail=f"{seller} has evaluated your submitted offer for {player}. "+
+                ("Player and agent negotiations are now required." if
+                 status=="accepted_pending_contract" else
+                 "Review the club response in your Transfer Centre."),
+            offer_id=oid,when=now)
+        conn.commit()
+        if status=="accepted_pending_contract":
+            try:
+                _agent_opening_quote(conn,career_id=career_id,offer_id=oid,
+                    window_id=window_id,now=now)
+            except ValueError as exc:
+                _message(conn,career_id=career_id,window_id=window_id,
+                    key=f"manager-buy-agent-blocked:{oid}",
+                    headline="Player/agent talks cannot begin",
+                    detail=str(exc)[:240],offer_id=oid,when=now)
+                conn.commit()
+        changed+=1
+        if changed>=5:break
+    return changed
+
+
 def process_live_market(conn,*,career_id,now=None,
                         fc27_activity_scale_qa=1):
     """Reconcile due market moments, then close at 30 min; safe on rerun.
@@ -578,6 +644,9 @@ def process_live_market(conn,*,career_id,now=None,
     if snap["state"]=="closed":
         return {"state":"closed","changed":False,"new_offers":0}
     win=snap["window_id"]
+    if snap["state"]=="open":
+        _review_due_manager_buying_offers(conn,career_id=career_id,
+            window_id=win,now=t)
     if fc27_activity_scale_qa not in (1,3):
         raise ValueError("Unsupported isolated FC27 activity scenario")
     from world_fc27_market_schedule import (

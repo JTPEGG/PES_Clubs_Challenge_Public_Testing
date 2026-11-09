@@ -95,6 +95,30 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
               else "rotation" if rank<18 else "fringe")
     term=1+_stable(career_id,player_id,VERSION)%4
     listed=role=="fringe" and term<=2
+    if target["dataset"]=="fc27-warehouse-659-mens-2026-27":
+        # Consistent source-backed club listing for seller AI and Scouting.
+        from world_fc27_transfer_list import listing_score
+        person=conn.execute("""SELECT p.birth_date,cs.expires_on
+            FROM world_players p
+            LEFT JOIN world_career_contract_snapshots cs
+              ON cs.career_id=? AND cs.player_id=p.player_id
+            WHERE p.player_id=?""",(career_id,player_id)).fetchone()
+        locked=target.get("pes_date") or conn.execute(
+            "SELECT pes_lock_date FROM world_career_saves WHERE career_id=?",
+            (career_id,)).fetchone()[0]
+        today=date.fromisoformat(locked)
+        try:
+            birthday=date.fromisoformat(person[0]) if person and person[0] else None
+            age=today.year-birthday.year-((today.month,today.day)<(birthday.month,birthday.day)) if birthday else None
+        except ValueError: age=None
+        try:
+            remaining=(date.fromisoformat(person[1])-today).days/365.25 if person and person[1] else None
+        except ValueError: remaining=None
+        lane=lane_of(next(pos for pid,rating,pos in ranked if pid==player_id))
+        same_lane=[pid for pid,rating,pos in ranked if lane_of(pos)==lane]
+        listed=listing_score(position_depth=same_lane.index(player_id),
+            overall=target["overall"],age=age,years_left=remaining,
+            financial_pressure=(fc27_seller or {}).get("financial_pressure_index",0))>=0.54
     # In AI-only club dealings, a small, explicitly FICTIONAL subset of
     # expiring starters may push for an exit. The human manager is never
     # assigned a wish or request by this model.
@@ -210,7 +234,8 @@ def submit_buy_offer(conn,*,career_id,player_id,offered_fee,request_key,now=None
                timedelta(days=1)).isoformat()
     offer_id=propose_offer(conn,career_id=career_id,request_key=request_key,
         player_id=player_id,buying_club_id=target["manager"],
-        offered_fee=offered_fee,agreement_date=game_date)
+        offered_fee=offered_fee,agreement_date=game_date,
+        defer_seller_review=(target["dataset"]=="fc27-warehouse-659-mens-2026-27"))
     # Continental participation affects consent; fictional career estimate,
     # not an assertion of real Champions League qualification.
     conn.execute("""INSERT OR IGNORE INTO world_career_offer_europe
@@ -224,16 +249,25 @@ def submit_buy_offer(conn,*,career_id,player_id,offered_fee,request_key,now=None
                         (offer_id,)).fetchone()[0]
     club=conn.execute("SELECT name FROM world_clubs WHERE club_id=?",
                       (target["seller"],)).fetchone()[0]
+    if target["dataset"]=="fc27-warehouse-659-mens-2026-27":
+        conn.execute("""INSERT INTO world_career_offer_events
+            (offer_id,event_type,detail) VALUES(?,?,?)""",
+            (offer_id,"manager_buy_queued",
+             "Real autonomous seller review queued; separate from later agent and sign-off stages"))
     _message(conn,career_id=career_id,window_id=snap["window_id"],
         key=f"manager-bid:{offer_id}",offer_id=offer_id,when=now,
-        headline=("Transfer bid rejected by selling club" if status=="rejected"
+        headline=("Your bid is awaiting the selling club"
+                  if status=="proposed" else
+                  "Transfer bid rejected by selling club" if status=="rejected"
                   else "Selling club makes a counteroffer" if status=="countered"
                   else "Transfer fee agreed, player talks pending"
                   if status=="accepted_pending_contract"
                   else "Your transfer offer submitted"),
         detail=(f"£{offered_fee:,} bid for {target['name']} of {club}. "
-                f"Selling club response: {status.replace('_',' ')}. "
-                "No sale is final until the player and agent agree terms."))
+                +("The selling club will evaluate the fee at its next decision point."
+                  if status=="proposed" else
+                  f"Selling club response: {status.replace('_',' ')}.")
+                +" No transfer occurs until agent terms and manager sign-off are complete."))
     conn.commit()
     if status=="accepted_pending_contract":
         try:
@@ -399,6 +433,25 @@ def act_on_buy_offer(conn,*,career_id,offer_id,action,weekly_wage=None,
         confirm_future_agreement(conn,career_id=career_id,offer_id=offer_id,
                                  agreement_date=agreement_date)
         result="Transfer signed; player registers in your career at the deadline."
+    elif action=="delay_signing":
+        # A manager may defer paperwork once without extending the immutable
+        # 30-minute market deadline or falsely implying agreement.
+        if status!="accepted_pending_contract":
+            raise ValueError("Only a deal awaiting your signature can be delayed")
+        agent=conn.execute("""SELECT status FROM world_career_agent_terms
+            WHERE career_id=? AND offer_id=?""",(career_id,offer_id)).fetchone()
+        if not agent or agent[0]!="accepted":
+            raise ValueError("Personal terms must be agreed before delaying signature")
+        previously=conn.execute("""SELECT 1 FROM world_career_offer_events
+            WHERE offer_id=? AND event_type='buyer_signing_delayed'""",
+            (offer_id,)).fetchone()
+        if previously:raise ValueError("You have already used the one signing delay")
+        conn.execute("""INSERT INTO world_career_offer_events
+            (offer_id,event_type,detail) VALUES(?,?,?)""",
+            (offer_id,"buyer_signing_delayed",
+             "Human manager deferred signing once; no extension to the global market deadline"))
+        result=("Paperwork deferred. You can confirm or cancel later, but the "
+                "30-minute transfer deadline has not changed.")
     elif action=="withdraw":
         from world_careers import withdraw_offer
         withdraw_offer(conn,career_id=career_id,offer_id=offer_id)
@@ -416,7 +469,12 @@ def act_on_buy_offer(conn,*,career_id,offer_id,action,weekly_wage=None,
         key=f"manager-buy-action:{offer_id}:{action}:"+
             str(conn.execute("""SELECT COALESCE(MAX(event_id),0) FROM world_career_offer_events
                  WHERE offer_id=?""",(offer_id,)).fetchone()[0]),
-        headline="Outgoing transfer update",detail=result,offer_id=offer_id,when=now)
+        headline=("Paperwork awaits your decision" if action=="terms" and
+                  result.startswith("Player and agent accepted")
+                  else "Transfer signature delayed" if action=="delay_signing"
+                  else "Transfer signing confirmed" if action=="sign"
+                  else "Transfer negotiation update"),
+        detail=result,offer_id=offer_id,when=now)
     conn.commit()
     return result
 

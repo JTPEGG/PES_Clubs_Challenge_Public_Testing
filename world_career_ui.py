@@ -353,6 +353,64 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-view[data-view="scouting"] .desk-scout-finance b{font-size:16px}
 @media(max-width:580px){.desk-scout-condition-grid{grid-template-columns:1fr}.desk-scout-searchbar>label{flex:1 1 135px}}
 
+/* Scouting is a clean server-backed search, not a partial client-side table */
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes){width:100%;min-width:0!important;table-layout:fixed}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) td:first-child,
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) td:nth-child(2){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:first-child{width:21%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(2){width:17%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(3){width:7%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(4),
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(5){width:6%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(6){width:11%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(7){width:12%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(8){width:13%}
+.desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(9){width:7%}
+.desk-view[data-view="scouting"] .scout-table{overflow-x:auto;max-width:100%}
+.desk-view[data-view="scouting"] .desk-scout-lead{display:none}
+.desk-view[data-view="scouting"] .desk-scout-searchbar{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(130px,.8fr) minmax(130px,.8fr) auto;align-items:end;gap:10px;padding:15px;background:#172e43;border:1px solid #365b73;border-radius:10px}
+.desk-scout-searchbar>label,.desk-scout-quick>label{display:flex;flex-direction:column;gap:5px;color:#bed7e5;font-size:11px;font-weight:690}
+.desk-scout-searchbar select,.desk-scout-searchbar input,.desk-scout-quick input[type=number]{background:#0e2236!important;border:1px solid #4b728b!important;border-radius:6px!important;min-height:37px!important;padding:7px 9px!important;color:#f5fbff!important;font-size:13px!important}
+.desk-scout-searchbar select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#9ad1e5 50%),linear-gradient(135deg,#9ad1e5 50%,transparent 50%)!important;background-position:calc(100% - 17px) 15px,calc(100% - 12px) 15px!important;background-size:5px 5px!important;background-repeat:no-repeat!important;padding-right:28px!important}
+.desk-scout-quick{grid-column:1/-1;display:flex;align-items:end;gap:9px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #34546b}
+.desk-scout-quick>label.desk-scout-quick-number{flex:0 1 170px;min-width:125px}
+.desk-scout-quick-check{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;padding:10px 12px;background:#1f3c51;border:1px solid #466b80;border-radius:7px;min-height:37px;color:#e5f6ff!important;font-size:12px!important;cursor:pointer}
+.desk-scout-quick-check input{accent-color:#62c8d9;min-width:16px;min-height:16px;cursor:pointer}
+.desk-scout-add,.desk-scout-clear{min-height:37px}
+.desk-position-chooser{grid-column:1/-1;border:1px solid #476e85;border-radius:8px;padding:13px;background:#12283c}
+.desk-position-chooser h4{font-size:13px;margin:0 0 7px}
+.desk-position-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.desk-position-grid label{display:flex!important;align-items:center;gap:7px;padding:9px!important;background:#1b3c51;border:1px solid #476c83;border-radius:6px;cursor:pointer;font-size:12px;color:#e9f8ff}
+.desk-position-grid label:has(input:checked){background:#255771;border-color:#76c4dd}
+.desk-position-grid input{accent-color:#68d0df}
+.desk-budget-available{margin-left:12px;color:#a5edcf;font-size:13px}
+.desk-offer-briefing{background:#12273b;border:1px solid #36556d;border-radius:9px;padding:15px 17px;margin:14px 0 16px}
+.desk-offer-briefing-title{display:flex;justify-content:space-between;align-items:center;gap:9px;font-size:14px;font-weight:780;padding-bottom:12px}
+.desk-offer-briefing-title span{font-size:10px;font-weight:600;letter-spacing:.04em;color:#aac1d0}
+.desk-offer-briefing-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
+.desk-offer-briefing-metrics>div{background:#1b354b;border:1px solid #335670;border-radius:7px;padding:11px;min-width:0}
+.desk-offer-briefing-metrics small{display:block;color:#9cbfd3;font-size:10px;line-height:1.4}
+.desk-offer-briefing-metrics strong{font-size:18px;font-weight:800;display:block;white-space:nowrap;margin-top:4px}
+.desk-positive{color:#72dfb9}.desk-negative{color:#ffbb91}
+.desk-offer-briefing-note{color:#b9cedd;font-size:12px;line-height:1.65;margin:10px 0 0}
+.desk-inbox-reader .desk-inbox-detail>.offer>.label,.desk-inbox-reader .desk-inbox-detail>.offer>h3,.desk-inbox-reader .desk-inbox-detail>.offer>.count{display:none}
+.desk-inbox-reader .desk-inbox-detail>.offer>.muted:first-of-type{font-size:11px;color:#8fa9bb}
+.desk-inbox-reader .desk-inbox-detail>.offer .actions{align-items:end;gap:10px;border-top:1px solid #2c465b;padding-top:14px;display:flex;flex-wrap:wrap}
+.desk-inbox-reader .desk-inbox-detail>.offer .actions button{font-size:12px;padding:9px 13px}
+.desk-counter-stepper{display:inline-flex;align-items:center;gap:7px;flex-wrap:wrap}
+.desk-counter-stepper input{width:123px!important;font-size:13px!important;font-variant-numeric:tabular-nums;padding:7px!important}
+.desk-counter-stepper button{padding:7px 10px!important;min-width:32px;background:#29465d!important;border:1px solid #50768c!important}
+.desk-counter-preview{font-size:12px;color:#8ef0ce;min-width:56px;font-weight:800}
+.desk-view[data-view="news"] .desk-news-card{background:#142a40;border:1px solid #38536c;border-radius:8px;margin:0 0 9px;padding:14px}
+.desk-news-route{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;color:#e1f5ff}
+.desk-news-route .desk-news-player{font-weight:780;color:#fff}
+.desk-news-route .desk-news-arrow{color:#74d5c6;font-weight:900;font-size:18px}
+.desk-news-route .desk-news-club{color:#bad8e7}
+.desk-news-fee{color:#89e8bf;font-weight:750}
+.desk-view[data-view="news"] .desk-news-card small{color:#9aafc1}
+@media(max-width:1120px){.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:630px){.desk-position-grid{grid-template-columns:repeat(3,1fr)}.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:1fr}.desk-scout-quick>label.desk-scout-quick-number{flex:1 1 125px}}
+
 """
 
 DASHBOARD_JS = r"""
@@ -497,13 +555,19 @@ DASHBOARD_JS = r"""
     [
       {name:'Transfer budget',remaining:Number(budgetValues.feeRemaining),
         total:Number(budgetValues.feeTotal),suffix:'available'},
-      {name:'Weekly wage headroom',remaining:Number(budgetValues.wageRemaining),
-        total:Number(budgetValues.wageTotal),suffix:'per week'}
+      {name:'Total weekly wage budget',remaining:Number(budgetValues.wageRemaining),
+        total:Number(budgetValues.wageTotal),suffix:'per week',showTotal:true}
     ].forEach(function(entry){
       const card=document.createElement('div');card.className='card';
       const label=document.createElement('div');label.className='label';label.textContent=entry.name;
       const val=document.createElement('div');val.className='desk-finance-value';
-      val.textContent=gbp(entry.remaining);
+      val.textContent=gbp(entry.showTotal?entry.total:entry.remaining);
+      if(entry.showTotal){
+        const available=document.createElement('small');
+        available.className='desk-finance-available';
+        available.textContent=gbp(entry.remaining)+' available per week';
+        card.appendChild(available);
+      }
       const track=document.createElement('div');track.className='desk-finance-track';
       const fill=document.createElement('div');fill.className='desk-finance-fill';
       fill.style.width=Math.min(100,Math.max(0,entry.remaining/Math.max(1,entry.total)*100))+'%';
@@ -605,6 +669,10 @@ DASHBOARD_JS = r"""
     return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
+    if(card.dataset.deskSide==='buy')
+      return card.dataset.deskStatus==='countered'||
+        (card.dataset.deskStatus==='accepted_pending_contract'&&
+         card.dataset.deskAgent==='terms_accepted');
     return card.dataset.deskStatus==='proposed'||
       (card.dataset.deskStatus==='accepted_pending_contract'&&
        card.dataset.deskAgent==='terms_accepted');
@@ -623,10 +691,51 @@ DASHBOARD_JS = r"""
       cleanInboxClub(card.dataset.deskBuyer||'Buying club');
     holder.querySelector('.desk-inbox-fee').textContent=
       card.querySelector('.count')?.textContent.trim()||'—';
-    holder.querySelector('.desk-inbox-state').textContent=inboxLabels[status]||status;
+    const buyingStages={proposed:'Seller reviewing',countered:'Counteroffer',
+      accepted_pending_contract:card.dataset.deskAgent==='terms_accepted'?
+        'Sign-off needed':'Agent talks',
+      agreed_future:'Confirmed',completed:'Confirmed',
+      rejected:'Rejected',withdrawn:'Withdrawn'};
+    holder.querySelector('.desk-inbox-state').textContent=
+      (card.dataset.deskSide==='buy'?buyingStages[status]:inboxLabels[status])||status;
   }
+
+  function enhanceCounter(card){
+    if(!card)return;
+    card.querySelectorAll('input[name="counter_fee"]').forEach(input=>{
+      if(input.dataset.stepper==='1')return;
+      input.dataset.stepper='1';
+      const original=Number(input.min)||0;
+      const step=original>=10000000?250000:original>=1000000?50000:
+        original>=200000?10000:original>=20000?2500:500;
+      const wrapper=document.createElement('span');
+      wrapper.className='desk-counter-stepper';
+      input.before(wrapper);wrapper.appendChild(input);
+      const preview=document.createElement('strong');
+      preview.className='desk-counter-preview';
+      function repaint(){preview.textContent=gbp(Number(input.value)||0);}
+      function adjust(delta){
+        const low=Number(input.min)||0,high=Number(input.max)||1000000000;
+        const next=Math.max(low,Math.min(high,(Number(input.value)||low)+delta));
+        input.value=String(next);repaint();
+      }
+      const minus=document.createElement('button');
+      minus.type='button';minus.textContent='−';minus.title='Reduce counter by '+gbp(step);
+      minus.setAttribute('aria-label','Reduce counteroffer by '+gbp(step));
+      minus.addEventListener('click',()=>adjust(-step));
+      const plus=document.createElement('button');
+      plus.type='button';plus.textContent='+';plus.title='Increase counter by '+gbp(step);
+      plus.setAttribute('aria-label','Increase counteroffer by '+gbp(step));
+      plus.addEventListener('click',()=>adjust(step));
+      wrapper.append(minus,plus,preview);
+      input.addEventListener('input',repaint);
+      repaint();
+    });
+  }
+
   function makeInboxItem(card){
     if(card.closest('.desk-inbox-item'))return;
+    enhanceCounter(card);
     const item=document.createElement('details');
     item.className='desk-inbox-item';
     item.dataset.offerId=card.dataset.liveOfferId||'';
@@ -708,8 +817,7 @@ DASHBOARD_JS = r"""
       const matches=(!playerQuery||haystack.includes(playerQuery));
       let statusMatch=true;
       if(activeFilter==='action')
-        statusMatch=(status==='proposed'||(
-          status==='accepted_pending_contract'&&playerState==='terms_accepted'));
+        statusMatch=actionRequired(card);
       else if(activeFilter==='talks')
         statusMatch=(status==='countered'||status==='accepted_pending_contract');
       else if(activeFilter==='signed')
@@ -767,13 +875,14 @@ DASHBOARD_JS = r"""
   // is no separate Apply Filter step and no extra server-side offer action.
   document.querySelectorAll('.desk-view table').forEach(function(table){
     if(!table.tHead||!table.tBodies.length||!table.tHead.rows.length)return;
-    if(table.dataset.deskEnhance==='0')return;
+    if(table.dataset.deskEnhance==='0'||views.scouting.contains(table)||
+       views.squad.contains(table))return;
     const head=table.tHead.rows[0];
     const body=table.tBodies[0];
     if(head.cells.length<2)return;
     let sortIndex=-1,sortDirection=1;
     const conditions=new Map();
-    const enableColumnSearch=!views.transfers.contains(table);
+    const enableColumnSearch=views.shortlist.contains(table);
     const filterRow=document.createElement('tr');
     filterRow.className='desk-table-filter-row';
     function apply(){
@@ -897,6 +1006,83 @@ DASHBOARD_JS = r"""
     }
     const budgetControl=compactForm.querySelector('[data-scout-budget]');
     if(budgetControl){budgetControl.type='button';grid.appendChild(budgetControl);}
+
+    const quick=document.createElement('div');
+    quick.className='desk-scout-quick';
+    for(const name of ['scout_max_value','scout_max_wage','scout_interest']){
+      const setting=available.find(entry=>entry.name===name);
+      if(!setting)continue;
+      setting.field.classList.add(name==='scout_interest'?
+        'desk-scout-quick-check':'desk-scout-quick-number');
+      if(name==='scout_max_value'){
+        setting.field.firstChild.textContent='Max market value (£)';
+        setting.input.placeholder='No limit';
+      }
+      if(name==='scout_max_wage'){
+        setting.field.firstChild.textContent='Max wage estimate (£/wk)';
+        setting.input.placeholder='No limit';
+        setting.field.title='Current game/reference wages, not confirmed agent demands.';
+      }
+      quick.appendChild(setting.field);
+    }
+    const showTeam=document.createElement('label');
+    showTeam.className='desk-scout-quick-check';
+    const showTeamCheckbox=document.createElement('input');
+    showTeamCheckbox.type='checkbox';
+    const hideOwn=compactForm.querySelector('[data-scout-hide-mine]');
+    showTeamCheckbox.checked=hideOwn?.value!=='1';
+    const showTeamText=document.createElement('span');
+    showTeamText.textContent='Show '+(compactForm.dataset.clubName||'my club')+' players';
+    showTeam.append(showTeamCheckbox,showTeamText);
+    showTeamCheckbox.addEventListener('change',()=>{
+      if(hideOwn)hideOwn.value=showTeamCheckbox.checked?'0':'1';
+      compactForm.requestSubmit();
+    });
+    quick.appendChild(showTeam);
+    quick.appendChild(resetButton);
+    searchBar.appendChild(quick);
+
+    const oldPosition=available.find(entry=>entry.name==='scout_position');
+    if(oldPosition){
+      oldPosition.field.remove();oldPosition.input.value='';
+      available.splice(available.indexOf(oldPosition),1);
+    }
+    const positions=[
+      ['GK','Goalkeeper'],['CB','Centre-back'],['LB','Left-back'],
+      ['RB','Right-back'],['LWB','Left wing-back'],['RWB','Right wing-back'],
+      ['DMF','Defensive midfield'],['CMF','Central midfield'],
+      ['AMF','Attacking midfield'],['LMF','Left midfield'],
+      ['RMF','Right midfield'],['LWF','Left wing forward'],
+      ['RWF','Right wing forward'],['SS','Second striker'],
+      ['CF','Centre forward']
+    ];
+    const positionsInput=compactForm.querySelector('[data-scout-positions]');
+    const positionsPanel=document.createElement('section');
+    positionsPanel.className='desk-position-chooser';
+    const positionsTitle=document.createElement('h4');
+    positionsTitle.textContent='Positions — select one or more';
+    const positionsGrid=document.createElement('div');
+    positionsGrid.className='desk-position-grid';
+    const selectedCodes=new Set((positionsInput?.value||'').split(',').filter(Boolean));
+    const boxes=[];
+    positions.forEach(([code,name])=>{
+      const label=document.createElement('label');
+      label.title=name;
+      const box=document.createElement('input');
+      box.type='checkbox';box.value=code;box.checked=selectedCodes.has(code);
+      const span=document.createElement('span');span.textContent=code;
+      label.append(box,span);positionsGrid.appendChild(label);
+      boxes.push(box);
+      box.addEventListener('change',()=>{
+        if(positionsInput)positionsInput.value=boxes.filter(b=>b.checked)
+          .map(b=>b.value).join(',');
+        renderChips();compactForm.requestSubmit();
+      });
+    });
+    positionsPanel.append(positionsTitle,positionsGrid);grid.prepend(positionsPanel);
+    if(positionsInput)available.push({input:positionsInput,
+      field:positionsPanel,name:'scout_positions'});
+
     panel.appendChild(grid);
     const actions=document.createElement('div');actions.className='desk-scout-dialog-actions';
     const context=document.createElement('small');
@@ -932,7 +1118,8 @@ DASHBOARD_JS = r"""
     });
     done.addEventListener('click',()=>{compactForm.requestSubmit();closePanel();});
     const description={
-      scout_position:'Position',scout_min_overall:'Minimum rating',
+      scout_position:'Position',scout_positions:'Positions',
+      scout_listed:'Transfer listed',scout_min_overall:'Minimum rating',
       scout_max_age:'Maximum age',scout_max_value:'Transfer value',
       scout_max_wage:'Weekly wages',scout_interest:'Would consider move',
       scout_free_only:'Free agents',scout_category:'Rating category',
@@ -952,6 +1139,7 @@ DASHBOARD_JS = r"""
     function renderChips(){
       chips.replaceChildren();
       for(const {input,name} of available){
+        if(['scout_max_value','scout_max_wage','scout_interest'].includes(name))continue;
         if(!hasCondition(input))continue;
         const chip=document.createElement('span');chip.className='desk-scout-chip';
         const label=document.createElement('span');
@@ -975,6 +1163,9 @@ DASHBOARD_JS = r"""
       available.forEach(({input})=>{
         if(input.type==='checkbox')input.checked=false;else input.value='';
       });
+      boxes.forEach(b=>b.checked=false);
+      showTeamCheckbox.checked=true;
+      if(hideOwn)hideOwn.value='0';
       compactForm.requestSubmit();renderChips();
     });
     const explanation=views.scouting.querySelector('.desk-scout-finance + p.muted');
@@ -1343,8 +1534,10 @@ DASHBOARD_JS = r"""
   // seller-counter click.
   document.addEventListener('submit',async function(event){
     const form=event.target;
-    if(!(form instanceof HTMLFormElement)||!views.transfers.contains(form)||
+    if(!(form instanceof HTMLFormElement)||
+       !(views.transfers.contains(form)||views.inbox.contains(form))||
        form.classList.contains('desk-transfer-cancel-form'))return;
+    const fromInbox=views.inbox.contains(form);
     const buyingAction=form.action.endsWith('/market/buy/decision');
     const rebid=form.action.endsWith('/market/buy/rebid');
     if(!buyingAction&&!rebid)return;
@@ -1370,6 +1563,16 @@ DASHBOARD_JS = r"""
       const result=await response.json().catch(()=>null);
       if(!response.ok||!result?.ok)
         throw new Error(result?.error||'Negotiation could not be saved');
+      if(fromInbox){
+        showDecisionFeedback(oldCard,result.message,false);
+        if(submit?.value==='delay_signing'){
+          oldCard.querySelectorAll('button[value="delay_signing"]').forEach(b=>b.remove());
+          return;
+        }
+        // The authoritative server recomputes projected XI and buyer mail
+        // after a signed or cancelled purchase. Refresh only at that milestone.
+        location.reload();return;
+      }
       const template=document.createElement('template');
       template.innerHTML=result.html||'';
       const newCard=template.content.querySelector('[data-buy-offer-id]');
@@ -1391,15 +1594,18 @@ DASHBOARD_JS = r"""
         if(!row){
           row=document.createElement('tr');
           row.dataset.buyOfferId=String(result.offer_id);
-          for(let i=0;i<5;i++)row.appendChild(document.createElement('td'));
+          for(let i=0;i<7;i++)row.appendChild(document.createElement('td'));
           table.tBodies[0].prepend(row);
         }
         row.cells[0].textContent=result.player_name;
         row.cells[1].textContent=result.seller_name;
         row.cells[2].textContent=pound(result.offered_fee);
         row.cells[2].dataset.sortValue=String(result.offered_fee);
-        row.cells[3].textContent=result.status_label;
-        row.cells[4].replaceChildren();
+        row.cells[3].textContent=result.weekly_wage!=null?pound(result.weekly_wage):'Awaiting terms';
+        row.cells[3].dataset.sortValue=String(result.weekly_wage||0);
+        row.cells[4].textContent=result.contract_years?result.contract_years+' years':'—';
+        row.cells[5].textContent=result.status_label;
+        row.cells[6].replaceChildren();
         if(['proposed','countered','accepted_pending_contract'].includes(result.status)){
           const cancel=document.createElement('form');
           cancel.method='post';cancel.action=location.pathname+'/buy/decision';
@@ -1414,9 +1620,12 @@ DASHBOARD_JS = r"""
           btn.name='decision';btn.value='withdraw';btn.className='desk-transfer-cancel';
           btn.textContent='×';btn.title='Withdraw unsigned offer for '+result.player_name;
           btn.setAttribute('aria-label',btn.title);
-          cancel.appendChild(btn);row.cells[4].appendChild(cancel);
+          cancel.appendChild(btn);row.cells[6].appendChild(cancel);
         }
         updateSaleBudgetUI(result);
+        if(submit?.value==='sign'&&result.status==='agreed_future'){
+          location.reload();return;
+        }
         const count=table.closest('.desk-transfer-section')
            ?.querySelector('.desk-section-count');
         if(count)count.textContent=String(table.tBodies[0].rows.length);
@@ -1463,6 +1672,7 @@ DASHBOARD_JS = r"""
       updateOfferRow(offer);
       updateSaleBudgetUI(result);
       showDecisionFeedback(card,result.message,false);
+      if(button.value==='finalise')location.reload();
       if(Number.isFinite(Number(result.unread))){
         document.body.dataset.unread=String(result.unread);
         document.querySelectorAll('[data-desk-tab="inbox"] .desk-nav-count')
@@ -1504,9 +1714,8 @@ DASHBOARD_JS = r"""
       if(row){
         const free=Boolean(row.dataset.freeAgentSigningId);
         const status=free?'Cancelled':labels[result.status]||'Withdrawn';
-        if(row.cells[3])row.cells[3].textContent=
-          (free?status+' · '+row.cells[3].textContent.split(' · ').slice(1).join(' · '):status);
-        if(row.cells[4])row.cells[4].replaceChildren();
+        if(row.cells[5])row.cells[5].textContent=status;
+        if(row.cells[6])row.cells[6].replaceChildren();
         row.dataset.cancelled='true';
       }
       if(!row?.dataset.freeAgentSigningId){
@@ -1528,15 +1737,98 @@ DASHBOARD_JS = r"""
       updateSaleBudgetUI(result);
     }catch(error){
       let feedback=row?.querySelector('.desk-transfer-cancel-error');
-      if(!feedback&&row?.cells[4]){
+      if(!feedback&&row?.cells[6]){
         feedback=document.createElement('small');
         feedback.className='desk-transfer-cancel-error';
-        row.cells[4].appendChild(feedback);
+        row.cells[6].appendChild(feedback);
       }
       if(feedback)feedback.textContent=String(error.message||error);
       if(button)button.disabled=false;
     }finally{form.dataset.saving='0';}
   },true);
+
+  window.fc27SyncBuyingOffers=function(items,csrf){
+    if(!Array.isArray(items))return;
+    const stages={proposed:'Awaiting seller',countered:'Seller counteroffer',
+      rejected:'Bid rejected',accepted_pending_contract:'Agent talks',
+      agreed_future:'Confirmed',completed:'Confirmed',withdrawn:'Withdrawn'};
+    for(const o of items.slice().reverse()){
+      const id=Number(o.offer_id);
+      if(!Number.isSafeInteger(id)||id<=0)continue;
+      let card=views.inbox.querySelector('[data-live-offer-id="buy-'+id+'"]');
+      const fresh=!card;
+      if(fresh){
+        card=document.createElement('div');
+        card.className='card offer desk-inbox-buy-message';
+        card.dataset.liveOfferId='buy-'+id;card.dataset.buyOfferId=String(id);
+        card.dataset.deskSide='buy';card.dataset.deskPlayer=String(o.player_id);
+        card.dataset.deskPlayerName=o.player;card.dataset.deskBuyer=o.seller;
+        const label=document.createElement('div');label.className='label';
+        const heading=document.createElement('h3');heading.textContent=o.player;
+        const count=document.createElement('div');count.className='count';
+        const briefing=document.createElement('div');
+        briefing.className='desk-offer-briefing';
+        const title=document.createElement('div');title.className='desk-offer-briefing-title';
+        title.textContent='Incoming transfer — decision update';
+        const summary=document.createElement('p');summary.className='desk-offer-briefing-note';
+        briefing.append(title,summary);card.append(label,heading,count,briefing);
+        inboxGrid.hidden=false;
+        inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+        offerCards.push(card);makeInboxItem(card);
+        if(!selectedInboxCard)selectInboxCard(card);
+      }
+      const newAgent=o.agent_status==='accepted'?'terms_accepted':o.agent_status||'';
+      if(!fresh&&card.dataset.deskStatus===o.status&&
+         card.dataset.deskAgent===newAgent&&
+         card.dataset.delayUsed===String(!!o.delay_used))continue;
+      card.dataset.deskStatus=o.status;
+      card.dataset.deskAgent=newAgent;
+      card.dataset.delayUsed=String(!!o.delay_used);
+      card.querySelector('.label').textContent=o.seller+' · '+(stages[o.status]||o.status);
+      card.querySelector('.count').textContent=pound(o.fee);
+      const summary=card.querySelector('.desk-offer-briefing-note');
+      if(summary)summary.textContent=
+        o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'?
+          'Player terms agreed. Paperwork needs your final confirmation.':
+        o.status==='countered'?'The seller has countered your bid. Review negotiations in Transfers.':
+        o.status==='rejected'?'Seller rejected your fee. You can make an improved bid.':
+        o.status==='accepted_pending_contract'?'Seller accepted your fee. Negotiate the player contract in Transfers.':
+        o.status==='agreed_future'||o.status==='completed'?'Transfer confirmed and reflected in the projected squad.':
+        o.status==='proposed'?'The selling club is reviewing your bid.':'Transfer talks are closed.';
+      card.querySelectorAll(':scope > .actions,:scope > .desk-inbox-open-negotiation').forEach(x=>x.remove());
+      if(o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'){
+        const area=document.createElement('div');area.className='actions';
+        const form=document.createElement('form');
+        form.method='post';form.action=location.pathname+'/buy/decision';
+        for(const [name,value] of [['csrf',csrf],['offer_id',id]]){
+          const input=document.createElement('input');
+          input.type='hidden';input.name=name;input.value=String(value);
+          form.appendChild(input);
+        }
+        for(const [verb,title] of [['sign','Confirm signing'],
+          ...(!o.delay_used?[['delay_signing','Delay (once)']]:[]),
+          ['withdraw','Cancel']]){
+          const button=document.createElement('button');
+          button.name='decision';button.value=verb;button.textContent=title;
+          if(verb==='withdraw')button.className='danger';
+          form.appendChild(button);
+        }
+        area.appendChild(form);card.appendChild(area);
+      }else{
+        const link=document.createElement('a');
+        link.href='#transfers';link.dataset.deskTab='transfers';
+        link.className='desk-inbox-open-negotiation';
+        link.textContent='Open transfer negotiations';card.appendChild(link);
+      }
+      refreshInboxItem(card);
+      if(selectedInboxCard===card){
+        const header=inboxReader.querySelector('.desk-inbox-reader-header small');
+        if(header)header.textContent=o.seller+' · '+(stages[o.status]||o.status);
+      }
+      refreshInboxList();
+      if(fresh&&o.status==='countered')alertOfNewOffer({player:o.player,fee:o.fee});
+    }
+  };
   window.fc27SyncIncomingOffers=function(items,csrf){
     if(!Array.isArray(items))return;
     for(const o of items.slice().reverse()){
@@ -1556,9 +1848,43 @@ DASHBOARD_JS = r"""
         heading.textContent=o.player;
         const amount=document.createElement('div');
         amount.className='count';amount.textContent=pound(o.fee);
-        const time=document.createElement('p');time.className='muted';
-        time.textContent='Received '+String(o.received_at||'').slice(11,16)+' UTC';
-        card.append(label,heading,amount,time);
+        const briefing=document.createElement('div');
+        briefing.className='desk-offer-briefing';
+        const title=document.createElement('div');
+        title.className='desk-offer-briefing-title';
+        title.textContent='Decision briefing · Career estimates';
+        const metrics=document.createElement('div');
+        metrics.className='desk-offer-briefing-metrics';
+        const comparison=Number(o.valuation)>0?
+          (100*(Number(o.fee)-Number(o.valuation))/Number(o.valuation)):null;
+        const stats=[
+          ['Offer',pound(o.fee)],
+          ['Market valuation',o.valuation!=null?pound(o.valuation):'Unavailable'],
+          ['Offer vs value',comparison!=null?
+              (comparison>=0?'+':'')+comparison.toFixed(1)+'%':'—'],
+          ['Current wage / week',o.current_wage!=null?pound(o.current_wage):'Unknown']
+        ];
+        for(const [labelText,value] of stats){
+          const tile=document.createElement('div');
+          const caption=document.createElement('small');caption.textContent=labelText;
+          const number=document.createElement('strong');number.textContent=value;
+          tile.append(caption,number);metrics.appendChild(tile);
+        }
+        const impact=document.createElement('p');
+        impact.className='desk-offer-briefing-note';
+        impact.textContent='Sporting: '+(o.position||'Unknown position')+
+          ' · '+(o.overall!=null?'OVR '+o.overall:'Rating unavailable')+
+          ' · '+String(o.squad_role||'Role unknown').replaceAll('_',' ')+
+          '. Any confirmed sale reduces current positional depth.';
+        const finance=document.createElement('p');
+        finance.className='desk-offer-briefing-note';
+        finance.textContent='Financial: '+(comparison==null?
+          'No reliable valuation comparison available.':
+          pound(Math.abs(Number(o.fee)-Number(o.valuation)))+' '+
+          (comparison>=0?'above':'below')+' market estimate.')+
+          ' Only the board-allocated share becomes reinvestable.';
+        briefing.append(title,metrics,impact,finance);
+        card.append(label,heading,amount,briefing);
         if(o.status==='proposed'){
           const actions=document.createElement('div');actions.className='actions';
           for(const verb of ['accept','reject','counter'])

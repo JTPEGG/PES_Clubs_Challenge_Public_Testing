@@ -262,6 +262,9 @@ def run(world,output):
             ).filter(has_text="Jadon Sancho")
             check(sancho_row.count()==1 and "FREE" in sancho_row.inner_text(),
                   "Signed free agent must appear exactly once alongside purchased players in Incoming")
+            check(sancho_row.locator('td').count()==7 and
+                  'years' in sancho_row.locator('td').nth(4).inner_text(),
+                  "Incoming free agent must show a separate wage and contract length")
             check(page.locator("#free-signings").count()==0,
                   "Standalone free-agent transfer section should be removed")
             found.append("Fee-free Sancho signing is included in Incoming and not duplicated")
@@ -479,17 +482,21 @@ def run(world,output):
                   "Hide attributes must restore compact scouting view")
             attrs=page.locator('select[name="scout_attribute"] option').count()
             check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
-            check(not page.locator('input[name="scout_max_value"]').is_visible(),
-                  "Scouting conditions should be hidden outside Add condition")
-            page.locator("#desk-view-scouting .desk-scout-add").first.click()
             check(page.locator('input[name="scout_max_value"]').is_visible(),
-                  "Budget-aware market value condition missing")
+                  "Quick market value filter missing")
             check(page.locator('input[name="scout_max_wage"]').is_visible(),
-                  "Maximum weekly wage condition missing")
+                  "Quick weekly wage estimate filter missing")
             check(page.locator('input[name="scout_interest"]').is_visible(),
-                  "Player move-interest condition missing")
+                  "Quick interested-player toggle missing")
+            check(page.locator('.desk-scout-quick input[type="checkbox"]').count()>=2,
+                  "Show-own-team and interested-player toggles must be visible")
+            page.locator("#desk-view-scouting .desk-scout-add").first.click()
+            check(page.locator('.desk-position-grid input[type="checkbox"]').count()==15,
+                  "Granular 15-position multiselect is missing")
             check(page.locator('input[name="scout_free_only"]').is_visible(),
                   "Independent free-agent condition missing")
+            check(page.locator('input[name="scout_listed"]').is_visible(),
+                  "AI transfer-listed condition missing")
             page.locator('.desk-scout-dialog-close').click()
             check(not page.locator('.desk-scout-dialog').is_visible(),
                   "Condition editor must close without discarding filters")
@@ -525,6 +532,7 @@ def run(world,output):
             check(page.locator('#desk-view-scouting [data-scout-results] tbody tr').count()<80,
                   "My squad filter did not narrow the scouting results")
             page.locator('input[name="scout_squad"]').uncheck()
+            page.locator('.desk-scout-dialog-close').click()
             from world_scouting import interest_cache_ready
             check(interest_cache_ready(CAREER),
                   "Interest preview was not prewarmed during the initial career session")
@@ -540,7 +548,6 @@ def run(world,output):
                   f"Cached FC27 interest filter took {interest_seconds:.2f}s")
             found.append(f"Prewarmed would-consider-a-move response {interest_seconds:.2f}s")
             page.locator('input[name="scout_interest"]').uncheck()
-            page.locator('.desk-scout-dialog-close').click()
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator('#desk-view-transfers .desk-table-filter-row').count()==0,
                   "Transfer Centre should not have column search boxes")
@@ -580,6 +587,40 @@ def run(world,output):
                        AND request_key LIKE 'manager-buy-v1-%'""",
                     (CAREER,target)).fetchone()[0]
             check(count==1,"Browser-submitted transfer offer did not persist exactly once")
+            # A submitted FC27 bid must stay genuinely pending until the AI
+            # selling club reviews it at a later market checkpoint.
+            from world_live_market import _review_due_manager_buying_offers
+            from world_preseason_window import window_snapshot
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                saved=db.execute("""SELECT offer_id,status FROM world_career_offers
+                    WHERE career_id=? AND player_id=?
+                      AND request_key LIKE 'manager-buy-v1-%'
+                    ORDER BY offer_id DESC LIMIT 1""",(CAREER,target)).fetchone()
+                check(saved["status"]=="proposed",
+                      "FC27 selling club responded instantly instead of evaluating a pending bid")
+                queued=db.execute("""SELECT COUNT(*) FROM world_career_offer_events
+                    WHERE offer_id=? AND event_type='manager_buy_queued'""",
+                    (saved["offer_id"],)).fetchone()[0]
+                check(queued==1,"Submitted bid is not queued for autonomous review")
+                window_id=window_snapshot(db,career_id=CAREER)["window_id"]
+                reviewed=_review_due_manager_buying_offers(db,career_id=CAREER,
+                    window_id=window_id,
+                    now=datetime.now(timezone.utc)+timedelta(seconds=120))
+                after=db.execute("""SELECT status FROM world_career_offers
+                    WHERE offer_id=?""",(saved["offer_id"],)).fetchone()[0]
+                check(reviewed==1 and after in (
+                    "accepted_pending_contract","countered","rejected"),
+                    "Deferred AI seller review did not create a genuine club decision")
+                check(db.execute("""SELECT COUNT(*) FROM world_career_market_inbox
+                    WHERE offer_id=? AND message_key LIKE 'manager-buy-review:%'""",
+                    (saved["offer_id"],)).fetchone()[0]==1,
+                    "Selling club response was not delivered to manager Inbox")
+                check(db.execute("""SELECT club_id FROM world_career_registrations
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,target)).fetchone()[0]!=manager,
+                    "Unsigned purchase silently moved player into manager's team")
+            found.append("Manager's bid pending, delayed autonomous seller decision and Inbox mail are real")
             page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
             page.wait_for_function("document.body.dataset.unread === '0'",timeout=20000)
             check(page.locator('.desk-sidebar [data-desk-tab="inbox"] .desk-nav-count').count()==0,
