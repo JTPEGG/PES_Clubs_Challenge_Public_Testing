@@ -532,6 +532,7 @@ def run(world,output):
             check(page.locator('#desk-view-scouting [data-scout-results] tbody tr').count()<80,
                   "My squad filter did not narrow the scouting results")
             page.locator('input[name="scout_squad"]').uncheck()
+            page.locator('.desk-scout-dialog-close').click()
             from world_scouting import interest_cache_ready
             check(interest_cache_ready(CAREER),
                   "Interest preview was not prewarmed during the initial career session")
@@ -547,7 +548,6 @@ def run(world,output):
                   f"Cached FC27 interest filter took {interest_seconds:.2f}s")
             found.append(f"Prewarmed would-consider-a-move response {interest_seconds:.2f}s")
             page.locator('input[name="scout_interest"]').uncheck()
-            page.locator('.desk-scout-dialog-close').click()
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator('#desk-view-transfers .desk-table-filter-row').count()==0,
                   "Transfer Centre should not have column search boxes")
