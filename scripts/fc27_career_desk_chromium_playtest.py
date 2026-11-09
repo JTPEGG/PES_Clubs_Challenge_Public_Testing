@@ -278,8 +278,12 @@ def run(world,output):
             check(page.locator('[data-squad-pane="list"]').is_visible(),
                   "Compact squad list should be the default view")
             row=page.locator('#desk-view-squad .desk-compact-squad tbody tr').first
-            check(row.locator('td').count()==7,
-                  "Squad status, transfer listing and actions must be separate columns")
+            check(row.locator('td').count()==9,
+                  "Squad list must show age and wages in separate compact columns")
+            check(row.locator('td').nth(3).inner_text().isdigit(),
+                  "Squad age must come from source player birthdate")
+            check(row.locator('td').nth(5).inner_text().startswith("£"),
+                  "Squad weekly wage must come from the career salary record")
             check(row.locator('select[name="role"]').count()==1
                   and row.locator('input[name="listed"]').count()==1
                   and row.locator('button[value="update"]').count()==1,
