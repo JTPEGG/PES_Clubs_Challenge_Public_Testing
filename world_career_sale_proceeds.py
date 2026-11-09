@@ -36,21 +36,21 @@ def allocation_basis_points(*,pressure_index,financial_pressure_band,
     """Continuous model from existing source-labelled club financial pressure.
 
     At pressure 0 a well-funded board can reinvest 100%; severe pressure
-    approaches 50%, with a narrower ceiling where labelled financial
-    distress or overcommitment warrants cash retention by the club.
+    approaches 50%. Source financial stress labels make proportionate
+    adjustments without imposing artificial club-band percentage caps.
     This is a *game* policy, not a factual claim about a board.
     """
     if type(pressure_index) is not int or not 0 <= pressure_index <= 100:
         raise ValueError("FC27 sale allocation requires a valid 0–100 club financial-pressure index")
     if not isinstance(financial_pressure_band,str) or not financial_pressure_band:
         raise ValueError("FC27 sale allocation requires an identified financial-pressure band")
-    share = 1.0 - 0.50 * (pressure_index / 100.0) ** 1.35
-    if financial_pressure_band == "distress":
-        share = min(share,0.55)
-    elif financial_pressure_band == "over_committed":
-        share = min(share,0.75)
-    elif financial_pressure_band == "tight":
-        share = min(share,0.90)
+    # There are no discrete band caps or universal club percentages: the
+    # source-labelled pressure index drives a continuous reinvestment share.
+    # Labels only make modest contextual corrections to that same curve.
+    share = 1.0 - 0.45 * (pressure_index / 100.0) ** 1.30
+    band_adjustment={"distress":0.05,"over_committed":0.025,
+                     "tight":0.01}
+    share -= band_adjustment.get(financial_pressure_band,0.0)
     if operating_approach == "high_ambition" and financial_pressure_band != "distress":
         share += 0.025
     return max(0,min(10000,round(share*10000)))
