@@ -346,7 +346,7 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-scout-condition-grid label:has(input[type=checkbox]){display:flex!important;align-items:center;gap:8px}
 .desk-scout-dialog-actions{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #36546a;padding:13px 18px;align-items:center}
 .desk-scout-dialog-actions button{padding:9px 13px!important}
-.desk-view[data-view="scouting"] .scout-filters{background:none!important;padding:0!important;margin:10px 0!important}
+.desk-view[data-view="scouting"] .scout-filters{display:block!important;background:none!important;padding:0!important;margin:10px 0!important}
 .desk-view[data-view="scouting"] .desk-scout-table-tools{margin-top:5px}
 .desk-view[data-view="scouting"] .desk-scout-finance{margin-bottom:12px}
 .desk-view[data-view="scouting"] .desk-scout-finance span{padding:7px 12px;font-size:12px}
@@ -772,6 +772,7 @@ DASHBOARD_JS = r"""
     if(head.cells.length<2)return;
     let sortIndex=-1,sortDirection=1;
     const conditions=new Map();
+    const enableColumnSearch=!views.transfers.contains(table);
     const filterRow=document.createElement('tr');
     filterRow.className='desk-table-filter-row';
     function apply(){
@@ -802,9 +803,11 @@ DASHBOARD_JS = r"""
         conditions.set(index,filter.value.trim().toLocaleLowerCase());
         apply();
       });
-      filterCell.appendChild(filter);
-      filterCell.className=th.className;
-      filterRow.appendChild(filterCell);
+      if(enableColumnSearch){
+        filterCell.appendChild(filter);
+        filterCell.className=th.className;
+        filterRow.appendChild(filterCell);
+      }
       control.addEventListener('click',function(){
         sortDirection=(sortIndex===index?-sortDirection:1);
         sortIndex=index;
@@ -824,7 +827,8 @@ DASHBOARD_JS = r"""
         sorted.forEach(function(row){body.appendChild(row);});
       });
     });
-    table.tHead.appendChild(filterRow);
+    if(enableColumnSearch)table.tHead.appendChild(filterRow);
+    if(!enableColumnSearch)return;
     Array.from(body.rows).forEach(function(row){
       Array.from(row.cells).forEach(function(cell,index){
         // Clicking a plain position, club, value or status cell acts like
@@ -841,6 +845,142 @@ DASHBOARD_JS = r"""
       });
     });
   });
+  // Keep the existing source-backed 17k-player search engine and form
+  // serialization, but present conditions in a compact FM-style pop-out.
+  const compactForm=views.scouting.querySelector('form.scout-filters');
+  if(compactForm){
+    const searchBar=document.createElement('div');
+    searchBar.className='desk-scout-searchbar';
+    compactForm.prepend(searchBar);
+    const nameField=compactForm.querySelector('[name="scout_query"]')?.closest('label');
+    const sortField=compactForm.querySelector('[name="scout_sort"]')?.closest('label');
+    const orderField=compactForm.querySelector('[name="scout_order"]')?.closest('label');
+    for(const field of [nameField,sortField,orderField])if(field)searchBar.appendChild(field);
+    if(nameField){
+      const input=nameField.querySelector('input');
+      if(input){input.placeholder='Search all players by name';input.setAttribute('aria-label','Search players');}
+    }
+    const openButton=document.createElement('button');
+    openButton.type='button';openButton.className='desk-scout-add';
+    openButton.textContent='+ Add condition';
+    openButton.setAttribute('aria-expanded','false');
+    searchBar.appendChild(openButton);
+    const resetButton=document.createElement('button');
+    resetButton.type='button';resetButton.className='desk-scout-clear';
+    resetButton.textContent='Clear conditions';
+    searchBar.appendChild(resetButton);
+    const chips=document.createElement('div');
+    chips.className='desk-scout-chips';chips.setAttribute('aria-live','polite');
+    searchBar.insertAdjacentElement('afterend',chips);
+    const shade=document.createElement('div');shade.className='desk-scout-dialog-shade';
+    shade.hidden=true;
+    const panel=document.createElement('div');
+    panel.className='desk-scout-dialog';panel.hidden=true;
+    panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
+    panel.setAttribute('aria-label','Add scouting conditions');
+    const header=document.createElement('div');header.className='desk-scout-dialog-header';
+    const title=document.createElement('strong');title.textContent='Add scouting conditions';
+    const closeButton=document.createElement('button');
+    closeButton.type='button';closeButton.className='desk-scout-dialog-close';
+    closeButton.setAttribute('aria-label','Close conditions');closeButton.textContent='×';
+    header.append(title,closeButton);panel.append(header);
+    const grid=document.createElement('div');grid.className='desk-scout-condition-grid';
+    const conditionFields=Array.from(compactForm.children).filter(
+      child=>child.tagName==='LABEL'&&child!==nameField&&
+          child!==sortField&&child!==orderField);
+    const available=[];
+    for(const field of conditionFields){
+      grid.appendChild(field);
+      const input=field.querySelector('[name]');
+      if(input)available.push({input,field,name:input.name});
+    }
+    const budgetControl=compactForm.querySelector('[data-scout-budget]');
+    if(budgetControl){budgetControl.type='button';grid.appendChild(budgetControl);}
+    panel.appendChild(grid);
+    const actions=document.createElement('div');actions.className='desk-scout-dialog-actions';
+    const context=document.createElement('small');
+    context.textContent='Conditions combine to narrow the player list.';
+    const done=document.createElement('button');
+    done.type='button';done.className='desk-scout-add';done.textContent='Show results';
+    actions.append(context,done);panel.append(actions);
+    // The old visible submit button is redundant: instant AJAX filtering
+    // and this explicit Show results action continue to use the same form.
+    Array.from(compactForm.querySelectorAll(':scope > button')).forEach(button=>{
+      if(button!==openButton&&button!==resetButton&&button!==budgetControl)
+        button.hidden=true;
+    });
+    compactForm.append(shade,panel);
+    function closePanel(){
+      shade.hidden=true;panel.hidden=true;
+      openButton.setAttribute('aria-expanded','false');
+      openButton.focus();
+    }
+    function showPanel(){
+      shade.hidden=false;panel.hidden=false;
+      openButton.setAttribute('aria-expanded','true');
+      const first=panel.querySelector('input,select');
+      first?.focus();
+    }
+    openButton.addEventListener('click',()=>{
+      if(panel.hidden)showPanel();else closePanel();
+    });
+    closeButton.addEventListener('click',closePanel);
+    shade.addEventListener('click',closePanel);
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&!panel.hidden)closePanel();
+    });
+    done.addEventListener('click',()=>{compactForm.requestSubmit();closePanel();});
+    const description={
+      scout_position:'Position',scout_min_overall:'Minimum rating',
+      scout_max_age:'Maximum age',scout_max_value:'Transfer value',
+      scout_max_wage:'Weekly wages',scout_interest:'Would consider move',
+      scout_free_only:'Free agents',scout_category:'Rating category',
+      scout_min_category:'Minimum category',scout_attribute:'Attribute',
+      scout_min_attribute:'Minimum attribute',scout_contract:'Contract',
+      scout_squad:'My squad',scout_shortlist:'Shortlist'
+    };
+    function hasCondition(input){
+      return input.type==='checkbox'?input.checked:
+        input.value!==''&&input.value!==null;
+    }
+    function removeCondition(input){
+      if(input.type==='checkbox')input.checked=false;
+      else input.value='';
+      compactForm.requestSubmit();renderChips();
+    }
+    function renderChips(){
+      chips.replaceChildren();
+      for(const {input,name} of available){
+        if(!hasCondition(input))continue;
+        const chip=document.createElement('span');chip.className='desk-scout-chip';
+        const label=document.createElement('span');
+        const activeValue=input.type==='checkbox'?'':(
+          input.tagName==='SELECT'?input.selectedOptions[0]?.textContent:
+            input.name==='scout_max_value'||input.name==='scout_max_wage'?
+              '£'+Number(input.value).toLocaleString('en-GB'):input.value);
+        label.textContent=(description[name]||name.replace('scout_','').replaceAll('_',' '))+
+          (activeValue?' · '+activeValue:'');
+        const remove=document.createElement('button');remove.type='button';
+        remove.textContent='×';remove.setAttribute('aria-label','Remove '+label.textContent);
+        remove.addEventListener('click',()=>removeCondition(input));
+        chip.append(label,remove);chips.appendChild(chip);
+      }
+      openButton.textContent='+ Add condition'+(chips.children.length?
+        ' ('+chips.children.length+')':'');
+    }
+    compactForm.addEventListener('change',renderChips);
+    compactForm.addEventListener('input',renderChips);
+    resetButton.addEventListener('click',()=>{
+      available.forEach(({input})=>{
+        if(input.type==='checkbox')input.checked=false;else input.value='';
+      });
+      compactForm.requestSubmit();renderChips();
+    });
+    const explanation=views.scouting.querySelector('.desk-scout-finance + p.muted');
+    if(explanation)explanation.hidden=true;
+    renderChips();
+  }
+
   // Server-backed infinite scrolling: no Next button, no 80-player cap,
   // no full Career Desk reload and no duplicate market tick on filter changes.
   const scoutForm=views.scouting.querySelector('form.scout-filters');
