@@ -938,7 +938,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
     <div>Transfer budget · <b id="fee-current">{{money(funds)}}</b> available</div>
     <div class="budget-track"><div class="budget-fill" id="fee-bar" style="width:{{(100*funds/[budget_total,1]|max)|round(1)}}%"></div></div>
     <div id="fee-preview" hidden></div>
-    <div style="margin-top:14px">Weekly wage budget · <b id="wage-current">{{money(wage_headroom)}}</b> available</div>
+    <div style="margin-top:14px">Total weekly wage budget · <b>{{money(wage_total)}}</b> / week <span class="desk-budget-available"><b id="wage-current">{{money(wage_headroom)}}</b> available</span></div>
     <div class="budget-track"><div class="budget-fill" id="wage-bar" style="width:{{(100*wage_headroom/[wage_total,1]|max)|round(1)}}%"></div></div>
     <div id="wage-preview" hidden></div>
   </div>
@@ -950,23 +950,23 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <div class="card">
 <p class="muted">Your saved targets are available throughout the window. Browse players in Scouting and save them from their profile.</p>
 {% if shortlist %}
-<div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th></tr></thead>
+<div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th><th>Wage / week</th><th>Contract expires</th></tr></thead>
 <tbody>{% for p in shortlist %}
 <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a></td>
 <td>{{p.club_name|club_display}}</td><td>{{p.primary_position}}</td><td>{{p.overall}}</td>
-<td>{{money(p.market_value) if p.market_value is not none else '—'}}</td></tr>
+<td>{{money(p.market_value) if p.market_value is not none else '—'}}</td>
+<td>{{money(p.current_wage) if p.current_wage is not none else '—'}}</td>
+<td>{{p.expires if p.expires else ('Unattached' if p.free_agent else '—')}}</td></tr>
 {% endfor %}</tbody></table></div>
 {% else %}<p class="muted">No shortlisted players yet.</p>{% endif %}
 </div>
 <h2 id="scouting">Scouting &amp; squad values</h2>
 <div class="card">
-<div class="desk-scout-finance" aria-label="Available recruitment finances">
- <span>Available transfer budget <b>{{money(funds)}}</b></span>
- <span>Weekly wage headroom <b>{{money(wage_headroom)}} / week</b></span>
-</div>
-<p class="muted">Player interest is indicative, not an agreement. Wages, squad role, selling club and final negotiations still matter.</p>
+<p class="muted desk-scout-lead">Search the player database; add detailed conditions when needed.</p>
 <form class="scout-filters" method="get" action="/world/play/career/{{career_id}}/market#scouting">
 <label>Name<br><input name="scout_query" value="{{scout_query}}" placeholder="Search players"></label>
+<input type="hidden" name="scout_positions" value="{{scout_positions}}" data-scout-positions>
+<input type="hidden" name="scout_hide_mine" value="{{'1' if scout_hide_mine else '0'}}" data-scout-hide-mine>
 <label>Position<br><select name="scout_position">
 <option value="">All positions</option>
 {% for role in ['GK','DEF','MID','FWD'] %}<option value="{{role}}" {% if scout_position==role %}selected{% endif %}>{{role}}</option>{% endfor %}
@@ -997,6 +997,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label>Order<br><select name="scout_order"><option value="desc" {% if scout_order=='desc' %}selected{% endif %}>Highest first</option>
 <option value="asc" {% if scout_order=='asc' %}selected{% endif %}>Lowest first</option></select></label>
 <label><input type="checkbox" name="scout_shortlist" value="1" {% if scout_shortlist %}checked{% endif %}> Shortlist only</label>
+<label><input type="checkbox" name="scout_listed" value="1" {% if scout_listed %}checked{% endif %}> Transfer-listed players</label>
 <button>Apply filters</button>
 </form>
 <div class="desk-scout-table-tools"><button type="button" data-scout-attributes-toggle aria-expanded="false">Show attributes</button></div>
