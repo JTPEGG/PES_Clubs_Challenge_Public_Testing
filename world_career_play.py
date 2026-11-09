@@ -945,7 +945,6 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <h2 id="recruitment">Shortlist</h2>
 <div class="card">
 <p class="muted">Your saved targets are available throughout the window. Browse players in Scouting and save them from their profile.</p>
-<h3 id="shortlist">My transfer shortlist</h3>
 {% if shortlist %}
 <div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th></tr></thead>
 <tbody>{% for p in shortlist %}
@@ -995,23 +994,26 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label><input type="checkbox" name="scout_shortlist" value="1" {% if scout_shortlist %}checked{% endif %}> Shortlist only</label>
 <button>Apply filters</button>
 </form>
+<div class="desk-scout-table-tools"><button type="button" data-scout-attributes-toggle aria-expanded="false">Show attributes</button></div>
 <div class="scout-table" data-scout-scroll><table data-scout-results>
 <thead><tr><th>Player</th><th>Club</th><th>Pos</th><th>OVR</th><th>Age</th><th>Value</th>
-<th>Contract (game)</th><th>Years left</th><th>Pace</th><th>Shoot</th><th>Pass</th>
-<th>Dribble</th><th>Defend</th><th>Physical</th>
+<th title="Current game wage, or free-agent reference wage. Not an agreed transfer demand.">Wage / wk</th>
+<th>Contract (game)</th><th>Years left</th><th class="desk-scout-extra">Pace</th><th class="desk-scout-extra">Shoot</th><th class="desk-scout-extra">Pass</th>
+<th class="desk-scout-extra">Dribble</th><th class="desk-scout-extra">Defend</th><th class="desk-scout-extra">Physical</th>
 {% if scout_attribute %}<th>{{scout_attribute|replace('_',' ')|title}}</th>{% endif %}</tr></thead>
 <tbody>{% for p in scout_results %}
 <tr class="{{'owned' if p.owned else ''}}">
 <td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{'FREE' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
+<td title="{{'Reference game wage, not confirmed agent demand' if p.free_agent else 'Current game wage, not future agent demand'}}">{{('Est. ' if p.free_agent else '') + money(p.current_wage) if p.current_wage is not none else '—'}}</td>
 <td>{{'Unattached' if p.free_agent else p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
-<td>{{p.pace if p.pace is not none else '—'}}</td>
-<td>{{p.shooting if p.shooting is not none else '—'}}</td>
-<td>{{p.passing if p.passing is not none else '—'}}</td>
-<td>{{p.dribbling if p.dribbling is not none else '—'}}</td>
-<td>{{p.defending if p.defending is not none else '—'}}</td>
-<td>{{p.physicality if p.physicality is not none else '—'}}</td>
+<td class="desk-scout-extra">{{p.pace if p.pace is not none else '—'}}</td>
+<td class="desk-scout-extra">{{p.shooting if p.shooting is not none else '—'}}</td>
+<td class="desk-scout-extra">{{p.passing if p.passing is not none else '—'}}</td>
+<td class="desk-scout-extra">{{p.dribbling if p.dribbling is not none else '—'}}</td>
+<td class="desk-scout-extra">{{p.defending if p.defending is not none else '—'}}</td>
+<td class="desk-scout-extra">{{p.physicality if p.physicality is not none else '—'}}</td>
 {% if scout_attribute %}<td>{{p.detail_attribute if p.detail_attribute is not none else '—'}}</td>{% endif %}
 </tr>{% endfor %}</tbody></table></div>
 <div class="desk-scout-pager" data-scout-progress data-total="{{scout_total}}" role="status">
@@ -1035,15 +1037,26 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <div class="desk-transfer-split">
  <section class="card desk-transfer-section">
   <h3><span class="desk-direction in" aria-label="Incoming transfers">↙</span>
-   Incoming <span class="desk-section-count">{{purchases|length}}</span></h3>
+   Incoming <span class="desk-section-count">{{purchases|length + free_signings|length}}</span></h3>
   <div class="scout-table"><table data-desk-table="incoming">
   <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th></tr></thead>
   <tbody>{% for o in purchases %}
   <tr data-buy-offer-id="{{o.offer_id}}"><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
    <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
    <td><a href="#transfers">{{o.status_label}}</a></td></tr>
+  {% endfor %}
+  {% for s in free_signings %}
+  <tr data-free-agent-signing-id="{{s.signing_id}}">
+   <td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
+   <td>Free agent</td><td data-sort-value="0"><strong>FREE — £0</strong></td>
+   <td>{{'Signed — registers at deadline' if s.status=='agreed_future'
+         else 'Registered' if s.status=='completed'
+         else 'Awaiting your confirmation' if s.status=='terms_accepted'
+         else 'Agent counteroffer' if s.status=='countered'
+         else 'Cancelled'}} · {{money(s.proposed_weekly_wage_gbp)}}/wk · {{s.contract_years}} years</td>
+  </tr>
   {% endfor %}</tbody></table></div>
-  {% if not purchases %}<p class="muted">No incoming bids</p>{% endif %}
+  {% if not purchases and not free_signings %}<p class="muted">No incoming transfers</p>{% endif %}
  </section>
  <section class="card desk-transfer-section">
   <h3><span class="desk-direction out" aria-label="Outgoing transfers">↗</span>
@@ -1135,22 +1148,6 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 </div>{% endif %}
 </div>{% endfor %}</div>
 {% endif %}
-{% endif %}
-{% if free_signings %}
-<h2 id="free-signings">Free-agent contract negotiations</h2>
-<div class="scout-table"><table>
-<thead><tr><th>Player</th><th>Transfer fee</th><th>Weekly wage</th>
-<th>Contract</th><th>Status</th></tr></thead>
-<tbody>{% for s in free_signings %}
-<tr><td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
-<td><strong>FREE — £0</strong></td>
-<td>{{money(s.proposed_weekly_wage_gbp)}} / wk</td>
-<td>{{s.contract_years}} years</td>
-<td>{{'Signed — registers at deadline' if s.status=='agreed_future'
-else 'Registered' if s.status=='completed'
-else 'Awaiting your confirmation' if s.status=='terms_accepted'
-else 'Agent counteroffer' if s.status=='countered' else 'Cancelled'}}</td>
-</tr>{% endfor %}</tbody></table></div>
 {% endif %}
 <h2 id="inbox">Manager's Inbox</h2>
 <div id="desk-live-offer-stream" class="desk-live-offer-stream" hidden
@@ -2934,7 +2931,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 overall=p["overall"],age=p["age"],
                 value=(format_market_gbp(p["market_value"])
                        if p["market_value"] is not None else "—"),
-                contract=p["expires"] or "—",
+                wage=(("Est. " if p["free_agent"] else "")+
+                      format_market_gbp(p["current_wage"])
+                      if p["current_wage"] is not None else "—"),
+                contract=("Unattached" if p["free_agent"] else p["expires"] or "—"),
                 years_left=p["years_left"],
                 pace=p["pace"],shooting=p["shooting"],
                 passing=p["passing"],dribbling=p["dribbling"],
