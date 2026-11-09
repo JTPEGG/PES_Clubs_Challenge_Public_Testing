@@ -963,7 +963,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <h2 id="scouting">Scouting &amp; squad values</h2>
 <div class="card">
 <p class="muted desk-scout-lead">Search the player database; add detailed conditions when needed.</p>
-<form class="scout-filters" method="get" action="/world/play/career/{{career_id}}/market#scouting">
+<form class="scout-filters" method="get" data-club-name="{{manager_club_name}}" action="/world/play/career/{{career_id}}/market#scouting">
 <label>Name<br><input name="scout_query" value="{{scout_query}}" placeholder="Search players"></label>
 <input type="hidden" name="scout_positions" value="{{scout_positions}}" data-scout-positions>
 <input type="hidden" name="scout_hide_mine" value="{{'1' if scout_hide_mine else '0'}}" data-scout-hide-mine>
