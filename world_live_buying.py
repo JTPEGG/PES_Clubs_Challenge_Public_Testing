@@ -231,7 +231,8 @@ def submit_buy_offer(conn,*,career_id,player_id,offered_fee,request_key,now=None
                timedelta(days=1)).isoformat()
     offer_id=propose_offer(conn,career_id=career_id,request_key=request_key,
         player_id=player_id,buying_club_id=target["manager"],
-        offered_fee=offered_fee,agreement_date=game_date)
+        offered_fee=offered_fee,agreement_date=game_date,
+        defer_seller_review=(target["dataset"]=="fc27-warehouse-659-mens-2026-27"))
     # Continental participation affects consent; fictional career estimate,
     # not an assertion of real Champions League qualification.
     conn.execute("""INSERT OR IGNORE INTO world_career_offer_europe
@@ -245,16 +246,25 @@ def submit_buy_offer(conn,*,career_id,player_id,offered_fee,request_key,now=None
                         (offer_id,)).fetchone()[0]
     club=conn.execute("SELECT name FROM world_clubs WHERE club_id=?",
                       (target["seller"],)).fetchone()[0]
+    if target["dataset"]=="fc27-warehouse-659-mens-2026-27":
+        conn.execute("""INSERT INTO world_career_offer_events
+            (offer_id,event_type,detail) VALUES(?,?,?)""",
+            (offer_id,"manager_buy_queued",
+             "Real autonomous seller review queued; separate from later agent and sign-off stages"))
     _message(conn,career_id=career_id,window_id=snap["window_id"],
         key=f"manager-bid:{offer_id}",offer_id=offer_id,when=now,
-        headline=("Transfer bid rejected by selling club" if status=="rejected"
+        headline=("Your bid is awaiting the selling club"
+                  if status=="proposed" else
+                  "Transfer bid rejected by selling club" if status=="rejected"
                   else "Selling club makes a counteroffer" if status=="countered"
                   else "Transfer fee agreed, player talks pending"
                   if status=="accepted_pending_contract"
                   else "Your transfer offer submitted"),
         detail=(f"£{offered_fee:,} bid for {target['name']} of {club}. "
-                f"Selling club response: {status.replace('_',' ')}. "
-                "No sale is final until the player and agent agree terms."))
+                +("The selling club will evaluate the fee at its next decision point."
+                  if status=="proposed" else
+                  f"Selling club response: {status.replace('_',' ')}.")
+                +" No transfer occurs until agent terms and manager sign-off are complete."))
     conn.commit()
     if status=="accepted_pending_contract":
         try:
