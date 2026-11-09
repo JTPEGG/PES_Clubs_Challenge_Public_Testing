@@ -74,6 +74,9 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-scout-finance b{display:block;color:#fff;font-size:18px;margin-top:3px}
 .desk-view[data-view="scouting"] .scout-table{max-height:none;overflow-y:visible}
 .desk-view[data-view="scouting"] [data-scout-results] td{white-space:nowrap}
+.desk-view[data-view="scouting"] table[data-scout-results]:not(.desk-show-attributes) .desk-scout-extra{display:none!important}
+.desk-scout-table-tools{display:flex;justify-content:flex-end;margin:10px 0 8px}
+.desk-scout-table-tools button{font-size:12px;padding:6px 11px}
 .desk-view[data-view="scouting"] [data-scout-progress]{padding:12px 0 20px}
 .desk-view .scout-table tbody tr:hover{background:#28415a}
 .desk-view .scout-table a{color:#bce6ff}
@@ -321,7 +324,8 @@ DASHBOARD_JS = r"""
       const text=(node.textContent||'').trim().toLowerCase();
       if(id==='overview-anchor')destination='dashboard';
       else if(id==='squad')destination='squad';
-      else if(id==='recruitment'||id==='scouting')destination='scouting';
+      else if(id==='recruitment')destination='shortlist';
+      else if(id==='scouting')destination='scouting';
       else if(id==='transfer-centre'||id==='window-summary')
         destination='transfers';
       else if(id==='season-setup')destination='season-setup';
@@ -337,25 +341,8 @@ DASHBOARD_JS = r"""
   source.dataset.initialized='1';
   source.hidden=true;
 
-  // Extract the shortlist already rendered in the recruitment card, rather
-  // than introducing a second authoritative list or changing saved records.
-  const shortlistHeading=views.scouting.querySelector('#shortlist');
-  if(shortlistHeading&&shortlistHeading.parentElement){
-    const wrapper=document.createElement('div');
-    wrapper.className='card';
-    const sectionHead=document.createElement('h2');
-    sectionHead.textContent='Players you are tracking';
-    views.shortlist.appendChild(sectionHead);
-    views.shortlist.appendChild(wrapper);
-    let node=shortlistHeading;
-    while(node){
-      const next=node.nextElementSibling;
-      wrapper.appendChild(node);
-      node=next;
-    }
-  }
-  const shortlistTitle=views.shortlist.querySelector('h3#shortlist');
-  if(shortlistTitle)shortlistTitle.hidden=true;
+  // The complete shortlist section is routed to its own tab above.
+  // Never leave an orphan explanatory panel in Scouting.
   const noticeText='Your shortlist is saved to this career and remains available after the window closes.';
   if(!views.shortlist.children.length){
     views.shortlist.appendChild(emptyPanel('Your shortlist is empty',noticeText));
@@ -641,6 +628,7 @@ DASHBOARD_JS = r"""
         apply();
       });
       filterCell.appendChild(filter);
+      filterCell.className=th.className;
       filterRow.appendChild(filterCell);
       control.addEventListener('click',function(){
         sortDirection=(sortIndex===index?-sortDirection:1);
@@ -685,6 +673,14 @@ DASHBOARD_JS = r"""
   const scoutProgress=views.scouting.querySelector('[data-scout-progress]');
   if(scoutForm&&scoutTable&&scoutProgress){
     const tableBody=scoutTable.tBodies[0];
+    const attributesToggle=views.scouting.querySelector('[data-scout-attributes-toggle]');
+    if(attributesToggle){
+      attributesToggle.addEventListener('click',function(){
+        const expanded=scoutTable.classList.toggle('desk-show-attributes');
+        attributesToggle.setAttribute('aria-expanded',String(expanded));
+        attributesToggle.textContent=expanded?'Hide attributes':'Show attributes';
+      });
+    }
     const counter=scoutProgress.querySelector('[data-scout-count]');
     const status=scoutProgress.querySelector('[data-scout-loading]');
     const limitControl=scoutForm.querySelector('[data-scout-budget]');
@@ -709,14 +705,18 @@ DASHBOARD_JS = r"""
         if(player.shortlisted)first.appendChild(document.createTextNode(' ★'));
         row.appendChild(first);
         const fields=[player.club,player.position,player.overall,player.age,
-          player.value,player.contract,player.years_left,player.pace,
+          player.value,player.wage,player.contract,player.years_left,player.pace,
           player.shooting,player.passing,player.dribbling,
           player.defending,player.physicality];
         if(scoutForm.elements.scout_attribute.value)
           fields.push(player.detail_attribute);
-        fields.forEach(function(value){
+        fields.forEach(function(value,index){
           const cell=document.createElement('td');
           cell.textContent=display(value);
+          if(index>=8&&index<=13)cell.className='desk-scout-extra';
+          if(index===5)cell.title=player.club==='Free agent'?
+            'Reference game wage, not confirmed agent demand':
+            'Current game wage, not future agent demand';
           row.appendChild(cell);
         });
         fragment.appendChild(row);
