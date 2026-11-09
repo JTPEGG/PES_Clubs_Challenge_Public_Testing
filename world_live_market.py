@@ -908,7 +908,7 @@ def actionable_unread_count(conn,*,career_id):
     agent updates never trigger the Inbox badge. One offer creates at most one
     badge, regardless of how many updates were recorded against it.
     """
-    return conn.execute("""SELECT COUNT(DISTINCT m.offer_id)
+    offer_unread=conn.execute("""SELECT COUNT(DISTINCT m.offer_id)
         FROM world_career_market_inbox m
         JOIN world_career_offers o
           ON o.offer_id=m.offer_id AND o.career_id=m.career_id
@@ -923,6 +923,21 @@ def actionable_unread_count(conn,*,career_id):
                 AND ia.status='terms_accepted'
                 AND m.message_key LIKE 'agent:%'))""",
         (career_id,)).fetchone()[0]
+    # Contract requests appear in the same Inbox as transfer decisions.
+    # Information-only market news is never counted here.
+    contract_unread=0
+    if conn.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+        AND name='world_career_contract_renewals'""").fetchone():
+        contract_unread=conn.execute("""SELECT COUNT(DISTINCT r.player_id)
+            FROM world_career_contract_renewals r
+            WHERE r.career_id=? AND r.status IN
+               ('requested','countered','accepted_terms')
+              AND EXISTS (SELECT 1 FROM world_career_market_inbox m
+                WHERE m.career_id=r.career_id AND m.window_id=r.window_id
+                  AND m.is_read=0 AND m.message_key LIKE
+                     ('fc27-renewal:'||r.window_id||':'||r.player_id||':%'))""",
+            (career_id,)).fetchone()[0]
+    return offer_unread+contract_unread
 
 
 def market_messages(conn,*,career_id):
