@@ -405,3 +405,94 @@ def finalise_renewals(conn,*,career_id,effective_date):
         AND status IN ('requested','negotiating','countered','accepted_terms')""",
         (career_id,))
     return count
+
+CONTRACT_RENEWAL_PAGE = """<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contract negotiations · {{target.name}}</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}
+body{background:#0d1927;color:#eaf4fc;font:14px system-ui,sans-serif;margin:0;line-height:1.5}
+header{background:#172d43;border-bottom:1px solid #34516b;padding:17px max(20px,calc((100vw - 1030px)/2))}
+main{max-width:1030px;margin:0 auto;padding:27px 20px 90px}
+a{color:#9cdbff;text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:28px;margin:0 0 5px}.muted{color:#a6bfd0}
+.card{background:#152a40;border:1px solid #34536f;border-radius:10px;padding:20px;margin:18px 0}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.metric{background:#1b364e;border:1px solid #42647c;border-radius:7px;padding:14px}
+.metric small{display:block;color:#9fbfd1;font-size:11px}
+.metric strong{display:block;font-size:22px;margin-top:5px}
+fieldset{border:0;padding:0;margin:0}.fields{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+label{display:block;color:#c2d9e7;font-weight:700;font-size:12px;margin:7px 0}
+input,select{display:block;width:100%;padding:11px;background:#0e2235;color:#f3fbff;border:1px solid #4d718c;border-radius:6px;margin-top:7px;font-size:14px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:17px}
+button{border:1px solid #67b9d2;border-radius:7px;background:#26789d;color:white;padding:11px 16px;font-weight:700;cursor:pointer}
+button.secondary{background:#293d50;border-color:#69849b}
+button.danger{background:#572d3c;border-color:#9a5664}
+.note{font-size:12px;color:#afc9db;margin-top:13px}
+.badge{background:#254962;border:1px solid #5c8eac;border-radius:15px;padding:4px 10px;font-size:11px}
+.notice{padding:13px;border-radius:7px;background:#234638;color:#c2f8d9}
+.error{padding:13px;border-radius:7px;background:#4f2c38;color:#ffdce1}
+@media(max-width:700px){.metrics{grid-template-columns:repeat(2,1fr)}.fields{grid-template-columns:1fr}}
+</style></head><body>
+<header><a href="/world/play/career/{{career_id}}/market#squad">← Back to Squad</a></header>
+<main><h1>{{target.name}} · Contract talks</h1>
+<p class="muted">{{target.position}} · OVR {{target.overall}} ·
+{{target.role|replace('_',' ')|title if target.role else 'Squad role unknown'}}
+ · <span class="badge">{{renewal.status|replace('_',' ')|title if renewal else 'Available to negotiate'}}</span></p>
+{% if error %}<p class="error">{{error}}</p>{% endif %}
+{% if notice %}<p class="notice">{{notice}}</p>{% endif %}
+<div class="metrics">
+ <div class="metric"><small>Current wage / week</small><strong>{{money(target.wage)}}</strong></div>
+ <div class="metric"><small>Comparable FC27 wage</small><strong>{{money(target.reference) if target.reference is not none else 'Unknown'}}</strong></div>
+ <div class="metric"><small>Agent's asking wage</small><strong>{{money(renewal.demand_weekly_wage) if renewal else money(target.demand) if target.demand is not none else 'Unassessed'}}</strong></div>
+ <div class="metric"><small>Current expiry</small><strong style="font-size:17px">{{target.expires or 'Unknown'}}</strong></div>
+</div>
+<div class="card">
+<h2 style="margin-top:0">Contract evaluation</h2>
+<p>{{target.reason}}.
+{% if target.gap_pct is not none and target.gap_pct>0 %}
+The existing wage is approximately <b>{{'%.0f'|format(target.gap_pct)}}% below</b>
+the comparable FC27 wage estimate.
+{% endif %}
+The estimate uses {{target.sample}} rated players
+({{'same competition' if target.local else 'broader game dataset'}}).
+It is a simulation benchmark, not a verified real salary or guaranteed player demand.</p>
+<p class="note">Any signed increase reserves the difference from the player's current weekly wage, not the full new contract. The contract takes effect at the pre-season deadline; the 30-minute deadline never extends.</p>
+</div>
+<div class="card">
+<h2 style="margin-top:0">Offer new terms</h2>
+{% if state!='open' %}
+<p class="muted">Contract negotiations are available only during the 30-minute pre-season window.</p>
+{% elif renewal and renewal.status in ('agreed_future','completed') %}
+<p class="notice">The new {{renewal.contract_years}}-year deal is confirmed:
+{{money(renewal.offered_weekly_wage)}} per week.
+{% if renewal.status=='agreed_future' %}It becomes effective at the deadline.{% endif %}</p>
+{% else %}
+<form method="post" action="/world/play/career/{{career_id}}/market/contract/{{target.player_id}}/decision">
+ <input type="hidden" name="csrf" value="{{csrf}}">
+ <div class="fields">
+  <label>Offered wage (£/week)
+   <input type="number" name="weekly_wage" min="0" max="1000000" step="500"
+    value="{{renewal.demand_weekly_wage if renewal else target.demand or target.wage}}" required></label>
+  <label>New contract length
+   <select name="contract_years">
+   {% for years in [1,2,3,4,5] %}<option value="{{years}}"
+    {% if years==(renewal.contract_years if renewal and renewal.contract_years else 3) %}selected{% endif %}>{{years}} year{{'s' if years>1}}</option>{% endfor %}
+   </select></label>
+ </div>
+ <div class="actions"><button name="action" value="offer">Submit terms to agent</button>
+ {% if renewal and renewal.status=='accepted_terms' %}
+ <button name="action" value="confirm">Confirm new contract</button>{% endif %}
+ {% if renewal and renewal.status in ('requested','countered','accepted_terms','negotiating') %}
+ <button class="secondary" name="action" value="withdraw" formnovalidate>Withdraw offer</button>
+ <button class="danger" name="action" value="decline" formnovalidate>Decline renewal</button>
+ {% endif %}</div>
+</form>
+{% if renewal and renewal.rounds>0 %}
+<p class="note">Negotiation round {{renewal.rounds}} of 6.
+{% if renewal.status=='countered' %}The agent has countered your terms.
+{% elif renewal.status=='accepted_terms' %}The agent accepts, but the contract
+is not binding until you select Confirm.{% endif %}</p>{% endif %}
+{% endif %}
+</div>
+</main></body></html>"""
