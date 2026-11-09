@@ -533,12 +533,15 @@ def wage_budget_breakdown(conn, career_id, club_id):
            FROM world_fc27_free_agent_offers
            WHERE career_id=? AND buying_club_id=? AND status='agreed_future'""",
            (career_id,club_id))[0]
+    from world_fc27_contract_renewals import renewal_reserved_delta
+    renewal_delta=renewal_reserved_delta(conn,career_id=career_id,club_id=club_id)
     total, committed = row
     return {
         "total": total,
         "committed": committed,
-        "reserved_future": future,
-        "remaining": total-committed-future,
+        "reserved_future": future+renewal_delta,
+        "reserved_renewal_increases": renewal_delta,
+        "remaining": total-committed-future-renewal_delta,
     }
 
 
