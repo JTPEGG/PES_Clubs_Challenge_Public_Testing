@@ -12,7 +12,7 @@ VERSION="fc27-source-game-wage-contract-policy-v1"
 def fc27_agent_wage_floor(*,source_weekly_wage,buyer_appeal,
                           seller_appeal,offered_role,
                           seller_first_choice=False,
-                          transfer_listed=False):
+                          transfer_listed=False,market_reference_weekly=None):
     """Minimum game-simulation weekly salary a player might consider.
 
     Career opportunity and playing time alter the source salary benchmark.
@@ -27,7 +27,10 @@ def fc27_agent_wage_floor(*,source_weekly_wage,buyer_appeal,
         offered_role not in ("rotation","regular_starter","key_player",
                              "fringe","unspecified") or
         type(seller_first_choice) is not bool or
-        type(transfer_listed) is not bool):
+        type(transfer_listed) is not bool or
+        (market_reference_weekly is not None and
+         (type(market_reference_weekly) is not int or
+          market_reference_weekly<0))):
         raise ValueError("Source game wage and modelled sporting circumstances required")
     difference=buyer_appeal-seller_appeal
     # Players on a stronger current team want convincing football/salary
@@ -41,9 +44,14 @@ def fc27_agent_wage_floor(*,source_weekly_wage,buyer_appeal,
         incentive+=.08
     if transfer_listed and not seller_first_choice:
         incentive-=.07
-    # Very small game wages have a practical minimum; unknown never maps
-    # to this floor. £500 rounding is consistent with existing contracts.
-    return max(500,int(ceil(max(500,source_weekly_wage)*max(.93,incentive)/500)*500))
+    # Underpaid players use comparable FC27 salaries as a negotiating
+    # reference: a player on £7k does not have to settle for £7.5k just
+    # because that was his last game's contract. Competing role, prestige
+    # and club circumstances still matter; peer estimates are not facts.
+    effective=source_weekly_wage
+    if market_reference_weekly is not None and market_reference_weekly>effective:
+        effective=max(effective,round(market_reference_weekly*.90))
+    return max(500,int(ceil(max(500,effective)*max(.93,incentive)/500)*500))
 
 
 def fc27_sporting_recruitment_case(*,category,starter_gain,
