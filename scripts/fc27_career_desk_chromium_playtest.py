@@ -396,8 +396,8 @@ def run(world,output):
             check(page.locator("#desk-view-transfers table[data-desk-table='outgoing'] tbody "+selector).count()==1,
                   "Real offer did not appear in live Transfers table without reloading")
             page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
-            inbox_item=page.locator("#desk-view-inbox .desk-inbox-item").filter(
-                has=page.locator("[data-live-offer-id='"+str(live_offer_id)+"']")
+            inbox_item=page.locator(
+                "#desk-view-inbox .desk-inbox-item[data-offer-id='"+str(live_offer_id)+"']"
             )
             check(inbox_item.count()==1 and inbox_item.locator("summary").is_visible(),
                   "Real offer must arrive as a compact visible Inbox message")
