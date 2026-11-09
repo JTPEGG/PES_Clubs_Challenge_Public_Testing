@@ -262,6 +262,9 @@ def run(world,output):
             ).filter(has_text="Jadon Sancho")
             check(sancho_row.count()==1 and "FREE" in sancho_row.inner_text(),
                   "Signed free agent must appear exactly once alongside purchased players in Incoming")
+            check(sancho_row.locator('td').count()==7 and
+                  'years' in sancho_row.locator('td').nth(4).inner_text(),
+                  "Incoming free agent must show a separate wage and contract length")
             check(page.locator("#free-signings").count()==0,
                   "Standalone free-agent transfer section should be removed")
             found.append("Fee-free Sancho signing is included in Incoming and not duplicated")
@@ -479,17 +482,21 @@ def run(world,output):
                   "Hide attributes must restore compact scouting view")
             attrs=page.locator('select[name="scout_attribute"] option').count()
             check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
-            check(not page.locator('input[name="scout_max_value"]').is_visible(),
-                  "Scouting conditions should be hidden outside Add condition")
-            page.locator("#desk-view-scouting .desk-scout-add").first.click()
             check(page.locator('input[name="scout_max_value"]').is_visible(),
-                  "Budget-aware market value condition missing")
+                  "Quick market value filter missing")
             check(page.locator('input[name="scout_max_wage"]').is_visible(),
-                  "Maximum weekly wage condition missing")
+                  "Quick weekly wage estimate filter missing")
             check(page.locator('input[name="scout_interest"]').is_visible(),
-                  "Player move-interest condition missing")
+                  "Quick interested-player toggle missing")
+            check(page.locator('.desk-scout-quick input[type="checkbox"]').count()>=2,
+                  "Show-own-team and interested-player toggles must be visible")
+            page.locator("#desk-view-scouting .desk-scout-add").first.click()
+            check(page.locator('.desk-position-grid input[type="checkbox"]').count()==15,
+                  "Granular 15-position multiselect is missing")
             check(page.locator('input[name="scout_free_only"]').is_visible(),
                   "Independent free-agent condition missing")
+            check(page.locator('input[name="scout_listed"]').is_visible(),
+                  "AI transfer-listed condition missing")
             page.locator('.desk-scout-dialog-close').click()
             check(not page.locator('.desk-scout-dialog').is_visible(),
                   "Condition editor must close without discarding filters")
