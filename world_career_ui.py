@@ -557,6 +557,7 @@ DASHBOARD_JS = r"""
     refreshInboxItem(card);
   }
   offerCards.forEach(makeInboxItem);
+  if(!offerCards.length)inboxGrid.hidden=true;
   // Fast client-side inbox filters. Refreshing the market fetches genuine
   // updates from Flask, but switching views and narrowing visible cards
   // never needs a page request.
@@ -567,7 +568,7 @@ DASHBOARD_JS = r"""
     let playerQuery='';
     const filters=[
       ['all','All offers'],['action','Action needed'],
-      ['talks','Negotiating'],['signed','Signed'],['closed','Rejected / closed']
+      ['talks','Negotiating'],['signed','Confirmed'],['closed','Rejected / closed']
     ];
     const filterButtons=[];
     filters.forEach(function(item){
@@ -1069,7 +1070,7 @@ DASHBOARD_JS = r"""
           'Player and agent terms agreed — finalise the transfer before the deadline.':
           'Fee accepted — player/agent talks are in progress.'):
         status==='countered'?'Counter sent — awaiting the buying club.':
-        status==='agreed_future'?'Signed — registering at the deadline.':
+        status==='agreed_future'?'Confirmed — registration will take place at the deadline.':
         status==='rejected'?'Offer rejected.':
         status==='withdrawn'?'Negotiation withdrawn.':
         status==='completed'?'Transfer registered.':'';
@@ -1139,7 +1140,7 @@ DASHBOARD_JS = r"""
         if(!row){
           row=document.createElement('tr');
           row.dataset.buyOfferId=String(result.offer_id);
-          for(let i=0;i<4;i++)row.appendChild(document.createElement('td'));
+          for(let i=0;i<5;i++)row.appendChild(document.createElement('td'));
           table.tBodies[0].prepend(row);
         }
         row.cells[0].textContent=result.player_name;
@@ -1147,6 +1148,24 @@ DASHBOARD_JS = r"""
         row.cells[2].textContent=pound(result.offered_fee);
         row.cells[2].dataset.sortValue=String(result.offered_fee);
         row.cells[3].textContent=result.status_label;
+        row.cells[4].replaceChildren();
+        if(['proposed','countered','accepted_pending_contract'].includes(result.status)){
+          const cancel=document.createElement('form');
+          cancel.method='post';cancel.action=location.pathname+'/buy/decision';
+          cancel.className='desk-transfer-cancel-form';
+          for(const [name,value] of [['csrf',data.get('csrf')],
+              ['offer_id',result.offer_id]]){
+            const input=document.createElement('input');
+            input.type='hidden';input.name=name;input.value=String(value);
+            cancel.appendChild(input);
+          }
+          const btn=document.createElement('button');
+          btn.name='decision';btn.value='withdraw';btn.className='desk-transfer-cancel';
+          btn.textContent='×';btn.title='Withdraw unsigned offer for '+result.player_name;
+          btn.setAttribute('aria-label',btn.title);
+          cancel.appendChild(btn);row.cells[4].appendChild(cancel);
+        }
+        updateSaleBudgetUI(result);
         const count=table.closest('.desk-transfer-section')
            ?.querySelector('.desk-section-count');
         if(count)count.textContent=String(table.tBodies[0].rows.length);
@@ -1300,6 +1319,7 @@ DASHBOARD_JS = r"""
           note.textContent='Open the updated Inbox for further negotiation details.';
           card.appendChild(note);
         }
+        inboxGrid.hidden=false;
         inboxGrid.insertBefore(card,inboxColumns.nextSibling);
         offerCards.push(card);
         makeInboxItem(card);
