@@ -3114,11 +3114,18 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         card_html=render_template_string(fragment,o=item,spectator=False,
             snap=snap,career_id=career_id,csrf=csrf_value(),
             money=format_market_gbp)
+        manager_id=db.execute("""SELECT manager_club_id
+            FROM world_career_saves WHERE career_id=?""",
+            (career_id,)).fetchone()[0]
+        transfer_total=db.execute("""SELECT transfer_budget FROM world_career_club_ledger
+            WHERE career_id=? AND club_id=?""",(career_id,manager_id)).fetchone()[0]
         response=jsonify(ok=True,message=message,offer_id=offer_id,
             status=item["status"],status_label=item["status_label"],
             offered_fee=item["offered_fee"],player_id=item["player_id"],
             player_name=item["player_name"],seller_name=club_display(
-                item["seller_name"]),html=card_html,existing=existing)
+                item["seller_name"]),html=card_html,existing=existing,
+            available_transfer_budget=budget_remaining(db,career_id,manager_id),
+            total_transfer_budget=transfer_total)
         response.headers["Cache-Control"]="private, no-store"
         return response
 
