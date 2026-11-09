@@ -1,0 +1,43 @@
+name: FC27 real-source contract renewals and wage ambition QA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_fc27_contract_renewals.py'
+      - 'world_fc27_contract_terms.py'
+      - 'world_careers.py'
+      - 'world_preseason_window.py'
+      - 'world_player_morale.py'
+      - 'world_live_market.py'
+      - 'scripts/fc27_contract_renewals_qa.py'
+      - '.github/workflows/fc27-contract-renewal-qa.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fc27-renewals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-wage-and-renewal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install supported application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile renewal and transfer engine
+        run: |
+          python -m py_compile world_fc27_contract_renewals.py world_fc27_contract_terms.py world_player_morale.py world_live_market.py world_careers.py world_career_play.py
+      - name: Build disposable approved FC27 world
+        run: |
+          mkdir -p qa
+          python -u -m scripts.fc27_preview_bootstrap --destination qa/FC27_CONTRACT_RENEWAL_TEST.sqlite
+      - name: Verify real Burnley wages, requests, negotiated renewal and deadline
+        run: |
+          python -u -m scripts.fc27_contract_renewals_qa --world qa/FC27_CONTRACT_RENEWAL_TEST.sqlite
