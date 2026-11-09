@@ -1,0 +1,34 @@
+name: FC27 isolated career persistence and release safety
+
+on:
+  push:
+    paths:
+      - 'fc27_career_storage.py'
+      - 'fc27_playtest_app.py'
+      - 'world_career_play.py'
+      - 'test_fc27_career_storage.py'
+      - '.github/workflows/fc27-career-persistence.yml'
+  pull_request:
+    paths:
+      - 'fc27_career_storage.py'
+      - 'fc27_playtest_app.py'
+      - 'world_career_play.py'
+      - 'test_fc27_career_storage.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  career-overlay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile updated career runtime
+        run: python -m py_compile fc27_career_storage.py fc27_playtest_app.py world_career_play.py
+      - name: Run source isolation, transaction and restore regressions
+        run: python -m unittest -v test_fc27_career_storage test_fc27_sale_proceeds
