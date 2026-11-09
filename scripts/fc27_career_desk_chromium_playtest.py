@@ -403,8 +403,12 @@ def run(world,output):
             check("WH27:" not in inbox_item.locator("summary").inner_text(),
                   "Inbox summary leaked an internal warehouse club ID")
             inbox_item.locator("summary").click()
-            live_card=inbox_item.locator(selector)
-            check(live_card.is_visible(),"Opening Inbox message must show original offer details")
+            live_card=page.locator("#desk-view-inbox .desk-inbox-reader "+selector)
+            check(live_card.is_visible(),"Opening Inbox message must show offer details in the right reader")
+            split=page.locator("#desk-view-inbox .desk-inbox-split")
+            check(split.count()==1 and inbox_item.is_visible() and
+                  split.locator(".desk-inbox-reader").is_visible(),
+                  "Inbox should show separate message-list and reader panes")
             check(live_card.locator('button[value="accept"]').count()==1 and
                   live_card.locator('button[value="reject"]').count()==1 and
                   live_card.locator('button[value="counter"]').count()==1,
@@ -471,12 +475,21 @@ def run(world,output):
                   "Hide attributes must restore compact scouting view")
             attrs=page.locator('select[name="scout_attribute"] option').count()
             check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
+            check(not page.locator('input[name="scout_max_value"]').is_visible(),
+                  "Scouting conditions should be hidden outside Add condition")
+            page.locator("#desk-view-scouting .desk-scout-add").first.click()
             check(page.locator('input[name="scout_max_value"]').is_visible(),
-                  "Budget-aware scouting value filter missing")
+                  "Budget-aware market value condition missing")
+            check(page.locator('input[name="scout_max_wage"]').is_visible(),
+                  "Maximum weekly wage condition missing")
             check(page.locator('input[name="scout_interest"]').is_visible(),
-                  "Player move-interest scouting filter missing")
+                  "Player move-interest condition missing")
             check(page.locator('input[name="scout_free_only"]').is_visible(),
-                  "Independent free-agent-only scouting control missing")
+                  "Independent free-agent condition missing")
+            page.locator('.desk-scout-dialog-close').click()
+            check(not page.locator('.desk-scout-dialog').is_visible(),
+                  "Condition editor must close without discarding filters")
+            found.append("Scouting compact search and pop-out condition builder includes wages")
             page.screenshot(path=str(output/"03-desktop-scouting.png"),
                             animations="disabled",full_page=True)
             page.locator('[data-scout-progress]').scroll_into_view_if_needed()
@@ -490,6 +503,7 @@ def run(world,output):
             # A warmed filter must return promptly even while autonomous
             # FC27 market jobs run in the background. This measures the
             # actual live browser -> authenticated Flask JSON response.
+            page.locator("#desk-view-scouting .desk-scout-add").first.click()
             filter_started=perf_counter()
             with page.expect_response(
                 lambda response:"/market/scout-feed?" in response.url
@@ -522,6 +536,14 @@ def run(world,output):
                   f"Cached FC27 interest filter took {interest_seconds:.2f}s")
             found.append(f"Prewarmed would-consider-a-move response {interest_seconds:.2f}s")
             page.locator('input[name="scout_interest"]').uncheck()
+            page.locator('.desk-scout-dialog-close').click()
+            page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
+            check(page.locator('#desk-view-transfers .desk-table-filter-row').count()==0,
+                  "Transfer Centre should not have column search boxes")
+            page.locator('.desk-sidebar [data-desk-tab="squad"]').click()
+            columns=page.locator('#desk-view-squad table[data-desk-table="squad"] thead tr').first.inner_text()
+            check('Age' in columns and 'Wage / wk' in columns,
+                  "Compact Squad list is missing age or weekly wage")
             found.append("Desktop navigation: Squad, Inbox, Scouting, Transfers, Finances")
 
             target,ref_value=select_target(world,manager)
