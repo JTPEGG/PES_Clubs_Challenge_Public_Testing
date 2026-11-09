@@ -300,6 +300,59 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 @media(max-width:930px){.desk-tactics-layout{grid-template-columns:minmax(0,1fr)}.desk-pitch-wrap{max-width:680px;margin:0 auto;width:100%}.desk-tactics-roster{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.desk-tactics-roster{grid-template-columns:1fr}.desk-tactics-toolbar{gap:8px}.desk-pitch-token{width:81px}.desk-pitch-token .desk-player-name{font-size:9px}.desk-pitch-token .desk-player-disc{width:27px;height:27px;font-size:11px}}
 
+/* FM-like message list and adjacent reading pane */
+.desk-inbox-split{display:grid;grid-template-columns:minmax(245px,315px) minmax(0,1fr);border:1px solid #36516a;background:#102035;border-radius:10px;overflow:hidden;min-height:520px}
+.desk-inbox-split .desk-inbox-list{border:0;border-right:1px solid #35506a;border-radius:0;min-width:0;max-height:75vh;overflow-y:auto}
+.desk-inbox-split .desk-inbox-columns,.desk-inbox-split .desk-inbox-item>summary{display:grid;grid-template-columns:22px minmax(0,1fr) 74px;column-gap:8px;row-gap:3px}
+.desk-inbox-split .desk-inbox-columns{grid-template-columns:22px 1fr;padding:11px}
+.desk-inbox-split .desk-inbox-columns span:nth-child(n+3){display:none}
+.desk-inbox-split .desk-inbox-item>summary{padding:13px 10px;min-height:64px}
+.desk-inbox-split .desk-inbox-flag{grid-row:1/3;align-self:center}
+.desk-inbox-split .desk-inbox-subject{grid-column:2;grid-row:1}
+.desk-inbox-split .desk-inbox-sender{grid-column:2;grid-row:2;font-size:11px;color:#91afc3}
+.desk-inbox-split .desk-inbox-fee{grid-column:3;grid-row:1;font-size:12px}
+.desk-inbox-split .desk-inbox-state{grid-column:3;grid-row:2;font-size:10px;display:block!important;text-align:right}
+.desk-inbox-split .desk-inbox-item[data-selected="true"]>summary{background:#24506a;box-shadow:inset 3px 0 #70c7e8}
+.desk-inbox-reader{padding:0;min-width:0}
+.desk-inbox-reader-header{padding:17px 21px;background:#1a3149;border-bottom:1px solid #38516c;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.desk-inbox-reader-header strong{font-size:16px}
+.desk-inbox-reader-header small{display:block;margin-top:4px;font-size:12px;color:#a9c5d6}
+.desk-inbox-reader .desk-inbox-detail{padding:19px 21px}
+.desk-inbox-reader .desk-inbox-detail .offer{background:transparent!important;border:none!important;padding:0!important}
+.desk-inbox-reader .desk-inbox-detail .count{font-size:22px}
+.desk-inbox-reader-empty{padding:42px 24px;color:#9ebbcf;text-align:center}
+@media(max-width:760px){.desk-inbox-split{grid-template-columns:1fr}.desk-inbox-split .desk-inbox-list{border-right:0;border-bottom:1px solid #35506a;max-height:275px}.desk-inbox-reader{min-height:220px}.desk-inbox-reader .desk-inbox-detail{padding:13px}}
+/* Minimal scouting search and modal condition builder */
+.desk-scout-searchbar{display:flex;align-items:end;gap:9px;flex-wrap:wrap;background:#162b40;border:1px solid #385773;border-radius:9px;padding:12px 14px}
+.desk-scout-searchbar>label:first-child{flex:1 1 215px;max-width:430px}
+.desk-scout-searchbar input[type="search"],.desk-scout-searchbar input[name="scout_query"]{width:100%;padding:9px}
+.desk-scout-searchbar>label{font-size:12px;min-width:130px}
+.desk-scout-searchbar select{font-size:12px}
+.desk-scout-add,.desk-scout-clear{padding:9px 13px!important;border-radius:6px!important;font-size:12px!important;font-weight:720!important}
+.desk-scout-add{background:#25769c!important;color:white!important;border:1px solid #63b6d8!important}
+.desk-scout-clear{background:#23384d!important;border:1px solid #4a6b81!important}
+.desk-scout-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
+.desk-scout-chip{background:#203d53;border:1px solid #4d7b96;border-radius:5px;color:#e1f4ff;display:inline-flex;align-items:center;padding:5px 7px;gap:5px;font-size:11px}
+.desk-scout-chip button{border:0;background:transparent;color:#ffb0b0;padding:0 3px;cursor:pointer}
+.desk-scout-dialog[hidden],.desk-scout-dialog-shade[hidden]{display:none!important}
+.desk-scout-dialog-shade{position:fixed;inset:0;background:#040c15b8;z-index:79}
+.desk-scout-dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(730px,calc(100vw - 28px));max-height:min(83vh,770px);overflow-y:auto;z-index:80;background:#14273b;border:1px solid #6b9bb5;box-shadow:0 18px 70px #000b;border-radius:11px;padding:0}
+.desk-scout-dialog-header{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #36546a}
+.desk-scout-dialog-header strong{font-size:17px}
+.desk-scout-dialog-close{background:transparent;color:#e5f5ff;border:0;font-size:23px;padding:2px 8px}
+.desk-scout-condition-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:17px}
+.desk-scout-condition-grid label{display:block!important;margin:0!important;min-width:0;padding:8px 9px;border:1px solid #365268;border-radius:7px;background:#1c344a;color:#c9e1ed;font-size:12px}
+.desk-scout-condition-grid label select,.desk-scout-condition-grid label input:not([type=checkbox]){display:block;width:100%;margin-top:6px;background:#11283e;border:1px solid #456e89;color:#f2faff;border-radius:5px;padding:8px}
+.desk-scout-condition-grid label:has(input[type=checkbox]){display:flex!important;align-items:center;gap:8px}
+.desk-scout-dialog-actions{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #36546a;padding:13px 18px;align-items:center}
+.desk-scout-dialog-actions button{padding:9px 13px!important}
+.desk-view[data-view="scouting"] .scout-filters{display:block!important;background:none!important;padding:0!important;margin:10px 0!important}
+.desk-view[data-view="scouting"] .desk-scout-table-tools{margin-top:5px}
+.desk-view[data-view="scouting"] .desk-scout-finance{margin-bottom:12px}
+.desk-view[data-view="scouting"] .desk-scout-finance span{padding:7px 12px;font-size:12px}
+.desk-view[data-view="scouting"] .desk-scout-finance b{font-size:16px}
+@media(max-width:580px){.desk-scout-condition-grid{grid-template-columns:1fr}.desk-scout-searchbar>label{flex:1 1 135px}}
+
 """
 
 DASHBOARD_JS = r"""
@@ -500,6 +553,39 @@ DASHBOARD_JS = r"""
     views.inbox.appendChild(inboxGrid);
   }
   inboxGrid.classList.add('desk-inbox-list');
+  const inboxLayout=document.createElement('div');
+  inboxLayout.className='desk-inbox-split';
+  inboxGrid.before(inboxLayout);
+  const inboxReader=document.createElement('div');
+  inboxReader.className='desk-inbox-reader';
+  inboxReader.setAttribute('aria-label','Selected message');
+  inboxLayout.append(inboxGrid,inboxReader);
+  const inboxCardItems=new WeakMap();
+  let selectedInboxCard=null,selectedInboxItem=null,selectedInboxDetail=null;
+  function selectInboxCard(card){
+    if(!card)return;
+    const item=inboxCardItems.get(card);
+    if(!item)return;
+    if(selectedInboxCard===card)return;
+    if(selectedInboxItem&&selectedInboxDetail){
+      selectedInboxItem.appendChild(selectedInboxDetail);
+      selectedInboxItem.dataset.selected='false';
+    }
+    selectedInboxCard=card;selectedInboxItem=item;
+    selectedInboxDetail=item.querySelector('.desk-inbox-detail');
+    item.dataset.selected='true';
+    inboxReader.replaceChildren();
+    const heading=document.createElement('header');
+    heading.className='desk-inbox-reader-header';
+    const intro=document.createElement('div');
+    const strong=document.createElement('strong');
+    strong.textContent=card.dataset.deskPlayerName||'Transfer';
+    const small=document.createElement('small');
+    small.textContent=cleanInboxClub(card.dataset.deskBuyer||'')+
+      ' · '+(inboxLabels[card.dataset.deskStatus]||'Transfer update');
+    intro.append(strong,small);heading.appendChild(intro);
+    inboxReader.append(heading,selectedInboxDetail);
+  }
   const offerCards=Array.from(inboxGrid.querySelectorAll(':scope > .offer[data-desk-player]'));
   const inboxColumns=document.createElement('div');
   inboxColumns.className='desk-inbox-columns';
@@ -524,7 +610,7 @@ DASHBOARD_JS = r"""
        card.dataset.deskAgent==='terms_accepted');
   }
   function refreshInboxItem(card){
-    const holder=card.closest('.desk-inbox-item');
+    const holder=inboxCardItems.get(card)||card.closest('.desk-inbox-item');
     if(!holder)return;
     const status=card.dataset.deskStatus||'proposed';
     const required=actionRequired(card);
@@ -543,6 +629,7 @@ DASHBOARD_JS = r"""
     if(card.closest('.desk-inbox-item'))return;
     const item=document.createElement('details');
     item.className='desk-inbox-item';
+    item.dataset.offerId=card.dataset.liveOfferId||'';
     const summary=document.createElement('summary');
     for(const className of ['desk-inbox-flag','desk-inbox-subject',
         'desk-inbox-sender','desk-inbox-fee','desk-inbox-state']){
@@ -554,9 +641,16 @@ DASHBOARD_JS = r"""
     card.before(item);
     item.append(summary,body);
     body.appendChild(card);
+    inboxCardItems.set(card,item);
+    summary.addEventListener('click',function(event){
+      event.preventDefault();
+      selectInboxCard(card);
+    });
     refreshInboxItem(card);
   }
   offerCards.forEach(makeInboxItem);
+  if(offerCards.length)selectInboxCard(offerCards[0]);
+  else inboxReader.innerHTML='<div class="desk-inbox-reader-empty">Select a message to read it here.</div>';
   if(!offerCards.length)inboxGrid.hidden=true;
   // Fast client-side inbox filters. Refreshing the market fetches genuine
   // updates from Flask, but switching views and narrowing visible cards
@@ -626,11 +720,27 @@ DASHBOARD_JS = r"""
     }
     function applyInboxFilter(){
       offerCards.forEach(function(card){
-        const item=card.closest('.desk-inbox-item');
+        const item=inboxCardItems.get(card);
         if(item)item.hidden=!qualifies(card);
       });
       const existing=views.inbox.querySelector('.desk-no-match');
       if(existing)existing.remove();
+      if(selectedInboxCard&&!qualifies(selectedInboxCard)){
+        selectedInboxCard=null;
+        const next=offerCards.find(qualifies);
+        if(next)selectInboxCard(next);
+        else{
+          if(selectedInboxItem&&selectedInboxDetail){
+            selectedInboxItem.appendChild(selectedInboxDetail);
+            selectedInboxItem.dataset.selected='false';
+          }
+          selectedInboxItem=null;selectedInboxDetail=null;
+          inboxReader.innerHTML='<div class="desk-inbox-reader-empty">No messages match these filters.</div>';
+        }
+      }else if(!selectedInboxCard){
+        const next=offerCards.find(qualifies);
+        if(next)selectInboxCard(next);
+      }
       if(offerCards.length && !offerCards.some(qualifies)){
         const message=emptyPanel('No offers match',
           'Try another player, buying club or status.');
@@ -663,6 +773,7 @@ DASHBOARD_JS = r"""
     if(head.cells.length<2)return;
     let sortIndex=-1,sortDirection=1;
     const conditions=new Map();
+    const enableColumnSearch=!views.transfers.contains(table);
     const filterRow=document.createElement('tr');
     filterRow.className='desk-table-filter-row';
     function apply(){
@@ -693,9 +804,11 @@ DASHBOARD_JS = r"""
         conditions.set(index,filter.value.trim().toLocaleLowerCase());
         apply();
       });
-      filterCell.appendChild(filter);
-      filterCell.className=th.className;
-      filterRow.appendChild(filterCell);
+      if(enableColumnSearch){
+        filterCell.appendChild(filter);
+        filterCell.className=th.className;
+        filterRow.appendChild(filterCell);
+      }
       control.addEventListener('click',function(){
         sortDirection=(sortIndex===index?-sortDirection:1);
         sortIndex=index;
@@ -715,7 +828,8 @@ DASHBOARD_JS = r"""
         sorted.forEach(function(row){body.appendChild(row);});
       });
     });
-    table.tHead.appendChild(filterRow);
+    if(enableColumnSearch)table.tHead.appendChild(filterRow);
+    if(!enableColumnSearch)return;
     Array.from(body.rows).forEach(function(row){
       Array.from(row.cells).forEach(function(cell,index){
         // Clicking a plain position, club, value or status cell acts like
@@ -732,6 +846,142 @@ DASHBOARD_JS = r"""
       });
     });
   });
+  // Keep the existing source-backed 17k-player search engine and form
+  // serialization, but present conditions in a compact FM-style pop-out.
+  const compactForm=views.scouting.querySelector('form.scout-filters');
+  if(compactForm){
+    const searchBar=document.createElement('div');
+    searchBar.className='desk-scout-searchbar';
+    compactForm.prepend(searchBar);
+    const nameField=compactForm.querySelector('[name="scout_query"]')?.closest('label');
+    const sortField=compactForm.querySelector('[name="scout_sort"]')?.closest('label');
+    const orderField=compactForm.querySelector('[name="scout_order"]')?.closest('label');
+    for(const field of [nameField,sortField,orderField])if(field)searchBar.appendChild(field);
+    if(nameField){
+      const input=nameField.querySelector('input');
+      if(input){input.placeholder='Search all players by name';input.setAttribute('aria-label','Search players');}
+    }
+    const openButton=document.createElement('button');
+    openButton.type='button';openButton.className='desk-scout-add';
+    openButton.textContent='+ Add condition';
+    openButton.setAttribute('aria-expanded','false');
+    searchBar.appendChild(openButton);
+    const resetButton=document.createElement('button');
+    resetButton.type='button';resetButton.className='desk-scout-clear';
+    resetButton.textContent='Clear conditions';
+    searchBar.appendChild(resetButton);
+    const chips=document.createElement('div');
+    chips.className='desk-scout-chips';chips.setAttribute('aria-live','polite');
+    searchBar.insertAdjacentElement('afterend',chips);
+    const shade=document.createElement('div');shade.className='desk-scout-dialog-shade';
+    shade.hidden=true;
+    const panel=document.createElement('div');
+    panel.className='desk-scout-dialog';panel.hidden=true;
+    panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');
+    panel.setAttribute('aria-label','Add scouting conditions');
+    const header=document.createElement('div');header.className='desk-scout-dialog-header';
+    const title=document.createElement('strong');title.textContent='Add scouting conditions';
+    const closeButton=document.createElement('button');
+    closeButton.type='button';closeButton.className='desk-scout-dialog-close';
+    closeButton.setAttribute('aria-label','Close conditions');closeButton.textContent='×';
+    header.append(title,closeButton);panel.append(header);
+    const grid=document.createElement('div');grid.className='desk-scout-condition-grid';
+    const conditionFields=Array.from(compactForm.children).filter(
+      child=>child.tagName==='LABEL'&&child!==nameField&&
+          child!==sortField&&child!==orderField);
+    const available=[];
+    for(const field of conditionFields){
+      grid.appendChild(field);
+      const input=field.querySelector('[name]');
+      if(input)available.push({input,field,name:input.name});
+    }
+    const budgetControl=compactForm.querySelector('[data-scout-budget]');
+    if(budgetControl){budgetControl.type='button';grid.appendChild(budgetControl);}
+    panel.appendChild(grid);
+    const actions=document.createElement('div');actions.className='desk-scout-dialog-actions';
+    const context=document.createElement('small');
+    context.textContent='Conditions combine to narrow the player list.';
+    const done=document.createElement('button');
+    done.type='button';done.className='desk-scout-add';done.textContent='Show results';
+    actions.append(context,done);panel.append(actions);
+    // The old visible submit button is redundant: instant AJAX filtering
+    // and this explicit Show results action continue to use the same form.
+    Array.from(compactForm.querySelectorAll(':scope > button')).forEach(button=>{
+      if(button!==openButton&&button!==resetButton&&button!==budgetControl)
+        button.hidden=true;
+    });
+    compactForm.append(shade,panel);
+    function closePanel(){
+      shade.hidden=true;panel.hidden=true;
+      openButton.setAttribute('aria-expanded','false');
+      openButton.focus();
+    }
+    function showPanel(){
+      shade.hidden=false;panel.hidden=false;
+      openButton.setAttribute('aria-expanded','true');
+      const first=panel.querySelector('input,select');
+      first?.focus();
+    }
+    openButton.addEventListener('click',()=>{
+      if(panel.hidden)showPanel();else closePanel();
+    });
+    closeButton.addEventListener('click',closePanel);
+    shade.addEventListener('click',closePanel);
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Escape'&&!panel.hidden)closePanel();
+    });
+    done.addEventListener('click',()=>{compactForm.requestSubmit();closePanel();});
+    const description={
+      scout_position:'Position',scout_min_overall:'Minimum rating',
+      scout_max_age:'Maximum age',scout_max_value:'Transfer value',
+      scout_max_wage:'Weekly wages',scout_interest:'Would consider move',
+      scout_free_only:'Free agents',scout_category:'Rating category',
+      scout_min_category:'Minimum category',scout_attribute:'Attribute',
+      scout_min_attribute:'Minimum attribute',scout_contract:'Contract',
+      scout_squad:'My squad',scout_shortlist:'Shortlist'
+    };
+    function hasCondition(input){
+      return input.type==='checkbox'?input.checked:
+        input.value!==''&&input.value!==null;
+    }
+    function removeCondition(input){
+      if(input.type==='checkbox')input.checked=false;
+      else input.value='';
+      compactForm.requestSubmit();renderChips();
+    }
+    function renderChips(){
+      chips.replaceChildren();
+      for(const {input,name} of available){
+        if(!hasCondition(input))continue;
+        const chip=document.createElement('span');chip.className='desk-scout-chip';
+        const label=document.createElement('span');
+        const activeValue=input.type==='checkbox'?'':(
+          input.tagName==='SELECT'?input.selectedOptions[0]?.textContent:
+            input.name==='scout_max_value'||input.name==='scout_max_wage'?
+              '£'+Number(input.value).toLocaleString('en-GB'):input.value);
+        label.textContent=(description[name]||name.replace('scout_','').replaceAll('_',' '))+
+          (activeValue?' · '+activeValue:'');
+        const remove=document.createElement('button');remove.type='button';
+        remove.textContent='×';remove.setAttribute('aria-label','Remove '+label.textContent);
+        remove.addEventListener('click',()=>removeCondition(input));
+        chip.append(label,remove);chips.appendChild(chip);
+      }
+      openButton.textContent='+ Add condition'+(chips.children.length?
+        ' ('+chips.children.length+')':'');
+    }
+    compactForm.addEventListener('change',renderChips);
+    compactForm.addEventListener('input',renderChips);
+    resetButton.addEventListener('click',()=>{
+      available.forEach(({input})=>{
+        if(input.type==='checkbox')input.checked=false;else input.value='';
+      });
+      compactForm.requestSubmit();renderChips();
+    });
+    const explanation=views.scouting.querySelector('.desk-scout-finance + p.muted');
+    if(explanation)explanation.hidden=true;
+    renderChips();
+  }
+
   // Server-backed infinite scrolling: no Next button, no 80-player cap,
   // no full Career Desk reload and no duplicate market tick on filter changes.
   const scoutForm=views.scouting.querySelector('form.scout-filters');
@@ -1324,6 +1574,7 @@ DASHBOARD_JS = r"""
         inboxGrid.insertBefore(card,inboxColumns.nextSibling);
         offerCards.push(card);
         makeInboxItem(card);
+        if(!selectedInboxCard)selectInboxCard(card);
         refreshInboxList();
         const empty=views.inbox.querySelector('#desk-inbox-no-offers');
         if(empty)empty.hidden=true;

@@ -7,6 +7,7 @@ the existing player-interest inputs used by AI clubs.
 """
 from world_preseason_window import window_snapshot
 from world_careers import _player_reference
+from world_explorer import age_on
 from world_player_decisions import PLAYER_CURRENT_ROLES
 
 ROLES=("key_player","regular_starter","rotation","fringe")
@@ -26,10 +27,10 @@ def initialise_squad_desk(conn):
 
 
 def squad_preview(conn,*,career_id):
-    row=conn.execute("""SELECT dataset_id,manager_club_id FROM world_career_saves
+    row=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date FROM world_career_saves
         WHERE career_id=? AND state='sandbox'""",(career_id,)).fetchone()
     if not row:raise ValueError("Unknown development career")
-    dataset,manager=row
+    dataset,manager,asof=row
     window=window_snapshot(conn,career_id=career_id)
     pending={}
     if window["state"]!="not_started":
@@ -45,13 +46,16 @@ def squad_preview(conn,*,career_id):
     squads=conn.execute("""SELECT r.player_id,r.club_id,p.full_name,p.primary_position,
             x.overall,pc.current_role,pc.transfer_listed,
             lc.squad_role_estimate,lc.transfer_listed_estimate,
-            cl.name AS club_name
+            cl.name AS club_name,p.birth_date,pc.current_wage_weekly,
+            cs.weekly_wage_gbp
         FROM world_career_registrations r
         JOIN world_players p ON p.player_id=r.player_id
         JOIN world_clubs cl ON cl.club_id=r.club_id
         JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
         LEFT JOIN world_career_player_circumstances pc
           ON pc.career_id=r.career_id AND pc.player_id=r.player_id
+        LEFT JOIN world_career_contract_snapshots cs
+          ON cs.career_id=r.career_id AND cs.player_id=r.player_id
         LEFT JOIN world_career_live_player_context lc
           ON lc.career_id=r.career_id AND lc.player_id=r.player_id
             AND lc.window_id=?
@@ -74,8 +78,14 @@ def squad_preview(conn,*,career_id):
     results=[]
     sales=[]
     unavailable=[]
+    # The agreed wage becomes the planned wage for incoming players.
+    # For existing players, prefer a manager-saved figure, then source game wages.
+    signed_wages=dict(conn.execute("""SELECT player_id,offered_wage_weekly
+        FROM world_career_offers WHERE career_id=? AND buying_club_id=?
+        AND status IN ('agreed_future','completed')""",(career_id,manager)).fetchall())
     for row in squads:
-        player,club,name,pos,overall,role,listed,estimate_role,estimate_listed,club_name=row
+        (player,club,name,pos,overall,role,listed,estimate_role,
+         estimate_listed,club_name,birth_date,manual_wage,game_wage)=row
         value,_=_player_reference(conn,dataset,player)
         move=pending.get(player)
         arrival=move=="buying"
@@ -90,6 +100,9 @@ def squad_preview(conn,*,career_id):
             inferred=game_player_facts(conn,career_id,player)
         data=dict(player_id=player,club_id=club,full_name=name,
                   position=pos,overall=overall,market_value=value,
+                  age=age_on(birth_date,asof) if birth_date else None,
+                  weekly_wage=(signed_wages.get(player) if arrival else
+                      manual_wage if manual_wage is not None else game_wage),
                   role=role or estimate_role or
                        (inferred or {}).get("current_role") or "rotation",
                   listed=bool(listed if listed is not None else
@@ -110,7 +123,8 @@ def squad_preview(conn,*,career_id):
     if conn.execute("""SELECT 1 FROM sqlite_master
          WHERE type='table' AND name='world_fc27_free_agent_offers'""").fetchone():
         committed=conn.execute("""SELECT f.player_id,p.full_name,
-            p.primary_position,x.overall
+            p.primary_position,x.overall,p.birth_date,
+            f.proposed_weekly_wage_gbp
             FROM world_fc27_free_agent_offers f
             JOIN world_players p ON p.player_id=f.player_id
             JOIN world_dataset_ratings x ON x.dataset_id=?
@@ -120,11 +134,13 @@ def squad_preview(conn,*,career_id):
                 AND NOT EXISTS(SELECT 1 FROM world_career_registrations r
                   WHERE r.career_id=f.career_id AND r.player_id=f.player_id)""",
             (dataset,career_id,manager)).fetchall()
-        for player,name,pos,overall in committed:
+        for player,name,pos,overall,birth_date,contract_wage in committed:
             value,_=_player_reference(conn,dataset,player)
             results.append(dict(player_id=player,club_id=manager,
                 full_name=name,position=pos,overall=overall,
                 market_value=0 if value is None else value,
+                age=age_on(birth_date,asof) if birth_date else None,
+                weekly_wage=contract_wage,
                 role="regular_starter",listed=False,incoming=True,
                 departing=False,from_club="Free agent",
                 morale_status=None,morale_reason=None))
