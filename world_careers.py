@@ -878,6 +878,21 @@ def settle_future_deal(conn, *, career_id, offer_id, weekly_wage, agreement_date
         conn.execute("""UPDATE world_career_offers
             SET status='agreed_future',offered_wage_weekly=?,agreement_date=?,effective_date=?
             WHERE offer_id=?""",(weekly_wage,agreement_date,effective.isoformat(),offer_id))
+        # A binding FC27 sale releases only the *board-allocated* share of
+        # the fee into the seller's budget immediately. The allocation and
+        # offer status are committed by this same transaction. No cash is
+        # credited on an unsigned fee acceptance or again at registration.
+        from world_career_sale_proceeds import credit_signed_sale
+        sale_credit=credit_signed_sale(conn,career_id=career_id,offer_id=offer_id,
+            seller_club_id=o[2],gross_fee=o[3])
+        if sale_credit and sale_credit["credited_now"]:
+            conn.execute("""INSERT INTO world_career_offer_events
+                (offer_id,event_type,detail) VALUES(?,?,?)""",
+                (offer_id,"board_sale_budget_allocation",
+                 f"FC27 game board allocated £{sale_credit['allocated']:,} "
+                 f"of £{o[3]:,} in sale proceeds "
+                 f"({sale_credit['basis_points']/100:.2f}%) to future "
+                 "transfer funds; deadline registration still pending."))
         if modern:
             manager=_one(conn,"SELECT manager_club_id FROM world_career_saves WHERE career_id=?",
                 (career_id,))[0]
