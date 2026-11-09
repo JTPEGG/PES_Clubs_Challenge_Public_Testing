@@ -95,6 +95,27 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
               else "rotation" if rank<18 else "fringe")
     term=1+_stable(career_id,player_id,VERSION)%4
     listed=role=="fringe" and term<=2
+    if target["dataset"]=="fc27-warehouse-659-mens-2026-27":
+        # Consistent source-backed club listing for seller AI and Scouting.
+        from world_fc27_transfer_list import listing_score
+        person=conn.execute("""SELECT p.birth_date,cs.expires_on
+            FROM world_players p
+            LEFT JOIN world_career_contract_snapshots cs
+              ON cs.career_id=? AND cs.player_id=p.player_id
+            WHERE p.player_id=?""",(career_id,player_id)).fetchone()
+        today=date.fromisoformat(target["pes_date"])
+        try:
+            birthday=date.fromisoformat(person[0]) if person and person[0] else None
+            age=today.year-birthday.year-((today.month,today.day)<(birthday.month,birthday.day)) if birthday else None
+        except ValueError: age=None
+        try:
+            remaining=(date.fromisoformat(person[1])-today).days/365.25 if person and person[1] else None
+        except ValueError: remaining=None
+        lane=lane_of(next(pos for pid,rating,pos in ranked if pid==player_id))
+        same_lane=[pid for pid,rating,pos in ranked if lane_of(pos)==lane]
+        listed=listing_score(position_depth=same_lane.index(player_id),
+            overall=target["overall"],age=age,years_left=remaining,
+            financial_pressure=(fc27_seller or {}).get("financial_pressure_index",0))>=0.54
     # In AI-only club dealings, a small, explicitly FICTIONAL subset of
     # expiring starters may push for an exit. The human manager is never
     # assigned a wish or request by this model.
