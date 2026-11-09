@@ -103,7 +103,10 @@ def _model_player_and_seller(conn,*,career_id,player_id,target,
             LEFT JOIN world_career_contract_snapshots cs
               ON cs.career_id=? AND cs.player_id=p.player_id
             WHERE p.player_id=?""",(career_id,player_id)).fetchone()
-        today=date.fromisoformat(target["pes_date"])
+        locked=target.get("pes_date") or conn.execute(
+            "SELECT pes_lock_date FROM world_career_saves WHERE career_id=?",
+            (career_id,)).fetchone()[0]
+        today=date.fromisoformat(locked)
         try:
             birthday=date.fromisoformat(person[0]) if person and person[0] else None
             age=today.year-birthday.year-((today.month,today.day)<(birthday.month,birthday.day)) if birthday else None
