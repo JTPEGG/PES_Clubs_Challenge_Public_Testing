@@ -959,6 +959,7 @@ DASHBOARD_JS = r"""
       pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
       pound(result.sale_board_withheld||0)+' retained by the board.';
   }
+  window.fc27UpdateBudget=updateSaleBudgetUI;
   const labels={
     proposed:'New offer',countered:'Awaiting buyer',
     accepted_pending_contract:'Player/agent talks',
