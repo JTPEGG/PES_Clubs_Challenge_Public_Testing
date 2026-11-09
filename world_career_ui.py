@@ -555,13 +555,19 @@ DASHBOARD_JS = r"""
     [
       {name:'Transfer budget',remaining:Number(budgetValues.feeRemaining),
         total:Number(budgetValues.feeTotal),suffix:'available'},
-      {name:'Weekly wage headroom',remaining:Number(budgetValues.wageRemaining),
-        total:Number(budgetValues.wageTotal),suffix:'per week'}
+      {name:'Total weekly wage budget',remaining:Number(budgetValues.wageRemaining),
+        total:Number(budgetValues.wageTotal),suffix:'per week',showTotal:true}
     ].forEach(function(entry){
       const card=document.createElement('div');card.className='card';
       const label=document.createElement('div');label.className='label';label.textContent=entry.name;
       const val=document.createElement('div');val.className='desk-finance-value';
-      val.textContent=gbp(entry.remaining);
+      val.textContent=gbp(entry.showTotal?entry.total:entry.remaining);
+      if(entry.showTotal){
+        const available=document.createElement('small');
+        available.className='desk-finance-available';
+        available.textContent=gbp(entry.remaining)+' available per week';
+        card.appendChild(available);
+      }
       const track=document.createElement('div');track.className='desk-finance-track';
       const fill=document.createElement('div');fill.className='desk-finance-fill';
       fill.style.width=Math.min(100,Math.max(0,entry.remaining/Math.max(1,entry.total)*100))+'%';
@@ -825,13 +831,14 @@ DASHBOARD_JS = r"""
   // is no separate Apply Filter step and no extra server-side offer action.
   document.querySelectorAll('.desk-view table').forEach(function(table){
     if(!table.tHead||!table.tBodies.length||!table.tHead.rows.length)return;
-    if(table.dataset.deskEnhance==='0')return;
+    if(table.dataset.deskEnhance==='0'||views.scouting.contains(table)||
+       views.squad.contains(table))return;
     const head=table.tHead.rows[0];
     const body=table.tBodies[0];
     if(head.cells.length<2)return;
     let sortIndex=-1,sortDirection=1;
     const conditions=new Map();
-    const enableColumnSearch=!views.transfers.contains(table);
+    const enableColumnSearch=views.shortlist.contains(table);
     const filterRow=document.createElement('tr');
     filterRow.className='desk-table-filter-row';
     function apply(){
@@ -1449,15 +1456,18 @@ DASHBOARD_JS = r"""
         if(!row){
           row=document.createElement('tr');
           row.dataset.buyOfferId=String(result.offer_id);
-          for(let i=0;i<5;i++)row.appendChild(document.createElement('td'));
+          for(let i=0;i<7;i++)row.appendChild(document.createElement('td'));
           table.tBodies[0].prepend(row);
         }
         row.cells[0].textContent=result.player_name;
         row.cells[1].textContent=result.seller_name;
         row.cells[2].textContent=pound(result.offered_fee);
         row.cells[2].dataset.sortValue=String(result.offered_fee);
-        row.cells[3].textContent=result.status_label;
-        row.cells[4].replaceChildren();
+        row.cells[3].textContent=result.weekly_wage!=null?pound(result.weekly_wage):'Awaiting terms';
+        row.cells[3].dataset.sortValue=String(result.weekly_wage||0);
+        row.cells[4].textContent=result.contract_years?result.contract_years+' years':'—';
+        row.cells[5].textContent=result.status_label;
+        row.cells[6].replaceChildren();
         if(['proposed','countered','accepted_pending_contract'].includes(result.status)){
           const cancel=document.createElement('form');
           cancel.method='post';cancel.action=location.pathname+'/buy/decision';
@@ -1472,7 +1482,7 @@ DASHBOARD_JS = r"""
           btn.name='decision';btn.value='withdraw';btn.className='desk-transfer-cancel';
           btn.textContent='×';btn.title='Withdraw unsigned offer for '+result.player_name;
           btn.setAttribute('aria-label',btn.title);
-          cancel.appendChild(btn);row.cells[4].appendChild(cancel);
+          cancel.appendChild(btn);row.cells[6].appendChild(cancel);
         }
         updateSaleBudgetUI(result);
         const count=table.closest('.desk-transfer-section')
@@ -1562,9 +1572,8 @@ DASHBOARD_JS = r"""
       if(row){
         const free=Boolean(row.dataset.freeAgentSigningId);
         const status=free?'Cancelled':labels[result.status]||'Withdrawn';
-        if(row.cells[3])row.cells[3].textContent=
-          (free?status+' · '+row.cells[3].textContent.split(' · ').slice(1).join(' · '):status);
-        if(row.cells[4])row.cells[4].replaceChildren();
+        if(row.cells[5])row.cells[5].textContent=status;
+        if(row.cells[6])row.cells[6].replaceChildren();
         row.dataset.cancelled='true';
       }
       if(!row?.dataset.freeAgentSigningId){
@@ -1586,10 +1595,10 @@ DASHBOARD_JS = r"""
       updateSaleBudgetUI(result);
     }catch(error){
       let feedback=row?.querySelector('.desk-transfer-cancel-error');
-      if(!feedback&&row?.cells[4]){
+      if(!feedback&&row?.cells[6]){
         feedback=document.createElement('small');
         feedback.className='desk-transfer-cancel-error';
-        row.cells[4].appendChild(feedback);
+        row.cells[6].appendChild(feedback);
       }
       if(feedback)feedback.textContent=String(error.message||error);
       if(button)button.disabled=false;
