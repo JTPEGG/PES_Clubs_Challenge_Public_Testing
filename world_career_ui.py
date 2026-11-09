@@ -74,6 +74,9 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-scout-finance b{display:block;color:#fff;font-size:18px;margin-top:3px}
 .desk-view[data-view="scouting"] .scout-table{max-height:none;overflow-y:visible}
 .desk-view[data-view="scouting"] [data-scout-results] td{white-space:nowrap}
+.desk-view[data-view="scouting"] table[data-scout-results]:not(.desk-show-attributes) .desk-scout-extra{display:none!important}
+.desk-scout-table-tools{display:flex;justify-content:flex-end;margin:10px 0 8px}
+.desk-scout-table-tools button{font-size:12px;padding:6px 11px}
 .desk-view[data-view="scouting"] [data-scout-progress]{padding:12px 0 20px}
 .desk-view .scout-table tbody tr:hover{background:#28415a}
 .desk-view .scout-table a{color:#bce6ff}
@@ -91,7 +94,32 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-view-header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
 .desk-view-header h2{margin:9px 0 0}
 .desk-view-header .muted{margin:3px 0}
-.desk-inbox-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:10px 0 20px}
+.desk-inbox-tools{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin:10px 0 12px}
+.desk-inbox-list{display:block!important;border:1px solid #36516a;border-radius:8px;overflow:hidden;background:#14263b}
+.desk-inbox-columns,.desk-inbox-item>summary{display:grid;grid-template-columns:34px minmax(150px,1.5fr) minmax(120px,1.1fr) 105px minmax(115px,.9fr);align-items:center;gap:11px}
+.desk-inbox-columns{padding:9px 13px;background:#223a52;font-size:11px;font-weight:750;color:#b8d0e2;text-transform:uppercase;letter-spacing:.04em}
+.desk-inbox-item{border-bottom:1px solid #30475e}
+.desk-inbox-item:last-child{border-bottom:0}
+.desk-inbox-item>summary{min-height:47px;cursor:pointer;padding:8px 13px;font-size:13px;list-style:none}
+.desk-inbox-item>summary::-webkit-details-marker{display:none}
+.desk-inbox-item>summary:hover{background:#234059}
+.desk-inbox-item[open]>summary{background:#244157}
+.desk-inbox-item[data-action-needed="true"]>summary{background:#19344a}
+.desk-inbox-flag{display:inline-grid;place-items:center;width:18px;height:18px;border:1px solid #5b7891;border-radius:4px;color:transparent;font-weight:900}
+.desk-inbox-item[data-action-needed="true"] .desk-inbox-flag{color:#13283b;background:#ffcf70;border-color:#ffcf70}
+.desk-inbox-subject{font-weight:700;color:#eaf5ff;overflow:hidden;text-overflow:ellipsis}
+.desk-inbox-sender{color:#c2dbeb;overflow:hidden;text-overflow:ellipsis}
+.desk-inbox-fee{font-variant-numeric:tabular-nums;color:#8be3c6;font-weight:700;text-align:right}
+.desk-inbox-state{color:#c9ddeb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.desk-inbox-item[data-status="agreed_future"] .desk-inbox-state,.desk-inbox-item[data-status="completed"] .desk-inbox-state{color:#86e0b8}
+.desk-inbox-item .desk-inbox-detail{padding:12px 16px 15px 49px;background:#0f1d2e}
+.desk-inbox-item .desk-inbox-detail>.offer{margin:0!important;border:1px solid #365570;border-radius:6px;padding:12px!important;background:#172b41}
+.desk-inbox-item .desk-inbox-detail>.offer .actions{display:flex;gap:8px;flex-wrap:wrap}
+.desk-transfer-cancel-form{margin:0!important;display:inline-flex!important}
+.desk-transfer-cancel{padding:1px 6px!important;width:26px;height:26px;line-height:1;font-size:20px!important;font-weight:650!important;border:1px solid #a86774!important;color:#ffcbd3!important;background:#5a2d38!important;border-radius:5px!important}
+.desk-transfer-cancel:hover{background:#803e4d!important}
+@media(max-width:720px){.desk-inbox-columns,.desk-inbox-item>summary{grid-template-columns:24px minmax(100px,1.5fr) minmax(92px,1fr) minmax(80px,.7fr);gap:7px}.desk-inbox-columns span:nth-child(5),.desk-inbox-state{display:none}.desk-inbox-item>summary{padding:9px}.desk-inbox-item .desk-inbox-detail{padding:9px}}
+
 .desk-live-offer-stream:not([hidden]){display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:14px 0 18px}
 .desk-live-offer-stream .offer{margin:0;border-color:#4384a4}
 .desk-live-offer-stream .actions{display:flex;flex-wrap:wrap;gap:8px}
@@ -321,7 +349,8 @@ DASHBOARD_JS = r"""
       const text=(node.textContent||'').trim().toLowerCase();
       if(id==='overview-anchor')destination='dashboard';
       else if(id==='squad')destination='squad';
-      else if(id==='recruitment'||id==='scouting')destination='scouting';
+      else if(id==='recruitment')destination='shortlist';
+      else if(id==='scouting')destination='scouting';
       else if(id==='transfer-centre'||id==='window-summary')
         destination='transfers';
       else if(id==='season-setup')destination='season-setup';
@@ -337,25 +366,8 @@ DASHBOARD_JS = r"""
   source.dataset.initialized='1';
   source.hidden=true;
 
-  // Extract the shortlist already rendered in the recruitment card, rather
-  // than introducing a second authoritative list or changing saved records.
-  const shortlistHeading=views.scouting.querySelector('#shortlist');
-  if(shortlistHeading&&shortlistHeading.parentElement){
-    const wrapper=document.createElement('div');
-    wrapper.className='card';
-    const sectionHead=document.createElement('h2');
-    sectionHead.textContent='Players you are tracking';
-    views.shortlist.appendChild(sectionHead);
-    views.shortlist.appendChild(wrapper);
-    let node=shortlistHeading;
-    while(node){
-      const next=node.nextElementSibling;
-      wrapper.appendChild(node);
-      node=next;
-    }
-  }
-  const shortlistTitle=views.shortlist.querySelector('h3#shortlist');
-  if(shortlistTitle)shortlistTitle.hidden=true;
+  // The complete shortlist section is routed to its own tab above.
+  // Never leave an orphan explanatory panel in Scouting.
   const noticeText='Your shortlist is saved to this career and remains available after the window closes.';
   if(!views.shortlist.children.length){
     views.shortlist.appendChild(emptyPanel('Your shortlist is empty',noticeText));
@@ -447,6 +459,12 @@ DASHBOARD_JS = r"""
       grid.appendChild(card);
     });
     views.finances.appendChild(grid);
+    const saleNote=document.createElement('p');
+    saleNote.className='muted';saleNote.dataset.saleBudgetSummary='';
+    saleNote.textContent='Confirmed sales: '+gbp(Number(budgetValues.reinvested)||0)+
+      ' made available for new transfers; '+gbp(Number(budgetValues.boardRetained)||0)+
+      ' retained by the board (FC27 game-model policy).';
+    views.finances.appendChild(saleNote);
 
   }else{
     views.finances.appendChild(emptyPanel(
@@ -472,45 +490,85 @@ DASHBOARD_JS = r"""
   if(!views.scouting.children.length)
     views.scouting.appendChild(emptyPanel('Scouting is not active on this screen','You can still open saved scouting profiles from your shortlist.'));
 
-  // One place for all offers concerning the same player. Forms and controls
-  // stay attached to their original offers.
-  const inboxGrid=views.inbox.querySelector(':scope > .grid');
-  const offerCards=inboxGrid?Array.from(inboxGrid.querySelectorAll(':scope > .offer[data-desk-player]')):[];
-  if(inboxGrid&&offerCards.length){
-    const seen=new Map();
-    offerCards.forEach(function(card){
-      const key=card.dataset.deskPlayer;
-      if(!seen.has(key))seen.set(key,[]);
-      seen.get(key).push(card);
-    });
-    seen.forEach(function(cards){
-      if(cards.length<2)return;
-      const holder=document.createElement('details');
-      holder.className='desk-grouped-offer';holder.open=true;
-      const sum=document.createElement('summary');
-      const heading=document.createElement('span');
-      heading.textContent=cards[0].dataset.deskPlayerName||'Player';
-      const count=document.createElement('span');count.className='desk-group-count';
-      count.textContent=cards.length+' competing bids';
-      sum.appendChild(heading);sum.appendChild(count);
-      const inner=document.createElement('div');inner.className='desk-grouped-grid';
-      inboxGrid.insertBefore(holder,cards[0]);
-      holder.appendChild(sum);holder.appendChild(inner);
-      cards.forEach(function(card){inner.appendChild(card);});
-    });
+  // Inbox is a compact FM-like message list. Every offer remains a separate
+  // message so competing bids are readable and each has its own actions.
+  // The original server-validated forms stay inside the expanded message.
+  let inboxGrid=views.inbox.querySelector(':scope > .grid');
+  if(!inboxGrid){
+    inboxGrid=document.createElement('div');
+    inboxGrid.className='grid';
+    views.inbox.appendChild(inboxGrid);
   }
-
+  inboxGrid.classList.add('desk-inbox-list');
+  const offerCards=Array.from(inboxGrid.querySelectorAll(':scope > .offer[data-desk-player]'));
+  const inboxColumns=document.createElement('div');
+  inboxColumns.className='desk-inbox-columns';
+  for(const label of ['!','Player / subject','Buying club','Fee','Status']){
+    const span=document.createElement('span');span.textContent=label;
+    inboxColumns.appendChild(span);
+  }
+  inboxGrid.prepend(inboxColumns);
+  let refreshInboxList=()=>{};
+  const inboxLabels={
+    proposed:'New offer',countered:'Negotiating',
+    accepted_pending_contract:'Player/agent talks',
+    agreed_future:'Confirmed',completed:'Confirmed',
+    withdrawn:'Withdrawn',rejected:'Rejected'
+  };
+  function cleanInboxClub(value){
+    return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
+  }
+  function actionRequired(card){
+    return card.dataset.deskStatus==='proposed'||
+      (card.dataset.deskStatus==='accepted_pending_contract'&&
+       card.dataset.deskAgent==='terms_accepted');
+  }
+  function refreshInboxItem(card){
+    const holder=card.closest('.desk-inbox-item');
+    if(!holder)return;
+    const status=card.dataset.deskStatus||'proposed';
+    const required=actionRequired(card);
+    holder.dataset.actionNeeded=String(required);
+    holder.dataset.status=status;
+    holder.querySelector('.desk-inbox-flag').textContent=required?'!':'';
+    holder.querySelector('.desk-inbox-subject').textContent=
+      card.dataset.deskPlayerName||'Player transfer';
+    holder.querySelector('.desk-inbox-sender').textContent=
+      cleanInboxClub(card.dataset.deskBuyer||'Buying club');
+    holder.querySelector('.desk-inbox-fee').textContent=
+      card.querySelector('.count')?.textContent.trim()||'—';
+    holder.querySelector('.desk-inbox-state').textContent=inboxLabels[status]||status;
+  }
+  function makeInboxItem(card){
+    if(card.closest('.desk-inbox-item'))return;
+    const item=document.createElement('details');
+    item.className='desk-inbox-item';
+    const summary=document.createElement('summary');
+    for(const className of ['desk-inbox-flag','desk-inbox-subject',
+        'desk-inbox-sender','desk-inbox-fee','desk-inbox-state']){
+      const cell=document.createElement('span');
+      cell.className=className;summary.appendChild(cell);
+    }
+    const body=document.createElement('div');
+    body.className='desk-inbox-detail';
+    card.before(item);
+    item.append(summary,body);
+    body.appendChild(card);
+    refreshInboxItem(card);
+  }
+  offerCards.forEach(makeInboxItem);
+  if(!offerCards.length)inboxGrid.hidden=true;
   // Fast client-side inbox filters. Refreshing the market fetches genuine
   // updates from Flask, but switching views and narrowing visible cards
   // never needs a page request.
-  if(offerCards.length){
+  if(inboxGrid){
     const toolbar=document.createElement('div');
     toolbar.className='desk-inbox-tools';
     let activeFilter='all';
     let playerQuery='';
     const filters=[
       ['all','All offers'],['action','Action needed'],
-      ['talks','Negotiating'],['signed','Signed'],['closed','Rejected / closed']
+      ['talks','Negotiating'],['signed','Confirmed'],['closed','Rejected / closed']
     ];
     const filterButtons=[];
     filters.forEach(function(item){
@@ -567,25 +625,20 @@ DASHBOARD_JS = r"""
       return matches&&statusMatch;
     }
     function applyInboxFilter(){
-      offerCards.forEach(function(card){card.hidden=!qualifies(card);});
-      inboxGrid.querySelectorAll('.desk-grouped-offer').forEach(function(holder){
-        const visible=Array.from(holder.querySelectorAll('.offer')).filter(function(card){
-          return !card.hidden;
-        });
-        holder.hidden=visible.length===0;
-        const counter=holder.querySelector('.desk-group-count');
-        if(counter)counter.textContent=visible.length+' of '+
-          holder.querySelectorAll('.offer').length+' bids shown';
+      offerCards.forEach(function(card){
+        const item=card.closest('.desk-inbox-item');
+        if(item)item.hidden=!qualifies(card);
       });
-      let visible=offerCards.some(function(card){return !card.hidden;});
-      const previous=views.inbox.querySelector('.desk-no-match');
-      if(previous)previous.remove();
-      if(!visible){
-        const noMatch=emptyPanel('No offers match','Try a different player, club or status filter.');
-        noMatch.classList.add('desk-no-match');
-        toolbar.insertAdjacentElement('afterend',noMatch);
+      const existing=views.inbox.querySelector('.desk-no-match');
+      if(existing)existing.remove();
+      if(offerCards.length && !offerCards.some(qualifies)){
+        const message=emptyPanel('No offers match',
+          'Try another player, buying club or status.');
+        message.classList.add('desk-no-match');
+        toolbar.insertAdjacentElement('afterend',message);
       }
     }
+    refreshInboxList=applyInboxFilter;
     views.inbox.addEventListener('click',function(e){
       const b=e.target.closest('[data-desk-filter-player]');
       if(!b)return;
@@ -641,6 +694,7 @@ DASHBOARD_JS = r"""
         apply();
       });
       filterCell.appendChild(filter);
+      filterCell.className=th.className;
       filterRow.appendChild(filterCell);
       control.addEventListener('click',function(){
         sortDirection=(sortIndex===index?-sortDirection:1);
@@ -685,6 +739,14 @@ DASHBOARD_JS = r"""
   const scoutProgress=views.scouting.querySelector('[data-scout-progress]');
   if(scoutForm&&scoutTable&&scoutProgress){
     const tableBody=scoutTable.tBodies[0];
+    const attributesToggle=views.scouting.querySelector('[data-scout-attributes-toggle]');
+    if(attributesToggle){
+      attributesToggle.addEventListener('click',function(){
+        const expanded=scoutTable.classList.toggle('desk-show-attributes');
+        attributesToggle.setAttribute('aria-expanded',String(expanded));
+        attributesToggle.textContent=expanded?'Hide attributes':'Show attributes';
+      });
+    }
     const counter=scoutProgress.querySelector('[data-scout-count]');
     const status=scoutProgress.querySelector('[data-scout-loading]');
     const limitControl=scoutForm.querySelector('[data-scout-budget]');
@@ -709,14 +771,18 @@ DASHBOARD_JS = r"""
         if(player.shortlisted)first.appendChild(document.createTextNode(' ★'));
         row.appendChild(first);
         const fields=[player.club,player.position,player.overall,player.age,
-          player.value,player.contract,player.years_left,player.pace,
+          player.value,player.wage,player.contract,player.years_left,player.pace,
           player.shooting,player.passing,player.dribbling,
           player.defending,player.physicality];
         if(scoutForm.elements.scout_attribute.value)
           fields.push(player.detail_attribute);
-        fields.forEach(function(value){
+        fields.forEach(function(value,index){
           const cell=document.createElement('td');
           cell.textContent=display(value);
+          if(index>=8&&index<=13)cell.className='desk-scout-extra';
+          if(index===5)cell.title=player.club==='Free agent'?
+            'Reference game wage, not confirmed agent demand':
+            'Current game wage, not future agent demand';
           row.appendChild(cell);
         });
         fragment.appendChild(row);
@@ -862,11 +928,43 @@ DASHBOARD_JS = r"""
     return (n<0?'-':'')+'£'+(abs>=1e6?(abs/1e6).toFixed(2)+'m':
       abs>=1e3?Math.round(abs/1e3)+'k':Math.round(abs).toLocaleString('en-GB'));
   };
+  function updateSaleBudgetUI(result){
+    if(result.available_transfer_budget===undefined)return;
+    const available=Number(result.available_transfer_budget)||0;
+    const total=Number(result.total_transfer_budget)||0;
+    const panel=document.querySelector('#budget-panel');
+    if(panel){
+      panel.dataset.feeRemaining=String(available);
+      panel.dataset.feeTotal=String(total);
+      panel.dataset.reinvested=String(result.sale_budget_allocated||0);
+      panel.dataset.boardRetained=String(result.sale_board_withheld||0);
+      const label=panel.querySelector('#fee-current');
+      if(label)label.textContent=pound(available);
+      const bar=panel.querySelector('#fee-bar');
+      if(bar)bar.style.width=Math.min(100,Math.max(0,available/Math.max(1,total)*100))+'%';
+    }
+    document.body.dataset.feeRemaining=String(available);
+    document.body.dataset.feeTotal=String(total);
+    const scoutValue=views.scouting.querySelector('.desk-scout-finance b');
+    if(scoutValue)scoutValue.textContent=pound(available);
+    const financeTile=views.finances.querySelector('.desk-finance-grid .card');
+    if(financeTile){
+      const number=financeTile.querySelector('.desk-finance-value');
+      if(number)number.textContent=pound(available);
+      const fill=financeTile.querySelector('.desk-finance-fill');
+      if(fill)fill.style.width=Math.min(100,Math.max(0,available/Math.max(1,total)*100))+'%';
+    }
+    const note=views.finances.querySelector('[data-sale-budget-summary]');
+    if(note)note.textContent='Confirmed sales: '+
+      pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
+      pound(result.sale_board_withheld||0)+' retained by the board.';
+  }
+  window.fc27UpdateBudget=updateSaleBudgetUI;
   const labels={
     proposed:'New offer',countered:'Awaiting buyer',
     accepted_pending_contract:'Player/agent talks',
-    agreed_future:'Signed — registering at deadline',
-    completed:'Registered for season',
+    agreed_future:'Confirmed',
+    completed:'Confirmed',
     withdrawn:'Withdrawn',rejected:'Declined'
   };
   function formFor(offer,verb,csrf){
@@ -928,6 +1026,9 @@ DASHBOARD_JS = r"""
     const agent=offer.agent_status;
     for(const card of views.inbox.querySelectorAll('[data-live-offer-id="'+id+'"]')){
       card.dataset.deskStatus=status;
+      if(agent!==null && agent!==undefined)card.dataset.deskAgent=agent;
+      refreshInboxItem(card);
+      refreshInboxList();
       const label=card.querySelector('.label');
       if(label)label.textContent=(card.dataset.deskBuyer||offer.buyer||'Buying club')+
         ' · '+(labels[status]||status);
@@ -970,7 +1071,7 @@ DASHBOARD_JS = r"""
           'Player and agent terms agreed — finalise the transfer before the deadline.':
           'Fee accepted — player/agent talks are in progress.'):
         status==='countered'?'Counter sent — awaiting the buying club.':
-        status==='agreed_future'?'Signed — registering at the deadline.':
+        status==='agreed_future'?'Confirmed — registration will take place at the deadline.':
         status==='rejected'?'Offer rejected.':
         status==='withdrawn'?'Negotiation withdrawn.':
         status==='completed'?'Transfer registered.':'';
@@ -980,8 +1081,11 @@ DASHBOARD_JS = r"""
     if(!outgoing)return;
     const row=outgoing.tBodies[0].querySelector(
       '[data-live-offer-id="'+Number(offer.offer_id)+'"]');
-    if(row&&row.cells.length>3)
+    if(row&&row.cells.length>3){
       row.cells[3].textContent=labels[offer.status]||offer.status;
+      if(row.cells[4] && !['proposed','countered','accepted_pending_contract'].includes(offer.status))
+        row.cells[4].replaceChildren();
+    }
   }
   // A buying-club decision uses the same server-side agent and transfer
   // checks as the native form, but refreshes ONLY the affected buying card.
@@ -989,7 +1093,8 @@ DASHBOARD_JS = r"""
   // seller-counter click.
   document.addEventListener('submit',async function(event){
     const form=event.target;
-    if(!(form instanceof HTMLFormElement)||!views.transfers.contains(form))return;
+    if(!(form instanceof HTMLFormElement)||!views.transfers.contains(form)||
+       form.classList.contains('desk-transfer-cancel-form'))return;
     const buyingAction=form.action.endsWith('/market/buy/decision');
     const rebid=form.action.endsWith('/market/buy/rebid');
     if(!buyingAction&&!rebid)return;
@@ -1036,7 +1141,7 @@ DASHBOARD_JS = r"""
         if(!row){
           row=document.createElement('tr');
           row.dataset.buyOfferId=String(result.offer_id);
-          for(let i=0;i<4;i++)row.appendChild(document.createElement('td'));
+          for(let i=0;i<5;i++)row.appendChild(document.createElement('td'));
           table.tBodies[0].prepend(row);
         }
         row.cells[0].textContent=result.player_name;
@@ -1044,6 +1149,24 @@ DASHBOARD_JS = r"""
         row.cells[2].textContent=pound(result.offered_fee);
         row.cells[2].dataset.sortValue=String(result.offered_fee);
         row.cells[3].textContent=result.status_label;
+        row.cells[4].replaceChildren();
+        if(['proposed','countered','accepted_pending_contract'].includes(result.status)){
+          const cancel=document.createElement('form');
+          cancel.method='post';cancel.action=location.pathname+'/buy/decision';
+          cancel.className='desk-transfer-cancel-form';
+          for(const [name,value] of [['csrf',data.get('csrf')],
+              ['offer_id',result.offer_id]]){
+            const input=document.createElement('input');
+            input.type='hidden';input.name=name;input.value=String(value);
+            cancel.appendChild(input);
+          }
+          const btn=document.createElement('button');
+          btn.name='decision';btn.value='withdraw';btn.className='desk-transfer-cancel';
+          btn.textContent='×';btn.title='Withdraw unsigned offer for '+result.player_name;
+          btn.setAttribute('aria-label',btn.title);
+          cancel.appendChild(btn);row.cells[4].appendChild(cancel);
+        }
+        updateSaleBudgetUI(result);
         const count=table.closest('.desk-transfer-section')
            ?.querySelector('.desk-section-count');
         if(count)count.textContent=String(table.tBodies[0].rows.length);
@@ -1088,6 +1211,7 @@ DASHBOARD_JS = r"""
         agent_status:null,buyer:card?.dataset.deskBuyer};
       updateIncomingCard(offer,String(data.get('csrf')||''));
       updateOfferRow(offer);
+      updateSaleBudgetUI(result);
       showDecisionFeedback(card,result.message,false);
       if(Number.isFinite(Number(result.unread))){
         document.body.dataset.unread=String(result.unread);
@@ -1104,12 +1228,71 @@ DASHBOARD_JS = r"""
       buttons.forEach(b=>{if(b.isConnected)b.disabled=false;});
     }
   },true);
+  // Inline X cancels only unsigned deals. Keep the Transfer Centre open,
+  // use the authoritative POST/CSRF routes, and update the exact affected row.
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||
+       !form.classList.contains('desk-transfer-cancel-form'))return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    form.dataset.saving='1';
+    const button=event.submitter||form.querySelector('button');
+    if(button)button.disabled=true;
+    const row=form.closest('tr');
+    const action=event.submitter?.value||button?.value||'';
+    const data=new FormData(form);
+    if(button&&button.name)data.set(button.name,action);
+    try{
+      const response=await fetch(form.action,{
+        method:'POST',body:data,credentials:'same-origin',cache:'no-store',
+        headers:{Accept:'application/json'}
+      });
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'Cancellation could not be completed');
+      if(row){
+        const free=Boolean(row.dataset.freeAgentSigningId);
+        const status=free?'Cancelled':labels[result.status]||'Withdrawn';
+        if(row.cells[3])row.cells[3].textContent=
+          (free?status+' · '+row.cells[3].textContent.split(' · ').slice(1).join(' · '):status);
+        if(row.cells[4])row.cells[4].replaceChildren();
+        row.dataset.cancelled='true';
+      }
+      if(!row?.dataset.freeAgentSigningId){
+        const id=Number(data.get('offer_id'));
+        if(Number.isFinite(id)){
+          const offer={offer_id:id,status:result.status||'withdrawn',agent_status:null};
+          updateIncomingCard(offer,String(data.get('csrf')||''));
+          updateOfferRow(offer);
+          if(row?.dataset.buyOfferId&&result.html){
+            const html=document.createElement('template');
+            html.innerHTML=result.html;
+            const card=html.content.querySelector('[data-buy-offer-id]');
+            const existing=views.transfers.querySelector(
+              '.grid [data-buy-offer-id="'+id+'"]');
+            if(card&&existing)existing.replaceWith(card);
+          }
+        }
+      }
+      updateSaleBudgetUI(result);
+    }catch(error){
+      let feedback=row?.querySelector('.desk-transfer-cancel-error');
+      if(!feedback&&row?.cells[4]){
+        feedback=document.createElement('small');
+        feedback.className='desk-transfer-cancel-error';
+        row.cells[4].appendChild(feedback);
+      }
+      if(feedback)feedback.textContent=String(error.message||error);
+      if(button)button.disabled=false;
+    }finally{form.dataset.saving='0';}
+  },true);
   window.fc27SyncIncomingOffers=function(items,csrf){
     if(!Array.isArray(items))return;
     for(const o of items.slice().reverse()){
       const id=Number(o.offer_id);
       if(!Number.isSafeInteger(id)||id<=0)continue;
-      if(!seen.has(id)&&stream){
+      if(!seen.has(id)&&inboxGrid){
         seen.add(id);
         const card=document.createElement('div');
         card.className='card offer';card.dataset.liveOfferId=String(id);
@@ -1137,7 +1320,11 @@ DASHBOARD_JS = r"""
           note.textContent='Open the updated Inbox for further negotiation details.';
           card.appendChild(note);
         }
-        stream.hidden=false;stream.prepend(card);
+        inboxGrid.hidden=false;
+        inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+        offerCards.push(card);
+        makeInboxItem(card);
+        refreshInboxList();
         const empty=views.inbox.querySelector('#desk-inbox-no-offers');
         if(empty)empty.hidden=true;
       }
@@ -1155,7 +1342,17 @@ DASHBOARD_JS = r"""
         row.cells[2].textContent=pound(o.fee);
         row.cells[2].dataset.sortValue=String(o.fee);
         row.cells[3].textContent=labels[o.status]||o.status;
-        row.cells[4].textContent=String(o.received_at||'').slice(11,16)+' UTC';
+        row.cells[4].replaceChildren();
+        if(['proposed','countered','accepted_pending_contract'].includes(o.status)){
+          const form=formFor(o,'cancel',csrf);
+          form.className='desk-transfer-cancel-form';
+          const button=form.querySelector('button');
+          button.className='desk-transfer-cancel';
+          button.textContent='×';
+          button.setAttribute('title','Cancel unsigned transfer for '+o.player);
+          button.setAttribute('aria-label','Cancel unsigned transfer for '+o.player);
+          row.cells[4].appendChild(form);
+        }
       }
     }
     const n=outgoing?.tBodies[0].rows.length||0;
