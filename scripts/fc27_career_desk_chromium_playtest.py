@@ -392,8 +392,19 @@ def run(world,output):
             check(page.locator("#desk-view-transfers table[data-desk-table='outgoing'] tbody "+selector).count()==1,
                   "Real offer did not appear in live Transfers table without reloading")
             page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
-            live_card=page.locator("#desk-view-inbox #desk-live-offer-stream "+selector)
-            check(live_card.is_visible(),"New real offer not visible in live Inbox")
+            inbox_item=page.locator("#desk-view-inbox .desk-inbox-item").filter(
+                has=page.locator("[data-live-offer-id='"+str(live_offer_id)+"']")
+            )
+            check(inbox_item.count()==1 and inbox_item.locator("summary").is_visible(),
+                  "Real offer must arrive as a compact visible Inbox message")
+            check(inbox_item.get_attribute("data-action-needed")=="true" and
+                  inbox_item.locator(".desk-inbox-flag").inner_text()=="!",
+                  "New actionable offer must have an Inbox exclamation mark")
+            check("WH27:" not in inbox_item.locator("summary").inner_text(),
+                  "Inbox summary leaked an internal warehouse club ID")
+            inbox_item.locator("summary").click()
+            live_card=inbox_item.locator(selector)
+            check(live_card.is_visible(),"Opening Inbox message must show original offer details")
             check(live_card.locator('button[value="accept"]').count()==1 and
                   live_card.locator('button[value="reject"]').count()==1 and
                   live_card.locator('button[value="counter"]').count()==1,
