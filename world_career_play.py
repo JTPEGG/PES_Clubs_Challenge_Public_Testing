@@ -786,7 +786,8 @@ small{color:#b4cadb}form.inline{display:inline-flex}
   <div class="scout-table desk-squad-table"><table data-desk-table="squad">
   <thead><tr>
    <th>Player</th><th>Pos.</th><th data-sort-type="number">OVR</th>
-   <th data-sort-type="number">Value</th><th>Squad status</th>
+   <th data-sort-type="number">Age</th><th data-sort-type="number">Value</th>
+   <th data-sort-type="number">Wage / wk</th><th>Squad status</th>
    <th>Transfer list</th><th>Actions</th>
   </tr></thead><tbody>
   {% for p in squad.players %}
@@ -797,7 +798,9 @@ small{color:#b4cadb}form.inline{display:inline-flex}
    </td>
    <td>{{p.position or '—'}}</td>
    <td data-sort-value="{{p.overall}}">{{p.overall}}</td>
+   <td data-sort-value="{{p.age if p.age is not none else -1}}">{{p.age if p.age is not none else '—'}}</td>
    <td data-sort-value="{{p.market_value or 0}}">{{money(p.market_value) if p.market_value is not none else '—'}}</td>
+   <td data-sort-value="{{p.weekly_wage if p.weekly_wage is not none else -1}}">{{money(p.weekly_wage) if p.weekly_wage is not none else '—'}}</td>
    {% if not p.incoming and snap.state in ('not_started','open') %}
    <td>
     <select name="role" form="squad-row-{{p.player_id}}" aria-label="Squad role for {{p.full_name}}">
@@ -971,6 +974,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <label>Min OVR<br><input name="scout_min_overall" type="number" min="1" max="99" value="{{scout_min_overall}}" style="width:80px"></label>
 <label>Max age<br><input name="scout_max_age" type="number" min="16" max="65" value="{{scout_max_age}}" style="width:80px"></label>
 <label>Maximum market value (£)<br><input name="scout_max_value" type="number" min="0" step="100000" value="{{scout_max_value}}" placeholder="No limit" style="width:160px"></label>
+<label>Maximum weekly wage (£)<br><input name="scout_max_wage" type="number" min="0" step="1000" value="{{scout_max_wage}}" placeholder="No limit" style="width:160px"></label>
 <button type="button" data-scout-budget>Use available budget</button>
 <label><input type="checkbox" name="scout_interest" value="1" {% if scout_interest %}checked{% endif %}> Would consider a move</label>
 <label><input type="checkbox" name="scout_free_only" value="1" {% if scout_free_only %}checked{% endif %}> Free agents only (£0 fee)</label>
@@ -2564,6 +2568,7 @@ def create_play_blueprint(db_path):
         scout_min_attribute=filter_value("scout_min_attribute")
         scout_contract=request.args.get("scout_contract","") if not spectator else ""
         scout_max_value=filter_value("scout_max_value")
+        scout_max_wage=filter_value("scout_max_wage")
         scout_interest=request.args.get("scout_interest")=="1" if not spectator else False
         scout_free_only=request.args.get("scout_free_only")=="1" if not spectator else False
         scout_squad=request.args.get("scout_squad")=="1" if not spectator else False
@@ -2595,7 +2600,8 @@ def create_play_blueprint(db_path):
             category=scout_category,min_category=scout_min_category,
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
-            max_market_value=scout_max_value,interested_only=scout_interest,
+            max_market_value=scout_max_value,max_weekly_wage=scout_max_wage,
+            interested_only=scout_interest,
             free_only=scout_free_only,descending=scout_order=="desc",shortlist_only=scout_shortlist,
             limit=scout_page_size,offset=(scout_page-1)*scout_page_size,
             with_total=True) if not spectator else ([],0))
@@ -2785,6 +2791,7 @@ def create_play_blueprint(db_path):
             scout_min_category=scout_min_category or "",scout_attribute=scout_attribute,
             scout_min_attribute=scout_min_attribute or "",scout_contract=scout_contract,
             scout_max_value=scout_max_value if scout_max_value is not None else "",
+            scout_max_wage=scout_max_wage if scout_max_wage is not None else "",
             scout_interest=scout_interest,scout_squad=scout_squad,scout_sort=scout_sort,
             scout_order=scout_order,scout_shortlist=scout_shortlist,
             scout_free_only=scout_free_only,free_signings=free_signings,
@@ -2941,6 +2948,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     sort_by=request.args.get("scout_sort","overall"),
                     descending=request.args.get("scout_order","desc")!="asc",
                     max_market_value=positive_number("scout_max_value"),
+                    max_weekly_wage=positive_number("scout_max_wage"),
                     interested_only=request.args.get("scout_interest")=="1",
                     free_only=request.args.get("scout_free_only")=="1",
                     limit=page_size,offset=(page-1)*page_size,
