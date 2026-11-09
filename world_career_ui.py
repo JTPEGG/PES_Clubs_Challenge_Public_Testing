@@ -118,7 +118,7 @@ body.desk-ui[data-spectator="true"] .desk-workspace{width:100%;max-width:1440px;
 .desk-transfer-cancel-form{margin:0!important;display:inline-flex!important}
 .desk-transfer-cancel{padding:1px 6px!important;width:26px;height:26px;line-height:1;font-size:20px!important;font-weight:650!important;border:1px solid #a86774!important;color:#ffcbd3!important;background:#5a2d38!important;border-radius:5px!important}
 .desk-transfer-cancel:hover{background:#803e4d!important}
-@media(max-width:720px){.desk-inbox-columns,.desk-inbox-item>summary{grid-template-columns:24px minmax(100px,1.5fr) minmax(92px,1fr) minmax(80px,.7fr);gap:7px}.desk-inbox-columns span:nth-child(4),.desk-inbox-state{display:none}.desk-inbox-item>summary{padding:9px}.desk-inbox-item .desk-inbox-detail{padding:9px}}
+@media(max-width:720px){.desk-inbox-columns,.desk-inbox-item>summary{grid-template-columns:24px minmax(100px,1.5fr) minmax(92px,1fr) minmax(80px,.7fr);gap:7px}.desk-inbox-columns span:nth-child(5),.desk-inbox-state{display:none}.desk-inbox-item>summary{padding:9px}.desk-inbox-item .desk-inbox-detail{padding:9px}}
 
 .desk-live-offer-stream:not([hidden]){display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:14px 0 18px}
 .desk-live-offer-stream .offer{margin:0;border-color:#4384a4}
@@ -463,7 +463,7 @@ DASHBOARD_JS = r"""
     saleNote.className='muted';saleNote.dataset.saleBudgetSummary='';
     saleNote.textContent='Confirmed sales: '+gbp(Number(budgetValues.reinvested)||0)+
       ' made available for new transfers; '+gbp(Number(budgetValues.boardRetained)||0)+
-      ' retained by the board.';
+      ' retained by the board (FC27 game-model policy).';
     views.finances.appendChild(saleNote);
 
   }else{
