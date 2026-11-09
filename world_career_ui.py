@@ -1848,9 +1848,43 @@ DASHBOARD_JS = r"""
         heading.textContent=o.player;
         const amount=document.createElement('div');
         amount.className='count';amount.textContent=pound(o.fee);
-        const time=document.createElement('p');time.className='muted';
-        time.textContent='Received '+String(o.received_at||'').slice(11,16)+' UTC';
-        card.append(label,heading,amount,time);
+        const briefing=document.createElement('div');
+        briefing.className='desk-offer-briefing';
+        const title=document.createElement('div');
+        title.className='desk-offer-briefing-title';
+        title.textContent='Decision briefing · Career estimates';
+        const metrics=document.createElement('div');
+        metrics.className='desk-offer-briefing-metrics';
+        const comparison=Number(o.valuation)>0?
+          (100*(Number(o.fee)-Number(o.valuation))/Number(o.valuation)):null;
+        const stats=[
+          ['Offer',pound(o.fee)],
+          ['Market valuation',o.valuation!=null?pound(o.valuation):'Unavailable'],
+          ['Offer vs value',comparison!=null?
+              (comparison>=0?'+':'')+comparison.toFixed(1)+'%':'—'],
+          ['Current wage / week',o.current_wage!=null?pound(o.current_wage):'Unknown']
+        ];
+        for(const [labelText,value] of stats){
+          const tile=document.createElement('div');
+          const caption=document.createElement('small');caption.textContent=labelText;
+          const number=document.createElement('strong');number.textContent=value;
+          tile.append(caption,number);metrics.appendChild(tile);
+        }
+        const impact=document.createElement('p');
+        impact.className='desk-offer-briefing-note';
+        impact.textContent='Sporting: '+(o.position||'Unknown position')+
+          ' · '+(o.overall!=null?'OVR '+o.overall:'Rating unavailable')+
+          ' · '+String(o.squad_role||'Role unknown').replaceAll('_',' ')+
+          '. Any confirmed sale reduces current positional depth.';
+        const finance=document.createElement('p');
+        finance.className='desk-offer-briefing-note';
+        finance.textContent='Financial: '+(comparison==null?
+          'No reliable valuation comparison available.':
+          pound(Math.abs(Number(o.fee)-Number(o.valuation)))+' '+
+          (comparison>=0?'above':'below')+' market estimate.')+
+          ' Only the board-allocated share becomes reinvestable.';
+        briefing.append(title,metrics,impact,finance);
+        card.append(label,heading,amount,briefing);
         if(o.status==='proposed'){
           const actions=document.createElement('div');actions.className='actions';
           for(const verb of ['accept','reject','counter'])
