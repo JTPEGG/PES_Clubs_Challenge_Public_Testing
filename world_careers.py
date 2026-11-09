@@ -990,12 +990,16 @@ def agent_terms(conn, *, career_id, offer_id,
                     position=player_info[0],overall=player_info[1],
                     starting_roles=tactics)
                 first_choice=bool(cost.get("first_choice",False))
+            from world_fc27_contract_renewals import market_reference_for_transfer
+            peer_reference=market_reference_for_transfer(conn,
+                dataset=o[2],player_id=o[1],club_id=info[1])
             demand=fc27_agent_wage_floor(
                 source_weekly_wage=info[2],
                 buyer_appeal=buyer["sporting_appeal"],
                 seller_appeal=seller["sporting_appeal"],
                 offered_role=role_promise,
-                seller_first_choice=first_choice)
+                seller_first_choice=first_choice,
+                market_reference_weekly=peer_reference)
         if policy["version"] in (DECISION_VERSION,DECISION_V2_VERSION):
             if not choice["can_negotiate"]:
                 raise ValueError("Player will not open agent talks: "+choice["reason"])
