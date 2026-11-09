@@ -256,6 +256,15 @@ def run(world,output):
                   "Free agent registered before deadline or terms not saved")
             found.append("Sancho available, £0 transfer fee, agent wage agreed, manager signed, not registered early")
             page.goto(base+manager_path,wait_until="domcontentloaded")
+            page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
+            sancho_row=page.locator(
+                '[data-desk-table="incoming"] tr[data-free-agent-signing-id]'
+            ).filter(has_text="Jadon Sancho")
+            check(sancho_row.count()==1 and "FREE" in sancho_row.inner_text(),
+                  "Signed free agent must appear exactly once alongside purchased players in Incoming")
+            check(page.locator("#free-signings").count()==0,
+                  "Standalone free-agent transfer section should be removed")
+            found.append("Fee-free Sancho signing is included in Incoming and not duplicated")
 
             for name in ["squad","inbox","scouting","transfers","finances"]:
                 page.locator(f'.desk-sidebar [data-desk-tab="{name}"]').click()
@@ -434,8 +443,21 @@ def run(world,output):
             first=page.locator('#desk-view-scouting table tbody tr').first.inner_text()
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()>=80,
                   "FC27 scouting did not render its first 80 players")
-            first_pace=page.locator("#desk-view-scouting .scout-table table tbody tr").first.locator("td").nth(8).inner_text()
+            scout_row=page.locator("#desk-view-scouting [data-scout-results] tbody tr").first
+            wage=scout_row.locator("td").nth(6).inner_text()
+            check(wage.startswith("£") and wage!="—",
+                  "Game source weekly wage must appear immediately after transfer value")
+            extra_header=page.locator("#desk-view-scouting th.desk-scout-extra").first
+            check(not extra_header.is_visible(),
+                  "Six category attribute columns must be hidden by default")
+            page.locator("[data-scout-attributes-toggle]").click()
+            check(extra_header.is_visible(),
+                  "Show attributes must reveal the optional scouting columns")
+            first_pace=scout_row.locator("td").nth(9).inner_text()
             check(first_pace.isdigit(),"FC27 six-category scouting source data is missing")
+            page.locator("[data-scout-attributes-toggle]").click()
+            check(not extra_header.is_visible(),
+                  "Hide attributes must restore compact scouting view")
             attrs=page.locator('select[name="scout_attribute"] option').count()
             check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
             check(page.locator('input[name="scout_max_value"]').is_visible(),
