@@ -1045,10 +1045,12 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <h3><span class="desk-direction in" aria-label="Incoming transfers">↙</span>
    Incoming <span class="desk-section-count">{{purchases|length + free_signings|length}}</span></h3>
   <div class="scout-table"><table data-desk-table="incoming">
-  <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th><th aria-label="Cancel unsigned deal"></th></tr></thead>
+  <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Wage / week</th><th>Contract</th><th>Status</th><th aria-label="Cancel unsigned deal"></th></tr></thead>
   <tbody>{% for o in purchases %}
   <tr data-buy-offer-id="{{o.offer_id}}"><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
    <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
+   <td data-sort-value="{{o.signed_weekly_wage or o.negotiated_wage or 0}}">{{money(o.signed_weekly_wage or o.negotiated_wage) if o.signed_weekly_wage or o.negotiated_wage else 'Awaiting terms'}}</td>
+   <td>{{(o.agreed_contract_years|string) + ' years' if o.agreed_contract_years else '—'}}</td>
    <td><a href="#transfers">{{o.status_label}}</a></td>
    <td>{% if not spectator and snap.state=='open' and o.status in ('proposed','countered','accepted_pending_contract') %}
     <form method="post" class="desk-transfer-cancel-form" action="/world/play/career/{{career_id}}/market/buy/decision">
@@ -1060,11 +1062,13 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   {% for s in free_signings %}
   <tr data-free-agent-signing-id="{{s.signing_id}}">
    <td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
-   <td>Free agent</td><td data-sort-value="0"><strong>FREE — £0</strong></td>
+   <td>—</td><td data-sort-value="0"><strong>FREE — £0</strong></td>
+   <td data-sort-value="{{s.proposed_weekly_wage_gbp}}">{{money(s.proposed_weekly_wage_gbp)}}</td>
+   <td>{{s.contract_years}} years</td>
    <td>{{'Confirmed' if s.status in ('agreed_future','completed')
          else 'Awaiting your confirmation' if s.status=='terms_accepted'
          else 'Agent counteroffer' if s.status=='countered'
-         else 'Cancelled'}} · {{money(s.proposed_weekly_wage_gbp)}}/wk · {{s.contract_years}} years</td>
+         else 'Cancelled'}}</td>
    <td>{% if not spectator and snap.state=='open' and s.status in ('terms_accepted','countered') %}
      <form method="post" class="desk-transfer-cancel-form" action="/world/play/career/{{career_id}}/market/free-agent">
       <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="player_id" value="{{s.player_id}}">
@@ -2678,7 +2682,10 @@ def create_play_blueprint(db_path):
             outgoing=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
                 o.demanded_fee,p.full_name AS player_name,
                 sc.name AS seller_name,t.status AS agent_status,
-                t.demanded_wage_weekly AS agent_demand
+                t.demanded_wage_weekly AS agent_demand,
+                t.proposed_wage_weekly AS negotiated_wage,
+                t.contract_years AS agreed_contract_years,
+                o.offered_wage_weekly AS signed_weekly_wage
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
@@ -3125,7 +3132,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         row=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
             o.demanded_fee,p.full_name AS player_name,
             sc.name AS seller_name,t.status AS agent_status,
-            t.demanded_wage_weekly AS agent_demand
+            t.demanded_wage_weekly AS agent_demand,
+            t.proposed_wage_weekly AS negotiated_wage,
+            t.contract_years AS agreed_contract_years,
+            o.offered_wage_weekly AS signed_weekly_wage
             FROM world_career_offers o
             JOIN world_career_saves c ON c.career_id=o.career_id
             JOIN world_players p ON p.player_id=o.player_id
@@ -3159,7 +3169,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             WHERE career_id=? AND club_id=?""",(career_id,manager_id)).fetchone()[0]
         response=jsonify(ok=True,message=message,offer_id=offer_id,
             status=item["status"],status_label=item["status_label"],
-            offered_fee=item["offered_fee"],player_id=item["player_id"],
+            offered_fee=item["offered_fee"],
+            weekly_wage=(item["signed_weekly_wage"] or item["negotiated_wage"]),
+            contract_years=item["agreed_contract_years"],
+            player_id=item["player_id"],
             player_name=item["player_name"],seller_name=club_display(
                 item["seller_name"]),html=card_html,existing=existing,
             available_transfer_budget=budget_remaining(db,career_id,manager_id),
