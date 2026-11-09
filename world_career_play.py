@@ -1562,6 +1562,8 @@ Rejected and expired offers are not transfers.</p>
          refreshUnread(unread);
          if(typeof window.fc27SyncIncomingOffers==='function')
            window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
+         if(typeof window.fc27SyncBuyingOffers==='function')
+           window.fc27SyncBuyingOffers(state.buying_updates,state.csrf);
          if(typeof window.fc27UpdateBudget==='function')
            window.fc27UpdateBudget(state);
          const marketFeed=document.querySelector('#desk-view-news .feed');
@@ -3176,6 +3178,29 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 received_at=received,agent_status=agent,
                 demanded_fee=demanded)
                 for oid,pid,status,fee,name,buyer,received,agent,demanded in offer_rows]
+            buying_rows=db.execute("""SELECT o.offer_id,o.player_id,
+                    o.status,o.offered_fee,p.full_name,sc.name,
+                    t.status,t.demanded_wage_weekly,
+                    t.proposed_wage_weekly,t.contract_years,
+                    EXISTS(SELECT 1 FROM world_career_offer_events ev
+                      WHERE ev.offer_id=o.offer_id
+                        AND ev.event_type='buyer_signing_delayed')
+                FROM world_career_preseason_window_offers wo
+                JOIN world_career_offers o ON o.offer_id=wo.offer_id
+                JOIN world_players p ON p.player_id=o.player_id
+                JOIN world_clubs sc ON sc.club_id=o.selling_club_id
+                LEFT JOIN world_career_agent_terms t ON t.offer_id=o.offer_id
+                WHERE wo.window_id=? AND o.career_id=?
+                  AND o.buying_club_id=? AND o.selling_club_id<>?
+                ORDER BY o.offer_id DESC LIMIT 100""",
+                (snap["window_id"],career_id,career[0],career[0])).fetchall() if snap["window_id"] else []
+            buying_updates=[dict(offer_id=oid,player_id=pid,status=status,
+                fee=fee,player=name,seller=clean_buyer(seller),
+                agent_status=agent,agent_demand=demanded,
+                weekly_wage=wage,contract_years=years,
+                delay_used=bool(delayed))
+                for oid,pid,status,fee,name,seller,agent,demanded,wage,years,delayed
+                in buying_rows]
             recent=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
                 o.offered_fee,e.created_at FROM world_career_offer_events e
                 JOIN world_career_offers o ON o.offer_id=e.offer_id
@@ -3213,7 +3238,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 total_transfer_budget=transfer_total,
                 sale_budget_allocated=sale_totals[0],sale_board_withheld=sale_totals[1],
                 unread=unread,incoming_offers=offers,
-                offer_updates=live_offers,csrf=csrf_value(),
+                offer_updates=live_offers,buying_updates=buying_updates,csrf=csrf_value(),
                 world_updates=world_updates,
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
