@@ -1129,7 +1129,10 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
 <input type="hidden" name="csrf" value="{{csrf}}">
 <input type="hidden" name="offer_id" value="{{o.offer_id}}">
-<button name="decision" value="sign">Sign transfer</button></form>
+<button name="decision" value="sign">Confirm transfer</button>
+{% if not o.signing_delay_used %}
+<button name="decision" value="delay_signing" type="submit">Delay decision (once)</button>
+{% endif %}</form>
 {% elif o.status=='accepted_pending_contract' and o.agent_demand is none %}
 <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
 <input type="hidden" name="csrf" value="{{csrf}}">
@@ -1181,7 +1184,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <input type="hidden" name="csrf" value="{{csrf}}">
 <button>Mark as read</button>
 </form>{% endif %}
-{% if offers %}
+{% if offers or purchases %}
 <div class="grid">{% for o in offers %}
 <div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
@@ -1265,7 +1268,55 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  <button name="decision" value="cancel" class="danger">Cancel transfer</button></form>
  {% endif %}
  </div>{% endif %}
-</div>{% endfor %}</div>
+</div>{% endfor %}
+{% for o in purchases %}
+<div class="card offer desk-inbox-buy-message"
+ data-live-offer-id="buy-{{o.offer_id}}"
+ data-buy-offer-id="{{o.offer_id}}" data-desk-side="buy"
+ data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
+ data-desk-buyer="{{o.seller_name|club_display}}" data-desk-status="{{o.status}}"
+ data-desk-agent="{{'terms_accepted' if o.agent_status=='accepted' else o.agent_status or ''}}">
+ <div class="label">{{o.seller_name|club_display}} · {{o.status_label}}</div>
+ <h3>{{o.player_name}}</h3><div class="count">{{money(o.offered_fee)}}</div>
+ <div class="desk-offer-briefing">
+  <div class="desk-offer-briefing-title">Club & agent decision <span>Incoming transfer</span></div>
+  <div class="desk-offer-briefing-metrics">
+   <div><small>Agreed / offered fee</small><strong>{{money(o.offered_fee)}}</strong></div>
+   <div><small>Current agent request</small><strong>{{money(o.agent_demand) if o.agent_demand is not none else 'Awaiting terms'}}</strong></div>
+   <div><small>Weekly wage agreed</small><strong>{{money(o.signed_weekly_wage or o.negotiated_wage) if (o.signed_weekly_wage or o.negotiated_wage) else 'Not agreed'}}</strong></div>
+   <div><small>Contract</small><strong>{{(o.agreed_contract_years|string) ~ ' years' if o.agreed_contract_years else 'Pending'}}</strong></div>
+  </div>
+  <p class="desk-offer-briefing-note">
+   {% if o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
+   <b>Paperwork ready.</b> Player and agent terms are agreed, but the signing requires your confirmation.
+   {% elif o.status=='accepted_pending_contract' %}
+   <b>Fee accepted.</b> Complete personal terms with the player's agent before you can sign.
+   {% elif o.status=='countered' %}
+   <b>Seller counteroffer.</b> Review the revised fee in your transfer negotiations.
+   {% elif o.status=='rejected' %}
+   <b>Rejected.</b> The selling club declined your offer.
+   {% elif o.status in ('agreed_future','completed') %}
+   <b>Confirmed.</b> The player is included in your projected squad.
+   {% else %}{{o.status_label}}.{% endif %}
+  </p>
+ </div>
+ {% if not spectator and snap.state=='open' and o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
+ <div class="actions">
+  <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
+   <input type="hidden" name="csrf" value="{{csrf}}">
+   <input type="hidden" name="offer_id" value="{{o.offer_id}}">
+   <button name="decision" value="sign">Confirm signing</button>
+   {% if not o.signing_delay_used %}
+   <button name="decision" value="delay_signing">Delay (once)</button>
+   {% endif %}
+   <button name="decision" value="withdraw" class="danger">Cancel</button>
+  </form>
+ </div>
+ {% else %}
+ <a href="#transfers" data-desk-tab="transfers" class="desk-inbox-open-negotiation">View transfer negotiations</a>
+ {% endif %}
+</div>
+{% endfor %}</div>
 {% else %}<div class="card" id="desk-inbox-no-offers"><p>No offers have arrived yet. The world is evaluating its squads;
 a quiet market is possible. No transfers will be invented to fill the inbox.</p></div>{% endif %}
 {% if snap.state=='closed' %}
@@ -2736,7 +2787,10 @@ def create_play_blueprint(db_path):
                 t.demanded_wage_weekly AS agent_demand,
                 t.proposed_wage_weekly AS negotiated_wage,
                 t.contract_years AS agreed_contract_years,
-                o.offered_wage_weekly AS signed_weekly_wage
+                o.offered_wage_weekly AS signed_weekly_wage,
+                EXISTS(SELECT 1 FROM world_career_offer_events e
+                    WHERE e.offer_id=o.offer_id AND e.event_type='buyer_signing_delayed')
+                    AS signing_delay_used
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
@@ -3198,7 +3252,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             t.demanded_wage_weekly AS agent_demand,
             t.proposed_wage_weekly AS negotiated_wage,
             t.contract_years AS agreed_contract_years,
-            o.offered_wage_weekly AS signed_weekly_wage
+            o.offered_wage_weekly AS signed_weekly_wage,
+            EXISTS(SELECT 1 FROM world_career_offer_events e
+                WHERE e.offer_id=o.offer_id AND e.event_type='buyer_signing_delayed')
+                AS signing_delay_used
             FROM world_career_offers o
             JOIN world_career_saves c ON c.career_id=o.career_id
             JOIN world_players p ON p.player_id=o.player_id
