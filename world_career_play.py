@@ -795,6 +795,10 @@ small{color:#b4cadb}form.inline{display:inline-flex}
    <td class="desk-squad-name"><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>
      {% if p.incoming %}<span class="desk-squad-arrival" title="Joining at the transfer deadline">Arriving</span>{% endif %}
      {% if p.morale_status=='transfer_requested' %}<span class="desk-squad-request" title="{{p.morale_reason}}">Transfer requested</span>{% endif %}
+     {% if p.contract_renewal and p.contract_renewal.status in ('requested','countered','accepted_terms') %}
+     <span class="desk-squad-request" title="Player agent is seeking contract negotiations">Contract talks</span>{% endif %}
+     {% if p.contract_renewal and p.contract_renewal.status in ('agreed_future','completed') %}
+     <span class="desk-squad-arrival" title="New contract agreed">Renewed</span>{% endif %}
    </td>
    <td>{{p.position or '—'}}</td>
    <td data-sort-value="{{p.overall}}">{{p.overall}}</td>
@@ -821,6 +825,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
      <input type="hidden" name="csrf" value="{{csrf}}">
      <input type="hidden" name="player_id" value="{{p.player_id}}">
      <button name="action" value="update" type="submit">Save</button>
+     <a class="desk-squad-contract-link" href="/world/play/career/{{career_id}}/market/contract/{{p.player_id}}" title="Negotiate a new contract with {{p.full_name}}">Contract</a>
      {% if snap.state=='open' %}
      <button name="action" value="offer" type="submit" class="desk-squad-offer"
        title="Circulate this transfer-listed player to AI clubs">Offer to clubs</button>
@@ -1184,7 +1189,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <input type="hidden" name="csrf" value="{{csrf}}">
 <button>Mark as read</button>
 </form>{% endif %}
-{% if offers or purchases %}
+{% if offers or purchases or renewal_requests %}
 <div class="grid">{% for o in offers %}
 <div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
@@ -1315,6 +1320,31 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  {% else %}
  <a href="#transfers" data-desk-tab="transfers" class="desk-inbox-open-negotiation">View transfer negotiations</a>
  {% endif %}
+</div>
+{% endfor %}
+{% for contract in renewal_requests %}
+<div class="card offer desk-contract-inbox"
+ data-live-offer-id="contract-{{contract.player_id}}" data-desk-side="contract"
+ data-desk-player="{{contract.player_id}}"
+ data-desk-player-name="{{contract.full_name}}"
+ data-desk-buyer="Player representative"
+ data-desk-status="{{contract.status}}">
+  <div class="label">Contract renewal · Player representative</div>
+  <h3>{{contract.full_name}}</h3>
+  <div class="count">{{money(contract.demand_weekly_wage)}}/wk requested</div>
+  <div class="desk-offer-briefing">
+   <div class="desk-offer-briefing-title">Your player's contract <span>Agent briefing</span></div>
+   <div class="desk-offer-briefing-metrics">
+    <div><small>Existing salary</small><strong>{{money(contract.old_weekly_wage)}}/wk</strong></div>
+    <div><small>Comparable wage estimate</small><strong>{{money(contract.peer_weekly_wage) if contract.peer_weekly_wage is not none else 'Unknown'}}</strong></div>
+    <div><small>Agent's requested salary</small><strong>{{money(contract.demand_weekly_wage)}}/wk</strong></div>
+    <div><small>Status</small><strong>{{contract.status|replace('_',' ')|title}}</strong></div>
+   </div>
+   <p class="desk-offer-briefing-note">A player can seek a competitive renewal without being forced onto the transfer list. A serious unresolved wage dispute can make a transfer request more likely.</p>
+  </div>
+  <a class="desk-inbox-open-negotiation"
+   href="/world/play/career/{{career_id}}/market/contract/{{contract.player_id}}">
+   Open contract negotiations</a>
 </div>
 {% endfor %}</div>
 {% else %}<div class="card" id="desk-inbox-no-offers"><p>No offers have arrived yet. The world is evaluating its squads;
@@ -2717,6 +2747,19 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 shortlist_only=True,limit=300)
         recommendations=[]  # Suggested targets intentionally hidden in the simplified scouting desk.
         squad=squad_preview(db,career_id=career_id) if not spectator else {"players":[],"departures":[]}
+        renewal_requests=[]
+        if not spectator and snap["state"]!="not_started":
+            from world_fc27_contract_renewals import all_renewals
+            current_renewals=all_renewals(db,career_id=career_id)
+            for p in squad["players"]:
+                p["contract_renewal"]=current_renewals.get(p["player_id"])
+            if current_renewals:
+                renewal_requests=db.execute("""SELECT r.*,p.full_name
+                    FROM world_career_contract_renewals r
+                    JOIN world_players p ON p.player_id=r.player_id
+                    WHERE r.career_id=? AND r.window_id=?
+                    ORDER BY r.created_at DESC,r.player_id""",
+                    (career_id,snap["window_id"])).fetchall()
         from world_career_tactics import prepare_tactics
         tactics=(prepare_tactics(db,career_id=career_id,
                                 players=squad["players"]) if not spectator
@@ -2938,7 +2981,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
         rendered=render_template_string(LIVE_MARKET_PAGE,
             title=c["title"],career_id=career_id,manager_name=c["name"],
             spectator=spectator,snap=snap,offers=offers,
-            purchases=purchases,targets=targets,player_search=player_search,
+            purchases=purchases,renewal_requests=renewal_requests,targets=targets,player_search=player_search,
             buy_request_key="manager-buy-v1-"+secrets.token_urlsafe(14),
             messages=messages,news_feed=news_feed,unread=unread,signed=signed,
             scout_results=scout_results,scout_attributes=scout_attributes,
@@ -3520,6 +3563,50 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             response=jsonify(ok=False,error=str(exc)[:220])
             response.headers["Cache-Control"]="private, no-store"
             return response,400
+
+    @bp.get("/world/play/career/<career_id>/market/contract/<int:player_id>")
+    def manager_contract_renewal_page(career_id,player_id):
+        if not authenticated():return redirect("/world/play")
+        from world_fc27_contract_renewals import (
+            wage_signal,renewal_info,CONTRACT_RENEWAL_PAGE)
+        with connect() as db:
+            try:
+                player=wage_signal(db,career_id=career_id,player_id=player_id)
+                renewal=renewal_info(db,career_id=career_id,player_id=player_id)
+                state=window_snapshot(db,career_id=career_id)["state"]
+            except ValueError as exc:
+                abort(404,str(exc))
+        response=make_response(render_template_string(CONTRACT_RENEWAL_PAGE,
+            career_id=career_id,target=player,renewal=renewal,state=state,
+            money=format_market_gbp,csrf=csrf_value(),
+            error=request.args.get("error","")[:240],
+            notice=request.args.get("notice","")[:240]))
+        response.headers["Cache-Control"]="private, no-store"
+        return response
+
+    @bp.post("/world/play/career/<career_id>/market/contract/<int:player_id>/decision")
+    def manager_contract_renewal_decision(career_id,player_id):
+        check_write()
+        from world_fc27_contract_renewals import renewal_action
+        from urllib.parse import quote
+        try:
+            action=request.form.get("action","")
+            wage=(int(request.form["weekly_wage"]) if action=="offer" else None)
+            years=(int(request.form["contract_years"]) if action=="offer" else None)
+            with connect() as db:
+                result=renewal_action(db,career_id=career_id,player_id=player_id,
+                    action=action,weekly_wage=wage,contract_years=years)
+            if request.accept_mimetypes.best=="application/json":
+                response=jsonify(ok=True,**result)
+                response.headers["Cache-Control"]="private, no-store"
+                return response
+            return redirect("/world/play/career/"+career_id+"/market/contract/"+
+                str(player_id)+"?notice="+quote(result["message"][:240]))
+        except (ValueError,sqlite3.Error,KeyError,TypeError) as exc:
+            if request.accept_mimetypes.best=="application/json":
+                return jsonify(ok=False,error=str(exc)[:240]),400
+            return redirect("/world/play/career/"+career_id+"/market/contract/"+
+                str(player_id)+"?error="+quote(str(exc)[:240]))
 
     @bp.post("/world/play/career/<career_id>/market/squad/decision")
     def manager_squad_decision(career_id):
