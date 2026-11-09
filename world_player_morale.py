@@ -120,6 +120,17 @@ def reconcile_player_morale(conn,*,career_id,now=None):
     old_morale=dict(conn.execute("""SELECT player_id,status
         FROM world_career_player_morale WHERE career_id=? AND window_id=?""",
         (career_id,window_id)).fetchall())
+    # A rejected or ignored wage request is a separate concern from minutes.
+    # Retaining first-team status alone must not erase a wage dispute.
+    wage_disputes={}
+    if dataset=="fc27-warehouse-659-mens-2026-27" and conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' "
+            "AND name='world_career_contract_renewals'").fetchone():
+        wage_disputes=dict(conn.execute("""SELECT player_id,status
+           FROM world_career_contract_renewals
+           WHERE career_id=? AND window_id=? AND initiated_by='player'
+             AND status IN ('requested','countered','declined')""",
+           (career_id,window_id)).fetchall())
     has_rejections={r[0] for r in conn.execute("""SELECT DISTINCT o.player_id
         FROM world_career_offers o
         JOIN world_career_preseason_window_offers wt ON wt.offer_id=o.offer_id
@@ -142,13 +153,34 @@ def reconcile_player_morale(conn,*,career_id,now=None):
             starter={"GK":1,"DEF":4,"MID":4,"FWD":2}.get(position_family(pos),3)
             role=("regular_starter" if rank<starter else
                   "rotation" if rank<starter*2 else "fringe")
+        if pid in wage_disputes and club==manager and elapsed>=650:
+            # An unresolved demand may progress to a transfer request.
+            # This is NOT a forced sale or a refusal to play. It only
+            # signals that a credible external offer may appeal.
+            from world_fc27_contract_renewals import wage_signal
+            signal=wage_signal(conn,career_id=career_id,player_id=pid)
+            if (signal["gap_pct"] is not None and signal["gap_pct"]>=35
+                    and pid not in old_morale):
+                reason=("Wage dissatisfaction: current £"+
+                    format(signal["wage"],",")+"/week versus comparable "+
+                    "FC27 game wages of £"+format(signal["reference"],",")+
+                    "/week. Player asks to explore higher-paid opportunities.")
+                conn.execute("""INSERT OR IGNORE INTO world_career_player_morale
+                    (career_id,window_id,player_id,club_id,status,reason,requested_at)
+                    VALUES(?,?,?,?,'transfer_requested',?,?)""",
+                    (career_id,window_id,pid,club,reason,t.isoformat()))
+                old_morale[pid]="transfer_requested"
+                requested+=1
+                _message(conn,career_id=career_id,window_id=window_id,
+                    key=f"wage-transfer-request:{pid}",when=t,
+                    headline=f"{name} asks to explore a transfer",detail=reason)
         if role not in ("fringe","rotation"):
             # A player's request is not an irreversible random event.
             # A genuine promotion to regular first-team status may resolve
             # their playing-time motivation; a blocked high-value exit
             # is a different concern and is not silently erased.
             if (old_morale.get(pid)=="transfer_requested" and
-                    pid not in has_rejections):
+                    pid not in has_rejections and pid not in wage_disputes):
                 conn.execute("""DELETE FROM world_career_player_morale
                     WHERE career_id=? AND window_id=? AND player_id=?
                     AND status='transfer_requested'""",
