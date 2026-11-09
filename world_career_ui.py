@@ -300,6 +300,59 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 @media(max-width:930px){.desk-tactics-layout{grid-template-columns:minmax(0,1fr)}.desk-pitch-wrap{max-width:680px;margin:0 auto;width:100%}.desk-tactics-roster{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.desk-tactics-roster{grid-template-columns:1fr}.desk-tactics-toolbar{gap:8px}.desk-pitch-token{width:81px}.desk-pitch-token .desk-player-name{font-size:9px}.desk-pitch-token .desk-player-disc{width:27px;height:27px;font-size:11px}}
 
+/* FM-like message list and adjacent reading pane */
+.desk-inbox-split{display:grid;grid-template-columns:minmax(245px,315px) minmax(0,1fr);border:1px solid #36516a;background:#102035;border-radius:10px;overflow:hidden;min-height:520px}
+.desk-inbox-split .desk-inbox-list{border:0;border-right:1px solid #35506a;border-radius:0;min-width:0;max-height:75vh;overflow-y:auto}
+.desk-inbox-split .desk-inbox-columns,.desk-inbox-split .desk-inbox-item>summary{display:grid;grid-template-columns:22px minmax(0,1fr) 74px;column-gap:8px;row-gap:3px}
+.desk-inbox-split .desk-inbox-columns{grid-template-columns:22px 1fr;padding:11px}
+.desk-inbox-split .desk-inbox-columns span:nth-child(n+3){display:none}
+.desk-inbox-split .desk-inbox-item>summary{padding:13px 10px;min-height:64px}
+.desk-inbox-split .desk-inbox-flag{grid-row:1/3;align-self:center}
+.desk-inbox-split .desk-inbox-subject{grid-column:2;grid-row:1}
+.desk-inbox-split .desk-inbox-sender{grid-column:2;grid-row:2;font-size:11px;color:#91afc3}
+.desk-inbox-split .desk-inbox-fee{grid-column:3;grid-row:1;font-size:12px}
+.desk-inbox-split .desk-inbox-state{grid-column:3;grid-row:2;font-size:10px;display:block!important;text-align:right}
+.desk-inbox-split .desk-inbox-item[data-selected="true"]>summary{background:#24506a;box-shadow:inset 3px 0 #70c7e8}
+.desk-inbox-reader{padding:0;min-width:0}
+.desk-inbox-reader-header{padding:17px 21px;background:#1a3149;border-bottom:1px solid #38516c;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.desk-inbox-reader-header strong{font-size:16px}
+.desk-inbox-reader-header small{display:block;margin-top:4px;font-size:12px;color:#a9c5d6}
+.desk-inbox-reader .desk-inbox-detail{padding:19px 21px}
+.desk-inbox-reader .desk-inbox-detail .offer{background:transparent!important;border:none!important;padding:0!important}
+.desk-inbox-reader .desk-inbox-detail .count{font-size:22px}
+.desk-inbox-reader-empty{padding:42px 24px;color:#9ebbcf;text-align:center}
+@media(max-width:760px){.desk-inbox-split{grid-template-columns:1fr}.desk-inbox-split .desk-inbox-list{border-right:0;border-bottom:1px solid #35506a;max-height:275px}.desk-inbox-reader{min-height:220px}.desk-inbox-reader .desk-inbox-detail{padding:13px}}
+/* Minimal scouting search and modal condition builder */
+.desk-scout-searchbar{display:flex;align-items:end;gap:9px;flex-wrap:wrap;background:#162b40;border:1px solid #385773;border-radius:9px;padding:12px 14px}
+.desk-scout-searchbar>label:first-child{flex:1 1 215px;max-width:430px}
+.desk-scout-searchbar input[type="search"],.desk-scout-searchbar input[name="scout_query"]{width:100%;padding:9px}
+.desk-scout-searchbar>label{font-size:12px;min-width:130px}
+.desk-scout-searchbar select{font-size:12px}
+.desk-scout-add,.desk-scout-clear{padding:9px 13px!important;border-radius:6px!important;font-size:12px!important;font-weight:720!important}
+.desk-scout-add{background:#25769c!important;color:white!important;border:1px solid #63b6d8!important}
+.desk-scout-clear{background:#23384d!important;border:1px solid #4a6b81!important}
+.desk-scout-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
+.desk-scout-chip{background:#203d53;border:1px solid #4d7b96;border-radius:5px;color:#e1f4ff;display:inline-flex;align-items:center;padding:5px 7px;gap:5px;font-size:11px}
+.desk-scout-chip button{border:0;background:transparent;color:#ffb0b0;padding:0 3px;cursor:pointer}
+.desk-scout-dialog[hidden],.desk-scout-dialog-shade[hidden]{display:none!important}
+.desk-scout-dialog-shade{position:fixed;inset:0;background:#040c15b8;z-index:79}
+.desk-scout-dialog{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(730px,calc(100vw - 28px));max-height:min(83vh,770px);overflow-y:auto;z-index:80;background:#14273b;border:1px solid #6b9bb5;box-shadow:0 18px 70px #000b;border-radius:11px;padding:0}
+.desk-scout-dialog-header{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #36546a}
+.desk-scout-dialog-header strong{font-size:17px}
+.desk-scout-dialog-close{background:transparent;color:#e5f5ff;border:0;font-size:23px;padding:2px 8px}
+.desk-scout-condition-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:17px}
+.desk-scout-condition-grid label{display:block!important;margin:0!important;min-width:0;padding:8px 9px;border:1px solid #365268;border-radius:7px;background:#1c344a;color:#c9e1ed;font-size:12px}
+.desk-scout-condition-grid label select,.desk-scout-condition-grid label input:not([type=checkbox]){display:block;width:100%;margin-top:6px;background:#11283e;border:1px solid #456e89;color:#f2faff;border-radius:5px;padding:8px}
+.desk-scout-condition-grid label:has(input[type=checkbox]){display:flex!important;align-items:center;gap:8px}
+.desk-scout-dialog-actions{display:flex;justify-content:space-between;gap:10px;border-top:1px solid #36546a;padding:13px 18px;align-items:center}
+.desk-scout-dialog-actions button{padding:9px 13px!important}
+.desk-view[data-view="scouting"] .scout-filters{background:none!important;padding:0!important;margin:10px 0!important}
+.desk-view[data-view="scouting"] .desk-scout-table-tools{margin-top:5px}
+.desk-view[data-view="scouting"] .desk-scout-finance{margin-bottom:12px}
+.desk-view[data-view="scouting"] .desk-scout-finance span{padding:7px 12px;font-size:12px}
+.desk-view[data-view="scouting"] .desk-scout-finance b{font-size:16px}
+@media(max-width:580px){.desk-scout-condition-grid{grid-template-columns:1fr}.desk-scout-searchbar>label{flex:1 1 135px}}
+
 """
 
 DASHBOARD_JS = r"""
@@ -500,6 +553,39 @@ DASHBOARD_JS = r"""
     views.inbox.appendChild(inboxGrid);
   }
   inboxGrid.classList.add('desk-inbox-list');
+  const inboxLayout=document.createElement('div');
+  inboxLayout.className='desk-inbox-split';
+  inboxGrid.before(inboxLayout);
+  const inboxReader=document.createElement('div');
+  inboxReader.className='desk-inbox-reader';
+  inboxReader.setAttribute('aria-label','Selected message');
+  inboxLayout.append(inboxGrid,inboxReader);
+  const inboxCardItems=new WeakMap();
+  let selectedInboxCard=null,selectedInboxItem=null,selectedInboxDetail=null;
+  function selectInboxCard(card){
+    if(!card)return;
+    const item=inboxCardItems.get(card);
+    if(!item)return;
+    if(selectedInboxCard===card)return;
+    if(selectedInboxItem&&selectedInboxDetail){
+      selectedInboxItem.appendChild(selectedInboxDetail);
+      selectedInboxItem.dataset.selected='false';
+    }
+    selectedInboxCard=card;selectedInboxItem=item;
+    selectedInboxDetail=item.querySelector('.desk-inbox-detail');
+    item.dataset.selected='true';
+    inboxReader.replaceChildren();
+    const heading=document.createElement('header');
+    heading.className='desk-inbox-reader-header';
+    const intro=document.createElement('div');
+    const strong=document.createElement('strong');
+    strong.textContent=card.dataset.deskPlayerName||'Transfer';
+    const small=document.createElement('small');
+    small.textContent=cleanInboxClub(card.dataset.deskBuyer||'')+
+      ' · '+(inboxLabels[card.dataset.deskStatus]||'Transfer update');
+    intro.append(strong,small);heading.appendChild(intro);
+    inboxReader.append(heading,selectedInboxDetail);
+  }
   const offerCards=Array.from(inboxGrid.querySelectorAll(':scope > .offer[data-desk-player]'));
   const inboxColumns=document.createElement('div');
   inboxColumns.className='desk-inbox-columns';
@@ -524,7 +610,7 @@ DASHBOARD_JS = r"""
        card.dataset.deskAgent==='terms_accepted');
   }
   function refreshInboxItem(card){
-    const holder=card.closest('.desk-inbox-item');
+    const holder=inboxCardItems.get(card)||card.closest('.desk-inbox-item');
     if(!holder)return;
     const status=card.dataset.deskStatus||'proposed';
     const required=actionRequired(card);
@@ -554,9 +640,16 @@ DASHBOARD_JS = r"""
     card.before(item);
     item.append(summary,body);
     body.appendChild(card);
+    inboxCardItems.set(card,item);
+    summary.addEventListener('click',function(event){
+      event.preventDefault();
+      selectInboxCard(card);
+    });
     refreshInboxItem(card);
   }
   offerCards.forEach(makeInboxItem);
+  if(offerCards.length)selectInboxCard(offerCards[0]);
+  else inboxReader.innerHTML='<div class="desk-inbox-reader-empty">Select a message to read it here.</div>';
   if(!offerCards.length)inboxGrid.hidden=true;
   // Fast client-side inbox filters. Refreshing the market fetches genuine
   // updates from Flask, but switching views and narrowing visible cards
@@ -626,11 +719,27 @@ DASHBOARD_JS = r"""
     }
     function applyInboxFilter(){
       offerCards.forEach(function(card){
-        const item=card.closest('.desk-inbox-item');
+        const item=inboxCardItems.get(card);
         if(item)item.hidden=!qualifies(card);
       });
       const existing=views.inbox.querySelector('.desk-no-match');
       if(existing)existing.remove();
+      if(selectedInboxCard&&!qualifies(selectedInboxCard)){
+        selectedInboxCard=null;
+        const next=offerCards.find(qualifies);
+        if(next)selectInboxCard(next);
+        else{
+          if(selectedInboxItem&&selectedInboxDetail){
+            selectedInboxItem.appendChild(selectedInboxDetail);
+            selectedInboxItem.dataset.selected='false';
+          }
+          selectedInboxItem=null;selectedInboxDetail=null;
+          inboxReader.innerHTML='<div class="desk-inbox-reader-empty">No messages match these filters.</div>';
+        }
+      }else if(!selectedInboxCard){
+        const next=offerCards.find(qualifies);
+        if(next)selectInboxCard(next);
+      }
       if(offerCards.length && !offerCards.some(qualifies)){
         const message=emptyPanel('No offers match',
           'Try another player, buying club or status.');
@@ -1324,6 +1433,7 @@ DASHBOARD_JS = r"""
         inboxGrid.insertBefore(card,inboxColumns.nextSibling);
         offerCards.push(card);
         makeInboxItem(card);
+        if(!selectedInboxCard)selectInboxCard(card);
         refreshInboxList();
         const empty=views.inbox.querySelector('#desk-inbox-no-offers');
         if(empty)empty.hidden=true;
