@@ -3337,6 +3337,17 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         response.headers["Cache-Control"]="private, no-store"
         return response
 
+    @bp.get("/world/play/career/<career_id>/market/buy/status/<int:offer_id>")
+    def manager_market_buy_status(career_id,offer_id):
+        if not authenticated():
+            return jsonify(ok=False,error="Authentication required"),401
+        try:
+            with connect() as db:
+                return buy_offer_response(db,career_id,offer_id,
+                    "Latest verified club and agent decision",existing=True)
+        except (ValueError,sqlite3.Error) as exc:
+            return jsonify(ok=False,error=str(exc)[:200]),400
+
     @bp.post("/world/play/career/<career_id>/market/buy")
     def manager_market_buy(career_id):
         check_write()
@@ -3348,7 +3359,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     offered_fee=int(request.form["offered_fee"]),
                     request_key=request.form["request_key"])
                 message=("Offer already recorded" if result["existing"] else
-                    "Transfer bid submitted; selling club response: "+
+                    "Offer submitted. Waiting for the autonomous selling club to review."
+                    if result["status"]=="proposed" else
+                    "Transfer bid submitted; seller response: "+
                     result["status"].replace("_"," "))
                 if wants_json:
                     return buy_offer_response(db,career_id,result["offer_id"],
