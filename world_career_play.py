@@ -942,7 +942,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
  </div>
 </div>
 {% if not spectator %}
-<h2 id="recruitment">Shortlist</h2>
+<h2 id="recruitment">My transfer shortlist</h2>
 <div class="card">
 <p class="muted">Your saved targets are available throughout the window. Browse players in Scouting and save them from their profile.</p>
 {% if shortlist %}
