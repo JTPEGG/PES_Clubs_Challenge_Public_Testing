@@ -1190,15 +1190,27 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  <h3 style="margin:6px 0"><button type="button" class="desk-player-quickfilter"
  data-desk-filter-player="{{o.player_name}}" title="Filter offers for {{o.player_name}}">{{o.player_name}}</button></h3>
  <div class="count">{{money(o.offered_fee)}}</div>
- {% if o.market_value is not none and o.market_value>0 %}
- <p class="muted" style="margin:5px 0">Indicative market value: <b>{{money(o.market_value)}}</b></p>
- <p class="muted" style="margin:5px 0">
- Bid versus valuation:
- <b>{{'+' if o.value_difference>=0 else '−'}}{{money(o.value_difference|abs)}}</b>
- (<b>{{'+' if o.value_difference_pct>=0 else '−'}}{{'%.1f'|format(o.value_difference_pct|abs)}}%</b>)
- {{'above' if o.value_difference>=0 else 'below'}} the modelled value.
- </p>
- {% else %}<p class="muted">Indicative market value unavailable.</p>{% endif %}
+ <div class="desk-offer-briefing">
+   <div class="desk-offer-briefing-title">Decision briefing <span>Career estimates</span></div>
+   <div class="desk-offer-briefing-metrics">
+     <div><small>Offer</small><strong>{{money(o.offered_fee)}}</strong></div>
+     <div><small>Market valuation</small><strong>{{money(o.market_value) if o.market_value is not none else 'Unavailable'}}</strong></div>
+     <div><small>Offer vs value</small><strong class="{{'desk-positive' if o.value_difference is not none and o.value_difference>=0 else 'desk-negative'}}">{{('+' if o.value_difference>=0 else '−') ~ ('%.1f'|format(o.value_difference_pct|abs)) ~ '%' if o.value_difference_pct is not none else '—'}}</strong></div>
+     <div><small>Current wage / week</small><strong>{{money(o.current_wage) if o.current_wage is not none else 'Unknown'}}</strong></div>
+   </div>
+   <p class="desk-offer-briefing-note"><b>Sporting impact:</b>
+      {{o.position or 'Position unknown'}} · {{'OVR ' ~ o.overall if o.overall is not none else 'Unknown rating'}}
+      · {{o.squad_role|replace('_',' ')|title if o.squad_role else 'Squad role not recorded'}}.
+      {% if o.competing_offers %}<b>{{o.competing_offers}} competing bid(s)</b>.{% endif %}
+      A sale reduces projected positional depth until replacements are agreed.
+   </p>
+   <p class="desk-offer-briefing-note"><b>Financial impact:</b>
+      {% if o.market_value is not none and o.market_value>0 %}
+      {{money(o.value_difference|abs)}} {{'above' if o.value_difference>=0 else 'below'}} indicative valuation.
+      {% else %}A reliable value comparison is unavailable.{% endif %}
+      The board allocates its reinvestable share of the fee only once this transfer is confirmed.
+   </p>
+ </div>
  {% if o.demanded_fee is not none %}
  <p class="muted">Your counter: {{money(o.demanded_fee)}}</p>{% endif %}
  {% if o.competing_offers and o.status=='accepted_pending_contract' %}
@@ -2678,6 +2690,22 @@ def create_play_blueprint(db_path):
                                           if valuation is not None else None)
                 item["value_difference_pct"]=(100*(r["offered_fee"]-valuation)/valuation
                     if valuation is not None and valuation>0 else None)
+                profile=db.execute("""SELECT p.primary_position,x.overall,
+                    COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
+                    pc.current_role
+                    FROM world_players p
+                    LEFT JOIN world_dataset_ratings x
+                      ON x.dataset_id=? AND x.player_id=p.player_id
+                    LEFT JOIN world_career_player_circumstances pc
+                      ON pc.career_id=? AND pc.player_id=p.player_id
+                    LEFT JOIN world_career_contract_snapshots cs
+                      ON cs.career_id=? AND cs.player_id=p.player_id
+                    WHERE p.player_id=?""",
+                    (dataset,career_id,career_id,r["player_id"])).fetchone()
+                item["position"]=profile[0] if profile else None
+                item["overall"]=profile[1] if profile else None
+                item["current_wage"]=profile[2] if profile else None
+                item["squad_role"]=profile[3] if profile else None
                 offers.append(item)
             outgoing=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
                 o.demanded_fee,p.full_name AS player_name,
