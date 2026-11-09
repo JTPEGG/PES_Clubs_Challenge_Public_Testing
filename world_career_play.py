@@ -1479,6 +1479,8 @@ Rejected and expired offers are not transfers.</p>
          refreshUnread(unread);
          if(typeof window.fc27SyncIncomingOffers==='function')
            window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
+         if(typeof window.fc27UpdateBudget==='function')
+           window.fc27UpdateBudget(state);
          const marketFeed=document.querySelector('#desk-view-news .feed');
          if(marketFeed&&Array.isArray(state.world_updates)){
            // Received from the saved AI deal ledger; never fabricate news.
@@ -3049,7 +3051,22 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 detail=(name+" · "+clean_club(seller)+" → "+clean_club(buyer)+
                         " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
                 for eid,name,seller,buyer,fee,when in recent]
+            manager_id=career[0]
+            transfer_total=db.execute("""SELECT transfer_budget
+                 FROM world_career_club_ledger WHERE career_id=? AND club_id=?""",
+                 (career_id,manager_id)).fetchone()[0]
+            sale_totals=(db.execute("""SELECT COALESCE(SUM(allocated_gbp),0),
+                 COALESCE(SUM(withheld_gbp),0)
+                 FROM world_career_sale_budget_credits
+                 WHERE career_id=? AND seller_club_id=?""",
+                 (career_id,manager_id)).fetchone()
+                 if db.execute("""SELECT 1 FROM sqlite_master
+                    WHERE type='table' AND name='world_career_sale_budget_credits'""").fetchone()
+                 else (0,0))
             payload=dict(state=snap["state"],latest_message_id=msg[1],
+                available_transfer_budget=budget_remaining(db,career_id,manager_id),
+                total_transfer_budget=transfer_total,
+                sale_budget_allocated=sale_totals[0],sale_board_withheld=sale_totals[1],
                 unread=unread,incoming_offers=offers,
                 offer_updates=live_offers,csrf=csrf_value(),
                 world_updates=world_updates,
