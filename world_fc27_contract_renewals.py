@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS world_career_contract_renewals (
 );
 CREATE INDEX IF NOT EXISTS world_renewal_player_status ON
  world_career_contract_renewals(career_id,player_id,status);
+CREATE TABLE IF NOT EXISTS world_career_contract_request_sweeps (
+ career_id TEXT NOT NULL, window_id INTEGER NOT NULL,
+ swept_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(career_id,window_id)
+);
 """
 
 def initialise_contract_renewals(conn):
@@ -115,6 +120,17 @@ def _peer_market_wage(conn,*,dataset,club_id,overall,position):
     return dict(reference=int(round(median(peer)/500)*500) if len(peer)>=4 else None,
                 sample=len(peer),local=len(local)>=4)
 
+def market_reference_for_transfer(conn,*,dataset,player_id,club_id):
+    """Comparable game wages for players at AI or human clubs."""
+    player=conn.execute("""SELECT x.overall,p.primary_position
+        FROM world_dataset_ratings x JOIN world_players p
+          ON p.player_id=x.player_id
+        WHERE x.dataset_id=? AND x.player_id=?""",
+        (dataset,player_id)).fetchone()
+    if not player or player[0] is None:return None
+    return _peer_market_wage(conn,dataset=dataset,club_id=club_id,
+        overall=player[0],position=player[1])["reference"]
+
 def wage_signal(conn,*,career_id,player_id):
     target=_target(conn,career_id,player_id)
     peers=_peer_market_wage(conn,dataset=target["dataset"],club_id=target["club"],
@@ -179,10 +195,13 @@ def generate_player_requests(conn,*,career_id,now=None):
     car=conn.execute("""SELECT dataset_id,manager_club_id FROM world_career_saves
         WHERE career_id=?""",(career_id,)).fetchone()
     if car is None or car[0]!=DATASET:return 0
+    if conn.execute("""SELECT 1 FROM world_career_contract_request_sweeps
+        WHERE career_id=? AND window_id=?""",
+        (career_id,snap["window_id"])).fetchone():
+        return 0
     already=conn.execute("""SELECT COUNT(*) FROM world_career_contract_renewals
         WHERE career_id=? AND window_id=? AND initiated_by='player'""",
         (career_id,snap["window_id"])).fetchone()[0]
-    if already>=5:return 0
     players=conn.execute("""SELECT r.player_id FROM world_career_registrations r
         JOIN world_dataset_ratings x ON x.player_id=r.player_id
              AND x.dataset_id=?
@@ -200,11 +219,13 @@ def generate_player_requests(conn,*,career_id,now=None):
         # Weighted dissatisfaction and contract pressure; an underpaid
         # starter is more likely to ask even with time left on their deal.
         chance=max(0,min(.90,(signal["pressure"]-.14)*1.13))
-        if _stable(career_id,snap["window_id"],pid)>chance:continue
+        if not (signal["gap_pct"]>=40 and
+                signal["role"] in ("key_player","regular_starter")) and (
+                _stable(career_id,snap["window_id"],pid)>chance):continue
         candidates.append((signal["pressure"],pid,signal))
     candidates.sort(reverse=True)
     count=0
-    for _,pid,signal in candidates[:max(0,min(3,5-already))]:
+    for _,pid,signal in candidates[:max(0,min(5,5-already))]:
         conn.execute("""INSERT OR IGNORE INTO world_career_contract_renewals
             (career_id,window_id,player_id,club_id,old_weekly_wage,
              peer_weekly_wage,demand_weekly_wage,status,initiated_by,model_version)
@@ -220,7 +241,9 @@ def generate_player_requests(conn,*,career_id,now=None):
                 "Their agent wants a competitive renewal or may consider a move. "
                 "Open Squad → Contract to discuss terms."))
         count+=1
-    if count:conn.commit()
+    conn.execute("""INSERT OR IGNORE INTO world_career_contract_request_sweeps
+        (career_id,window_id) VALUES(?,?)""",(career_id,snap["window_id"]))
+    conn.commit()
     return count
 
 def renewal_action(conn,*,career_id,player_id,action,weekly_wage=None,
