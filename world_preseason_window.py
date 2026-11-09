@@ -281,6 +281,10 @@ def finalise_preseason_window(conn, *, career_id, season_index=1, now=None):
                      "Transfer not fully signed before the real-time 30-minute deadline."))
                 expired+=1
             # 'rejected','withdrawn','completed': historical decisions left intact.
+        # Renewals are separate contracts for players staying with their club.
+        # They never move the player's registration or affect transfer fees.
+        from world_fc27_contract_renewals import finalise_renewals
+        finalise_renewals(conn,career_id=career_id,effective_date=c[0])
         # Pending, independently consented loans register at the same immutable
         # deadline; none may collide with a signed permanent transfer.
         from world_career_lifecycle import activate_agreed_loans
