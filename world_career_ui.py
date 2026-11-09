@@ -459,6 +459,12 @@ DASHBOARD_JS = r"""
       grid.appendChild(card);
     });
     views.finances.appendChild(grid);
+    const saleNote=document.createElement('p');
+    saleNote.className='muted';saleNote.dataset.saleBudgetSummary='';
+    saleNote.textContent='Confirmed sales: '+gbp(Number(budgetValues.reinvested)||0)+
+      ' made available for new transfers; '+gbp(Number(budgetValues.boardRetained)||0)+
+      ' retained by the board.';
+    views.finances.appendChild(saleNote);
 
   }else{
     views.finances.appendChild(emptyPanel(
@@ -921,6 +927,37 @@ DASHBOARD_JS = r"""
     return (n<0?'-':'')+'£'+(abs>=1e6?(abs/1e6).toFixed(2)+'m':
       abs>=1e3?Math.round(abs/1e3)+'k':Math.round(abs).toLocaleString('en-GB'));
   };
+  function updateSaleBudgetUI(result){
+    if(result.available_transfer_budget===undefined)return;
+    const available=Number(result.available_transfer_budget)||0;
+    const total=Number(result.total_transfer_budget)||0;
+    const panel=document.querySelector('#budget-panel');
+    if(panel){
+      panel.dataset.feeRemaining=String(available);
+      panel.dataset.feeTotal=String(total);
+      panel.dataset.reinvested=String(result.sale_budget_allocated||0);
+      panel.dataset.boardRetained=String(result.sale_board_withheld||0);
+      const label=panel.querySelector('#fee-current');
+      if(label)label.textContent=pound(available);
+      const bar=panel.querySelector('#fee-bar');
+      if(bar)bar.style.width=Math.min(100,Math.max(0,available/Math.max(1,total)*100))+'%';
+    }
+    document.body.dataset.feeRemaining=String(available);
+    document.body.dataset.feeTotal=String(total);
+    const scoutValue=views.scouting.querySelector('.desk-scout-finance b');
+    if(scoutValue)scoutValue.textContent=pound(available);
+    const financeTile=views.finances.querySelector('.desk-finance-grid .card');
+    if(financeTile){
+      const number=financeTile.querySelector('.desk-finance-value');
+      if(number)number.textContent=pound(available);
+      const fill=financeTile.querySelector('.desk-finance-fill');
+      if(fill)fill.style.width=Math.min(100,Math.max(0,available/Math.max(1,total)*100))+'%';
+    }
+    const note=views.finances.querySelector('[data-sale-budget-summary]');
+    if(note)note.textContent='Confirmed sales: '+
+      pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
+      pound(result.sale_board_withheld||0)+' retained by the board.';
+  }
   const labels={
     proposed:'New offer',countered:'Awaiting buyer',
     accepted_pending_contract:'Player/agent talks',
@@ -1154,6 +1191,7 @@ DASHBOARD_JS = r"""
         agent_status:null,buyer:card?.dataset.deskBuyer};
       updateIncomingCard(offer,String(data.get('csrf')||''));
       updateOfferRow(offer);
+      updateSaleBudgetUI(result);
       showDecisionFeedback(card,result.message,false);
       if(Number.isFinite(Number(result.unread))){
         document.body.dataset.unread=String(result.unread);
@@ -1169,6 +1207,65 @@ DASHBOARD_JS = r"""
       form.dataset.saving='0';
       buttons.forEach(b=>{if(b.isConnected)b.disabled=false;});
     }
+  },true);
+  // Inline X cancels only unsigned deals. Keep the Transfer Centre open,
+  // use the authoritative POST/CSRF routes, and update the exact affected row.
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||
+       !form.classList.contains('desk-transfer-cancel-form'))return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    form.dataset.saving='1';
+    const button=event.submitter||form.querySelector('button');
+    if(button)button.disabled=true;
+    const row=form.closest('tr');
+    const action=event.submitter?.value||button?.value||'';
+    const data=new FormData(form);
+    if(button&&button.name)data.set(button.name,action);
+    try{
+      const response=await fetch(form.action,{
+        method:'POST',body:data,credentials:'same-origin',cache:'no-store',
+        headers:{Accept:'application/json'}
+      });
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'Cancellation could not be completed');
+      if(row){
+        const free=Boolean(row.dataset.freeAgentSigningId);
+        const status=free?'Cancelled':labels[result.status]||'Withdrawn';
+        if(row.cells[3])row.cells[3].textContent=
+          (free?status+' · '+row.cells[3].textContent.split(' · ').slice(1).join(' · '):status);
+        if(row.cells[4])row.cells[4].replaceChildren();
+        row.dataset.cancelled='true';
+      }
+      if(!row?.dataset.freeAgentSigningId){
+        const id=Number(data.get('offer_id'));
+        if(Number.isFinite(id)){
+          const offer={offer_id:id,status:result.status||'withdrawn',agent_status:null};
+          updateIncomingCard(offer,String(data.get('csrf')||''));
+          updateOfferRow(offer);
+          if(row?.dataset.buyOfferId&&result.html){
+            const html=document.createElement('template');
+            html.innerHTML=result.html;
+            const card=html.content.querySelector('[data-buy-offer-id]');
+            const existing=views.transfers.querySelector(
+              '.grid [data-buy-offer-id="'+id+'"]');
+            if(card&&existing)existing.replaceWith(card);
+          }
+        }
+      }
+      updateSaleBudgetUI(result);
+    }catch(error){
+      let feedback=row?.querySelector('.desk-transfer-cancel-error');
+      if(!feedback&&row?.cells[4]){
+        feedback=document.createElement('small');
+        feedback.className='desk-transfer-cancel-error';
+        row.cells[4].appendChild(feedback);
+      }
+      if(feedback)feedback.textContent=String(error.message||error);
+      if(button)button.disabled=false;
+    }finally{form.dataset.saving='0';}
   },true);
   window.fc27SyncIncomingOffers=function(items,csrf){
     if(!Array.isArray(items))return;
