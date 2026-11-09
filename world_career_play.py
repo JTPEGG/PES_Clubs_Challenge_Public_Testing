@@ -1594,6 +1594,9 @@ Rejected and expired offers are not transfers.</p>
            window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
          if(typeof window.fc27SyncBuyingOffers==='function')
            window.fc27SyncBuyingOffers(state.buying_updates,state.csrf);
+         if(typeof window.fc27SyncContractRequests==='function')
+           window.fc27SyncContractRequests(state.contract_updates,
+             {{career_id|tojson}});
          if(typeof window.fc27UpdateBudget==='function')
            window.fc27UpdateBudget(state);
          const marketFeed=document.querySelector('#desk-view-news .feed');
@@ -3289,6 +3292,16 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 delay_used=bool(delayed))
                 for oid,pid,status,fee,name,seller,agent,demanded,wage,years,delayed
                 in buying_rows]
+            contract_updates=[dict(player_id=r[0],status=r[1],
+                current_wage=r[2],peer_wage=r[3],demand=r[4],
+                player=r[5]) for r in db.execute("""SELECT
+                a.player_id,a.status,a.old_weekly_wage,
+                a.peer_weekly_wage,a.demand_weekly_wage,p.full_name
+                FROM world_career_contract_renewals a
+                JOIN world_players p ON p.player_id=a.player_id
+                WHERE a.career_id=? AND a.window_id=?
+                ORDER BY a.updated_at DESC LIMIT 50""",
+                (career_id,snap["window_id"])).fetchall()] if snap["window_id"] else []
             recent=db.execute("""SELECT e.event_id,p.full_name,sc.name,b.name,
                 o.offered_fee,e.created_at FROM world_career_offer_events e
                 JOIN world_career_offers o ON o.offer_id=e.offer_id
@@ -3326,7 +3339,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 total_transfer_budget=transfer_total,
                 sale_budget_allocated=sale_totals[0],sale_board_withheld=sale_totals[1],
                 unread=unread,incoming_offers=offers,
-                offer_updates=live_offers,buying_updates=buying_updates,csrf=csrf_value(),
+                offer_updates=live_offers,buying_updates=buying_updates,
+                contract_updates=contract_updates,csrf=csrf_value(),
                 world_updates=world_updates,
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
