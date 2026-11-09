@@ -199,9 +199,6 @@ def generate_player_requests(conn,*,career_id,now=None):
         WHERE career_id=? AND window_id=?""",
         (career_id,snap["window_id"])).fetchone():
         return 0
-    already=conn.execute("""SELECT COUNT(*) FROM world_career_contract_renewals
-        WHERE career_id=? AND window_id=? AND initiated_by='player'""",
-        (career_id,snap["window_id"])).fetchone()[0]
     players=conn.execute("""SELECT r.player_id FROM world_career_registrations r
         JOIN world_dataset_ratings x ON x.player_id=r.player_id
              AND x.dataset_id=?
@@ -225,7 +222,7 @@ def generate_player_requests(conn,*,career_id,now=None):
         candidates.append((signal["pressure"],pid,signal))
     candidates.sort(reverse=True)
     count=0
-    for _,pid,signal in candidates[:max(0,min(5,5-already))]:
+    for _,pid,signal in candidates:
         conn.execute("""INSERT OR IGNORE INTO world_career_contract_renewals
             (career_id,window_id,player_id,club_id,old_weekly_wage,
              peer_weekly_wage,demand_weekly_wage,status,initiated_by,model_version)
@@ -322,6 +319,13 @@ def renewal_action(conn,*,career_id,player_id,action,weekly_wage=None,
             message=(f"{target['name']}'s new {status['contract_years']}-year "
                 f"contract confirmed at £{status['offered_weekly_wage']:,}/week. "
                 f"An extra £{diff:,}/week is reserved for the new season.")
+            if conn.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+                AND name='world_career_player_morale'""").fetchone():
+                conn.execute("""DELETE FROM world_career_player_morale
+                    WHERE career_id=? AND window_id=? AND player_id=?
+                    AND status='transfer_requested'
+                    AND reason LIKE 'Wage dissatisfaction:%'""",
+                    (career_id,snap["window_id"],player_id))
             event="confirmed"
         else:
             result="declined" if action=="decline" else "withdrawn"
