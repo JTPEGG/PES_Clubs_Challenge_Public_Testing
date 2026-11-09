@@ -127,8 +127,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     attribute="", min_attribute=None, contract="",
                     squad_only=False, limit=80, sort_by='overall', descending=True,
                     shortlist_only=False, offset=0, with_total=False,
-                    max_market_value=None, interested_only=False,
-                    free_only=False):
+                    max_market_value=None, max_weekly_wage=None,
+                    interested_only=False,free_only=False):
     from world_ai_bidding import position_family
     save=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=? AND state='sandbox'""",
@@ -149,6 +149,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
     q=query.strip()[:70].lower()
     max_market_value=(max(0,int(max_market_value))
         if max_market_value is not None else None)
+    max_weekly_wage=(max(0,int(max_weekly_wage))
+        if max_weekly_wage is not None else None)
     interested_only=bool(interested_only)
     free_only=bool(free_only)
     if sort_by not in SORT_COLUMNS:sort_by='overall'
@@ -375,6 +377,9 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         except ValueError:
             age=None
         if max_age is not None and (age is None or age>max_age):continue
+        if max_weekly_wage is not None and (
+                d["current_wage"] is None or
+                d["current_wage"]>max_weekly_wage):continue
         d["age"]=age
         expiry=None
         try:
@@ -474,7 +479,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         and not category and min_category is None
         and not attribute and min_attribute is None and not contract
         and not squad_only and not shortlist_only and not free_only
-        and max_market_value is None):
+        and max_market_value is None and max_weekly_wage is None):
         _remember_interest(interest_key,(d["player_id"] for d in out))
     total=len(out)
     offset=max(0,int(offset))
