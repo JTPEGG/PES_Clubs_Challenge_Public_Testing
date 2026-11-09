@@ -587,6 +587,40 @@ def run(world,output):
                        AND request_key LIKE 'manager-buy-v1-%'""",
                     (CAREER,target)).fetchone()[0]
             check(count==1,"Browser-submitted transfer offer did not persist exactly once")
+            # A submitted FC27 bid must stay genuinely pending until the AI
+            # selling club reviews it at a later market checkpoint.
+            from world_live_market import _review_due_manager_buying_offers
+            from world_preseason_window import window_snapshot
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                saved=db.execute("""SELECT offer_id,status FROM world_career_offers
+                    WHERE career_id=? AND player_id=?
+                      AND request_key LIKE 'manager-buy-v1-%'
+                    ORDER BY offer_id DESC LIMIT 1""",(CAREER,target)).fetchone()
+                check(saved["status"]=="proposed",
+                      "FC27 selling club responded instantly instead of evaluating a pending bid")
+                queued=db.execute("""SELECT COUNT(*) FROM world_career_offer_events
+                    WHERE offer_id=? AND event_type='manager_buy_queued'""",
+                    (saved["offer_id"],)).fetchone()[0]
+                check(queued==1,"Submitted bid is not queued for autonomous review")
+                window_id=window_snapshot(db,career_id=CAREER)["window_id"]
+                reviewed=_review_due_manager_buying_offers(db,career_id=CAREER,
+                    window_id=window_id,
+                    now=datetime.now(timezone.utc)+timedelta(seconds=120))
+                after=db.execute("""SELECT status FROM world_career_offers
+                    WHERE offer_id=?""",(saved["offer_id"],)).fetchone()[0]
+                check(reviewed==1 and after in (
+                    "accepted_pending_contract","countered","rejected"),
+                    "Deferred AI seller review did not create a genuine club decision")
+                check(db.execute("""SELECT COUNT(*) FROM world_career_market_inbox
+                    WHERE offer_id=? AND message_key LIKE 'manager-buy-review:%'""",
+                    (saved["offer_id"],)).fetchone()[0]==1,
+                    "Selling club response was not delivered to manager Inbox")
+                check(db.execute("""SELECT club_id FROM world_career_registrations
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,target)).fetchone()[0]!=manager,
+                    "Unsigned purchase silently moved player into manager's team")
+            found.append("Manager's bid pending, delayed autonomous seller decision and Inbox mail are real")
             page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
             page.wait_for_function("document.body.dataset.unread === '0'",timeout=20000)
             check(page.locator('.desk-sidebar [data-desk-tab="inbox"] .desk-nav-count').count()==0,
