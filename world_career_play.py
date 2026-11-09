@@ -1008,7 +1008,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if scout_attribute %}<th>{{scout_attribute|replace('_',' ')|title}}</th>{% endif %}</tr></thead>
 <tbody>{% for p in scout_results %}
 <tr class="{{'owned' if p.owned else ''}}">
-<td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
+<td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{'—' if p.free_agent else p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{'FREE' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
 <td title="{{'Reference game wage, not confirmed agent demand' if p.free_agent else 'Current game wage, not future agent demand'}}">{{('Est. ' if p.free_agent else '') + money(p.current_wage) if p.current_wage is not none else '—'}}</td>
@@ -2560,6 +2560,9 @@ def create_play_blueprint(db_path):
             return int(value) if value.isdigit() else None
         scout_query=request.args.get("scout_query","").strip()[:70] if not spectator else ""
         scout_position=request.args.get("scout_position","") if not spectator else ""
+        scout_positions=request.args.get("scout_positions","")[:160] if not spectator else ""
+        scout_hide_mine=request.args.get("scout_hide_mine")=="1" if not spectator else False
+        scout_listed=request.args.get("scout_listed")=="1" if not spectator else False
         scout_min_overall=filter_value("scout_min_overall")
         scout_max_age=filter_value("scout_max_age")
         scout_category=request.args.get("scout_category","") if not spectator else ""
@@ -2596,7 +2599,9 @@ def create_play_blueprint(db_path):
         scout_page_size=80
         scout_results,scout_total=(scouting_search(
             db,career_id=career_id,query=scout_query,
-            position=scout_position,min_overall=scout_min_overall,max_age=scout_max_age,
+            position=scout_position,position_codes=scout_positions,
+            exclude_manager_players=scout_hide_mine,listed_only=scout_listed,
+            min_overall=scout_min_overall,max_age=scout_max_age,
             category=scout_category,min_category=scout_min_category,
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
@@ -2786,7 +2791,11 @@ def create_play_blueprint(db_path):
             shortlist=shortlist,recommendations=recommendations,squad=squad,
             tactics=tactics,
             scout_categories=CATEGORIES,scout_query=scout_query,
-            scout_position=scout_position,scout_min_overall=scout_min_overall or "",
+            scout_position=scout_position,scout_positions=scout_positions,
+            scout_hide_mine=scout_hide_mine,scout_listed=scout_listed,
+            manager_club_name=club_display(db.execute("""SELECT name FROM world_clubs
+                WHERE club_id=?""",(c["manager_club_id"],)).fetchone()[0]),
+            scout_min_overall=scout_min_overall or "",
             scout_max_age=scout_max_age or "",scout_category=scout_category,
             scout_min_category=scout_min_category or "",scout_attribute=scout_attribute,
             scout_min_attribute=scout_min_attribute or "",scout_contract=scout_contract,
@@ -2936,6 +2945,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     db,career_id=career_id,
                     query=request.args.get("scout_query","")[:70],
                     position=request.args.get("scout_position",""),
+                    position_codes=request.args.get("scout_positions","")[:160],
+                    exclude_manager_players=request.args.get("scout_hide_mine")=="1",
+                    listed_only=request.args.get("scout_listed")=="1",
                     min_overall=positive_number("scout_min_overall"),
                     max_age=positive_number("scout_max_age"),
                     category=request.args.get("scout_category",""),
@@ -2960,7 +2972,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         for p in results:
             data.append(dict(
                 player_id=p["player_id"],name=p["full_name"],
-                club=re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",p["club_name"]),
+                club=("-" if p["free_agent"] else re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",p["club_name"])),
                 position=p["primary_position"] or "—",
                 overall=p["overall"],age=p["age"],
                 value=(format_market_gbp(p["market_value"])
