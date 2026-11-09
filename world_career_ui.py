@@ -691,7 +691,13 @@ DASHBOARD_JS = r"""
       cleanInboxClub(card.dataset.deskBuyer||'Buying club');
     holder.querySelector('.desk-inbox-fee').textContent=
       card.querySelector('.count')?.textContent.trim()||'—';
-    holder.querySelector('.desk-inbox-state').textContent=inboxLabels[status]||status;
+    const buyingStages={proposed:'Seller reviewing',countered:'Counteroffer',
+      accepted_pending_contract:card.dataset.deskAgent==='terms_accepted'?
+        'Sign-off needed':'Agent talks',
+      agreed_future:'Confirmed',completed:'Confirmed',
+      rejected:'Rejected',withdrawn:'Withdrawn'};
+    holder.querySelector('.desk-inbox-state').textContent=
+      (card.dataset.deskSide==='buy'?buyingStages[status]:inboxLabels[status])||status;
   }
 
   function enhanceCounter(card){
@@ -1617,6 +1623,9 @@ DASHBOARD_JS = r"""
           cancel.appendChild(btn);row.cells[6].appendChild(cancel);
         }
         updateSaleBudgetUI(result);
+        if(submit?.value==='sign'&&result.status==='agreed_future'){
+          location.reload();return;
+        }
         const count=table.closest('.desk-transfer-section')
            ?.querySelector('.desk-section-count');
         if(count)count.textContent=String(table.tBodies[0].rows.length);
@@ -1737,6 +1746,89 @@ DASHBOARD_JS = r"""
       if(button)button.disabled=false;
     }finally{form.dataset.saving='0';}
   },true);
+
+  window.fc27SyncBuyingOffers=function(items,csrf){
+    if(!Array.isArray(items))return;
+    const stages={proposed:'Awaiting seller',countered:'Seller counteroffer',
+      rejected:'Bid rejected',accepted_pending_contract:'Agent talks',
+      agreed_future:'Confirmed',completed:'Confirmed',withdrawn:'Withdrawn'};
+    for(const o of items.slice().reverse()){
+      const id=Number(o.offer_id);
+      if(!Number.isSafeInteger(id)||id<=0)continue;
+      let card=views.inbox.querySelector('[data-live-offer-id="buy-'+id+'"]');
+      const fresh=!card;
+      if(fresh){
+        card=document.createElement('div');
+        card.className='card offer desk-inbox-buy-message';
+        card.dataset.liveOfferId='buy-'+id;card.dataset.buyOfferId=String(id);
+        card.dataset.deskSide='buy';card.dataset.deskPlayer=String(o.player_id);
+        card.dataset.deskPlayerName=o.player;card.dataset.deskBuyer=o.seller;
+        const label=document.createElement('div');label.className='label';
+        const heading=document.createElement('h3');heading.textContent=o.player;
+        const count=document.createElement('div');count.className='count';
+        const briefing=document.createElement('div');
+        briefing.className='desk-offer-briefing';
+        const title=document.createElement('div');title.className='desk-offer-briefing-title';
+        title.textContent='Incoming transfer — decision update';
+        const summary=document.createElement('p');summary.className='desk-offer-briefing-note';
+        briefing.append(title,summary);card.append(label,heading,count,briefing);
+        inboxGrid.hidden=false;
+        inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+        offerCards.push(card);makeInboxItem(card);
+        if(!selectedInboxCard)selectInboxCard(card);
+      }
+      const newAgent=o.agent_status==='accepted'?'terms_accepted':o.agent_status||'';
+      if(!fresh&&card.dataset.deskStatus===o.status&&
+         card.dataset.deskAgent===newAgent&&
+         card.dataset.delayUsed===String(!!o.delay_used))continue;
+      card.dataset.deskStatus=o.status;
+      card.dataset.deskAgent=newAgent;
+      card.dataset.delayUsed=String(!!o.delay_used);
+      card.querySelector('.label').textContent=o.seller+' · '+(stages[o.status]||o.status);
+      card.querySelector('.count').textContent=pound(o.fee);
+      const summary=card.querySelector('.desk-offer-briefing-note');
+      if(summary)summary.textContent=
+        o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'?
+          'Player terms agreed. Paperwork needs your final confirmation.':
+        o.status==='countered'?'The seller has countered your bid. Review negotiations in Transfers.':
+        o.status==='rejected'?'Seller rejected your fee. You can make an improved bid.':
+        o.status==='accepted_pending_contract'?'Seller accepted your fee. Negotiate the player contract in Transfers.':
+        o.status==='agreed_future'||o.status==='completed'?'Transfer confirmed and reflected in the projected squad.':
+        o.status==='proposed'?'The selling club is reviewing your bid.':'Transfer talks are closed.';
+      card.querySelectorAll(':scope > .actions,:scope > .desk-inbox-open-negotiation').forEach(x=>x.remove());
+      if(o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'){
+        const area=document.createElement('div');area.className='actions';
+        const form=document.createElement('form');
+        form.method='post';form.action=location.pathname+'/buy/decision';
+        for(const [name,value] of [['csrf',csrf],['offer_id',id]]){
+          const input=document.createElement('input');
+          input.type='hidden';input.name=name;input.value=String(value);
+          form.appendChild(input);
+        }
+        for(const [verb,title] of [['sign','Confirm signing'],
+          ...(!o.delay_used?[['delay_signing','Delay (once)']]:[]),
+          ['withdraw','Cancel']]){
+          const button=document.createElement('button');
+          button.name='decision';button.value=verb;button.textContent=title;
+          if(verb==='withdraw')button.className='danger';
+          form.appendChild(button);
+        }
+        area.appendChild(form);card.appendChild(area);
+      }else{
+        const link=document.createElement('a');
+        link.href='#transfers';link.dataset.deskTab='transfers';
+        link.className='desk-inbox-open-negotiation';
+        link.textContent='Open transfer negotiations';card.appendChild(link);
+      }
+      refreshInboxItem(card);
+      if(selectedInboxCard===card){
+        const header=inboxReader.querySelector('.desk-inbox-reader-header small');
+        if(header)header.textContent=o.seller+' · '+(stages[o.status]||o.status);
+      }
+      refreshInboxList();
+      if(fresh&&o.status==='countered')alertOfNewOffer({player:o.player,fee:o.fee});
+    }
+  };
   window.fc27SyncIncomingOffers=function(items,csrf){
     if(!Array.isArray(items))return;
     for(const o of items.slice().reverse()){
