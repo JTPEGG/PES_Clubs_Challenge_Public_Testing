@@ -510,7 +510,7 @@ DASHBOARD_JS = r"""
     withdrawn:'Withdrawn',rejected:'Rejected'
   };
   function cleanInboxClub(value){
-    return String(value||'').replace(/\\s*\\[WH27:[^\\]]+\\]\\s*$/i,'').trim();
+    return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
     return card.dataset.deskStatus==='proposed'||
