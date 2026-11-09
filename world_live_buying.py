@@ -420,6 +420,25 @@ def act_on_buy_offer(conn,*,career_id,offer_id,action,weekly_wage=None,
         confirm_future_agreement(conn,career_id=career_id,offer_id=offer_id,
                                  agreement_date=agreement_date)
         result="Transfer signed; player registers in your career at the deadline."
+    elif action=="delay_signing":
+        # A manager may defer paperwork once without extending the immutable
+        # 30-minute market deadline or falsely implying agreement.
+        if status!="accepted_pending_contract":
+            raise ValueError("Only a deal awaiting your signature can be delayed")
+        agent=conn.execute("""SELECT status FROM world_career_agent_terms
+            WHERE career_id=? AND offer_id=?""",(career_id,offer_id)).fetchone()
+        if not agent or agent[0]!="accepted":
+            raise ValueError("Personal terms must be agreed before delaying signature")
+        previously=conn.execute("""SELECT 1 FROM world_career_offer_events
+            WHERE offer_id=? AND event_type='buyer_signing_delayed'""",
+            (offer_id,)).fetchone()
+        if previously:raise ValueError("You have already used the one signing delay")
+        conn.execute("""INSERT INTO world_career_offer_events
+            (offer_id,event_type,detail) VALUES(?,?,?)""",
+            (offer_id,"buyer_signing_delayed",
+             "Human manager deferred signing once; no extension to the global market deadline"))
+        result=("Paperwork deferred. You can confirm or cancel later, but the "
+                "30-minute transfer deadline has not changed.")
     elif action=="withdraw":
         from world_careers import withdraw_offer
         withdraw_offer(conn,career_id=career_id,offer_id=offer_id)
@@ -437,7 +456,12 @@ def act_on_buy_offer(conn,*,career_id,offer_id,action,weekly_wage=None,
         key=f"manager-buy-action:{offer_id}:{action}:"+
             str(conn.execute("""SELECT COALESCE(MAX(event_id),0) FROM world_career_offer_events
                  WHERE offer_id=?""",(offer_id,)).fetchone()[0]),
-        headline="Outgoing transfer update",detail=result,offer_id=offer_id,when=now)
+        headline=("Paperwork awaits your decision" if action=="terms" and
+                  result.startswith("Player and agent accepted")
+                  else "Transfer signature delayed" if action=="delay_signing"
+                  else "Transfer signing confirmed" if action=="sign"
+                  else "Transfer negotiation update"),
+        detail=result,offer_id=offer_id,when=now)
     conn.commit()
     return result
 
