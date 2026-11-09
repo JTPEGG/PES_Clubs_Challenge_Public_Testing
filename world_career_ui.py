@@ -629,6 +629,7 @@ DASHBOARD_JS = r"""
     if(card.closest('.desk-inbox-item'))return;
     const item=document.createElement('details');
     item.className='desk-inbox-item';
+    item.dataset.offerId=card.dataset.liveOfferId||'';
     const summary=document.createElement('summary');
     for(const className of ['desk-inbox-flag','desk-inbox-subject',
         'desk-inbox-sender','desk-inbox-fee','desk-inbox-state']){
