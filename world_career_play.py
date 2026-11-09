@@ -2479,7 +2479,7 @@ def create_play_blueprint(db_path):
                     # Source-identity suffix is retained in the database
                     # but never displayed in a career title.
                     from re import sub
-                    club_name=sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",row[0])
+                    club_name=sub(r"\s*\[WH27:[^\]]+\]\s*$","",row[0])
                     title=(request.form.get("title","").strip()
                         or f"{club_name} · 2026/27")[:80]
                     start_sandbox(
@@ -2702,7 +2702,7 @@ def create_play_blueprint(db_path):
                 ORDER BY e.event_id DESC LIMIT 40""",
                 (snap["window_id"],career_id)).fetchall()
             for event_id,name,seller,buyer,fee,when in deal_rows:
-                clean=lambda value:re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",value)
+                clean=lambda value:re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",value)
                 world_news.append(dict(event_id=event_id,headline="AI transfer agreed",
                     detail=(name+" · "+clean(seller)+" → "+clean(buyer)+
                         " · "+format_market_gbp(fee)),
@@ -2950,7 +2950,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         for p in results:
             data.append(dict(
                 player_id=p["player_id"],name=p["full_name"],
-                club=re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",p["club_name"]),
+                club=re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",p["club_name"]),
                 position=p["primary_position"] or "—",
                 overall=p["overall"],age=p["age"],
                 value=(format_market_gbp(p["market_value"])
@@ -3025,7 +3025,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 (snap["window_id"],career_id,career[0],career[0])).fetchall() if snap["window_id"] else []
             offers=len(offer_rows)
             import re
-            clean_buyer=lambda value:re.sub(r"\\s+\\[WH27:[0-9a-fA-F]{8,20}\\]$","",value)
+            clean_buyer=lambda value:re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",value)
             live_offers=[dict(offer_id=oid,player_id=pid,status=status,
                 fee=fee,player=name,buyer=clean_buyer(buyer),
                 received_at=received,agent_status=agent,
@@ -3044,7 +3044,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 (snap["window_id"],career_id)).fetchall() if snap["window_id"] else []
             import re
             def clean_club(v):
-                return re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",v)
+                return re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",v)
             world_updates=[dict(event_id=eid,headline="AI transfer agreed",
                 detail=(name+" · "+clean_club(seller)+" → "+clean_club(buyer)+
                         " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
