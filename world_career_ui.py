@@ -411,6 +411,13 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 @media(max-width:1120px){.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:630px){.desk-position-grid{grid-template-columns:repeat(3,1fr)}.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:1fr}.desk-scout-quick>label.desk-scout-quick-number{flex:1 1 125px}}
 
+.desk-squad-contract-link{display:inline-flex;align-items:center;justify-content:center;
+  background:#24485f;color:#c5eafa;border:1px solid #4e819c;border-radius:5px;
+  font-size:11px;font-weight:700;padding:6px 9px;white-space:nowrap;text-decoration:none}
+.desk-squad-contract-link:hover{background:#2f6078;color:#fff}
+.desk-inbox-item[data-status="requested"] .desk-inbox-state,
+.desk-inbox-item[data-status="accepted_terms"] .desk-inbox-state{color:#ffce83}
+
 """
 
 DASHBOARD_JS = r"""
@@ -669,6 +676,8 @@ DASHBOARD_JS = r"""
     return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
+    if(card.dataset.deskSide==='contract')
+      return ['requested','countered','accepted_terms'].includes(card.dataset.deskStatus);
     if(card.dataset.deskSide==='buy')
       return card.dataset.deskStatus==='countered'||
         (card.dataset.deskStatus==='accepted_pending_contract'&&
@@ -696,8 +705,13 @@ DASHBOARD_JS = r"""
         'Sign-off needed':'Agent talks',
       agreed_future:'Confirmed',completed:'Confirmed',
       rejected:'Rejected',withdrawn:'Withdrawn'};
+    const renewalStages={requested:'New wage request',negotiating:'Agent talks',
+      countered:'Agent counteroffer',accepted_terms:'Approval needed',
+      agreed_future:'Renewed',completed:'Renewed',
+      declined:'Declined',withdrawn:'Withdrawn',expired:'Expired'};
     holder.querySelector('.desk-inbox-state').textContent=
-      (card.dataset.deskSide==='buy'?buyingStages[status]:inboxLabels[status])||status;
+      (card.dataset.deskSide==='contract'?renewalStages[status]:
+       card.dataset.deskSide==='buy'?buyingStages[status]:inboxLabels[status])||status;
   }
 
   function enhanceCounter(card){
@@ -1747,6 +1761,55 @@ DASHBOARD_JS = r"""
     }finally{form.dataset.saving='0';}
   },true);
 
+
+  window.fc27SyncContractRequests=function(items,careerId){
+    if(!Array.isArray(items))return;
+    for(const item of items){
+      const playerId=Number(item.player_id);
+      if(!Number.isSafeInteger(playerId)||playerId<=0)continue;
+      let card=views.inbox.querySelector(
+        '[data-live-offer-id="contract-'+playerId+'"]');
+      if(!card){
+        card=document.createElement('div');
+        card.className='card offer desk-contract-inbox';
+        card.dataset.liveOfferId='contract-'+playerId;
+        card.dataset.deskSide='contract';
+        card.dataset.deskPlayer=String(playerId);
+        card.dataset.deskPlayerName=item.player;
+        card.dataset.deskBuyer='Player representative';
+        const label=document.createElement('div');label.className='label';
+        label.textContent='Contract renewal · Player representative';
+        const heading=document.createElement('h3');heading.textContent=item.player;
+        const count=document.createElement('div');count.className='count';
+        const brief=document.createElement('div');brief.className='desk-offer-briefing';
+        const title=document.createElement('div');title.className='desk-offer-briefing-title';
+        title.textContent='Player wage and contract request';
+        const explanation=document.createElement('p');
+        explanation.className='desk-offer-briefing-note';
+        brief.append(title,explanation);
+        const link=document.createElement('a');link.className='desk-inbox-open-negotiation';
+        link.href='/world/play/career/'+encodeURIComponent(careerId)+
+          '/market/contract/'+playerId;
+        link.textContent='Open contract negotiations';
+        card.append(label,heading,count,brief,link);
+        inboxGrid.hidden=false;
+        inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+        offerCards.push(card);makeInboxItem(card);
+      }
+      if(card.dataset.deskStatus===item.status &&
+         card.dataset.demand===String(item.demand))continue;
+      card.dataset.deskStatus=item.status;
+      card.dataset.demand=String(item.demand);
+      card.querySelector('.count').textContent=pound(item.demand)+'/wk';
+      card.querySelector('.desk-offer-briefing-note').textContent=
+        'Current £'+Number(item.current_wage).toLocaleString('en-GB')+
+        '/week · comparable FC27 wage £'+Number(item.peer_wage||0).toLocaleString('en-GB')+
+        '/week. Agent status: '+String(item.status).replaceAll('_',' ')+
+        '. Renegotiation does not force a transfer.';
+      refreshInboxItem(card);
+      refreshInboxList();
+    }
+  };
   window.fc27SyncBuyingOffers=function(items,csrf){
     if(!Array.isArray(items))return;
     const stages={proposed:'Awaiting seller',countered:'Seller counteroffer',
