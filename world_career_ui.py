@@ -962,6 +962,83 @@ DASHBOARD_JS = r"""
     }
     const budgetControl=compactForm.querySelector('[data-scout-budget]');
     if(budgetControl){budgetControl.type='button';grid.appendChild(budgetControl);}
+
+    const quick=document.createElement('div');
+    quick.className='desk-scout-quick';
+    for(const name of ['scout_max_value','scout_max_wage','scout_interest']){
+      const setting=available.find(entry=>entry.name===name);
+      if(!setting)continue;
+      setting.field.classList.add(name==='scout_interest'?
+        'desk-scout-quick-check':'desk-scout-quick-number');
+      if(name==='scout_max_value'){
+        setting.field.firstChild.textContent='Max market value (£)';
+        setting.input.placeholder='No limit';
+      }
+      if(name==='scout_max_wage'){
+        setting.field.firstChild.textContent='Max wage estimate (£/wk)';
+        setting.input.placeholder='No limit';
+        setting.field.title='Current game/reference wages, not confirmed agent demands.';
+      }
+      quick.appendChild(setting.field);
+    }
+    const showTeam=document.createElement('label');
+    showTeam.className='desk-scout-quick-check';
+    const showTeamCheckbox=document.createElement('input');
+    showTeamCheckbox.type='checkbox';
+    const hideOwn=compactForm.querySelector('[data-scout-hide-mine]');
+    showTeamCheckbox.checked=hideOwn?.value!=='1';
+    const showTeamText=document.createElement('span');
+    showTeamText.textContent='Show '+(compactForm.dataset.clubName||'my club')+' players';
+    showTeam.append(showTeamCheckbox,showTeamText);
+    showTeamCheckbox.addEventListener('change',()=>{
+      if(hideOwn)hideOwn.value=showTeamCheckbox.checked?'0':'1';
+      compactForm.requestSubmit();
+    });
+    quick.appendChild(showTeam);
+    quick.appendChild(resetButton);
+    searchBar.appendChild(quick);
+
+    const oldPosition=available.find(entry=>entry.name==='scout_position');
+    if(oldPosition){
+      oldPosition.field.remove();oldPosition.input.value='';
+      available.splice(available.indexOf(oldPosition),1);
+    }
+    const positions=[
+      ['GK','Goalkeeper'],['CB','Centre-back'],['LB','Left-back'],
+      ['RB','Right-back'],['LWB','Left wing-back'],['RWB','Right wing-back'],
+      ['DMF','Defensive midfield'],['CMF','Central midfield'],
+      ['AMF','Attacking midfield'],['LMF','Left midfield'],
+      ['RMF','Right midfield'],['LWF','Left wing forward'],
+      ['RWF','Right wing forward'],['SS','Second striker'],
+      ['CF','Centre forward']
+    ];
+    const positionsInput=compactForm.querySelector('[data-scout-positions]');
+    const positionsPanel=document.createElement('section');
+    positionsPanel.className='desk-position-chooser';
+    const positionsTitle=document.createElement('h4');
+    positionsTitle.textContent='Positions — select one or more';
+    const positionsGrid=document.createElement('div');
+    positionsGrid.className='desk-position-grid';
+    const selectedCodes=new Set((positionsInput?.value||'').split(',').filter(Boolean));
+    const boxes=[];
+    positions.forEach(([code,name])=>{
+      const label=document.createElement('label');
+      label.title=name;
+      const box=document.createElement('input');
+      box.type='checkbox';box.value=code;box.checked=selectedCodes.has(code);
+      const span=document.createElement('span');span.textContent=code;
+      label.append(box,span);positionsGrid.appendChild(label);
+      boxes.push(box);
+      box.addEventListener('change',()=>{
+        if(positionsInput)positionsInput.value=boxes.filter(b=>b.checked)
+          .map(b=>b.value).join(',');
+        renderChips();compactForm.requestSubmit();
+      });
+    });
+    positionsPanel.append(positionsTitle,positionsGrid);grid.prepend(positionsPanel);
+    if(positionsInput)available.push({input:positionsInput,
+      field:positionsPanel,name:'scout_positions'});
+
     panel.appendChild(grid);
     const actions=document.createElement('div');actions.className='desk-scout-dialog-actions';
     const context=document.createElement('small');
@@ -997,7 +1074,8 @@ DASHBOARD_JS = r"""
     });
     done.addEventListener('click',()=>{compactForm.requestSubmit();closePanel();});
     const description={
-      scout_position:'Position',scout_min_overall:'Minimum rating',
+      scout_position:'Position',scout_positions:'Positions',
+      scout_listed:'Transfer listed',scout_min_overall:'Minimum rating',
       scout_max_age:'Maximum age',scout_max_value:'Transfer value',
       scout_max_wage:'Weekly wages',scout_interest:'Would consider move',
       scout_free_only:'Free agents',scout_category:'Rating category',
@@ -1017,6 +1095,7 @@ DASHBOARD_JS = r"""
     function renderChips(){
       chips.replaceChildren();
       for(const {input,name} of available){
+        if(['scout_max_value','scout_max_wage','scout_interest'].includes(name))continue;
         if(!hasCondition(input))continue;
         const chip=document.createElement('span');chip.className='desk-scout-chip';
         const label=document.createElement('span');
@@ -1040,6 +1119,9 @@ DASHBOARD_JS = r"""
       available.forEach(({input})=>{
         if(input.type==='checkbox')input.checked=false;else input.value='';
       });
+      boxes.forEach(b=>b.checked=false);
+      showTeamCheckbox.checked=true;
+      if(hideOwn)hideOwn.value='0';
       compactForm.requestSubmit();renderChips();
     });
     const explanation=views.scouting.querySelector('.desk-scout-finance + p.muted');
