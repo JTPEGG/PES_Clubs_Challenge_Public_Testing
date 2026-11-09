@@ -1361,11 +1361,22 @@ Rejected and expired offers are not transfers.</p>
 {% endif %}
 <h2>Market news</h2>
 {% if news_feed %}
-<div class="feed">
+<div class="feed desk-news-feed">
 {% for m in news_feed %}
-<div class="card" {% if m.event_id is defined %}data-world-event-id="{{m.event_id}}"{% endif %}><b>{{m.headline}}</b>
-<p style="margin:5px 0">{{m.detail}}</p>
-<small>{{m.created_at}} UTC</small>
+<div class="desk-news-card" {% if m.is_world is defined and m.is_world %}data-world-event-id="{{m.event_id}}"{% endif %}>
+  <b>{{m.headline}}</b>
+  {% if m.is_world is defined and m.is_world %}
+  <div class="desk-news-route">
+    <span class="desk-news-player">{{m.player}}</span>
+    <span class="desk-news-club">{{m.seller}}</span>
+    <span class="desk-news-arrow" aria-label="transferred to">→</span>
+    <span class="desk-news-club">{{m.buyer}}</span>
+    <span class="desk-news-fee">{{m.fee_display}}</span>
+  </div>
+  {% else %}
+  <p style="margin:6px 0">{{m.detail}}</p>
+  {% endif %}
+  <small>{{m.created_at}} UTC</small>
 </div>{% endfor %}</div>
 {% else %}<div class="card">No news yet.</div>{% endif %}
 <p class="desk-provenance">Career market values, wages and player preferences are simulated.</p>
@@ -1512,14 +1523,26 @@ Rejected and expired offers are not transfers.</p>
              if(id>newestWorldEvent && !newsVisible())unseenMarketNews++;
              newestWorldEvent=Math.max(newestWorldEvent,id);
              const card=document.createElement('div');
-             card.className='card';card.dataset.worldEventId=String(id);
+             card.className='desk-news-card';card.dataset.worldEventId=String(id);
              const heading=document.createElement('b');
              heading.textContent=item.headline;
-             const summary=document.createElement('p');
-             summary.style.margin='5px 0';summary.textContent=item.detail;
+             const route=document.createElement('div');
+             route.className='desk-news-route';
+             const parts=[
+               [item.player,'desk-news-player'],
+               [item.seller,'desk-news-club'],
+               ['→','desk-news-arrow'],
+               [item.buyer,'desk-news-club'],
+               [item.fee,'desk-news-fee']
+             ];
+             parts.forEach(function(part){
+               const span=document.createElement('span');
+               span.className=part[1];span.textContent=part[0]||'—';
+               route.appendChild(span);
+             });
              const when=document.createElement('small');
              when.textContent=item.created_at;
-             card.append(heading,summary,when);
+             card.append(heading,route,when);
              marketFeed.prepend(card);
            });
            refreshNewsBadge();
@@ -2753,10 +2776,20 @@ def create_play_blueprint(db_path):
             for event_id,name,seller,buyer,fee,when in deal_rows:
                 clean=lambda value:re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",value)
                 world_news.append(dict(event_id=event_id,headline="AI transfer agreed",
+                    player=name,seller=clean(seller),buyer=clean(buyer),
+                    fee_display=format_market_gbp(fee),is_world=True,
                     detail=(name+" · "+clean(seller)+" → "+clean(buyer)+
                         " · "+format_market_gbp(fee)),
                     created_at=when,is_read=1))
-        news_feed=sorted([*messages,*world_news],
+        import re
+        sanitise_news=lambda v:re.sub(r"\s*\[WH27:[^\]]+\]","",str(v or "")).strip()
+        clean_messages=[]
+        for m in messages:
+            entry=dict(m)
+            entry["headline"]=sanitise_news(entry.get("headline"))
+            entry["detail"]=sanitise_news(entry.get("detail"))
+            clean_messages.append(entry)
+        news_feed=sorted([*clean_messages,*world_news],
             key=lambda item:str(item["created_at"]),reverse=True)
 
         from world_player_morale import existing_morale
@@ -3104,6 +3137,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             def clean_club(v):
                 return re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",v)
             world_updates=[dict(event_id=eid,headline="AI transfer agreed",
+                player=name,seller=clean_club(seller),buyer=clean_club(buyer),
+                fee=format_market_gbp(fee),
                 detail=(name+" · "+clean_club(seller)+" → "+clean_club(buyer)+
                         " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
                 for eid,name,seller,buyer,fee,when in recent]
