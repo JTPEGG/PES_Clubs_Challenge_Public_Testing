@@ -669,6 +669,10 @@ DASHBOARD_JS = r"""
     return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
+    if(card.dataset.deskSide==='buy')
+      return card.dataset.deskStatus==='countered'||
+        (card.dataset.deskStatus==='accepted_pending_contract'&&
+         card.dataset.deskAgent==='terms_accepted');
     return card.dataset.deskStatus==='proposed'||
       (card.dataset.deskStatus==='accepted_pending_contract'&&
        card.dataset.deskAgent==='terms_accepted');
@@ -807,8 +811,7 @@ DASHBOARD_JS = r"""
       const matches=(!playerQuery||haystack.includes(playerQuery));
       let statusMatch=true;
       if(activeFilter==='action')
-        statusMatch=(status==='proposed'||(
-          status==='accepted_pending_contract'&&playerState==='terms_accepted'));
+        statusMatch=actionRequired(card);
       else if(activeFilter==='talks')
         statusMatch=(status==='countered'||status==='accepted_pending_contract');
       else if(activeFilter==='signed')
@@ -1525,8 +1528,10 @@ DASHBOARD_JS = r"""
   // seller-counter click.
   document.addEventListener('submit',async function(event){
     const form=event.target;
-    if(!(form instanceof HTMLFormElement)||!views.transfers.contains(form)||
+    if(!(form instanceof HTMLFormElement)||
+       !(views.transfers.contains(form)||views.inbox.contains(form))||
        form.classList.contains('desk-transfer-cancel-form'))return;
+    const fromInbox=views.inbox.contains(form);
     const buyingAction=form.action.endsWith('/market/buy/decision');
     const rebid=form.action.endsWith('/market/buy/rebid');
     if(!buyingAction&&!rebid)return;
@@ -1552,6 +1557,16 @@ DASHBOARD_JS = r"""
       const result=await response.json().catch(()=>null);
       if(!response.ok||!result?.ok)
         throw new Error(result?.error||'Negotiation could not be saved');
+      if(fromInbox){
+        showDecisionFeedback(oldCard,result.message,false);
+        if(submit?.value==='delay_signing'){
+          oldCard.querySelectorAll('button[value="delay_signing"]').forEach(b=>b.remove());
+          return;
+        }
+        // The authoritative server recomputes projected XI and buyer mail
+        // after a signed or cancelled purchase. Refresh only at that milestone.
+        location.reload();return;
+      }
       const template=document.createElement('template');
       template.innerHTML=result.html||'';
       const newCard=template.content.querySelector('[data-buy-offer-id]');
@@ -1648,6 +1663,7 @@ DASHBOARD_JS = r"""
       updateOfferRow(offer);
       updateSaleBudgetUI(result);
       showDecisionFeedback(card,result.message,false);
+      if(button.value==='finalise')location.reload();
       if(Number.isFinite(Number(result.unread))){
         document.body.dataset.unread=String(result.unread);
         document.querySelectorAll('[data-desk-tab="inbox"] .desk-nav-count')
