@@ -1,0 +1,24 @@
+name: FC27 confirmed-sale reinvestment budget QA
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'world_career_sale_proceeds.py'
+      - 'world_careers.py'
+      - 'test_fc27_sale_proceeds.py'
+      - '.github/workflows/fc27-sale-reinvestment-qa.yml'
+permissions:
+  contents: read
+jobs:
+  board-sale-budget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile modified career logic
+        run: python -m py_compile world_career_sale_proceeds.py world_careers.py world_career_play.py world_career_ui.py
+      - name: Run sale budget and rollback regressions
+        run: python -m unittest -v test_fc27_sale_proceeds

@@ -930,6 +930,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <span class="pill">✅ <b>{{signed}}</b> agreed deals</span></div>
   <div class="budget-panel" id="budget-panel"
        data-fee-remaining="{{funds}}" data-fee-total="{{budget_total}}"
+       data-reinvested="{{board_reinvestment}}" data-board-retained="{{board_withheld}}"
        data-wage-remaining="{{wage_headroom}}" data-wage-total="{{wage_total}}">
     <div>Transfer budget · <b id="fee-current">{{money(funds)}}</b> available</div>
     <div class="budget-track"><div class="budget-fill" id="fee-bar" style="width:{{(100*funds/[budget_total,1]|max)|round(1)}}%"></div></div>
@@ -1039,21 +1040,31 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <h3><span class="desk-direction in" aria-label="Incoming transfers">↙</span>
    Incoming <span class="desk-section-count">{{purchases|length + free_signings|length}}</span></h3>
   <div class="scout-table"><table data-desk-table="incoming">
-  <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th></tr></thead>
+  <thead><tr><th>Player</th><th>From</th><th data-sort-type="number">Fee</th><th>Status</th><th aria-label="Cancel unsigned deal"></th></tr></thead>
   <tbody>{% for o in purchases %}
   <tr data-buy-offer-id="{{o.offer_id}}"><td><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}">{{o.player_name}}</a></td>
    <td>{{o.seller_name|club_display}}</td><td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
-   <td><a href="#transfers">{{o.status_label}}</a></td></tr>
+   <td><a href="#transfers">{{o.status_label}}</a></td>
+   <td>{% if not spectator and snap.state=='open' and o.status in ('proposed','countered','accepted_pending_contract') %}
+    <form method="post" class="desk-transfer-cancel-form" action="/world/play/career/{{career_id}}/market/buy/decision">
+     <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="offer_id" value="{{o.offer_id}}">
+     <button class="desk-transfer-cancel" name="decision" value="withdraw"
+       title="Withdraw unsigned offer for {{o.player_name}}" aria-label="Withdraw unsigned offer for {{o.player_name}}">×</button>
+    </form>{% endif %}</td></tr>
   {% endfor %}
   {% for s in free_signings %}
   <tr data-free-agent-signing-id="{{s.signing_id}}">
    <td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
    <td>Free agent</td><td data-sort-value="0"><strong>FREE — £0</strong></td>
-   <td>{{'Signed — registers at deadline' if s.status=='agreed_future'
-         else 'Registered' if s.status=='completed'
+   <td>{{'Confirmed' if s.status in ('agreed_future','completed')
          else 'Awaiting your confirmation' if s.status=='terms_accepted'
          else 'Agent counteroffer' if s.status=='countered'
          else 'Cancelled'}} · {{money(s.proposed_weekly_wage_gbp)}}/wk · {{s.contract_years}} years</td>
+   <td>{% if not spectator and snap.state=='open' and s.status in ('terms_accepted','countered') %}
+     <form method="post" class="desk-transfer-cancel-form" action="/world/play/career/{{career_id}}/market/free-agent">
+      <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="player_id" value="{{s.player_id}}">
+      <button class="desk-transfer-cancel" name="action" value="withdraw" title="Cancel free-agent talks with {{s.full_name}}" aria-label="Cancel free-agent talks with {{s.full_name}}">×</button>
+     </form>{% endif %}</td>
   </tr>
   {% endfor %}</tbody></table></div>
   {% if not purchases and not free_signings %}<p class="muted">No incoming transfers</p>{% endif %}
@@ -1062,12 +1073,16 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   <h3><span class="desk-direction out" aria-label="Outgoing transfers">↗</span>
    Outgoing <span class="desk-section-count">{{offers|length}}</span></h3>
   <div class="scout-table"><table data-desk-table="outgoing">
-  <thead><tr><th>Player</th><th>To</th><th data-sort-type="number">Fee</th><th>Status</th><th>Received</th></tr></thead>
+  <thead><tr><th>Player</th><th>To</th><th data-sort-type="number">Fee</th><th>Status</th><th aria-label="Cancel unsigned deal"></th></tr></thead>
   <tbody>{% for o in offers %}
   <tr data-live-offer-id="{{o.offer_id}}"><td>{{o.player_name}}</td><td>{{o.buyer_name|club_display}}</td>
    <td data-sort-value="{{o.offered_fee}}">{{money(o.offered_fee)}}</td>
    <td><a href="#transfers">{{o.status_label}}</a></td>
-   <td>{{o.received_at[11:16] if o.received_at else '—'}} UTC</td></tr>
+   <td>{% if not spectator and snap.state=='open' and o.status in ('proposed','countered','accepted_pending_contract') %}
+    <form method="post" class="desk-transfer-cancel-form" action="/world/play/career/{{career_id}}/market/decision">
+     <input type="hidden" name="csrf" value="{{csrf}}"><input type="hidden" name="offer_id" value="{{o.offer_id}}">
+     <button class="desk-transfer-cancel" name="decision" value="cancel" title="Cancel unsigned transfer for {{o.player_name}}" aria-label="Cancel unsigned transfer for {{o.player_name}}">×</button>
+    </form>{% endif %}</td></tr>
   {% endfor %}</tbody></table></div>
   {% if not offers %}<p class="muted">No outgoing bids</p>{% endif %}
  </section>
@@ -1464,6 +1479,8 @@ Rejected and expired offers are not transfers.</p>
          refreshUnread(unread);
          if(typeof window.fc27SyncIncomingOffers==='function')
            window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
+         if(typeof window.fc27UpdateBudget==='function')
+           window.fc27UpdateBudget(state);
          const marketFeed=document.querySelector('#desk-view-news .feed');
          if(marketFeed&&Array.isArray(state.world_updates)){
            // Received from the saved AI deal ledger; never fabricate news.
@@ -2047,7 +2064,7 @@ def create_play_blueprint(db_path):
         """Remove internal warehouse IDs from presentation only, never source keys."""
         if not isinstance(value,str):return value
         import re
-        return re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$", "",value)
+        return re.sub(r"\s*\[WH27:[^\]]+\]\s*$", "",value,flags=re.IGNORECASE).strip()
 
     def serializer():
         secret=os.getenv("WORLD_MARKET_COOKIE_SECRET","")
@@ -2464,7 +2481,7 @@ def create_play_blueprint(db_path):
                     # Source-identity suffix is retained in the database
                     # but never displayed in a career title.
                     from re import sub
-                    club_name=sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",row[0])
+                    club_name=sub(r"\s*\[WH27:[^\]]+\]\s*$","",row[0])
                     title=(request.form.get("title","").strip()
                         or f"{club_name} · 2026/27")[:80]
                     start_sandbox(
@@ -2523,6 +2540,14 @@ def create_play_blueprint(db_path):
                 (career_id,)).fetchall()
         unread=0
         signed=0
+        sale_totals=(db.execute("""SELECT COALESCE(SUM(allocated_gbp),0),
+            COALESCE(SUM(withheld_gbp),0)
+            FROM world_career_sale_budget_credits
+            WHERE career_id=? AND seller_club_id=?""",
+            (career_id,c["manager_club_id"])).fetchone()
+            if db.execute("""SELECT 1 FROM sqlite_master WHERE type='table'
+                AND name='world_career_sale_budget_credits'""").fetchone()
+            else (0,0))
         purchases=[]
         player_search=request.args.get("player_search","").strip()[:70] if not spectator else ""
         targets=[]
@@ -2616,8 +2641,8 @@ def create_play_blueprint(db_path):
                 (snap["window_id"],career_id,c["manager_club_id"])).fetchall()
             labels={"proposed":"New offer","countered":"Awaiting buyer",
                     "accepted_pending_contract":"Player/agent talks",
-                    "agreed_future":"Signed — registering at deadline",
-                    "completed":"Registered for season","rejected":"Declined",
+                    "agreed_future":"Confirmed",
+                    "completed":"Confirmed","rejected":"Declined",
                     "withdrawn":"Withdrawn"}
             dataset=db.execute("""SELECT dataset_id FROM world_career_saves
                 WHERE career_id=?""",(career_id,)).fetchone()[0]
@@ -2655,8 +2680,8 @@ def create_play_blueprint(db_path):
             buy_labels={"proposed":"Awaiting seller","countered":"Seller counteroffer",
                 "rejected":"Seller rejected offer",
                 "accepted_pending_contract":"Player/agent talks",
-                "agreed_future":"Signed — registering at deadline",
-                "completed":"Registered for season","withdrawn":"Withdrawn"}
+                "agreed_future":"Confirmed",
+                "completed":"Confirmed","withdrawn":"Withdrawn"}
             purchases=[dict(r,status_label=buy_labels.get(r["status"],r["status"]))
                 for r in outgoing]
             signed=sum(o["status"] in ("agreed_future","completed") for o in offers+purchases)
@@ -2679,7 +2704,7 @@ def create_play_blueprint(db_path):
                 ORDER BY e.event_id DESC LIMIT 40""",
                 (snap["window_id"],career_id)).fetchall()
             for event_id,name,seller,buyer,fee,when in deal_rows:
-                clean=lambda value:re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",value)
+                clean=lambda value:re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",value)
                 world_news.append(dict(event_id=event_id,headline="AI transfer agreed",
                     detail=(name+" · "+clean(seller)+" → "+clean(buyer)+
                         " · "+format_market_gbp(fee)),
@@ -2767,6 +2792,7 @@ def create_play_blueprint(db_path):
             player_morale=morale,season_exclusions=excluded,
             money=format_market_gbp,
             funds=budget_remaining(db,career_id,c["manager_club_id"]),
+            board_reinvestment=sale_totals[0],board_withheld=sale_totals[1],
             budget_total=db.execute("""SELECT transfer_budget FROM world_career_club_ledger
                 WHERE career_id=? AND club_id=?""",(career_id,c["manager_club_id"])).fetchone()[0],
             wage_total=wage_budget_breakdown(db,career_id,c["manager_club_id"])["total"],
@@ -2926,7 +2952,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         for p in results:
             data.append(dict(
                 player_id=p["player_id"],name=p["full_name"],
-                club=re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",p["club_name"]),
+                club=re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",p["club_name"]),
                 position=p["primary_position"] or "—",
                 overall=p["overall"],age=p["age"],
                 value=(format_market_gbp(p["market_value"])
@@ -3001,7 +3027,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 (snap["window_id"],career_id,career[0],career[0])).fetchall() if snap["window_id"] else []
             offers=len(offer_rows)
             import re
-            clean_buyer=lambda value:re.sub(r"\\s+\\[WH27:[0-9a-fA-F]{8,20}\\]$","",value)
+            clean_buyer=lambda value:re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",value)
             live_offers=[dict(offer_id=oid,player_id=pid,status=status,
                 fee=fee,player=name,buyer=clean_buyer(buyer),
                 received_at=received,agent_status=agent,
@@ -3020,12 +3046,27 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 (snap["window_id"],career_id)).fetchall() if snap["window_id"] else []
             import re
             def clean_club(v):
-                return re.sub(r"\s+\[WH27:[0-9a-fA-F]{8,20}\]$","",v)
+                return re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",v)
             world_updates=[dict(event_id=eid,headline="AI transfer agreed",
                 detail=(name+" · "+clean_club(seller)+" → "+clean_club(buyer)+
                         " · "+format_market_gbp(fee)),created_at=str(when)+" UTC")
                 for eid,name,seller,buyer,fee,when in recent]
+            manager_id=career[0]
+            transfer_total=db.execute("""SELECT transfer_budget
+                 FROM world_career_club_ledger WHERE career_id=? AND club_id=?""",
+                 (career_id,manager_id)).fetchone()[0]
+            sale_totals=(db.execute("""SELECT COALESCE(SUM(allocated_gbp),0),
+                 COALESCE(SUM(withheld_gbp),0)
+                 FROM world_career_sale_budget_credits
+                 WHERE career_id=? AND seller_club_id=?""",
+                 (career_id,manager_id)).fetchone()
+                 if db.execute("""SELECT 1 FROM sqlite_master
+                    WHERE type='table' AND name='world_career_sale_budget_credits'""").fetchone()
+                 else (0,0))
             payload=dict(state=snap["state"],latest_message_id=msg[1],
+                available_transfer_budget=budget_remaining(db,career_id,manager_id),
+                total_transfer_budget=transfer_total,
+                sale_budget_allocated=sale_totals[0],sale_board_withheld=sale_totals[1],
                 unread=unread,incoming_offers=offers,
                 offer_updates=live_offers,csrf=csrf_value(),
                 world_updates=world_updates,
@@ -3081,8 +3122,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             "proposed":"Awaiting seller","countered":"Seller counteroffer",
             "rejected":"Seller rejected offer",
             "accepted_pending_contract":"Player/agent talks",
-            "agreed_future":"Signed — registering at deadline",
-            "completed":"Registered for season","withdrawn":"Withdrawn"}
+            "agreed_future":"Confirmed",
+            "completed":"Confirmed","withdrawn":"Withdrawn"}
         item=dict(row,status_label=status_labels.get(row["status"],row["status"]))
         before='<div class="grid">{% for o in purchases %}\n'
         after='</div>{% endfor %}</div>\n{% endif %}\n{% endif %}'
@@ -3090,11 +3131,18 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         card_html=render_template_string(fragment,o=item,spectator=False,
             snap=snap,career_id=career_id,csrf=csrf_value(),
             money=format_market_gbp)
+        manager_id=db.execute("""SELECT manager_club_id
+            FROM world_career_saves WHERE career_id=?""",
+            (career_id,)).fetchone()[0]
+        transfer_total=db.execute("""SELECT transfer_budget FROM world_career_club_ledger
+            WHERE career_id=? AND club_id=?""",(career_id,manager_id)).fetchone()[0]
         response=jsonify(ok=True,message=message,offer_id=offer_id,
             status=item["status"],status_label=item["status_label"],
             offered_fee=item["offered_fee"],player_id=item["player_id"],
             player_name=item["player_name"],seller_name=club_display(
-                item["seller_name"]),html=card_html,existing=existing)
+                item["seller_name"]),html=card_html,existing=existing,
+            available_transfer_budget=budget_remaining(db,career_id,manager_id),
+            total_transfer_budget=transfer_total)
         response.headers["Cache-Control"]="private, no-store"
         return response
 
@@ -3296,9 +3344,29 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     if row is None:
                         raise ValueError("Offer no longer exists in this career")
                     unread=actionable_unread_count(db,career_id=career_id)
+                    manager_id=db.execute("""SELECT manager_club_id
+                        FROM world_career_saves WHERE career_id=?""",
+                        (career_id,)).fetchone()[0]
+                    sale_totals=(db.execute("""SELECT
+                            COALESCE(SUM(allocated_gbp),0),COALESCE(SUM(withheld_gbp),0)
+                        FROM world_career_sale_budget_credits
+                        WHERE career_id=? AND seller_club_id=?""",
+                        (career_id,manager_id)).fetchone()
+                        if db.execute("""SELECT 1 FROM sqlite_master
+                            WHERE type='table' AND name='world_career_sale_budget_credits'""").fetchone()
+                        else (0,0))
                     response=jsonify(ok=True,message=result,offer_id=offer_id,
                         status=row["status"],demanded_fee=row["demanded_fee"],
-                        unread=unread)
+                        unread=unread,
+                        sale_budget_allocated=sale_totals[0],
+                        sale_board_withheld=sale_totals[1],
+                        available_transfer_budget=budget_remaining(db,career_id,
+                            manager_id),
+                        total_transfer_budget=db.execute("""SELECT transfer_budget
+                             FROM world_career_club_ledger
+                             WHERE career_id=? AND club_id=(SELECT manager_club_id
+                                 FROM world_career_saves WHERE career_id=?)""",
+                             (career_id,career_id)).fetchone()[0])
                     response.headers["Cache-Control"]="private, no-store"
                     return response
             from urllib.parse import quote
