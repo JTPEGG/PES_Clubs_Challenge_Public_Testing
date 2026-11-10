@@ -1600,6 +1600,9 @@ Rejected and expired offers are not transfers.</p>
            window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
          if(typeof window.fc27SyncBuyingOffers==='function')
            window.fc27SyncBuyingOffers(state.buying_updates,state.csrf);
+         if(typeof window.fc27SyncFreeAgentOffers==='function')
+           window.fc27SyncFreeAgentOffers(state.free_agent_updates,
+             state.csrf,{{career_id|tojson}});
          if(typeof window.fc27SyncContractRequests==='function')
            window.fc27SyncContractRequests(state.contract_updates,
              {{career_id|tojson}});
@@ -3314,6 +3317,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     o.status,o.offered_fee,p.full_name,sc.name,
                     t.status,t.demanded_wage_weekly,
                     t.proposed_wage_weekly,t.contract_years,
+                    (SELECT q.status FROM world_career_player_choices q
+                      WHERE q.career_id=o.career_id AND q.window_id=wo.window_id
+                        AND q.kind='purchase' AND q.source_id=o.offer_id) AS player_choice,
                     EXISTS(SELECT 1 FROM world_career_offer_events ev
                       WHERE ev.offer_id=o.offer_id
                         AND ev.event_type='buyer_signing_delayed')
@@ -3329,10 +3335,27 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             buying_updates=[dict(offer_id=oid,player_id=pid,status=status,
                 fee=fee,player=name,seller=clean_buyer(seller),
                 agent_status=agent,agent_demand=demanded,
-                weekly_wage=wage,contract_years=years,
+                weekly_wage=wage,contract_years=years,player_choice=choice,
                 delay_used=bool(delayed))
-                for oid,pid,status,fee,name,seller,agent,demanded,wage,years,delayed
+                for oid,pid,status,fee,name,seller,agent,demanded,wage,years,choice,delayed
                 in buying_rows]
+            from world_fc27_player_review import choice_for,rival_bids
+            free_updates=[]
+            if snap["window_id"]:
+                free_rows=db.execute("""SELECT f.signing_id,f.player_id,f.status,
+                    f.proposed_weekly_wage_gbp,p.full_name
+                    FROM world_fc27_free_agent_offers f
+                    JOIN world_players p ON p.player_id=f.player_id
+                    WHERE f.career_id=? ORDER BY f.signing_id DESC""",
+                    (career_id,)).fetchall()
+                for signing,pid,status,wage,name in free_rows:
+                    verdict=choice_for(db,career_id=career_id,
+                        kind="free_agent",source_id=signing)
+                    free_updates.append(dict(signing_id=signing,
+                        player_id=pid,player=name,status=status,wage=wage,
+                        player_choice=verdict["status"] if verdict else None,
+                        rivals=len(rival_bids(db,career_id=career_id,
+                            signing_id=signing))))
             contract_updates=[dict(player_id=r[0],status=r[1],
                 current_wage=r[2],peer_wage=r[3],demand=r[4],
                 player=r[5]) for r in db.execute("""SELECT
@@ -3381,6 +3404,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 sale_budget_allocated=sale_totals[0],sale_board_withheld=sale_totals[1],
                 unread=unread,incoming_offers=offers,
                 offer_updates=live_offers,buying_updates=buying_updates,
+                free_agent_updates=free_updates,
                 contract_updates=contract_updates,csrf=csrf_value(),
                 world_updates=world_updates,
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
