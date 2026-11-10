@@ -1598,8 +1598,21 @@ DASHBOARD_JS = r"""
   let inboxMarkInProgress=false;
   function markInboxViewed(){
     if(Number(document.body.dataset.unread||0)<=0||inboxMarkInProgress)return;
-    const form=views.inbox.querySelector('form[data-mark-inbox-read]');
-    if(!form)return;
+    let form=views.inbox.querySelector('form[data-mark-inbox-read]');
+    if(!form){
+      // When the first bid arrives after the original page render, the
+      // server hasn't yet rendered a read-form. Acknowledge new mail using
+      // the same manager CSRF token as all the other authenticated actions.
+      const csrf=document.querySelector('input[name="csrf"]')?.value;
+      if(!csrf)return;
+      form=document.createElement('form');
+      form.method='post';form.action=location.pathname+'/read';
+      form.dataset.markInboxRead='';
+      const field=document.createElement('input');
+      field.type='hidden';field.name='csrf';field.value=csrf;
+      form.append(field);form.hidden=true;
+      views.inbox.appendChild(form);
+    }
     inboxMarkInProgress=true;
     fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form),
       credentials:'same-origin',headers:{'Accept':'application/json'}})
