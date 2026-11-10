@@ -492,6 +492,130 @@ DASHBOARD_JS = r"""
     views[name]=pane;
     host.appendChild(pane);
   });
+  // Keep the manager's navigation visible during contract talks. Fetch only
+  // the existing source-backed contract form; no full dashboard navigation
+  // or duplicate transfer-authorisation endpoint is introduced.
+  const contractLayer=document.createElement('div');
+  contractLayer.className='desk-contract-layer';contractLayer.hidden=true;
+  contractLayer.innerHTML='<div class="desk-contract-scrim" data-contract-close></div>'+
+    '<aside class="desk-contract-panel" role="dialog" aria-modal="true" aria-label="Contract negotiations">'+
+    '<div class="desk-contract-header"><div><strong>Contract negotiations</strong>'+
+    '<small>Career Desk · 30-minute window remains open</small></div>'+
+    '<button class="desk-contract-close" type="button" data-contract-close aria-label="Close negotiations">×</button></div>'+
+    '<div class="desk-contract-body" data-contract-body></div></aside>';
+  document.body.appendChild(contractLayer);
+  const contractBody=contractLayer.querySelector('[data-contract-body]');
+  let contractRequest=null,contractUrlOpen=null,contractFocus=null;
+  function validContractUrl(href){
+    const url=new URL(href,location.href);
+    if(url.origin!==location.origin||
+       !/^\/world\/play\/career\/[^/]+\/market\/contract\/\d+$/.test(url.pathname))
+      return null;
+    // Do not open another career's negotiation route from this page.
+    return url.pathname.startsWith(location.pathname+'/contract/')?url:null;
+  }
+  function closeContractDrawer(){
+    contractRequest?.abort();contractRequest=null;
+    contractLayer.hidden=true;
+    document.body.classList.remove('desk-contract-open');
+    contractUrlOpen=null;
+    if(contractFocus?.isConnected)contractFocus.focus();
+  }
+  async function loadContractDrawer(url){
+    contractRequest?.abort();
+    const requestControl=new AbortController();
+    contractRequest=requestControl;
+    contractBody.textContent='Loading contract details…';
+    try{
+      const response=await fetch(url.pathname+'?panel=1',{
+        cache:'no-store',credentials:'same-origin',
+        signal:requestControl.signal,headers:{Accept:'text/html'}});
+      if(!response.ok||!validContractUrl(response.url))
+        throw new Error('Contract negotiations are not available right now');
+      const html=await response.text();
+      const documentFromServer=new DOMParser().parseFromString(html,'text/html');
+      const main=documentFromServer.querySelector('main');
+      if(!main)throw new Error('The player contract details could not be read');
+      contractBody.replaceChildren(document.importNode(main,true));
+      contractBody.scrollTop=0;
+    }catch(error){
+      if(error.name==='AbortError')return;
+      contractBody.textContent=String(error.message||error);
+    }finally{
+      if(contractRequest===requestControl)contractRequest=null;
+    }
+  }
+  document.addEventListener('click',function(event){
+    const close=event.target.closest('[data-contract-close]');
+    if(close&&contractLayer.contains(close)){
+      event.preventDefault();closeContractDrawer();return;
+    }
+    const link=event.target.closest('a[href]');
+    if(!link||event.defaultPrevented||event.button!==0||
+       event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    const url=validContractUrl(link.href);
+    if(!url)return;
+    event.preventDefault();
+    contractFocus=link;
+    contractUrlOpen=url;
+    contractLayer.hidden=false;
+    document.body.classList.add('desk-contract-open');
+    contractLayer.querySelector('.desk-contract-close').focus();
+    loadContractDrawer(url);
+  },true);
+  document.addEventListener('keydown',function(event){
+    if(event.key==='Escape'&&!contractLayer.hidden){
+      event.preventDefault();closeContractDrawer();
+    }
+  });
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||
+       !(contractLayer.contains(form)||views.inbox.contains(form)))return;
+    const url=new URL(form.getAttribute('action')||'',location.href);
+    if(!/^\/world\/play\/career\/[^/]+\/market\/contract\/\d+\/decision$/.test(url.pathname)||
+       url.origin!==location.origin||
+       !url.pathname.startsWith(location.pathname+'/contract/'))return;
+    const pressed=event.submitter;
+    if(!pressed||pressed.name!=='action')return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    const data=new FormData(form);
+    data.set('action',pressed.value);
+    const buttons=Array.from(form.querySelectorAll('button'));
+    const feedback=document.createElement('p');
+    feedback.className='desk-contract-feedback';feedback.setAttribute('role','status');
+    feedback.textContent='Sending your decision to the player’s agent…';
+    form.appendChild(feedback);
+    form.dataset.saving='1';buttons.forEach(b=>b.disabled=true);
+    try{
+      const response=await fetch(url.pathname,{
+        method:'POST',credentials:'same-origin',body:data,
+        headers:{Accept:'application/json'},cache:'no-store'});
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'Contract decision was not saved');
+      feedback.textContent=result.message||'Contract decision saved.';
+      if(['agreed_future','completed','declined','withdrawn'].includes(result.status)){
+        closeContractDrawer();
+        // The Inbox now contains the actual signed/rejected decision, sourced
+        // from the committed server transaction rather than a fake toast.
+        location.hash='#inbox';
+        location.reload();
+      }else if(!contractLayer.hidden&&contractUrlOpen){
+        await loadContractDrawer(contractUrlOpen);
+      }else{
+        location.hash='#inbox';location.reload();
+      }
+    }catch(error){
+      feedback.textContent=String(error.message||error);
+      feedback.dataset.error='1';
+    }finally{
+      form.dataset.saving='0';
+      buttons.forEach(button=>{if(button.isConnected)button.disabled=false;});
+    }
+  },true);
+
   const redirects={
     overview:'dashboard','overview-anchor':'dashboard',
     recruitment:'scouting','buy-players':'scouting',
