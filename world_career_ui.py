@@ -428,6 +428,44 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-inbox-profile-link{font-size:16px;font-weight:750;color:#eaf6ff;
  text-decoration:none}.desk-inbox-profile-link:hover{text-decoration:underline;color:#8be1fa}
 .desk-inbox-free-message .actions form{display:flex;gap:8px;flex-wrap:wrap}
+/* Contracts open in a lightweight drawer: the desk sidebar remains in place. */
+body.desk-contract-open{overflow:hidden}
+.desk-contract-layer{position:fixed;inset:0;z-index:110;display:flex;justify-content:flex-end}
+.desk-contract-scrim{position:absolute;inset:0;background:#04111bcc}
+.desk-contract-panel{position:relative;display:flex;flex-direction:column;width:min(650px,100vw);
+ height:100%;background:#101f30;border-left:1px solid #456a84;box-shadow:-24px 0 60px #020710a8}
+.desk-contract-header{display:flex;justify-content:space-between;align-items:center;gap:12px;
+ padding:14px 18px;border-bottom:1px solid #31516a;background:#172c40}
+.desk-contract-header strong{font-size:15px}.desk-contract-header small{display:block;color:#9cb9cb;font-size:11px}
+.desk-contract-close{font-size:22px;line-height:1;border:1px solid #536f82;
+ background:#294259;border-radius:7px;padding:6px 12px;color:white;cursor:pointer}
+.desk-contract-body{overflow-y:auto;flex:1;padding:15px 20px 50px;min-height:0}
+.desk-contract-body main{max-width:none;margin:0;padding:0}
+.desk-contract-body main>a:first-child{display:none}
+.desk-contract-body h1{font-size:21px;margin:0 0 7px}
+.desk-contract-body .muted,.desk-contract-body .note{color:#afc7d7;font-size:12px}
+.desk-contract-body .card{background:#182e43;border:1px solid #38556d;border-radius:9px;padding:15px;margin:13px 0}
+.desk-contract-body .card h2{font-size:16px;margin:0 0 9px}
+.desk-contract-body .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.desk-contract-body .metric{border:1px solid #3c5d77;background:#1c3850;border-radius:7px;padding:10px}
+.desk-contract-body .metric small{font-size:11px;color:#a9c7d9;display:block}
+.desk-contract-body .metric strong{font-size:17px;display:block;margin-top:4px}
+.desk-contract-body .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.desk-contract-body label{display:block;font-size:12px;color:#c2d8e8}
+.desk-contract-body input,.desk-contract-body select{display:block;width:100%;padding:10px;
+ border:1px solid #56758c;background:#102639;border-radius:6px;color:white;margin-top:5px}
+.desk-contract-body .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.desk-contract-body button{border:1px solid #63aecb;border-radius:6px;background:#246c91;color:#fff;
+ padding:9px 13px;cursor:pointer}
+.desk-contract-body button.secondary{background:#2b455a}.desk-contract-body button.danger{background:#713c49}
+.desk-contract-body .error{color:#ffcbc9}.desk-contract-body .notice{color:#abebd7}
+.desk-contract-body .badge{background:#23465e;border-radius:14px;padding:3px 9px}
+.desk-contract-feedback{font-size:13px;padding:10px 0;color:#b8e5f3}
+.desk-contract-feedback[data-error="1"]{color:#ffb5ab}
+.desk-inbox-player-meta{display:block!important;color:#9fe3d7!important;font-size:12px!important;margin:3px 0}
+.desk-renewal-quick-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.desk-renewal-quick-actions button,.desk-renewal-quick-actions a{font-size:12px;padding:7px 11px;border-radius:7px}
+@media(max-width:550px){.desk-contract-body .fields{grid-template-columns:1fr}.desk-contract-body .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 """
 
