@@ -30,6 +30,11 @@ VERSION="inbox-autonomous-market-v2-projected-squads"
 # Irregular spacing is deliberate: a market does not mechanically bid once
 # every minute. Each slot can also produce NO offer.
 MARKET_MOMENTS=(35,175,355,545,735,945,1165,1385,1580,1720,1740,1765)
+# A fresh human-club approach needs time for four independent stages: manager
+# fee review, up to two AI agent rounds, player consideration and final manager
+# sign-off. AI-to-AI world activity continues until the actual deadline.
+# This is workflow feasibility, not a quota or forced transfer decision.
+MIN_NEW_HUMAN_BID_LEAD_SECONDS=180
 
 SCHEMA="""
 CREATE TABLE IF NOT EXISTS world_career_live_market_access(
@@ -415,6 +420,11 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
 
 def _consider_bid(conn,*,career_id,window_id,slot,t):
     """Exactly one plausible proposal opportunity per due market moment."""
+    remaining=window_snapshot(conn,career_id=career_id,now=t)["remaining_seconds"]
+    if remaining is not None and remaining<MIN_NEW_HUMAN_BID_LEAD_SECONDS:
+        return None,("No new human-club approach: insufficient time for fee "
+                     "acceptance, agent terms, independent player choice and "
+                     "manager signature before the deadline")
     from world_recruitment_strategy import prospect_fee_cap
     from world_fc27_ai_recruitment import read_fc27_profiles
     row=conn.execute("""SELECT c.dataset_id,c.manager_club_id,c.pes_lock_date
@@ -567,6 +577,45 @@ def _respond_to_counter(conn,*,career_id,offer_id,window_id,t):
     conn.commit()
     return True
 
+def close_failed_human_sale_talks(conn,*,career_id,window_id,offer_id,
+                                  agent_state,previous=None,now=None):
+    """Report actual failed AI personal terms instead of an eternal 'talks' label.
+
+    No consent is invented: an unwilling player or a club that cannot supply
+    the required wage/role withdraws its UNSIGNED bid. Missing evidence gets
+    one retry so a transient lookup never immediately cancels the approach.
+    """
+    if not agent_state:return False
+    state=agent_state["status"]
+    definitive=state in ("role_refused","wage_limit","player_refused")
+    unresolved=(state=="needs_information" and previous is not None
+                and previous["status"]=="needs_information")
+    if not (definitive or unresolved):return False
+    row=conn.execute("""SELECT o.status,p.full_name,c.name
+        FROM world_career_offers o
+        JOIN world_players p ON p.player_id=o.player_id
+        JOIN world_clubs c ON c.club_id=o.buying_club_id
+        WHERE o.career_id=? AND o.offer_id=?""",
+        (career_id,offer_id)).fetchone()
+    if not row or row[0]!="accepted_pending_contract":return False
+    detail=(agent_state.get("decision_reason") or
+            "Buyer and player's agent could not complete personal terms.")
+    conn.execute("""UPDATE world_career_offers SET status='withdrawn'
+        WHERE career_id=? AND offer_id=? AND status='accepted_pending_contract'""",
+        (career_id,offer_id))
+    conn.execute("""INSERT INTO world_career_offer_events
+        (offer_id,event_type,detail) VALUES(?,'ai_personal_terms_failed',?)""",
+        (offer_id,detail))
+    _message(conn,career_id=career_id,window_id=window_id,
+        key=f"ai-personal-terms-failed:{offer_id}",
+        headline=f"Transfer talks ended: {row[1]}",
+        detail=f"{row[2]} could not agree personal terms. {detail} "
+               "The player remains at your club; this is not a completed sale.",
+        offer_id=offer_id,when=now)
+    conn.commit()
+    return True
+
+
 def _review_due_manager_buying_offers(conn,*,career_id,window_id,now):
     """Actually evaluate submitted human buy bids after the club's decision time.
 
@@ -711,7 +760,14 @@ def process_live_market(conn,*,career_id,now=None,
             else:
                 try:
                     before=incoming_approach(conn,oid)
-                    after=advance_incoming_approach(conn,career_id=career_id,offer_id=oid)
+                    if before and before["status"] in ("terms_accepted","future_agreed"):
+                        after=before
+                    else:
+                        after=advance_incoming_approach(conn,career_id=career_id,offer_id=oid)
+                    if close_failed_human_sale_talks(conn,career_id=career_id,
+                            window_id=win,offer_id=oid,agent_state=after,
+                            previous=before,now=t):
+                        continue
                     if (after and after["status"]!="needs_information" and
                         (before is None or after["status"]!=before["status"])):
                         _message(conn,career_id=career_id,window_id=win,
