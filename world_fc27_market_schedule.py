@@ -221,7 +221,7 @@ def plan_fc27_market_interval(conn,*,career_id,window_id,interval_index,
 
 def process_fc27_market_interval(conn,*,career_id,window_id,
                                  interval_index,when,activity_scale_qa=1,
-                                 work_budget_seconds=None):
+                                 work_budget_seconds=None,should_yield=None):
     """Resume persisted club-led searches within a bounded HTTP work budget.
 
     This controls per-request processing cost, NOT which clubs may recruit or
@@ -239,6 +239,8 @@ def process_fc27_market_interval(conn,*,career_id,window_id,
     stop_at=(monotonic()+work_budget_seconds
              if work_budget_seconds is not None else None)
     for (club,) in pending:
+        if should_yield is not None and should_yield():
+            break
         if stop_at is not None and monotonic()>=stop_at:
             break
         offered=consider_ai_world_deal(conn,career_id=career_id,
