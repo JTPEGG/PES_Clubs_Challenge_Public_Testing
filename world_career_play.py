@@ -966,6 +966,10 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% else %}<p class="muted">No shortlisted players yet.</p>{% endif %}
 </div>
 <h2 id="scouting">Scouting &amp; squad values</h2>
+<div class="desk-scout-finance" role="group" aria-label="Available scouting budgets">
+ <span>Transfer budget <b data-scout-fee-remaining>{{money(funds)}}</b></span>
+ <span>Weekly wage headroom <b data-scout-wage-remaining>{{money(wage_headroom)}}/wk</b></span>
+</div>
 <div class="card">
 <p class="muted desk-scout-lead">Search the player database; add detailed conditions when needed.</p>
 <form class="scout-filters" method="get" data-club-name="{{manager_club_name}}" action="/world/play/career/{{career_id}}/market#scouting">
@@ -1019,7 +1023,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{'—' if p.free_agent else p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{p.height_cm ~ ' cm' if p.height_cm is not none else '—'}}</td>
-<td>{{'FREE' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
+<td>{{'—' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
 <td title="{{'Reference game wage, not confirmed agent demand' if p.free_agent else 'Current game wage, not future agent demand'}}">{{('Est. ' if p.free_agent else '') + money(p.current_wage) if p.current_wage is not none else '—'}}</td>
 <td>{{'Unattached' if p.free_agent else p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
 <td class="desk-scout-extra">{{p.pace if p.pace is not none else '—'}}</td>
@@ -1499,22 +1503,21 @@ Rejected and expired offers are not transfers.</p>
 <div class="feed desk-news-feed">
 {% for m in news_feed %}
 <div class="desk-news-card" {% if m.is_world is defined and m.is_world %}data-world-event-id="{{m.event_id}}"{% endif %}>
-  <b>{{m.headline}}</b>
+ <span class="desk-news-icon" aria-hidden="true">{{m.icon}}</span>
+ <div class="desk-news-content">
+  <strong>{{m.headline}}</strong>
   {% if m.is_world is defined and m.is_world %}
   <div class="desk-news-route">
-    <span class="desk-news-player">{{m.player}}</span>
-    <span class="desk-news-club">{{m.seller}}</span>
-    <span class="desk-news-arrow" aria-label="transferred to">→</span>
-    <span class="desk-news-club">{{m.buyer}}</span>
-    <span class="desk-news-fee">{{m.fee_display}}</span>
+   <span class="desk-news-player">{{m.player}}</span>
+   <span class="desk-news-club">{{m.seller}}</span>
+   <span class="desk-news-arrow" aria-label="transferred to">→</span>
+   <span class="desk-news-club">{{m.buyer}}</span>
+   <span class="desk-news-fee">{{m.fee_display}}</span>
   </div>
-  {% else %}
-  <p style="margin:6px 0">{{m.detail}}</p>
-  {% endif %}
-  <small>{{m.created_at}} UTC</small>
+  {% elif m.show_detail %}<p class="desk-news-detail">{{m.detail}}</p>{% endif %}
+ </div>
 </div>{% endfor %}</div>
 {% else %}<div class="card">No news yet.</div>{% endif %}
-<p class="desk-provenance">Career market values, wages and player preferences are simulated.</p>
 {% endif %}
  </div>
 </div>
@@ -1734,7 +1737,7 @@ table{width:100%;border-collapse:collapse}td{padding:8px;border-bottom:1px solid
 Age {{player.age if player.age is not none else 'unknown'}}</p>
 <div class="grid">
 <div class="card">Overall<br><b>{{player.overall}}</b></div>
-<div class="card">Transfer fee<br><b>{{'FREE — £0' if player.free_agent else money(player.market_value) if player.market_value is not none else 'Unknown'}}</b></div>
+<div class="card">Transfer fee<br><b>{{'—' if player.free_agent else money(player.market_value) if player.market_value is not none else 'Unknown'}}</b></div>
 <div class="card">Estimated weekly wage expectation<br><b>{{money(player.wage_guidance)}}/week</b></div>
 <div class="card">Contract expires<br><b>{{'Unattached' if player.free_agent else player.expires or 'Unknown'}}</b>
 <p class="muted">Years remaining: {{player.years_left if player.years_left is not none else 'Unknown'}}</p></div>
@@ -3106,6 +3109,19 @@ def create_play_blueprint(db_path, on_career_commit=None):
             clean_messages.append(entry)
         news_feed=sorted([*clean_messages,*world_news],
             key=lambda item:str(item["created_at"]),reverse=True)
+        for item in news_feed:
+            headline=item["headline"].lower()
+            detail=item.get("detail","")
+            opening="summer transfer window is open" in headline
+            item["show_detail"]=bool(detail) and not opening
+            item["icon"]=("🤝" if item.get("is_world") or any(
+                term in headline for term in ("transfer completed","transfer agreed",
+                 "transfer agreement signed","signing confirmed"))
+                else "🔁" if "renewal" in headline or "new contract" in headline
+                else "✍" if "contract" in headline or "agent" in headline
+                else "⏰" if "deadline" in headline or "window has closed" in headline
+                else "📩" if "bid" in headline or "offer" in headline
+                else "📰")
 
         from world_player_morale import existing_morale
         morale=(existing_morale(db,career_id=career_id,window_id=snap["window_id"])
