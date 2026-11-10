@@ -516,7 +516,7 @@ def run(world,output):
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()>=80,
                   "FC27 scouting did not render its first 80 players")
             scout_row=page.locator("#desk-view-scouting [data-scout-results] tbody tr").first
-            wage=scout_row.locator("td").nth(6).inner_text()
+            wage=scout_row.locator("td").nth(7).inner_text()
             check(wage.startswith("£") and wage!="—",
                   "Game source weekly wage must appear immediately after transfer value")
             extra_header=page.locator("#desk-view-scouting th.desk-scout-extra").first
@@ -525,7 +525,7 @@ def run(world,output):
             page.locator("[data-scout-attributes-toggle]").click()
             check(extra_header.is_visible(),
                   "Show attributes must reveal the optional scouting columns")
-            first_pace=scout_row.locator("td").nth(9).inner_text()
+            first_pace=scout_row.locator("td").nth(10).inner_text()
             check(first_pace.isdigit(),"FC27 six-category scouting source data is missing")
             page.locator("[data-scout-attributes-toggle]").click()
             check(not extra_header.is_visible(),
