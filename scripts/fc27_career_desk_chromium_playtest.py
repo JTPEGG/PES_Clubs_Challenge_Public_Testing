@@ -806,6 +806,7 @@ def run(world,output):
                   "Contract talks navigated away from manager dashboard")
             offer_form=drawer.locator(
                 'form[action$="/contract/'+str(renewal_player)+'/decision"]')
+            offer_form.wait_for(state="visible",timeout=12000)
             check(offer_form.is_visible(),
                   "In-window contract panel did not load its valid negotiation form")
             offer_form.locator('input[name="weekly_wage"]').fill(str(renewal_wage))
