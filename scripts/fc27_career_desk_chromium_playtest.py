@@ -831,9 +831,15 @@ def run(world,output):
                 str(renewal_player)+'"]')
             check(signed.count()==1 and
                   signed.get_attribute("data-desk-status")=="agreed_future" and
-                  "New contract signed" in signed.inner_text() and
                   signed.locator('button[value="confirm"]').count()==0,
                   "Signed renewal missing authoritative Inbox receipt or requires another confirmation")
+            signed_item=page.locator('#desk-view-inbox .desk-inbox-item').filter(has=signed)
+            check(signed_item.count()==1,
+                  "Signed renewal not indexed as a manager Inbox email")
+            signed_item.locator('summary').click()
+            check("New contract signed" in
+                  page.locator('#desk-view-inbox .desk-inbox-reader').inner_text(),
+                  "Signed renewal Inbox email does not confirm the agreed contract")
             with closing(sqlite3.connect(world)) as db:
                 row=db.execute("""SELECT status,signed_at FROM
                     world_career_contract_renewals
