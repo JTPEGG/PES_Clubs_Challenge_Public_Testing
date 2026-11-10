@@ -1849,7 +1849,10 @@ DASHBOARD_JS = r"""
         card.dataset.deskSide='buy';card.dataset.deskPlayer=String(o.player_id);
         card.dataset.deskPlayerName=o.player;card.dataset.deskBuyer=o.seller;
         const label=document.createElement('div');label.className='label';
-        const heading=document.createElement('h3');heading.textContent=o.player;
+        const heading=document.createElement('h3');
+        const link=document.createElement('a');
+        link.href=location.pathname+'/player/'+encodeURIComponent(o.player_id);
+        link.textContent=o.player;heading.appendChild(link);
         const count=document.createElement('div');count.className='count';
         const briefing=document.createElement('div');
         briefing.className='desk-offer-briefing';
@@ -1863,25 +1866,33 @@ DASHBOARD_JS = r"""
         if(!selectedInboxCard)selectInboxCard(card);
       }
       const newAgent=o.agent_status==='accepted'?'terms_accepted':o.agent_status||'';
+      const prevBuyStatus=card.dataset.deskStatus;
       if(!fresh&&card.dataset.deskStatus===o.status&&
          card.dataset.deskAgent===newAgent&&
+         card.dataset.deskPlayerChoice===(o.player_choice||'')&&
          card.dataset.delayUsed===String(!!o.delay_used))continue;
       card.dataset.deskStatus=o.status;
       card.dataset.deskAgent=newAgent;
+      card.dataset.deskPlayerChoice=o.player_choice||'';
       card.dataset.delayUsed=String(!!o.delay_used);
       card.querySelector('.label').textContent=o.seller+' · '+(stages[o.status]||o.status);
       card.querySelector('.count').textContent=pound(o.fee);
       const summary=card.querySelector('.desk-offer-briefing-note');
       if(summary)summary.textContent=
         o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'?
-          'Player terms agreed. Paperwork needs your final confirmation.':
+          (o.player_choice==='accepted'?
+           'Player has accepted your proposal. Final paperwork is now required.':
+           o.player_choice==='declined'?
+           'The player has chosen not to join. You cannot sign this deal.':
+           'Agent wages agreed. The player is comparing offers; a separate Inbox decision follows.'):
         o.status==='countered'?'The seller has countered your bid. Review negotiations in Transfers.':
         o.status==='rejected'?'Seller rejected your fee. You can make an improved bid.':
         o.status==='accepted_pending_contract'?'Seller accepted your fee. Negotiate the player contract in Transfers.':
         o.status==='agreed_future'||o.status==='completed'?'Transfer confirmed and reflected in the projected squad.':
         o.status==='proposed'?'The selling club is reviewing your bid.':'Transfer talks are closed.';
       card.querySelectorAll(':scope > .actions,:scope > .desk-inbox-open-negotiation').forEach(x=>x.remove());
-      if(o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'){
+      if(o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'&&
+         o.player_choice==='accepted'){
         const area=document.createElement('div');area.className='actions';
         const form=document.createElement('form');
         form.method='post';form.action=location.pathname+'/buy/decision';
@@ -1911,7 +1922,8 @@ DASHBOARD_JS = r"""
         if(header)header.textContent=o.seller+' · '+(stages[o.status]||o.status);
       }
       refreshInboxList();
-      if(fresh&&o.status==='countered')alertOfNewOffer({player:o.player,fee:o.fee});
+      if(o.status==='countered'&&(fresh||prevBuyStatus!=='countered'))
+        alertOfNewOffer({player:o.player,fee:o.fee});
     }
   };
   window.fc27SyncIncomingOffers=function(items,csrf){
@@ -1930,7 +1942,9 @@ DASHBOARD_JS = r"""
         label.className='label';
         label.textContent=o.buyer+' · '+(labels[o.status]||o.status);
         const heading=document.createElement('h3');
-        heading.textContent=o.player;
+        const link=document.createElement('a');
+        link.href=location.pathname+'/player/'+encodeURIComponent(o.player_id);
+        link.textContent=o.player;heading.appendChild(link);
         const amount=document.createElement('div');
         amount.className='count';amount.textContent=pound(o.fee);
         const briefing=document.createElement('div');
@@ -1991,6 +2005,11 @@ DASHBOARD_JS = r"""
         if(empty)empty.hidden=true;
       }
       updateIncomingCard(o,csrf);
+      const saleCard=views.inbox.querySelector('[data-live-offer-id="'+id+'"]');
+      if(saleCard){
+        saleCard.dataset.deskPlayerChoice=o.player_choice||'';
+        refreshInboxItem(saleCard);
+      }
       if(outgoing){
         const tableBody=outgoing.tBodies[0];
         let row=Array.from(tableBody.querySelectorAll('[data-live-offer-id]'))
