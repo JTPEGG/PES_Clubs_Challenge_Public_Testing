@@ -1747,7 +1747,7 @@ Contract dates appear only where sourced.</p>
  This is a modelled FC27 game value; {{player.contract_source}}.</p>
 <form id="fa-contract" data-fa-action method="post"
  action="/world/play/career/{{career_id}}/market/free-agent"
- {% if free_offer and free_offer.status in ['agreed_future','completed'] %}hidden{% endif %}>
+ {% if free_offer and (free_offer.status in ['agreed_future','completed'] or free_choice and free_choice.status in ['evaluating','accepted']) %}hidden{% endif %}>
 <input type="hidden" name="csrf" value="{{csrf}}">
 <input type="hidden" name="player_id" value="{{player.player_id}}">
 <input type="hidden" name="action" value="offer">
@@ -1765,14 +1765,10 @@ Contract dates appear only where sourced.</p>
 </select></label>
 <button type="submit">Offer contract terms</button>
 </form>
-<form id="fa-confirm" data-fa-action method="post"
- action="/world/play/career/{{career_id}}/market/free-agent"
- {% if not free_offer or free_offer.status!='terms_accepted' %}hidden{% endif %}>
-<input type="hidden" name="csrf" value="{{csrf}}">
-<input type="hidden" name="player_id" value="{{player.player_id}}">
-<input type="hidden" name="action" value="confirm">
-<button type="submit">Confirm free-agent signing</button>
-</form>
+<p id="fa-decision-inbox" {% if not free_choice or free_choice.status not in ['evaluating','accepted'] %}hidden{% endif %}>
+ <a href="/world/play/career/{{career_id}}/market#inbox">
+ Review the player's decision and final paperwork in your Manager's Inbox</a>
+</p>
 <p id="fa-status" role="status">{{free_offer.agent_reason if free_offer else 'No contract proposal submitted yet.'}}</p>
 {% if free_offer and free_offer.status in ['agreed_future','completed'] %}
 <p><strong>Signing agreed:</strong> {{'Registers at the deadline' if free_offer.status=='agreed_future' else 'Registered in your squad'}}.</p>
@@ -1780,9 +1776,9 @@ Contract dates appear only where sourced.</p>
 <script>
 (function(){
  const host=document.getElementById('fa-contract');
- const confirm=document.getElementById('fa-confirm');
+ const confirm=document.getElementById('fa-decision-inbox');
  const status=document.getElementById('fa-status');
- for(const form of [host,confirm]){
+ for(const form of [host]){
    form.addEventListener('submit',async function(e){
      e.preventDefault();
      if(form.dataset.busy==='1')return;
@@ -1803,9 +1799,9 @@ Contract dates appear only where sourced.</p>
        status.style.color='#aee5d7';
        if(payload.status==='countered' && payload.required_weekly_wage_gbp)
          host.elements.weekly_wage.value=String(payload.required_weekly_wage_gbp);
-       if(payload.status==='terms_accepted')confirm.hidden=false;
-       if(payload.status==='agreed_future'){
-         host.hidden=true;confirm.hidden=true;
+       if(payload.status==='terms_accepted'){
+         host.hidden=true;confirm.hidden=false;
+         status.textContent='The agent provisionally agreed the wages. The player is now considering other offers and will respond in your Inbox.';
        }
      }catch(error){
        status.style.color='#ffb7b0';
@@ -3223,6 +3219,15 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             free_offer=(db.execute("""SELECT * FROM world_fc27_free_agent_offers
                  WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
                  if player["free_agent"] else None),
+            free_choice=(__import__("world_fc27_player_review",
+                fromlist=["choice_for"]).choice_for(db,career_id=career_id,
+                kind="free_agent",source_id=db.execute("""SELECT signing_id
+                  FROM world_fc27_free_agent_offers WHERE career_id=? AND player_id=?""",
+                  (career_id,player_id)).fetchone()[0])
+                  if player["free_agent"] and db.execute("""SELECT 1
+                    FROM world_fc27_free_agent_offers
+                    WHERE career_id=? AND player_id=?""",
+                    (career_id,player_id)).fetchone() else None),
             request_key="manager-buy-v1-"+secrets.token_urlsafe(14)))
         response.headers["Cache-Control"]="private, no-store"
         return response
@@ -3248,6 +3253,9 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 response.headers["Cache-Control"]="private, no-store"
                 return response
             from urllib.parse import quote
+            if action=="confirm":
+                return redirect("/world/play/career/"+career_id+
+                    "/market?notice="+quote(result["message"])+"#inbox")
             return redirect("/world/play/career/"+career_id+
                 "/market/player/"+str(player_id)+"?notice="+
                 quote(result["message"]))
