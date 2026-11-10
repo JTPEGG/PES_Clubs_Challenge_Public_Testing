@@ -1383,7 +1383,7 @@ DASHBOARD_JS = r"""
     const form=views.inbox.querySelector('form[data-mark-inbox-read]');
     if(!form)return;
     inboxMarkInProgress=true;
-    fetch(form.action,{method:'POST',body:new FormData(form),
+    fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form),
       credentials:'same-origin',headers:{'Accept':'application/json'}})
       .then(function(response){
         if(!response.ok)throw new Error('Inbox unread acknowledgement failed');
@@ -1591,8 +1591,8 @@ DASHBOARD_JS = r"""
        !(views.transfers.contains(form)||views.inbox.contains(form))||
        form.classList.contains('desk-transfer-cancel-form'))return;
     const fromInbox=views.inbox.contains(form);
-    const buyingAction=form.action.endsWith('/market/buy/decision');
-    const rebid=form.action.endsWith('/market/buy/rebid');
+    const buyingAction=(form.getAttribute('action')||'').endsWith('/market/buy/decision');
+    const rebid=(form.getAttribute('action')||'').endsWith('/market/buy/rebid');
     if(!buyingAction&&!rebid)return;
     event.preventDefault();
     if(form.dataset.saving==='1')return;
@@ -1610,7 +1610,7 @@ DASHBOARD_JS = r"""
     oldCard?.appendChild(status);
     form.dataset.saving='1';buttons.forEach(b=>b.disabled=true);
     try{
-      const response=await fetch(form.action,{method:'POST',body:data,
+      const response=await fetch(form.getAttribute('action'),{method:'POST',body:data,
         headers:{'Accept':'application/json'},credentials:'same-origin',
         cache:'no-store'});
       const result=await response.json().catch(()=>null);
@@ -1698,7 +1698,7 @@ DASHBOARD_JS = r"""
   document.addEventListener('submit',async function(event){
     const form=event.target;
     if(!(form instanceof HTMLFormElement)||!views.inbox.contains(form)||
-       !form.action.endsWith('/market/decision'))return;
+       !(form.getAttribute('action')||'').endsWith('/market/decision'))return;
     const button=event.submitter;
     if(!button||!button.name||button.name!=='decision')return;
     event.preventDefault();
@@ -1712,7 +1712,7 @@ DASHBOARD_JS = r"""
     buttons.forEach(b=>b.disabled=true);
     showDecisionFeedback(card,'Saving your '+button.value+' decision…',false);
     try{
-      const response=await fetch(form.action,{
+      const response=await fetch(form.getAttribute('action'),{
         method:'POST',body:data,credentials:'same-origin',
         headers:{'Accept':'application/json'},cache:'no-store'
       });
@@ -1757,7 +1757,7 @@ DASHBOARD_JS = r"""
     const data=new FormData(form);
     if(button&&button.name)data.set(button.name,action);
     try{
-      const response=await fetch(form.action,{
+      const response=await fetch(form.getAttribute('action'),{
         method:'POST',body:data,credentials:'same-origin',cache:'no-store',
         headers:{Accept:'application/json'}
       });
