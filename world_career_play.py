@@ -1869,7 +1869,7 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
    actionForm.dataset.saving='1';
    feedback('Saving your transfer decision…',false);
    try{
-     const response=await fetch(actionForm.action,{
+     const response=await fetch(actionForm.getAttribute('action'),{
        method:'POST',body:data,credentials:'same-origin',
        headers:{'Accept':'application/json'},cache:'no-store'});
      const saved=await response.json().catch(()=>null);
@@ -1886,7 +1886,7 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
        link.href=window.location.pathname.split('/player/')[0]+'#transfers';
        link.textContent='Open Transfer Centre';
        resultArea.appendChild(link);
-     }else if(actionForm.action.endsWith('/buy/rebid')){
+     }else if((actionForm.getAttribute('action')||'').endsWith('/buy/rebid')){
        resultArea.querySelector('[data-buy-offer-id]')?.insertAdjacentElement('beforebegin',latest);
      }else{
        actionForm.closest('[data-buy-offer-id]')?.replaceWith(latest);
@@ -1905,8 +1905,8 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
  resultArea.addEventListener('submit',function(e){
    const target=e.target;
    if(!(target instanceof HTMLFormElement))return;
-   if(!target.action.endsWith('/buy/decision')&&
-      !target.action.endsWith('/buy/rebid'))return;
+   if(!(target.getAttribute('action')||'').endsWith('/buy/decision')&&
+      !(target.getAttribute('action')||'').endsWith('/buy/rebid'))return;
    e.preventDefault();saveAction(target,e.submitter);
  });
 })();
