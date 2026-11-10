@@ -384,6 +384,11 @@ class LiveMarketHttpTests(unittest.TestCase):
                  (started+timedelta(minutes=30)).isoformat(timespec="seconds"),
                  CAREER))
             db.commit()
+            # The manager page now schedules AI activity asynchronously.
+            # Make the first seven minutes deterministic in this isolated
+            # test database before checking the generated bids.
+            from world_live_market import process_live_market
+            process_live_market(db,career_id=CAREER,now=now)
         url="/world/play/career/"+CAREER+"/market"
         first=self.client.get(url,base_url="https://localhost")
         self.assertEqual(first.status_code,200)
