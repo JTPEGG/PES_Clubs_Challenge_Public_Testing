@@ -266,14 +266,28 @@ def review_due_choices(conn,*,career_id,now=None):
             AND window_id=? AND kind=? AND source_id=? AND status='evaluating'""",
             (status,reason,clock.isoformat(),career_id,
              snap["window_id"],kind,identifier))
+        if kind=="sale":
+            club=conn.execute("""SELECT p.full_name,c.name
+                FROM world_career_offers o
+                JOIN world_players p ON p.player_id=o.player_id
+                JOIN world_clubs c ON c.club_id=o.buying_club_id
+                WHERE o.offer_id=? AND o.career_id=?""",
+                (identifier,career_id)).fetchone()
+            player_name,buyer_name=club if club else ("Player","buying club")
+            headline=(f"{player_name} chooses {buyer_name}" if status=="accepted"
+                      else f"{player_name} rejects {buyer_name}'s offer")
+            detail=reason+(". You can now approve this outgoing transfer in the Inbox."
+                if status=="accepted" else
+                ". This unsigned offer cannot be finalised.")
+        else:
+            headline=("Player accepts your contract" if status=="accepted"
+                      else "Player declines your contract")
+            detail=reason+(". Open your Inbox to confirm the signing."
+                   if status=="accepted" else ". No paperwork can be signed.")
         _message(conn,career_id=career_id,window_id=snap["window_id"],
             key=f"player-review-outcome:{kind}:{identifier}",
             offer_id=identifier if kind in ("purchase","sale") else None,
-            headline=("Player accepts your contract" if status=="accepted"
-                      else "Player declines your contract"),
-            detail=reason+(". Open your Inbox to confirm the signing."
-                   if status=="accepted" else ". No paperwork can be signed."),
-            when=clock)
+            headline=headline,detail=detail,when=clock)
         changes+=1
     if rows:conn.commit()
     return changes
