@@ -466,7 +466,10 @@ class LiveMarketHttpTests(unittest.TestCase):
         self.assertIn("Manager's Inbox",text)
         self.assertNotIn("Accept fee</button>",text)
         self.assertNotIn("Reject</button>",text)
-        self.assertNotIn('name="csrf"',text)
+        # The shared JavaScript contains CSS selectors mentioning csrf, but
+        # a spectator must never receive an actual CSRF-bearing input.
+        self.assertIsNone(re.search(
+            r'<input\\b[^>]*\\sname=["\\\']csrf["\\\']',text,re.I))
         self.assertIn("no-store",spectator.headers["Cache-Control"])
         unauth=self.app.test_client().post(url+"/decision",
             data=dict(csrf=self.csrf,offer_id=self.offer_id,decision="reject"),
