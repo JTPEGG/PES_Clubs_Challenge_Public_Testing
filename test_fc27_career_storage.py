@@ -113,17 +113,17 @@ class CareerSnapshotTests(unittest.TestCase):
 class ConnectionIsolationTests(unittest.TestCase):
     def test_development_host_allowed(self):
         self.assertEqual(SAVE_KEY,"fc27_manual_v2")
-        for role in ("fc27_app","fc27_v2_app"):
-            with self.subTest(role=role):
-                assert_isolated_target(f"postgresql://{role}:pw@db.{DEV}.supabase.co:5432/postgres")
-                assert_isolated_target(
-                    f"postgresql://{role}.{DEV}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
-                )
+        assert_isolated_target(f"postgresql://fc27_v2_app:pw@db.{DEV}.supabase.co:5432/postgres")
+        assert_isolated_target(
+            f"postgresql://fc27_v2_app.{DEV}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
+        )
 
     def test_production_and_unrelated_hosts_refused(self):
         for url in (
             f"postgresql://postgres:pw@db.{PROD}.supabase.co:5432/postgres",
-            f"postgresql://fc27_app.{PROD}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres",
+            f"postgresql://fc27_v2_app.{PROD}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres",
+            f"postgresql://fc27_app:pw@db.{DEV}.supabase.co:5432/postgres",
+            f"postgresql://fc27_app.{DEV}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres",
             f"postgresql://postgres:pw@db.{DEV}.supabase.co:5432/postgres",
             f"postgresql://postgres.{DEV}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres",
             "postgresql://postgres:pw@another-provider.example.com:5432/postgres",
