@@ -98,12 +98,17 @@ def run(world):
             WHERE career_id=? AND player_id=?""",(CAREER,player_id)).fetchone()
         before=wage_budget_breakdown(conn,CAREER,manager)
         active_request=renewal_info(conn,career_id=CAREER,player_id=player_id)
-        desired=max(matched["demand"],matched["wage"]+500,
+        # Starting the window initializes source-backed squad roles; the
+        # agent's CURRENT wage model can therefore differ from the preliminary
+        # static-squad comparison computed before the window opened.
+        current_signal=wage_signal(conn,career_id=CAREER,player_id=player_id)
+        desired=max(current_signal["demand"],matched["demand"],matched["wage"]+500,
                     active_request["demand_weekly_wage"] if active_request else 0)
         response=renewal_action(conn,career_id=CAREER,player_id=player_id,
             action="offer",weekly_wage=desired,contract_years=3)
         print("RENEWAL OFFER CHECK:",{
             "current_request":dict(active_request) if active_request else None,
+            "post_window_demand":current_signal["demand"],
             "desired":desired,"offer_response":response},flush=True)
         check(response["status"]=="agreed_future",
               "Accepted agent offer must sign automatically without a second manager approval")
