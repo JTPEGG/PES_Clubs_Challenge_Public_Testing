@@ -1113,7 +1113,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if o.agent_demand is not none and o.status=='accepted_pending_contract' %}
 <p class="agent-opening-quote">Agent opening request: <strong>{{money(o.agent_demand)}}/week</strong></p>{% endif %}
 {% if o.agent_status=='accepted' %}
-<p class="muted">Player and agent have agreed personal terms.</p>{% endif %}
+<p class="muted">Agent terms agreed; the player's separate decision is {{o.player_choice|default('pending',true)}}.</p>{% endif %}
 {% if not spectator and snap.state=='open' %}
 <div class="actions">
 {% if o.status=='countered' %}
@@ -1130,7 +1130,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
  value="{{((o.offered_fee+o.demanded_fee)//2)}}" required></label>
 <button name="decision" value="negotiate_counter">Negotiate fee</button>
 </form>
-{% elif o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
+{% elif o.status=='accepted_pending_contract' and o.agent_status=='accepted' and o.player_choice=='accepted' %}
 <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
 <input type="hidden" name="csrf" value="{{csrf}}">
 <input type="hidden" name="offer_id" value="{{o.offer_id}}">
@@ -1138,6 +1138,8 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if not o.signing_delay_used %}
 <button name="decision" value="delay_signing" type="submit">Delay decision (once)</button>
 {% endif %}</form>
+{% elif o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
+<p class="muted">{{'The player is comparing offers. A decision will arrive in your Inbox shortly.' if o.player_choice=='evaluating' else 'The player has declined this move.' if o.player_choice=='declined' else 'Awaiting a separate player decision.'}}</p>
 {% elif o.status=='accepted_pending_contract' and o.agent_demand is none %}
 <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
 <input type="hidden" name="csrf" value="{{csrf}}">
@@ -1195,8 +1197,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
  data-desk-buyer="{{o.buyer_name|club_display}}">
  <div class="label">{{o.buyer_name|club_display}} · {{o.status_label}}</div>
- <h3 style="margin:6px 0"><button type="button" class="desk-player-quickfilter"
- data-desk-filter-player="{{o.player_name}}" title="Filter offers for {{o.player_name}}">{{o.player_name}}</button></h3>
+ <h3 style="margin:6px 0"><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}" class="desk-player-profile">{{o.player_name}}</a></h3>
  <div class="count">{{money(o.offered_fee)}}</div>
  <div class="desk-offer-briefing">
    <div class="desk-offer-briefing-title">Decision briefing <span>Career estimates</span></div>
@@ -1280,9 +1281,10 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  data-buy-offer-id="{{o.offer_id}}" data-desk-side="buy"
  data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-buyer="{{o.seller_name|club_display}}" data-desk-status="{{o.status}}"
- data-desk-agent="{{'terms_accepted' if o.agent_status=='accepted' else o.agent_status or ''}}">
+ data-desk-agent="{{'terms_accepted' if o.agent_status=='accepted' else o.agent_status or ''}}"
+ data-desk-player-choice="{{o.player_choice or ''}}">
  <div class="label">{{o.seller_name|club_display}} · {{o.status_label}}</div>
- <h3>{{o.player_name}}</h3><div class="count">{{money(o.offered_fee)}}</div>
+ <h3><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}" class="desk-player-profile">{{o.player_name}}</a></h3><div class="count">{{money(o.offered_fee)}}</div>
  <div class="desk-offer-briefing">
   <div class="desk-offer-briefing-title">Club & agent decision <span>Incoming transfer</span></div>
   <div class="desk-offer-briefing-metrics">
@@ -1292,8 +1294,12 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
    <div><small>Contract</small><strong>{{(o.agreed_contract_years|string) ~ ' years' if o.agreed_contract_years else 'Pending'}}</strong></div>
   </div>
   <p class="desk-offer-briefing-note">
-   {% if o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
-   <b>Paperwork ready.</b> Player and agent terms are agreed, but the signing requires your confirmation.
+   {% if o.status=='accepted_pending_contract' and o.agent_status=='accepted' and o.player_choice=='accepted' %}
+   <b>Player accepts your offer.</b> Confirm or delay the separate signing paperwork.
+   {% elif o.status=='accepted_pending_contract' and o.agent_status=='accepted' and o.player_choice=='evaluating' %}
+   <b>Player deciding.</b> Agent terms have been agreed but the player is still considering your offer.
+   {% elif o.status=='accepted_pending_contract' and o.agent_status=='accepted' and o.player_choice=='declined' %}
+   <b>Player declines.</b> You cannot confirm the transfer.
    {% elif o.status=='accepted_pending_contract' %}
    <b>Fee accepted.</b> Complete personal terms with the player's agent before you can sign.
    {% elif o.status=='countered' %}
@@ -1305,7 +1311,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
    {% else %}{{o.status_label}}.{% endif %}
   </p>
  </div>
- {% if not spectator and snap.state=='open' and o.status=='accepted_pending_contract' and o.agent_status=='accepted' %}
+ {% if not spectator and snap.state=='open' and o.status=='accepted_pending_contract' and o.agent_status=='accepted' and o.player_choice=='accepted' %}
  <div class="actions">
   <form method="post" action="/world/play/career/{{career_id}}/market/buy/decision">
    <input type="hidden" name="csrf" value="{{csrf}}">
@@ -2869,6 +2875,10 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 t.proposed_wage_weekly AS negotiated_wage,
                 t.contract_years AS agreed_contract_years,
                 o.offered_wage_weekly AS signed_weekly_wage,
+                (SELECT q.status FROM world_career_player_choices q
+                   WHERE q.career_id=o.career_id AND q.source_id=o.offer_id
+                   AND q.kind='purchase' AND q.window_id=wo.window_id)
+                   AS player_choice,
                 EXISTS(SELECT 1 FROM world_career_offer_events e
                     WHERE e.offer_id=o.offer_id AND e.event_type='buyer_signing_delayed')
                     AS signing_delay_used
@@ -3380,6 +3390,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             t.proposed_wage_weekly AS negotiated_wage,
             t.contract_years AS agreed_contract_years,
             o.offered_wage_weekly AS signed_weekly_wage,
+            (SELECT q.status FROM world_career_player_choices q
+                WHERE q.career_id=o.career_id AND q.source_id=o.offer_id
+                AND q.kind='purchase' AND q.window_id=wo.window_id)
+                AS player_choice,
             EXISTS(SELECT 1 FROM world_career_offer_events e
                 WHERE e.offer_id=o.offer_id AND e.event_type='buyer_signing_delayed')
                 AS signing_delay_used
