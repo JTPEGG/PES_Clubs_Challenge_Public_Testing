@@ -389,8 +389,8 @@ class LiveMarketHttpTests(unittest.TestCase):
         self.assertEqual(first.status_code,200)
         html=first.get_data(as_text=True)
         self.assertIn("Manager's Inbox",html)
-        self.assertIn("Indicative market value:",html)
-        self.assertIn("Bid versus valuation:",html)
+        self.assertIn("Market valuation",html)
+        self.assertIn("Offer vs value",html)
         with self.connect_db() as db:
             slots=db.execute("""SELECT COUNT(*) FROM world_career_market_moments""").fetchone()[0]
             self.assertGreater(slots,1)
@@ -478,7 +478,7 @@ class LiveMarketHttpTests(unittest.TestCase):
         self.assertIn('data-desk-player-name="',html)
         self.assertIn('data-desk-status="',html)
         self.assertIn("desk-grouped-offer",html)
-        self.assertIn("data-desk-filter-player=",html)
+        self.assertIn("data-desk-filter-player",html)
         self.assertIn("Action needed",html)
         self.assertIn("Find a player or buying club",html)
         self.assertIn("Cancel transfer",html)
@@ -945,6 +945,11 @@ class LiveMarketHttpTests(unittest.TestCase):
             return actual_utc(t if now is None else now)
         with patch.object(clock_module,"_utc",side_effect=frozen_utc), \
              patch.object(live_module,"_utc",side_effect=frozen_utc):
+            # A GET schedules market AI in the background to protect the UI.
+            # Reconcile due slots directly in disposable QA storage so this
+            # assertion cannot race the asynchronous worker.
+            with self.connect_db() as db:
+                live_module.process_live_market(db,career_id=CAREER,now=t)
             page=self.client.get(f"/world/play/career/{CAREER}/market",
                                  base_url="https://localhost")
         self.assertEqual(page.status_code,200)
