@@ -827,10 +827,18 @@ DASHBOARD_JS = r"""
     strong.href=location.pathname+'/player/'+encodeURIComponent(card.dataset.deskPlayer||'');
     strong.textContent=card.dataset.deskPlayerName||'Transfer';
     strong.title='Open this player’s scouting profile';
+    const meta=document.createElement('span');
+    meta.className='desk-inbox-player-meta';
+    meta.textContent=[
+      card.dataset.deskPosition||'',
+      card.dataset.deskOverall?'OVR '+card.dataset.deskOverall:'',
+      card.dataset.deskAge?'Age '+card.dataset.deskAge:''
+    ].filter(Boolean).join(' · ');
+    if(!meta.textContent)meta.hidden=true;
     const small=document.createElement('small');
     small.textContent=cleanInboxClub(card.dataset.deskBuyer||'')+
       ' · '+(inboxLabels[card.dataset.deskStatus]||'Transfer update');
-    intro.append(strong,small);heading.appendChild(intro);
+    intro.append(strong,meta,small);heading.appendChild(intro);
     inboxReader.append(heading,selectedInboxDetail);
   }
   const offerCards=Array.from(inboxGrid.querySelectorAll(':scope > .offer[data-desk-player]'));
