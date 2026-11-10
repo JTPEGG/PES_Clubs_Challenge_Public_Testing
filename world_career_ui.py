@@ -466,6 +466,45 @@ body.desk-contract-open{overflow:hidden}
 .desk-renewal-quick-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:12px}
 .desk-renewal-quick-actions button,.desk-renewal-quick-actions a{font-size:12px;padding:7px 11px;border-radius:7px}
 @media(max-width:550px){.desk-contract-body .fields{grid-template-columns:1fr}.desk-contract-body .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Player reports share the Career Desk's existing sidebar, header and clock. */
+.desk-view[data-view="player"]{min-width:0}
+.desk-player-report{max-width:1120px;min-width:0}
+.desk-player-report .desk-player-back{display:inline-flex;align-items:center;gap:8px;
+ padding:8px 11px;color:#b6d4e5;text-decoration:none;font-size:12px;
+ border-radius:7px;border:1px solid #344f67;background:#162a3d}
+.desk-player-report .desk-player-back:hover{color:white;background:#22425a}
+.desk-player-report h1{margin:18px 0 3px;font-size:clamp(23px,3vw,30px);line-height:1.25;letter-spacing:-.025em}
+.desk-player-report>p.muted{margin:0 0 20px;font-size:13px}
+.desk-view[data-view="player"] .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.desk-view[data-view="player"] .grid>.card{min-height:92px;margin:0;padding:15px 16px;
+ border-radius:10px;color:#b1ccdd;font-size:12px}
+.desk-view[data-view="player"] .grid>.card b{display:block;margin-top:5px;
+ color:#f5faff;font-size:21px;line-height:1.2}
+.desk-player-report .card{padding:15px 18px;margin:13px 0}
+.desk-player-report h2{margin:26px 0 12px;font-size:18px}
+.desk-player-report .card p{font-size:13px;line-height:1.5}
+.desk-player-report form{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.desk-player-report form label{display:flex;flex-direction:column;gap:5px;font-size:12px}
+.desk-player-report button{padding:9px 14px;border-radius:7px}
+.desk-player-report input,.desk-player-report select{padding:9px 10px;border:1px solid #52738c;
+ background:#11263b;color:#f5fbff;border-radius:7px;min-width:0}
+.desk-player-report form input[type="hidden"]{display:none}
+.desk-player-report #scout-budget-preview{margin:8px 0;color:#a3d6ca;font-size:13px}
+.desk-player-report .card table{border-collapse:collapse;width:100%;font-size:13px}
+.desk-player-report .card td{border-bottom:1px solid #304c65;padding:8px}
+.desk-player-report .card td b{font-size:13px}
+.desk-player-report .muted{color:#aac1d2;font-size:12px}
+.desk-player-report .desk-player-response{font-size:12px;margin:8px 0;color:#a9edcf}
+.desk-player-report .desk-player-response[data-error="1"]{color:#ffaaa3}
+.desk-player-report #scout-buy-result>.offer{margin:13px 0;border:1px solid #355874;
+ border-left:3px solid #5ab9dc;padding:14px;border-radius:8px;background:#1a3148}
+.desk-player-report #scout-buy-result>.offer .card{margin:5px 0}
+.desk-player-report #scout-buy-result button{margin:4px 0}
+@media(max-width:1140px){.desk-view[data-view="player"] .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.desk-player-report{width:100%}.desk-view[data-view="player"] .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .desk-view[data-view="player"] .grid>.card{padding:12px;min-height:88px}
+ .desk-player-report .card{padding:12px}.desk-player-report form{align-items:stretch}
+ .desk-player-report label,.desk-player-report form input[type=number]{width:100%;max-width:100%}}
 
 """
 
@@ -475,11 +514,11 @@ DASHBOARD_JS = r"""
   const source=document.getElementById('desk-screen-source');
   const host=document.getElementById('desk-view-host');
   if(!source||!host||source.dataset.initialized==='1')return;
-  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup'];
+  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup','player'];
   const titles={
     dashboard:'Manager overview',inbox:"Manager's Inbox",transfers:'Transfer Centre',
     squad:'Squad planner',scouting:'Scouting',shortlist:'My shortlist',finances:'Club finances',
-    news:'Market news','season-setup':'Season setup'
+    news:'Market news','season-setup':'Season setup',player:'Player profile'
   };
   const views={};
   names.forEach(function(name){
@@ -624,6 +663,7 @@ DASHBOARD_JS = r"""
   };
   function viewForHash(){
     const key=decodeURIComponent((location.hash||'#dashboard').slice(1));
+    if(/^player-[1-9]\d*$/.test(key))return 'player';
     return views[key]?key:(redirects[key]||
       (document.body.dataset.windowState==='closed'?'transfers':'dashboard'));
   }
