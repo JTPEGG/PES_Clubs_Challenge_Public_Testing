@@ -38,15 +38,12 @@ def assert_isolated_target(url: str) -> None:
     parsed = urlsplit(url)
     hostname = (parsed.hostname or "").lower()
     username = unquote(parsed.username or "")
-    # Both roles are restricted to this dedicated development project.
-    # The new preview uses its own role and save key, so credentials and
-    # snapshots from the existing FC27 preview are never overwritten.
-    authorised_roles = ("fc27_app", "fc27_v2_app")
+    # The parallel V2 preview has its OWN role, private schema and key.
+    # Never accept credentials belonging to the existing FC27 or PES app.
     direct = (hostname == f"db.{PROJECT_REF}.supabase.co" and
-              username in authorised_roles and parsed.port == 5432)
+              username == "fc27_v2_app" and parsed.port == 5432)
     pooler = (hostname.endswith(".pooler.supabase.com") and
-              username in tuple(f"{role}.{PROJECT_REF}" for role in authorised_roles)
-              and parsed.port == 5432)
+              username == f"fc27_v2_app.{PROJECT_REF}" and parsed.port == 5432)
     if parsed.scheme not in ("postgres", "postgresql") or not (
             parsed.password and (direct or pooler)):
         raise RuntimeError("FC27 career persistence refused a non-development database target")
@@ -202,7 +199,7 @@ class CareerSaveStore:
         with self._connect_pg() as pg:
             with pg.cursor() as cur:
                 cur.execute(
-                    "SELECT db_bytes FROM fc27_storage.pes_save_store WHERE save_key=%s",
+                    "SELECT db_bytes FROM fc27_storage_v2.pes_save_store WHERE save_key=%s",
                     (SAVE_KEY,),
                 )
                 row = cur.fetchone()
@@ -219,7 +216,7 @@ class CareerSaveStore:
         with self._connect_pg() as pg:
             with pg.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO fc27_storage.pes_save_store(save_key,db_bytes,updated_at)
+                    """INSERT INTO fc27_storage_v2.pes_save_store(save_key,db_bytes,updated_at)
                        VALUES(%s,%s,NOW())
                        ON CONFLICT(save_key)
                        DO UPDATE SET db_bytes=EXCLUDED.db_bytes,updated_at=NOW()""",
