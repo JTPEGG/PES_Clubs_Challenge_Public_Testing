@@ -412,12 +412,24 @@ def act_on_buy_offer(conn,*,career_id,offer_id,action,weekly_wage=None,
         response=negotiate_agent(conn,career_id=career_id,offer_id=offer_id,
             weekly_wage=weekly_wage,contract_years=contract_years,
             role_promise=role_promise,agreement_date=agreement_date)
-        result=("Player and agent accepted. Confirm the signing before the deadline."
+        if response=="accepted":
+            from world_fc27_player_review import queue_choice
+            queue_choice(conn,career_id=career_id,kind="purchase",
+                source_id=offer_id,player_id=player_id,now=now)
+        result=("Agent has agreed provisional terms. The player is now "
+                "considering the move and any competing offers. "
+                "Await a separate Inbox decision before signing."
                 if response=="accepted" else
                 "Agent countered: review the demanded wage and submit improved terms.")
     elif action=="sign":
         if status!="accepted_pending_contract":
             raise ValueError("The player is not awaiting your final confirmation")
+        from world_fc27_player_review import choice_for
+        verdict=choice_for(conn,career_id=career_id,kind="purchase",
+                           source_id=offer_id)
+        if not verdict or verdict["status"]!="accepted":
+            raise ValueError("Agent terms alone are not the player's final "
+                             "decision. Await an accepting Inbox response.")
         competing=conn.execute("""SELECT 1 FROM world_career_offers
             WHERE career_id=? AND player_id=? AND offer_id<>?
               AND status IN ('agreed_future','completed') LIMIT 1""",
@@ -442,6 +454,11 @@ def act_on_buy_offer(conn,*,career_id,offer_id,action,weekly_wage=None,
             WHERE career_id=? AND offer_id=?""",(career_id,offer_id)).fetchone()
         if not agent or agent[0]!="accepted":
             raise ValueError("Personal terms must be agreed before delaying signature")
+        from world_fc27_player_review import choice_for
+        verdict=choice_for(conn,career_id=career_id,kind="purchase",
+                           source_id=offer_id)
+        if not verdict or verdict["status"]!="accepted":
+            raise ValueError("The player hasn't decided to sign yet")
         previously=conn.execute("""SELECT 1 FROM world_career_offer_events
             WHERE offer_id=? AND event_type='buyer_signing_delayed'""",
             (offer_id,)).fetchone()
@@ -469,8 +486,8 @@ def act_on_buy_offer(conn,*,career_id,offer_id,action,weekly_wage=None,
         key=f"manager-buy-action:{offer_id}:{action}:"+
             str(conn.execute("""SELECT COALESCE(MAX(event_id),0) FROM world_career_offer_events
                  WHERE offer_id=?""",(offer_id,)).fetchone()[0]),
-        headline=("Paperwork awaits your decision" if action=="terms" and
-                  result.startswith("Player and agent accepted")
+        headline=("Player is considering an agreed contract" if action=="terms" and
+                  response=="accepted"
                   else "Transfer signature delayed" if action=="delay_signing"
                   else "Transfer signing confirmed" if action=="sign"
                   else "Transfer negotiation update"),
