@@ -649,8 +649,11 @@ DASHBOARD_JS = r"""
     const heading=document.createElement('header');
     heading.className='desk-inbox-reader-header';
     const intro=document.createElement('div');
-    const strong=document.createElement('strong');
+    const strong=document.createElement('a');
+    strong.className='desk-inbox-profile-link';
+    strong.href=location.pathname+'/player/'+encodeURIComponent(card.dataset.deskPlayer||'');
     strong.textContent=card.dataset.deskPlayerName||'Transfer';
+    strong.title='Open this player’s scouting profile';
     const small=document.createElement('small');
     small.textContent=cleanInboxClub(card.dataset.deskBuyer||'')+
       ' · '+(inboxLabels[card.dataset.deskStatus]||'Transfer update');
@@ -676,15 +679,20 @@ DASHBOARD_JS = r"""
     return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
+    if(card.dataset.deskSide==='free')
+      return card.dataset.deskStatus==='terms_accepted'&&
+        card.dataset.deskPlayerChoice==='accepted';
     if(card.dataset.deskSide==='contract')
       return ['requested','countered','accepted_terms'].includes(card.dataset.deskStatus);
     if(card.dataset.deskSide==='buy')
       return card.dataset.deskStatus==='countered'||
         (card.dataset.deskStatus==='accepted_pending_contract'&&
-         card.dataset.deskAgent==='terms_accepted');
+         (card.dataset.deskAgent!=='terms_accepted'||
+          card.dataset.deskPlayerChoice==='accepted'));
     return card.dataset.deskStatus==='proposed'||
       (card.dataset.deskStatus==='accepted_pending_contract'&&
-       card.dataset.deskAgent==='terms_accepted');
+       card.dataset.deskAgent==='terms_accepted'&&
+       card.dataset.deskPlayerChoice==='accepted');
   }
   function refreshInboxItem(card){
     const holder=inboxCardItems.get(card)||card.closest('.desk-inbox-item');
@@ -702,16 +710,28 @@ DASHBOARD_JS = r"""
       card.querySelector('.count')?.textContent.trim()||'—';
     const buyingStages={proposed:'Seller reviewing',countered:'Counteroffer',
       accepted_pending_contract:card.dataset.deskAgent==='terms_accepted'?
-        'Sign-off needed':'Agent talks',
+        card.dataset.deskPlayerChoice==='accepted'?'Sign-off needed':
+        card.dataset.deskPlayerChoice==='declined'?'Player declined':'Player reviewing':
+        'Agent talks',
       agreed_future:'Confirmed',completed:'Confirmed',
       rejected:'Rejected',withdrawn:'Withdrawn'};
+    const freeStages={terms_accepted:card.dataset.deskPlayerChoice==='accepted'?
+        'Sign-off needed':card.dataset.deskPlayerChoice==='declined'?
+        'Player declined':'Player reviewing',countered:'Agent counter',
+        agreed_future:'Confirmed',completed:'Confirmed',withdrawn:'Withdrawn'};
+    const saleStages={...inboxLabels,
+      accepted_pending_contract:card.dataset.deskAgent==='terms_accepted'?
+         card.dataset.deskPlayerChoice==='accepted'?'Player ready':
+         card.dataset.deskPlayerChoice==='declined'?'Player declined':'Player reviewing':
+         'Agent talks'};
     const renewalStages={requested:'New wage request',negotiating:'Agent talks',
       countered:'Agent counteroffer',accepted_terms:'Approval needed',
       agreed_future:'Renewed',completed:'Renewed',
       declined:'Declined',withdrawn:'Withdrawn',expired:'Expired'};
     holder.querySelector('.desk-inbox-state').textContent=
       (card.dataset.deskSide==='contract'?renewalStages[status]:
-       card.dataset.deskSide==='buy'?buyingStages[status]:inboxLabels[status])||status;
+       card.dataset.deskSide==='free'?freeStages[status]:
+       card.dataset.deskSide==='buy'?buyingStages[status]:saleStages[status])||status;
   }
 
   function enhanceCounter(card){
@@ -1511,7 +1531,7 @@ DASHBOARD_JS = r"""
         const values=Array.from(actions.querySelectorAll('button[name="decision"]'),
           button=>button.value);
         if(status==='accepted_pending_contract'&&agent==='terms_accepted'&&
-           !values.includes('finalise'))
+           offer.player_choice==='accepted'&&!values.includes('finalise'))
           actions.prepend(formFor(offer,'finalise',csrf));
         if(!values.includes('cancel'))actions.appendChild(formFor(offer,'cancel',csrf));
       }
@@ -1523,7 +1543,9 @@ DASHBOARD_JS = r"""
       }
       note.textContent=status==='accepted_pending_contract'?
         (agent==='terms_accepted'?
-          'Player and agent terms agreed — finalise the transfer before the deadline.':
+          (offer.player_choice==='accepted'?
+            'Player has chosen this buyer. You may confirm the sale in your Inbox.':
+            'Player is considering the competing proposals. Finalisation is not yet available.'):
           'Fee accepted — player/agent talks are in progress.'):
         status==='countered'?'Counter sent — awaiting the buying club.':
         status==='agreed_future'?'Confirmed — registration will take place at the deadline.':
