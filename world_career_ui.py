@@ -1979,14 +1979,15 @@ DASHBOARD_JS = r"""
   },true);
 
 
-  window.fc27SyncContractRequests=function(items,careerId){
+  window.fc27SyncContractRequests=function(items,careerId,csrf){
     if(!Array.isArray(items))return;
     for(const item of items){
       const playerId=Number(item.player_id);
       if(!Number.isSafeInteger(playerId)||playerId<=0)continue;
       let card=views.inbox.querySelector(
         '[data-live-offer-id="contract-'+playerId+'"]');
-      if(!card){
+      const fresh=!card;
+      if(fresh){
         card=document.createElement('div');
         card.className='card offer desk-contract-inbox';
         card.dataset.liveOfferId='contract-'+playerId;
@@ -2004,27 +2005,52 @@ DASHBOARD_JS = r"""
         const explanation=document.createElement('p');
         explanation.className='desk-offer-briefing-note';
         brief.append(title,explanation);
-        const link=document.createElement('a');link.className='desk-inbox-open-negotiation';
-        link.href='/world/play/career/'+encodeURIComponent(careerId)+
-          '/market/contract/'+playerId;
-        link.textContent='Open contract negotiations';
-        card.append(label,heading,count,brief,link);
+        card.append(label,heading,count,brief);
         inboxGrid.hidden=false;
         inboxGrid.insertBefore(card,inboxColumns.nextSibling);
         offerCards.push(card);makeInboxItem(card);
       }
-      if(card.dataset.deskStatus===item.status &&
+      card.dataset.deskPosition=item.position||'';
+      card.dataset.deskOverall=item.overall||'';
+      card.dataset.deskAge=item.age||'';
+      if(!fresh&&card.dataset.deskStatus===item.status &&
          card.dataset.demand===String(item.demand))continue;
       card.dataset.deskStatus=item.status;
       card.dataset.demand=String(item.demand);
-      card.querySelector('.count').textContent=pound(item.demand)+'/wk';
-      card.querySelector('.desk-offer-briefing-note').textContent=
-        'Current £'+Number(item.current_wage).toLocaleString('en-GB')+
-        '/week · comparable FC27 wage £'+Number(item.peer_wage||0).toLocaleString('en-GB')+
-        '/week. Agent status: '+String(item.status).replaceAll('_',' ')+
-        '. Renegotiation does not force a transfer.';
-      refreshInboxItem(card);
-      refreshInboxList();
+      const signed=item.status==='agreed_future'||item.status==='completed';
+      card.querySelector('.label').textContent=signed?
+        'Contract signed':'Contract renewal · Player representative';
+      card.querySelector('.count').textContent=pound(item.demand)+'/wk requested';
+      card.querySelector('.desk-offer-briefing-note').textContent=signed?
+        'Signed contract confirmed. New terms become effective at the transfer deadline.':
+        'Current '+pound(item.current_wage)+'/week · comparable game wage '+
+        pound(item.peer_wage||0)+'/week. Agent status: '+
+        String(item.status).replaceAll('_',' ')+'.';
+      card.querySelectorAll(':scope > .desk-renewal-quick-actions')
+        .forEach(el=>el.remove());
+      if(['requested','countered','negotiating','accepted_terms'].includes(item.status)){
+        const actions=document.createElement('div');
+        actions.className='desk-renewal-quick-actions';
+        const link=document.createElement('a');
+        link.className='desk-inbox-open-negotiation';
+        link.href='/world/play/career/'+encodeURIComponent(careerId)+
+          '/market/contract/'+playerId;
+        link.textContent='Offer renewal';actions.appendChild(link);
+        if(csrf){
+          const form=document.createElement('form');
+          form.method='post';
+          form.setAttribute('action','/world/play/career/'+encodeURIComponent(careerId)+
+            '/market/contract/'+playerId+'/decision');
+          const input=document.createElement('input');
+          input.type='hidden';input.name='csrf';input.value=String(csrf);
+          const button=document.createElement('button');
+          button.name='action';button.value='decline';button.type='submit';
+          button.className='danger';button.textContent='Reject renewal';
+          form.append(input,button);actions.appendChild(form);
+        }
+        card.appendChild(actions);
+      }
+      refreshInboxItem(card);refreshInboxList();
     }
   };
   window.fc27SyncFreeAgentOffers=function(items,csrf,careerId){
@@ -2063,6 +2089,9 @@ DASHBOARD_JS = r"""
         const empty=views.inbox.querySelector('#desk-inbox-no-offers');
         if(empty)empty.hidden=true;
       }
+      card.dataset.deskPosition=o.position||'';
+      card.dataset.deskOverall=o.overall||'';
+      card.dataset.deskAge=o.age||'';
       const choice=o.player_choice||'';
       if(!fresh&&card.dataset.deskStatus===o.status&&
          card.dataset.deskPlayerChoice===choice)return;
@@ -2146,6 +2175,9 @@ DASHBOARD_JS = r"""
         offerCards.push(card);makeInboxItem(card);
         if(!selectedInboxCard)selectInboxCard(card);
       }
+      card.dataset.deskPosition=o.position||'';
+      card.dataset.deskOverall=o.overall||'';
+      card.dataset.deskAge=o.age||'';
       const newAgent=o.agent_status==='accepted'?'terms_accepted':o.agent_status||'';
       const prevBuyStatus=card.dataset.deskStatus;
       if(!fresh&&card.dataset.deskStatus===o.status&&
