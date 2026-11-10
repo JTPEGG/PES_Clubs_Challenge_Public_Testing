@@ -11,7 +11,7 @@ from time import monotonic
 from world_careers import _player_reference, age_on
 from world_valuation import model_value, fc27_game_reference_value
 
-SORT_COLUMNS=frozenset(('overall','age','market_value','pace','shooting','passing','dribbling','defending','physicality','years_left','full_name'))
+SORT_COLUMNS=frozenset(('overall','age','market_value','pace','shooting','passing','dribbling','defending','physicality','years_left','full_name','height_cm'))
 
 
 GROUPS={"GK":"GK","DEF":"DEF","MID":"MID","FWD":"FWD"}
@@ -129,7 +129,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     shortlist_only=False, offset=0, with_total=False,
                     max_market_value=None,max_weekly_wage=None,
                     position_codes="",exclude_manager_players=False,
-                    listed_only=False,interested_only=False,free_only=False):
+                    listed_only=False,interested_only=False,free_only=False,
+                    min_height_cm=None,max_height_cm=None):
     from world_ai_bidding import position_family
     save=conn.execute("""SELECT dataset_id,manager_club_id,pes_lock_date
         FROM world_career_saves WHERE career_id=? AND state='sandbox'""",
@@ -167,6 +168,13 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         if max_market_value is not None else None)
     max_weekly_wage=(max(0,int(max_weekly_wage))
         if max_weekly_wage is not None else None)
+    min_height_cm=(max(120,min(230,int(min_height_cm)))
+        if min_height_cm is not None else None)
+    max_height_cm=(max(120,min(230,int(max_height_cm)))
+        if max_height_cm is not None else None)
+    if (min_height_cm is not None and max_height_cm is not None
+            and min_height_cm>max_height_cm):
+        raise ValueError("Minimum height cannot exceed maximum height")
     interested_only=bool(interested_only)
     free_only=bool(free_only)
     if sort_by not in SORT_COLUMNS:sort_by='overall'
@@ -193,6 +201,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                 rows=conn.execute("""SELECT r.player_id,r.club_id,
                     c.name club_name,p.full_name,p.birth_date,
                     p.primary_position,x.overall,
+                    details.height_cm AS height_cm,
                     a.pace,a.shooting,a.passing,a.dribbling,a.defending,
                     a.physicality,
                     cs.expires_on AS expires,
@@ -203,6 +212,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     JOIN world_players p ON p.player_id=r.player_id
                     JOIN world_dataset_ratings x
                       ON x.dataset_id=? AND x.player_id=r.player_id
+                    LEFT JOIN world_dataset_pes_v2_player_details details
+                      ON details.dataset_id=x.dataset_id AND details.player_id=r.player_id
                     LEFT JOIN world_fc27_scout_categories a
                       ON a.player_id=r.player_id
                     LEFT JOIN world_career_contract_snapshots cs
@@ -240,6 +251,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             )
             SELECT r.player_id,r.club_id,c.name club_name,
               p.full_name,p.birth_date,p.primary_position,x.overall,
+              details.height_cm AS height_cm,
               a.pace,a.shooting,a.passing,a.dribbling,a.defending,a.physicality,
               cs.expires_on AS expires,cs.weekly_wage_gbp AS current_wage,
               a.detail_attribute
@@ -247,6 +259,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             JOIN world_clubs c ON c.club_id=r.club_id
             JOIN world_players p ON p.player_id=r.player_id
             JOIN world_dataset_ratings x ON x.dataset_id=? AND x.player_id=r.player_id
+            LEFT JOIN world_dataset_pes_v2_player_details details
+              ON details.dataset_id=x.dataset_id AND details.player_id=r.player_id
             LEFT JOIN fc27 a ON a.player_id=r.player_id
             LEFT JOIN world_career_contract_snapshots cs
               ON cs.career_id=r.career_id AND cs.player_id=r.player_id
@@ -266,7 +280,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                 free_rows=conn.execute("""SELECT fa.player_id,
                     NULL AS club_id,'Free agent' AS club_name,
                     p.full_name,p.birth_date,p.primary_position,
-                    x.overall,
+                    x.overall,details.height_cm AS height_cm,
                     cat.pace,cat.shooting,cat.passing,cat.dribbling,
                     cat.defending,cat.physicality,
                     NULL AS expires,
@@ -276,6 +290,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     JOIN world_players p ON p.player_id=fa.player_id
                     JOIN world_dataset_ratings x
                       ON x.player_id=fa.player_id AND x.dataset_id=fa.dataset_id
+                    LEFT JOIN world_dataset_pes_v2_player_details details
+                      ON details.dataset_id=fa.dataset_id AND details.player_id=fa.player_id
                     LEFT JOIN world_fc27_scout_categories cat
                       ON cat.player_id=fa.player_id
                     LEFT JOIN world_dataset_extended_attributes detail
@@ -293,7 +309,7 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         # Older datasets preserve their own documented source-backed fields.
         rows=conn.execute("""SELECT r.player_id,r.club_id,c.name club_name,
             p.full_name,p.birth_date,p.primary_position,
-            x.overall,x.pace,x.shooting,x.passing,x.dribbling,x.defending,x.physicality,
+            x.overall,NULL AS height_cm,x.pace,x.shooting,x.passing,x.dribbling,x.defending,x.physicality,
             (SELECT wc.expires FROM world_contracts wc
              WHERE wc.player_id=r.player_id AND wc.club_id=r.club_id
                AND wc.expires IS NOT NULL AND wc.source_url IS NOT NULL
@@ -412,6 +428,10 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         except ValueError:
             age=None
         if max_age is not None and (age is None or age>max_age):continue
+        if min_height_cm is not None and (
+                d["height_cm"] is None or d["height_cm"]<min_height_cm):continue
+        if max_height_cm is not None and (
+                d["height_cm"] is None or d["height_cm"]>max_height_cm):continue
         if max_weekly_wage is not None and (
                 d["current_wage"] is None or
                 d["current_wage"]>max_weekly_wage):continue
@@ -516,7 +536,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         and not squad_only and not shortlist_only and not free_only
         and not selected_positions and not exclude_manager_players
         and not listed_only
-        and max_market_value is None and max_weekly_wage is None):
+        and max_market_value is None and max_weekly_wage is None
+        and min_height_cm is None and max_height_cm is None):
         _remember_interest(interest_key,(d["player_id"] for d in out))
     total=len(out)
     offset=max(0,int(offset))
