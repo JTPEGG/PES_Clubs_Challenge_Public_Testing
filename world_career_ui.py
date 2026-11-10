@@ -2250,6 +2250,9 @@ DASHBOARD_JS = r"""
         card.className='card offer';card.dataset.liveOfferId=String(id);
         card.dataset.deskPlayer=String(o.player_id);
         card.dataset.deskPlayerName=o.player;card.dataset.deskStatus=o.status;
+        card.dataset.deskPosition=o.position||'';
+        card.dataset.deskOverall=o.overall||'';
+        card.dataset.deskAge=o.age||'';
         card.dataset.deskBuyer=o.buyer;
         const label=document.createElement('div');
         label.className='label';
@@ -2321,6 +2324,9 @@ DASHBOARD_JS = r"""
       const saleCard=views.inbox.querySelector('[data-live-offer-id="'+id+'"]');
       if(saleCard){
         saleCard.dataset.deskPlayerChoice=o.player_choice||'';
+        saleCard.dataset.deskPosition=o.position||'';
+        saleCard.dataset.deskOverall=o.overall||'';
+        saleCard.dataset.deskAge=o.age||'';
         refreshInboxItem(saleCard);
       }
       if(outgoing){
