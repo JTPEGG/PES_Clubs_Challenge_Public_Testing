@@ -815,6 +815,13 @@ def run(world,output):
                   "Continue link did not navigate to season setup checklist")
             found.append("Post-deadline offers labelled expired; Continue opens the real season setup")
 
+            # The deliberate pre-player-decision signing rejection returned
+            # an asserted HTTP 400; Chrome logs this expected response as
+            # a generic resource error. Allow only that exact single entry.
+            expected_rejection=("console: Failed to load resource: the server "
+                "responded with a status of 400 (BAD REQUEST)")
+            if premature["status"]==400 and expected_rejection in failures:
+                failures.remove(expected_rejection)
             check(not failures,"JavaScript / browser console errors: "+repr(failures))
             browser.close()
     finally:
