@@ -3070,6 +3070,8 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 if r["status"]=="withdrawn" and r["player_status"] in (
                         "role_refused","wage_limit","player_refused","needs_information"):
                     item["status_label"]="Personal terms unsuccessful"
+                elif r["status"]=="withdrawn" and r["player_choice"]=="declined":
+                    item["status_label"]="Player chose another club"
                 if r["status"]=="accepted_pending_contract":
                     if r["player_choice"]=="accepted":
                         item["status_label"]="Player accepts — sign transfer"
