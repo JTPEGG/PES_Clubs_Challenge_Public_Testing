@@ -97,7 +97,9 @@ def run(world):
             FROM world_career_contract_snapshots
             WHERE career_id=? AND player_id=?""",(CAREER,player_id)).fetchone()
         before=wage_budget_breakdown(conn,CAREER,manager)
-        desired=max(matched["demand"],matched["wage"]+500)
+        active_request=renewal_info(conn,career_id=CAREER,player_id=player_id)
+        desired=max(matched["demand"],matched["wage"]+500,
+                    active_request["demand_weekly_wage"] if active_request else 0)
         response=renewal_action(conn,career_id=CAREER,player_id=player_id,
             action="offer",weekly_wage=desired,contract_years=3)
         check(response["status"]=="agreed_future",
