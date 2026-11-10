@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import sqlite3
 import threading
-from time import perf_counter
+from time import perf_counter, sleep
 from datetime import datetime,timedelta
 from contextlib import closing
 from urllib.parse import urlparse
@@ -232,17 +232,57 @@ def run(world,output):
             offer_data=agent_response.value.json()
             check(offer_data.get('ok') and offer_data.get('status')=='terms_accepted',
                   "Sancho's modelled player/agent terms were not accepted in free-agent flow")
-            page.wait_for_function(
-                "()=>!document.querySelector('#fa-confirm').hidden",
-                timeout=12000)
-            with page.expect_response(
-                lambda response:response.url.endswith('/market/free-agent')
-                    and response.request.method=='POST',timeout=16000
-            ) as signing_response:
-                page.locator('#fa-confirm button[type=submit]').click()
-            signing=signing_response.value.json()
-            check(signing.get('ok') and signing.get('status')=='agreed_future',
-                  "Manager could not confirm agreed Sancho wage-only signing")
+            # Agent approval is provisional. Confirming before a separate
+            # player decision must be rejected by the real authenticated API.
+            check(page.locator('#fa-confirm').count()==0,
+                  "Free-agent profile incorrectly exposes immediate signing")
+            csrf=page.locator('#fa-contract input[name="csrf"]').input_value()
+            premature=page.request.post(base+manager_path+'/free-agent',
+                data={'csrf':csrf,'player_id':str(free[0]),
+                      'action':'confirm','weekly_wage':'0',
+                      'contract_years':'3','role_promise':'key_player'},
+                headers={'Accept':'application/json'})
+            check(premature.status==400 and not premature.json().get('ok'),
+                  "Manager can sign a free agent before player choice")
+            with closing(sqlite3.connect(world)) as db:
+                db.row_factory=sqlite3.Row
+                choice=db.execute("""SELECT status FROM world_career_player_choices
+                    WHERE career_id=? AND player_id=? AND kind='free_agent'
+                    ORDER BY source_id DESC LIMIT 1""",(CAREER,free[0])).fetchone()
+                check(choice is not None and choice['status']=='evaluating',
+                      "Separate free-agent choice was not queued")
+                # Only the disposable QA clock is accelerated: the real
+                # server continues using bounded player deliberation.
+                db.execute("""UPDATE world_career_player_choices SET due_at=?
+                    WHERE career_id=? AND player_id=? AND kind='free_agent'
+                      AND status='evaluating'""",
+                    ((datetime.now().astimezone()-timedelta(seconds=5)).isoformat(),
+                     CAREER,free[0]))
+                db.commit()
+            heartbeat=page.request.get(base+manager_path+'/pulse')
+            check(heartbeat.ok,"Manager heartbeat could not advance decisions")
+            player_choice=None
+            for _ in range(60):
+                with closing(sqlite3.connect(world)) as db:
+                    db.row_factory=sqlite3.Row
+                    player_choice=db.execute("""SELECT status FROM
+                        world_career_player_choices WHERE career_id=?
+                        AND player_id=? AND kind='free_agent'
+                        ORDER BY source_id DESC LIMIT 1""",
+                        (CAREER,free[0])).fetchone()
+                if player_choice and player_choice['status']!='evaluating':break
+                sleep(0.1)
+            check(player_choice is not None and
+                  player_choice['status']=='accepted',
+                  "Agent-approved Sancho did not receive a positive, independent player decision")
+            page.goto(base+manager_path+'#inbox',wait_until='domcontentloaded')
+            sancho_inbox=page.locator('.desk-inbox-free-message').filter(
+                has_text='Jadon Sancho')
+            check(sancho_inbox.count()==1 and
+                  sancho_inbox.get_attribute('data-desk-player-choice')=='accepted',
+                  "Player decision was not delivered to the manager Inbox")
+            sancho_inbox.locator('button[name="action"][value="confirm"]').click()
+            page.wait_for_load_state('domcontentloaded')
             with closing(sqlite3.connect(world)) as db:
                 signed_status=db.execute("""SELECT status FROM
                     world_fc27_free_agent_offers
@@ -254,7 +294,7 @@ def run(world,output):
                     (CAREER,free[0])).fetchone()[0]
             check(signed_status=='agreed_future' and registered==0,
                   "Free agent registered before deadline or terms not saved")
-            found.append("Sancho available, £0 transfer fee, agent wage agreed, manager signed, not registered early")
+            found.append("Sancho £0 fee; provisional wages, separate rival-aware player choice, Inbox paperwork and no premature registration")
             page.goto(base+manager_path,wait_until="domcontentloaded")
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             sancho_row=page.locator(
