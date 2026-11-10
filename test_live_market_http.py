@@ -462,7 +462,7 @@ class LiveMarketHttpTests(unittest.TestCase):
                                             base_url="https://localhost")
         text=spectator.get_data(as_text=True)
         self.assertEqual(spectator.status_code,200)
-        self.assertIn("Read only",text)
+        self.assertIn('data-spectator="true"',text)
         self.assertIn("Manager's Inbox",text)
         self.assertNotIn("Accept fee</button>",text)
         self.assertNotIn("Reject</button>",text)
