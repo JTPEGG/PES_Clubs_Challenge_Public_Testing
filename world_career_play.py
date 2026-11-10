@@ -1074,7 +1074,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
   {% for s in free_signings %}
   <tr data-free-agent-signing-id="{{s.signing_id}}">
    <td><a href="/world/play/career/{{career_id}}/market/player/{{s.player_id}}">{{s.full_name}}</a></td>
-   <td>—</td><td data-sort-value="0"><strong>FREE — £0</strong></td>
+   <td>—</td><td data-sort-value="0">—</td>
    <td data-sort-value="{{s.proposed_weekly_wage_gbp}}">{{money(s.proposed_weekly_wage_gbp)}}</td>
    <td>{{s.contract_years}} years</td>
    <td>{{'Confirmed' if s.status in ('agreed_future','completed')
@@ -3443,7 +3443,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 position=p["primary_position"] or "—",
                 overall=p["overall"],age=p["age"],
                 height=(str(p["height_cm"])+" cm" if p["height_cm"] is not None else "—"),
-                value=(format_market_gbp(p["market_value"])
+                value=("—" if p["free_agent"] else
+                       format_market_gbp(p["market_value"])
                        if p["market_value"] is not None else "—"),
                 wage=(("Est. " if p["free_agent"] else "")+
                       format_market_gbp(p["current_wage"])
