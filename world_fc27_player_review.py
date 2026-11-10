@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS world_career_player_choices (
  career_id TEXT NOT NULL REFERENCES world_career_saves(career_id),
  window_id INTEGER NOT NULL REFERENCES world_career_preseason_windows(window_id),
  player_id INTEGER NOT NULL REFERENCES world_players(player_id),
- kind TEXT NOT NULL CHECK(kind IN ('purchase','free_agent')),
+ kind TEXT NOT NULL CHECK(kind IN ('purchase','free_agent','sale')),
  source_id INTEGER NOT NULL,
  status TEXT NOT NULL CHECK(status IN ('evaluating','accepted','declined')),
  due_at TEXT NOT NULL,reason TEXT NOT NULL,
@@ -121,7 +121,7 @@ def queue_choice(conn,*,career_id,kind,source_id,player_id,now=None):
     from world_preseason_window import window_snapshot
     snap=window_snapshot(conn,career_id=career_id,now=now)
     if snap["state"]!="open":raise ValueError("The transfer window is not open")
-    if kind not in ("purchase","free_agent"):raise ValueError("Unrecognised choice type")
+    if kind not in ("purchase","free_agent","sale"):raise ValueError("Unrecognised choice type")
     existing=choice_for(conn,career_id=career_id,kind=kind,source_id=source_id)
     if existing and existing["status"] in ("accepted","declined"):
         return existing
@@ -171,7 +171,31 @@ def review_due_choices(conn,*,career_id,now=None):
         (career_id,snap["window_id"],clock.isoformat())).fetchall()
     changes=0
     for pid,kind,identifier in rows:
-        if kind=="purchase":
+        if kind=="sale":
+            # Accepted wage deals, not open fee-only bids, are eligible.
+            # Incomplete rival agent talks never hold the player hostage.
+            contenders=conn.execute("""SELECT o.offer_id,o.buying_club_id,
+                 t.proposed_wage_weekly,pc.prestige_score
+                 FROM world_career_offers o
+                 JOIN world_career_agent_terms t ON t.offer_id=o.offer_id
+                 LEFT JOIN world_career_prestige_snapshots pc
+                    ON pc.career_id=o.career_id AND pc.club_id=o.buying_club_id
+                 WHERE o.career_id=? AND o.player_id=?
+                   AND o.status='accepted_pending_contract'
+                   AND t.status='accepted' AND t.proposed_wage_weekly IS NOT NULL
+                 ORDER BY o.offer_id""",(career_id,pid)).fetchall()
+            # The player decides at the documented decision checkpoint.
+            # Revisit a candidate if there is no recorded valid contract.
+            if not contenders:continue
+            ranked=[(float(appeal or 50)+min(20,wage/5000),
+                oid) for oid,club,wage,appeal in contenders]
+            winner=max(ranked,key=lambda x:(x[0],-x[1]))[1]
+            status="accepted" if identifier==winner else "declined"
+            reason=("Player selects your club after weighing "+
+                    str(len(contenders))+" final wage proposal(s)" if
+                    status=="accepted" else
+                    "Player prefers a competing club's agreed sporting and wage terms")
+        elif kind=="purchase":
             from world_career_incoming import competing_player_choice
             choice=competing_player_choice(conn,career_id=career_id,
                                           offer_id=identifier)
@@ -223,7 +247,7 @@ def review_due_choices(conn,*,career_id,now=None):
              snap["window_id"],kind,identifier))
         _message(conn,career_id=career_id,window_id=snap["window_id"],
             key=f"player-review-outcome:{kind}:{identifier}",
-            offer_id=identifier if kind=="purchase" else None,
+            offer_id=identifier if kind in ("purchase","sale") else None,
             headline=("Player accepts your contract" if status=="accepted"
                       else "Player declines your contract"),
             detail=reason+(". Open your Inbox to confirm the signing."
