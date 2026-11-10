@@ -684,6 +684,14 @@ def run(world,output):
                     FROM world_career_market_inbox
                     WHERE career_id=? AND offer_id IS NULL""",
                     (CAREER,)).fetchone()[0]
+            if actionable:
+                with closing(sqlite3.connect(world)) as db:
+                    pending=db.execute("""SELECT message_key,headline,is_read,offer_id
+                        FROM world_career_market_inbox
+                        WHERE career_id=? AND is_read=0
+                        ORDER BY message_id DESC LIMIT 12""",(CAREER,)).fetchall()
+                print("INBOX_UNREAD_DIAGNOSTIC",actionable,
+                      [tuple(item) for item in pending],flush=True)
             check(actionable==0,
                   "Inbox still has unread actionable offers after being viewed")
             check(news_messages>=1,
