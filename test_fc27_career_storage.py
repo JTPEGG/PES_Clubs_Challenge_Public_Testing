@@ -77,14 +77,29 @@ class CareerSnapshotTests(unittest.TestCase):
             self.assertEqual(db.execute("PRAGMA integrity_check").fetchone()[0], "ok")
 
     def test_snapshot_restores_dynamic_tables_missing_from_frozen_world(self):
+        # V2 creates new tables after the immutable source is unpacked.
+        # AI intents, agent competition and the manager's mail must all be
+        # restored before a resumed 30-minute deadline is processed.
+        runtime_tables = (
+            "world_career_market_inbox",
+            "world_fc27_free_agent_rival_bids",
+            "world_fc27_market_intervals",
+            "world_fc27_market_club_intents",
+            "world_fc27_market_club_evaluations",
+            "world_fc27_market_negotiation_diagnostics",
+        )
         with sqlite3.connect(self.db_path) as db:
-            db.execute("CREATE TABLE world_career_market_inbox(id TEXT PRIMARY KEY, message TEXT)")
-            db.execute("INSERT INTO world_career_market_inbox VALUES('one','saved')")
+            for table in runtime_tables:
+                db.execute(f"CREATE TABLE {table}(id TEXT PRIMARY KEY, message TEXT)")
+                db.execute(f"INSERT INTO {table} VALUES('one','saved')")
         blob = make_career_snapshot(self.db_path, self.source_sha)
         shutil.copy2(self.frozen_copy, self.db_path)
         restore_career_snapshot(self.db_path, blob, self.source_sha)
         with sqlite3.connect(self.db_path) as db:
-            self.assertEqual(db.execute("SELECT message FROM world_career_market_inbox").fetchone()[0], "saved")
+            for table in runtime_tables:
+                with self.subTest(table=table):
+                    self.assertEqual(
+                        db.execute(f"SELECT message FROM {table}").fetchone()[0], "saved")
 
     def test_different_source_fails_closed_without_modifying_careers(self):
         self._career_changes()
