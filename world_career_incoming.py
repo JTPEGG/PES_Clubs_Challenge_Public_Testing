@@ -343,13 +343,12 @@ def finalise_incoming_approach(conn,*,career_id,offer_id,now=None):
         WHERE career_id=? AND offer_id=?""",(career_id,offer_id)).fetchone()
     if not accepted or accepted[0]!="accepted" or accepted[1] is None:
         raise ValueError("Agent agreement has not been verified")
-    choice=competing_player_choice(conn,career_id=career_id,offer_id=offer_id)
-    if choice["decision"]!="ready":
-        conn.execute("""INSERT INTO world_career_offer_events
-            (offer_id,event_type,detail) VALUES(?,?,?)""",
-            (offer_id,"player_competing_offer_"+choice["decision"],choice["reason"]))
-        conn.commit()
-        raise ValueError(choice["reason"])
+    from world_fc27_player_review import choice_for
+    choice=choice_for(conn,career_id=career_id,kind="sale",source_id=offer_id)
+    if choice is None or choice["status"]!="accepted":
+        raise ValueError("Player has not yet chosen this club. "+
+            (choice["reason"] if choice else
+             "A separate player decision will follow agent negotiations."))
     confirm_future_agreement(conn,career_id=career_id,offer_id=offer_id,
                              agreement_date=row[0])
     return _save(conn,career_id=career_id,offer_id=offer_id,
