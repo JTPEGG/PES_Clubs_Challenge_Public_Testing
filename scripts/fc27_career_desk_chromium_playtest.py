@@ -240,7 +240,7 @@ def run(world,output):
                 const form=document.querySelector('#fa-contract');
                 const data=new FormData(form);
                 data.set('action','confirm');
-                const response=await fetch(form.action,{
+                const response=await fetch(form.getAttribute('action'),{
                     method:'POST',body:data,credentials:'same-origin',
                     headers:{Accept:'application/json'}
                 });
