@@ -821,9 +821,9 @@ def run(world,output):
                   renewal_result.get("status")=="agreed_future",
                   "Accepted renewal didn't sign automatically after wage offer")
             page.wait_for_function(
-                "()=>location.hash==='#inbox' && "
-                "document.querySelector('.desk-contract-layer').hidden",
-                timeout=15000)
+                """(pid)=>location.hash==='#inbox' && Boolean(
+                    document.querySelector('#desk-view-inbox .desk-contract-inbox[data-desk-player="'+pid+'"][data-desk-status="agreed_future"]'))""",
+                arg=str(renewal_player),timeout=15000)
             check(page.locator('.desk-sidebar').is_visible(),
                   "Renewal completion lost the manager navigation")
             signed=page.locator(
