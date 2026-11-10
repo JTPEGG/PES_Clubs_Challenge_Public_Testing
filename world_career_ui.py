@@ -417,6 +417,9 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-squad-contract-link:hover{background:#2f6078;color:#fff}
 .desk-inbox-item[data-status="requested"] .desk-inbox-state,
 .desk-inbox-item[data-status="accepted_terms"] .desk-inbox-state{color:#ffce83}
+.desk-inbox-profile-link{font-size:16px;font-weight:750;color:#eaf6ff;
+ text-decoration:none}.desk-inbox-profile-link:hover{text-decoration:underline;color:#8be1fa}
+.desk-inbox-free-message .actions form{display:flex;gap:8px;flex-wrap:wrap}
 
 """
 
@@ -1830,6 +1833,92 @@ DASHBOARD_JS = r"""
         '. Renegotiation does not force a transfer.';
       refreshInboxItem(card);
       refreshInboxList();
+    }
+  };
+  window.fc27SyncFreeAgentOffers=function(items,csrf,careerId){
+    if(!Array.isArray(items))return;
+    for(const o of items){
+      const id=Number(o.signing_id);
+      if(!Number.isSafeInteger(id)||id<=0)continue;
+      const key='free-'+id;
+      let card=views.inbox.querySelector('[data-live-offer-id="'+key+'"]');
+      const fresh=!card;
+      if(fresh){
+        card=document.createElement('div');
+        card.className='card offer desk-inbox-free-message';
+        card.dataset.liveOfferId=key;card.dataset.deskSide='free';
+        card.dataset.deskPlayer=String(o.player_id);
+        card.dataset.deskPlayerName=o.player;
+        card.dataset.deskBuyer="Player's agent";
+        const label=document.createElement('div');label.className='label';
+        label.textContent='Free agent · Player decision';
+        const heading=document.createElement('h3');
+        const player=document.createElement('a');
+        player.href='/world/play/career/'+encodeURIComponent(careerId)+
+          '/market/player/'+encodeURIComponent(o.player_id);
+        player.textContent=o.player;heading.appendChild(player);
+        const count=document.createElement('div');count.className='count';
+        const brief=document.createElement('div');brief.className='desk-offer-briefing';
+        const title=document.createElement('div');title.className='desk-offer-briefing-title';
+        title.textContent='Free-agent contract decision';
+        const description=document.createElement('p');
+        description.className='desk-offer-briefing-note';
+        brief.append(title,description);
+        card.append(label,heading,count,brief);
+        inboxGrid.hidden=false;
+        inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+        offerCards.push(card);makeInboxItem(card);
+        const empty=views.inbox.querySelector('#desk-inbox-no-offers');
+        if(empty)empty.hidden=true;
+      }
+      const choice=o.player_choice||'';
+      if(!fresh&&card.dataset.deskStatus===o.status&&
+         card.dataset.deskPlayerChoice===choice)return;
+      card.dataset.deskStatus=o.status;card.dataset.deskPlayerChoice=choice;
+      card.querySelector('.count').textContent=pound(o.wage)+'/wk';
+      card.querySelector('.desk-offer-briefing-note').textContent=
+        o.status==='agreed_future'||o.status==='completed'?
+           'Confirmed. Registration takes place at the deadline.':
+        choice==='accepted'?
+           'The player has considered '+String(o.rivals||0)+
+           ' AI-club offers and wants to sign. Final paperwork is your decision.':
+        choice==='declined'?
+           'The player has chosen a different opportunity. No signature is possible.':
+        choice==='evaluating'?
+           'The agent has agreed provisional terms. The player is considering '+
+           String(o.rivals||0)+' recorded rival club offers.':
+        o.status==='countered'?'Agent counteroffer: review the player profile.':
+        'Waiting for the player and agent to assess your proposal.';
+      card.querySelectorAll(':scope > .actions,:scope > .desk-inbox-open-negotiation')
+        .forEach(x=>x.remove());
+      if(o.status==='terms_accepted'&&choice==='accepted'){
+        const actions=document.createElement('div');actions.className='actions';
+        const form=document.createElement('form');
+        form.method='post';
+        form.setAttribute('action','/world/play/career/'+encodeURIComponent(careerId)+
+          '/market/free-agent');
+        for(const [name,value] of [['csrf',csrf],['player_id',o.player_id]]){
+          const hidden=document.createElement('input');
+          hidden.type='hidden';hidden.name=name;hidden.value=String(value);
+          form.appendChild(hidden);
+        }
+        for(const [verb,label] of [['confirm','Confirm signing'],['withdraw','Cancel']]){
+          const button=document.createElement('button');
+          button.name='action';button.value=verb;button.textContent=label;
+          if(verb==='withdraw')button.className='danger';
+          form.appendChild(button);
+        }
+        actions.appendChild(form);card.appendChild(actions);
+      }else{
+        const link=document.createElement('a');
+        link.className='desk-inbox-open-negotiation';
+        link.href='/world/play/career/'+encodeURIComponent(careerId)+
+          '/market/player/'+encodeURIComponent(o.player_id);
+        link.textContent='Open player profile';card.appendChild(link);
+      }
+      refreshInboxItem(card);refreshInboxList();
+      if(choice==='accepted'&&fresh)
+        alertOfNewOffer({player:o.player,fee:0});
     }
   };
   window.fc27SyncBuyingOffers=function(items,csrf){
