@@ -815,11 +815,11 @@ def run(world,output):
                     '/contract/'+str(renewal_player)+'/decision') and
                     response.request.method=="POST",timeout=20000) as renewal_response:
                 offer_form.locator('button[value="offer"]').click()
-            renewal_result=renewal_response.value.json()
-            check(renewal_response.value.status==200 and
-                  renewal_result.get("ok") is True and
-                  renewal_result.get("status")=="agreed_future",
-                  "Accepted renewal didn't sign automatically after wage offer")
+            # The UI navigates to Inbox immediately on a successful POST,
+            # which may retire the devtools response body before Playwright
+            # can read it. Assert HTTP success plus durable saved state below.
+            check(renewal_response.value.status==200,
+                  "Accepted renewal HTTP response failed")
             page.wait_for_function(
                 """(pid)=>location.hash==='#inbox' && Boolean(
                     document.querySelector('#desk-view-inbox .desk-contract-inbox[data-desk-player="'+pid+'"][data-desk-status="agreed_future"]'))""",
@@ -882,10 +882,8 @@ def run(world,output):
                     '/contract/'+str(reject_player)+'/decision') and
                     response.request.method=="POST",timeout=15000) as decline_response:
                 reject_button.click()
-            decline=decline_response.value.json()
-            check(decline_response.value.status==200 and decline.get("ok") is True
-                  and decline.get("status")=="declined",
-                  "Quick Reject renewal did not save through secure manager endpoint")
+            check(decline_response.value.status==200,
+                  "Quick Reject renewal HTTP endpoint failed")
             with closing(sqlite3.connect(world)) as db:
                 rejected=db.execute("""SELECT status FROM
                     world_career_contract_renewals
