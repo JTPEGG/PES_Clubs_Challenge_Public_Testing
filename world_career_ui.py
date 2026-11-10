@@ -2773,20 +2773,176 @@ DASHBOARD_JS = r"""
     }
   }
 
+  // Player links open an authentic server-backed scout report in this same
+  // workspace. The single market heartbeat and left navigation remain alive.
+  // Source report JS is executed only after its own DOM has been mounted.
+  let playerRequest=null,playerOpened=0;
+  function profileIdFromHash(){
+    const match=/^#player-([1-9]\d*)$/.exec(location.hash);
+    const id=match?Number(match[1]):0;
+    return Number.isSafeInteger(id)?id:0;
+  }
+  function profileIdFromLink(link){
+    if(!link||!link.href)return 0;
+    const url=new URL(link.href,location.href);
+    const prefix=location.pathname+'/player/';
+    if(url.origin!==location.origin||!url.pathname.startsWith(prefix))return 0;
+    const suffix=url.pathname.slice(prefix.length);
+    if(!/^[1-9]\d*$/.test(suffix))return 0;
+    const id=Number(suffix);
+    return Number.isSafeInteger(id)?id:0;
+  }
+  async function loadPlayerReport(id){
+    if(!id)return;
+    const pane=views.player;
+    if(pane.dataset.playerId===String(id)&&pane.dataset.loaded==='1')return;
+    playerRequest?.abort();
+    const controller=new AbortController();
+    playerRequest=controller;
+    pane.dataset.playerId=String(id);
+    pane.dataset.loaded='0';
+    pane.innerHTML='<div class="desk-empty" role="status">Loading player report…</div>';
+    try{
+      const target=location.pathname+'/player/'+id;
+      const response=await fetch(target+'?panel=1',{
+        credentials:'same-origin',cache:'no-store',
+        headers:{Accept:'text/html'},signal:controller.signal
+      });
+      const finalUrl=new URL(response.url,location.href);
+      if(!response.ok||finalUrl.origin!==location.origin||
+         finalUrl.pathname!==target)
+        throw new Error('The player report could not be opened. Try again.');
+      const page= new DOMParser().parseFromString(await response.text(),'text/html');
+      const main=page.querySelector('main');
+      if(!main)throw new Error('Player information is unavailable.');
+      const inner=document.importNode(main,true);
+      const scriptBodies=Array.from(inner.querySelectorAll('script'))
+        .map(script=>script.textContent||'');
+      inner.querySelectorAll('script').forEach(script=>script.remove());
+      const report=document.createElement('div');
+      report.className='desk-player-report';
+      while(inner.firstChild)report.appendChild(inner.firstChild);
+      const back=report.querySelector('a[href*="#recruitment"]');
+      if(back){
+        back.href='#scouting';
+        back.dataset.deskTab='scouting';
+        back.classList.add('desk-player-back');
+        back.textContent='← Back to Scouting';
+      }
+      if(playerRequest!==controller)return;
+      pane.replaceChildren(report);
+      pane.dataset.loaded='1';
+      // Only same-origin scripts present in our own verified player-report
+      // template execute. The separately rendered page handles bidding and
+      // free-agent negotiation through the original secure endpoints.
+      for(const source of scriptBodies){
+        if(source.includes('setInterval(updateMarket,15000)'))continue;
+        const script=document.createElement('script');
+        script.textContent=source;
+        report.appendChild(script);
+        script.remove();
+      }
+    }catch(error){
+      if(error.name==='AbortError')return;
+      if(playerRequest!==controller)return;
+      pane.dataset.loaded='0';
+      const notice=document.createElement('div');
+      notice.className='desk-empty';
+      const message=document.createElement('p');
+      message.textContent=String(error.message||error);
+      const fallback=document.createElement('a');
+      fallback.href=location.pathname+'/player/'+id;
+      fallback.textContent='Open the player report separately';
+      notice.append(message,fallback);
+      pane.replaceChildren(notice);
+    }finally{
+      if(playerRequest===controller)playerRequest=null;
+    }
+  }
+  document.addEventListener('click',function(event){
+    const link=event.target.closest('a[href]');
+    if(!link||event.defaultPrevented||event.button!==0||
+       event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||
+       link.target==='_blank'||link.hasAttribute('download'))return;
+    const id=profileIdFromLink(link);
+    if(!id)return;
+    event.preventDefault();
+    playerOpened=id;
+    history.pushState(null,'','#player-'+id);
+    switchView('player',false);
+  },true);
+
+  // Shortlist changes inside the report are saved via the original CSRF
+  // endpoint without navigating away or interrupting the live window.
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||!views.player.contains(form))return;
+    const target=new URL(form.getAttribute('action')||'',location.href);
+    if(target.origin!==location.origin||
+       target.pathname!==location.pathname+'/shortlist')return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    const button=event.submitter||form.querySelector('button[type=submit],button');
+    const action=(button?.value||'save');
+    const feedback=document.createElement('p');
+    feedback.className='desk-player-response';
+    feedback.setAttribute('role','status');
+    feedback.textContent='Saving shortlist…';
+    form.insertAdjacentElement('afterend',feedback);
+    form.dataset.saving='1';
+    if(button)button.disabled=true;
+    try{
+      const data=new FormData(form);
+      data.set('action',action);
+      const response=await fetch(target.pathname,{
+        method:'POST',credentials:'same-origin',body:data,
+        cache:'no-store',headers:{Accept:'application/json'}
+      });
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'Shortlist change could not be saved');
+      feedback.textContent=result.shortlisted?'Added to your shortlist':'Removed from shortlist';
+      if(button){
+        button.value=result.shortlisted?'remove':'save';
+        button.textContent=result.shortlisted?'Remove from shortlist':'Add to shortlist';
+      }
+      const total=Math.max(0,Number(document.body.dataset.saved||0)+(result.shortlisted?1:-1));
+      document.body.dataset.saved=String(total);
+      document.querySelectorAll('[data-desk-tab="shortlist"] .desk-nav-count')
+        .forEach(count=>{count.textContent=String(total);});
+      views.shortlist.dataset.stale='1';
+    }catch(error){
+      feedback.textContent=String(error.message||error);
+      feedback.dataset.error='1';
+    }finally{
+      form.dataset.saving='0';
+      if(button&&button.isConnected)button.disabled=false;
+    }
+  },true);
+
   // Sidebar, mobile bar, overview buttons and legacy #section links use
   // the same one-page view switcher; no cross-page navigation is required.
   function switchView(name,changeUrl){
     if(!views[name])name='dashboard';
+    if(name==='shortlist'&&views.shortlist.dataset.stale==='1'){
+      location.hash='#shortlist';
+      location.reload();
+      return;
+    }
     names.forEach(function(other){views[other].hidden=other!==name;});
     document.querySelectorAll('[data-desk-tab]').forEach(function(link){
-      const active=link.dataset.deskTab===name;
+      const active=link.dataset.deskTab===(name==='player'?'scouting':name);
       if(active)link.setAttribute('aria-current','page');
       else link.removeAttribute('aria-current');
     });
     const label=document.getElementById('desk-current-view');
     if(label)label.textContent=titles[name];
-    if(changeUrl&&location.hash!=='#'+name){
+    if(changeUrl&&location.hash!=='#'+name&&name!=='player'){
       history.pushState(null,'','#'+name);
+    }
+    if(name==='player'){
+      const id=profileIdFromHash()||playerOpened;
+      if(id)loadPlayerReport(id);
     }
     if(name==='inbox'){
       document.getElementById('desk-offer-toast')?.remove();
