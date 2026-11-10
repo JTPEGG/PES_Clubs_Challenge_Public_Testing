@@ -401,13 +401,21 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-counter-stepper input{width:123px!important;font-size:13px!important;font-variant-numeric:tabular-nums;padding:7px!important}
 .desk-counter-stepper button{padding:7px 10px!important;min-width:32px;background:#29465d!important;border:1px solid #50768c!important}
 .desk-counter-preview{font-size:12px;color:#8ef0ce;min-width:56px;font-weight:800}
-.desk-view[data-view="news"] .desk-news-card{background:#142a40;border:1px solid #38536c;border-radius:8px;margin:0 0 9px;padding:14px}
-.desk-news-route{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;color:#e1f5ff}
+.desk-view[data-view="news"] .desk-news-feed{max-width:930px;display:grid;gap:7px}
+.desk-view[data-view="news"] .desk-news-card{display:flex;align-items:flex-start;gap:11px;
+ background:#14283d;border:1px solid #314c63;border-radius:9px;margin:0;padding:10px 12px;
+ box-shadow:inset 3px 0 #426e85;min-height:48px}
+.desk-news-icon{width:29px;height:29px;flex:0 0 29px;display:grid;place-items:center;
+ border-radius:7px;background:#233f54;border:1px solid #3c617b;font-size:15px}
+.desk-news-content{min-width:0;flex:1}
+.desk-news-content>strong{display:block;font-size:13px;line-height:1.45;color:#e8f5ff}
+.desk-news-detail{font-size:12px;color:#b6cedc;margin:3px 0 0;line-height:1.5}
+.desk-news-route{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:3px 0 0;
+ color:#e1f5ff;font-size:12px}
 .desk-news-route .desk-news-player{font-weight:780;color:#fff}
-.desk-news-route .desk-news-arrow{color:#74d5c6;font-weight:900;font-size:18px}
+.desk-news-route .desk-news-arrow{color:#74d5c6;font-weight:900;font-size:14px}
 .desk-news-route .desk-news-club{color:#bad8e7}
 .desk-news-fee{color:#89e8bf;font-weight:750}
-.desk-view[data-view="news"] .desk-news-card small{color:#9aafc1}
 @media(max-width:1120px){.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:630px){.desk-position-grid{grid-template-columns:repeat(3,1fr)}.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:1fr}.desk-scout-quick>label.desk-scout-quick-number{flex:1 1 125px}}
 
