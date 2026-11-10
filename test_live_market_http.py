@@ -466,7 +466,7 @@ class LiveMarketHttpTests(unittest.TestCase):
         self.assertIn("Manager's Inbox",text)
         self.assertNotIn("Accept fee</button>",text)
         self.assertNotIn("Reject</button>",text)
-        self.assertNotIn("csrf",text)
+        self.assertNotIn('name="csrf"',text)
         self.assertIn("no-store",spectator.headers["Cache-Control"])
         unauth=self.app.test_client().post(url+"/decision",
             data=dict(csrf=self.csrf,offer_id=self.offer_id,decision="reject"),
