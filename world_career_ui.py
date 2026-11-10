@@ -368,14 +368,14 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-view[data-view="scouting"] [data-scout-results]:not(.desk-show-attributes) th:nth-child(9){width:7%}
 .desk-view[data-view="scouting"] .scout-table{overflow-x:auto;max-width:100%}
 .desk-view[data-view="scouting"] .desk-scout-lead{display:none}
-.desk-view[data-view="scouting"] .desk-scout-searchbar{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(130px,.8fr) minmax(130px,.8fr) auto;align-items:end;gap:10px;padding:15px;background:#172e43;border:1px solid #365b73;border-radius:10px}
+.desk-view[data-view="scouting"] .desk-scout-searchbar{display:grid;grid-template-columns:minmax(180px,1.2fr) minmax(105px,.7fr) minmax(130px,.8fr) minmax(115px,.7fr) auto;align-items:end;gap:10px;padding:15px;background:#172e43;border:1px solid #365b73;border-radius:10px}
 .desk-scout-searchbar>label,.desk-scout-quick>label{display:flex;flex-direction:column;gap:5px;color:#bed7e5;font-size:11px;font-weight:690}
 .desk-scout-searchbar select,.desk-scout-searchbar input,.desk-scout-quick input[type=number]{background:#0e2236!important;border:1px solid #4b728b!important;border-radius:6px!important;min-height:37px!important;padding:7px 9px!important;color:#f5fbff!important;font-size:13px!important}
 .desk-scout-searchbar select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,#9ad1e5 50%),linear-gradient(135deg,#9ad1e5 50%,transparent 50%)!important;background-position:calc(100% - 17px) 15px,calc(100% - 12px) 15px!important;background-size:5px 5px!important;background-repeat:no-repeat!important;padding-right:28px!important}
-.desk-scout-quick{grid-column:1/-1;display:flex;align-items:end;gap:9px;flex-wrap:wrap;padding-top:12px;border-top:1px solid #34546b}
+.desk-scout-quick{grid-column:1/-1;display:flex;align-items:end;gap:7px;flex-wrap:wrap;padding-top:9px;border-top:1px solid #34546b}
 .desk-scout-quick>label.desk-scout-quick-number{flex:0 1 170px;min-width:125px}
-.desk-scout-quick-check{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;padding:10px 12px;background:#1f3c51;border:1px solid #466b80;border-radius:7px;min-height:37px;color:#e5f6ff!important;font-size:12px!important;cursor:pointer}
-.desk-scout-quick-check input{accent-color:#62c8d9;min-width:16px;min-height:16px;cursor:pointer}
+.desk-scout-quick-check{display:flex!important;flex-direction:row!important;align-items:center;gap:6px;padding:5px 8px;background:#1f3c51;border:1px solid #466b80;border-radius:5px;min-height:30px;color:#e5f6ff!important;font-size:11px!important;cursor:pointer}
+.desk-scout-quick-check input{accent-color:#62c8d9;min-width:14px;min-height:14px;width:14px;height:14px;margin:0;cursor:pointer}
 .desk-scout-add,.desk-scout-clear{min-height:37px}
 .desk-position-chooser{grid-column:1/-1;border:1px solid #476e85;border-radius:8px;padding:13px;background:#12283c}
 .desk-position-chooser h4{font-size:13px;margin:0 0 7px}
@@ -1081,8 +1081,16 @@ DASHBOARD_JS = r"""
 
     const oldPosition=available.find(entry=>entry.name==='scout_position');
     if(oldPosition){
-      oldPosition.field.remove();oldPosition.input.value='';
+      // Keep a quick broad-position selector on the main scouting toolbar.
+      // Detailed multi-position checkboxes remain inside Add condition.
+      oldPosition.field.classList.add('desk-scout-main-position');
+      searchBar.insertBefore(oldPosition.field,openButton);
       available.splice(available.indexOf(oldPosition),1);
+      oldPosition.input.addEventListener('change',()=>{
+        const detailed=compactForm.querySelector('[data-scout-positions]');
+        if(detailed)detailed.value='';
+        compactForm.requestSubmit();
+      });
     }
     const positions=[
       ['GK','Goalkeeper'],['CB','Centre-back'],['LB','Left-back'],
@@ -1113,6 +1121,9 @@ DASHBOARD_JS = r"""
       box.addEventListener('change',()=>{
         if(positionsInput)positionsInput.value=boxes.filter(b=>b.checked)
           .map(b=>b.value).join(',');
+        // Detailed selections replace the broad toolbar selector rather than
+        // silently AND-ing two incompatible position filters.
+        if(oldPosition)oldPosition.input.value='';
         renderChips();compactForm.requestSubmit();
       });
     });
