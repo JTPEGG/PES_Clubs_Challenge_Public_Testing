@@ -2129,6 +2129,9 @@ def create_play_blueprint(db_path, on_career_commit=None):
     market_lock=Lock()
     market_jobs={}
     market_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-market")
+    decision_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-decisions")
+    decision_lock=Lock()
+    decision_jobs={}
     # The source-only scouting preview can be prepared immediately after a
     # career is created. Separate it from the AI transfer worker so a large
     # market tick cannot hold up the interest filter's first use.
@@ -2185,6 +2188,32 @@ def create_play_blueprint(db_path, on_career_commit=None):
         except Exception:
             logging.getLogger(__name__).exception(
                 "career-market tick failed for %s",career_id)
+
+    def run_priority_tick(career_id):
+        """Manager decisions must not queue behind the 659-club market workload."""
+        try:
+            from world_live_market import _review_due_manager_buying_offers
+            from world_fc27_player_review import review_due_choices
+            with closing(connect()) as db:
+                snap=window_snapshot(db,career_id=career_id)
+                if snap["state"]=="open":
+                    clock=datetime.now(timezone.utc)
+                    _review_due_manager_buying_offers(db,career_id=career_id,
+                        window_id=snap["window_id"],now=clock)
+                    review_due_choices(db,career_id=career_id,now=clock)
+                    db.commit()
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Manager decision processing failed for %s",career_id)
+
+    def queue_priority_tick(career_id):
+        with decision_lock:
+            previous=decision_jobs.get(career_id)
+            if previous is not None and not previous.done():return
+            for key,job in list(decision_jobs.items()):
+                if job.done():decision_jobs.pop(key,None)
+            decision_jobs[career_id]=decision_executor.submit(
+                run_priority_tick,career_id)
 
     def queue_market_tick(career_id):
         # The one background worker naturally serialises world writes.
@@ -3220,6 +3249,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             # through the new-career POST in this Gunicorn process.
             queue_scout_warm(career_id)
             if snap["state"]!="not_started":
+                queue_priority_tick(career_id)
                 queue_market_tick(career_id)
             return live_market_render(db,career_id=career_id)
 
@@ -3239,6 +3269,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             if career is None:
                 return jsonify(error="career_not_found",
                     detail="This test career no longer exists on the server, likely after a deployment. Please create a new career."),410
+            queue_priority_tick(career_id)
             queue_market_tick(career_id)
             snap=window_snapshot(db,career_id=career_id)
             msg=db.execute("""SELECT COUNT(*),COALESCE(MAX(message_id),0)
@@ -3365,6 +3396,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 raise ValueError("Confirm that the manager is ready for the 30-minute session")
             with connect() as db:
                 state=start_live_market(db,career_id=career_id)
+            queue_priority_tick(career_id)
             queue_market_tick(career_id)
             # The active timer and manager overview already confirm the
             # window state. A repeated full-width message steals space on
