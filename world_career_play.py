@@ -1195,6 +1195,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <div class="grid">{% for o in offers %}
 <div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
+ data-desk-player-choice="{{o.player_choice or ''}}"
  data-desk-buyer="{{o.buyer_name|club_display}}">
  <div class="label">{{o.buyer_name|club_display}} · {{o.status_label}}</div>
  <h3 style="margin:6px 0"><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}" class="desk-player-profile">{{o.player_name}}</a></h3>
@@ -1225,7 +1226,8 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  {% if o.competing_offers and o.status=='accepted_pending_contract' %}
  <p class="alert"><b>{{o.competing_offers}} competing agreed-fee offer(s).</b>
  Player and agent must reconsider before any signature; the deal may be delayed.</p>{% endif %}
- {% if o.player_status %}<p class="muted">Player/agent: {{o.player_status|replace('_',' ')|title}}</p>
+ {% if o.player_status %}<p class="muted">Player/agent: {{o.player_status|replace('_',' ')|title}}
+{% if o.player_choice %} · Player decision: {{o.player_choice|title}}{% endif %}</p>
  {% if o.player_reason %}<small>{{o.player_reason}}</small>{% endif %}{% endif %}
  {% if not spectator and snap.state=='open' %}
  <div class="actions">
@@ -1244,7 +1246,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  min="{{o.offered_fee+1}}" max="{{[o.offered_fee*2,1000000000]|min}}"
  step="1" required></label>
  <button name="decision" value="counter">Counter</button></form>
- {% elif o.status=='accepted_pending_contract' and o.player_status=='terms_accepted' %}
+ {% elif o.status=='accepted_pending_contract' and o.player_status=='terms_accepted' and o.player_choice=='accepted' %}
  <div class="buyer-decision" style="width:100%">
  {% if o.confirmation %}
  <p class="time-note" style="margin:7px 0">
@@ -2894,6 +2896,10 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 o.demanded_fee,o.player_id,p.full_name player_name,
                 bc.name buyer_name,ia.status player_status,
                 ia.decision_reason player_reason,
+                (SELECT q.status FROM world_career_player_choices q
+                   WHERE q.career_id=o.career_id AND q.window_id=wo.window_id
+                     AND q.kind='sale' AND q.source_id=o.offer_id)
+                   AS player_choice,
                 (SELECT COUNT(*) FROM world_career_offers rival
                  WHERE rival.career_id=o.career_id AND rival.player_id=o.player_id
                    AND rival.offer_id<>o.offer_id
@@ -3332,7 +3338,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     wo.tagged_at,ia.status AS agent_status,
                     o.demanded_fee,lc.value_gbp,p.primary_position,
                     x.overall,COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
-                    pc.current_role
+                    pc.current_role,
+                    (SELECT q.status FROM world_career_player_choices q
+                     WHERE q.career_id=o.career_id AND q.window_id=wo.window_id
+                       AND q.kind='sale' AND q.source_id=o.offer_id)
                 FROM world_career_preseason_window_offers wo
                 JOIN world_career_offers o ON o.offer_id=wo.offer_id
                 JOIN world_players p ON p.player_id=o.player_id
@@ -3358,9 +3367,10 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 fee=fee,player=name,buyer=clean_buyer(buyer),
                 received_at=received,agent_status=agent,
                 demanded_fee=demanded,valuation=valuation,
-                position=position,overall=rating,current_wage=wage,squad_role=role)
+                position=position,overall=rating,current_wage=wage,
+                squad_role=role,player_choice=choice)
                 for (oid,pid,status,fee,name,buyer,received,agent,demanded,
-                     valuation,position,rating,wage,role) in offer_rows]
+                     valuation,position,rating,wage,role,choice) in offer_rows]
             buying_rows=db.execute("""SELECT o.offer_id,o.player_id,
                     o.status,o.offered_fee,p.full_name,sc.name,
                     t.status,t.demanded_wage_weekly,
