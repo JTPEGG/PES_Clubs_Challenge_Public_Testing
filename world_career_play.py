@@ -2174,7 +2174,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
     # simulation. Run autonomous ticks on a dedicated daemon executor, with
     # one in-flight tick per career and replay-safe database intents.
     from concurrent.futures import ThreadPoolExecutor
-    from threading import Lock
+    from threading import Lock, Event
     from contextlib import closing
     from time import perf_counter
     import logging
@@ -2186,6 +2186,12 @@ def create_play_blueprint(db_path, on_career_commit=None):
     decision_executor=ThreadPoolExecutor(max_workers=1,thread_name_prefix="fc27-decisions")
     decision_lock=Lock()
     decision_jobs={}
+    # A human POST has priority over autonomous market work. Market loops
+    # commit between club intents and voluntarily yield until the manager's
+    # decision is committed. Never hold this lock across SQLite I/O.
+    manager_write_event=Event()
+    manager_write_lock=Lock()
+    manager_write_count=0
     # The source-only scouting preview can be prepared immediately after a
     # career is created. Separate it from the AI transfer worker so a large
     # market tick cannot hold up the interest filter's first use.
@@ -2216,12 +2222,25 @@ def create_play_blueprint(db_path, on_career_commit=None):
 
     @bp.before_request
     def measure_desk_start():
+        nonlocal manager_write_count
         from flask import g
         g.desk_request_started=perf_counter()
+        g.desk_manager_write=(request.method=="POST" and
+                              "/market/" in request.path and
+                              request.path.startswith("/world/play/career/"))
+        if g.desk_manager_write:
+            with manager_write_lock:
+                manager_write_count+=1
+                manager_write_event.set()
 
     @bp.after_request
     def measure_desk_finish(response):
+        nonlocal manager_write_count
         from flask import g
+        if getattr(g,"desk_manager_write",False):
+            with manager_write_lock:
+                manager_write_count=max(0,manager_write_count-1)
+                if not manager_write_count:manager_write_event.clear()
         elapsed=(perf_counter()-g.desk_request_started)*1000
         response.headers["Server-Timing"]=f"desk;dur={elapsed:.1f}"
         if elapsed>1500:
@@ -2233,8 +2252,10 @@ def create_play_blueprint(db_path, on_career_commit=None):
     def run_market_tick(career_id):
         started=perf_counter()
         try:
+            if manager_write_event.is_set():return
             with closing(connect()) as db:
-                outcome=process_live_market(db,career_id=career_id)
+                outcome=process_live_market(db,career_id=career_id,
+                    yield_to_manager=manager_write_event.is_set)
                 db.commit()
             logging.getLogger(__name__).info(
                 "career-market tick %s completed in %.2fs (changed=%s)",
@@ -2245,6 +2266,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
 
     def run_priority_tick(career_id):
         """Manager decisions must not queue behind the 659-club market workload."""
+        if manager_write_event.is_set():return
         try:
             from world_live_market import _review_due_manager_buying_offers
             from world_fc27_player_review import review_due_choices
@@ -2393,13 +2415,13 @@ def create_play_blueprint(db_path, on_career_commit=None):
     def connect():
         nonlocal schema_ready
         from world_v2 import initialize_world
-        conn=sqlite3.connect(str(db_path),timeout=2,
+        conn=sqlite3.connect(str(db_path),timeout=5,
             factory=CareerPersistingConnection if on_career_commit else sqlite3.Connection)
         if on_career_commit:
             conn._persist_ready=schema_ready
         conn.row_factory=sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("PRAGMA busy_timeout=2000")
+        conn.execute("PRAGMA busy_timeout=5000")
         # Previously every browser filter/page visit reran ALL application
         # schema initialisers (DDL/commits). Initialise once per process.
         if not schema_ready:
