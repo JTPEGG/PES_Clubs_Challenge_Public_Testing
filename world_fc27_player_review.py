@@ -184,17 +184,22 @@ def review_due_choices(conn,*,career_id,now=None):
                    AND o.status='accepted_pending_contract'
                    AND t.status='accepted' AND t.proposed_wage_weekly IS NOT NULL
                  ORDER BY o.offer_id""",(career_id,pid)).fetchall()
-            # The player decides at the documented decision checkpoint.
-            # Revisit a candidate if there is no recorded valid contract.
-            if not contenders:continue
-            ranked=[(float(appeal or 50)+min(20,wage/5000),
-                oid) for oid,club,wage,appeal in contenders]
-            winner=max(ranked,key=lambda x:(x[0],-x[1]))[1]
-            status="accepted" if identifier==winner else "declined"
-            reason=("Player selects your club after weighing "+
-                    str(len(contenders))+" final wage proposal(s)" if
-                    status=="accepted" else
-                    "Player prefers a competing club's agreed sporting and wage terms")
+            # A player must make an actual decision at the due checkpoint.
+            # Pending fee-only bids do NOT stall a valid, agreed-wage deal.
+            # If a buyer withdraws in the meantime, close that attempt;
+            # never leave the player's choice indefinitely 'evaluating'.
+            if not contenders:
+                status="declined"
+                reason="No active buying club has an accepted agent contract; this proposed move cannot proceed"
+            else:
+                ranked=[(float(appeal or 50)+min(20,wage/5000),
+                    oid) for oid,club,wage,appeal in contenders]
+                winner=max(ranked,key=lambda x:(x[0],-x[1]))[1]
+                status="accepted" if identifier==winner else "declined"
+                reason=("Player chooses this buying club after comparing "+
+                        str(len(contenders))+" valid agreed-wage proposal(s)" if
+                        status=="accepted" else
+                        "Player prefers a competing club's agreed sporting and wage terms")
         elif kind=="purchase":
             from world_career_incoming import competing_player_choice
             choice=competing_player_choice(conn,career_id=career_id,
@@ -240,6 +245,22 @@ def review_due_choices(conn,*,career_id,now=None):
                 status="accepted"
                 reason=("Player wants to sign after comparing "+
                         str(len(rivals))+" credible AI-club offer(s)")
+        if kind=="sale" and status=="declined":
+            # An agent can agree wages for more than one club; the PLAYER
+            # chooses one. The other unsigned offers must visibly end and
+            # never remain as phantom pending transfers until the deadline.
+            current=conn.execute("""SELECT status FROM world_career_offers
+                WHERE career_id=? AND offer_id=?""",
+                (career_id,identifier)).fetchone()
+            if current and current[0]=="accepted_pending_contract":
+                conn.execute("""UPDATE world_career_offers SET status='withdrawn'
+                    WHERE career_id=? AND offer_id=?
+                      AND status='accepted_pending_contract'""",
+                    (career_id,identifier))
+                conn.execute("""INSERT INTO world_career_offer_events
+                    (offer_id,event_type,detail)
+                    VALUES (?,'player_declined_sale',?)""",
+                    (identifier,reason))
         conn.execute("""UPDATE world_career_player_choices
             SET status=?,reason=?,decided_at=? WHERE career_id=?
             AND window_id=? AND kind=? AND source_id=? AND status='evaluating'""",
