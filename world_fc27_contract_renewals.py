@@ -288,7 +288,7 @@ def renewal_action(conn,*,career_id,player_id,action,weekly_wage=None,
             outcome="agreed_future" if weekly_wage>=acceptable else "countered"
             if weekly_wage<demand*.65 and status and status["rounds"]>=2:
                 outcome="declined"
-            new_demand=demand if outcome=="accepted_terms" else int(
+            new_demand=demand if outcome=="agreed_future" else int(
                 round(max(weekly_wage+500,demand*(.992 if contract_years>=3 else 1.0))/500)*500)
             if outcome=="agreed_future":
                 wage=wage_budget_breakdown(conn,career_id,target["club"])
