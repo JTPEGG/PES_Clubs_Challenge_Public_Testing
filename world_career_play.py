@@ -2309,7 +2309,8 @@ def create_play_blueprint(db_path, on_career_commit=None):
                     # priority tick, not only after slow 659-club intervals.
                     from world_career_incoming import (
                         advance_incoming_approach,incoming_approach)
-                    from world_live_market import _respond_to_counter,_message
+                    from world_live_market import (
+                        _respond_to_counter,_message,close_failed_human_sale_talks)
                     from world_fc27_player_review import queue_choice
                     due=db.execute("""SELECT o.offer_id,o.player_id,o.status
                         FROM world_career_offers o
@@ -2335,6 +2336,11 @@ def create_play_blueprint(db_path, on_career_commit=None):
                             else:
                                 after=advance_incoming_approach(db,
                                     career_id=career_id,offer_id=oid)
+                            if close_failed_human_sale_talks(db,
+                                    career_id=career_id,window_id=snap["window_id"],
+                                    offer_id=oid,agent_state=after,
+                                    previous=before,now=clock):
+                                continue
                             if after and after["status"]=="terms_accepted":
                                 queue_choice(db,career_id=career_id,kind="sale",
                                     source_id=oid,player_id=pid,now=clock)
@@ -3061,6 +3067,18 @@ def create_play_blueprint(db_path, on_career_commit=None):
                     db,career_id=career_id,offer_id=r["offer_id"])
                 if r["status"]=="withdrawn" and not r["deadline_expired"] and item["confirmation"] and item["confirmation"]["expired_at"]:
                     item["status_label"]="Buyer withdrew — decision time expired"
+                if r["status"]=="withdrawn" and r["player_status"] in (
+                        "role_refused","wage_limit","player_refused","needs_information"):
+                    item["status_label"]="Personal terms unsuccessful"
+                if r["status"]=="accepted_pending_contract":
+                    if r["player_choice"]=="accepted":
+                        item["status_label"]="Player accepts — sign transfer"
+                    elif r["player_choice"]=="evaluating":
+                        item["status_label"]="Player considering offers"
+                    elif r["player_status"]=="agent_counter":
+                        item["status_label"]="Agent negotiating wages"
+                    elif r["player_status"]=="terms_accepted":
+                        item["status_label"]="Agent agreed — awaiting player"
                 valuation,_=_player_reference(db,dataset,r["player_id"])
                 item["market_value"]=valuation
                 item["value_difference"]=(r["offered_fee"]-valuation
