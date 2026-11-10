@@ -837,6 +837,19 @@ def run(world,output):
                   signed.get_attribute("data-desk-status")=="agreed_future" and
                   signed.locator('button[value="confirm"]').count()==0,
                   "Signed renewal missing authoritative Inbox receipt or requires another confirmation")
+            # Diagnose whether the newly signed email is in its list item
+            # or in the split-pane reader after the client router runs.
+            print("RENEWAL_INBOX_BROWSER_DIAGNOSTIC",page.evaluate(
+              """(pid)=>{
+                const root=document.querySelector('#desk-view-inbox');
+                const card=root?.querySelector('.desk-contract-inbox[data-desk-player="'+pid+'"]');
+                return {rootHidden:root?.hidden,cardParent:card?.parentElement?.className,
+                  cardVisible:card?!!card.getClientRects().length:null,
+                  cardText:card?.textContent?.slice(0,240),itemCount:root?.querySelectorAll('.desk-inbox-item').length,
+                  parentItem:card?.closest('.desk-inbox-item')?.dataset?.offerId,
+                  readerHasCard:!!root?.querySelector('.desk-inbox-reader .desk-contract-inbox[data-desk-player="'+pid+'"]'),
+                  list:root?.querySelector('.desk-inbox-list')?.innerText?.slice(0,270)};
+              }""",str(renewal_player)),flush=True)
             # The selected Inbox card lives in the right-hand reader,
             # outside its original summary row. If already selected, it is
             # visible and no list re-selection is necessary.
