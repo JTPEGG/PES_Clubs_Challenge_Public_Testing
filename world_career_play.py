@@ -1071,7 +1071,9 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
    <td data-sort-value="{{s.proposed_weekly_wage_gbp}}">{{money(s.proposed_weekly_wage_gbp)}}</td>
    <td>{{s.contract_years}} years</td>
    <td>{{'Confirmed' if s.status in ('agreed_future','completed')
-         else 'Awaiting your confirmation' if s.status=='terms_accepted'
+         else 'Ready for paperwork' if s.status=='terms_accepted' and s.player_choice=='accepted'
+         else 'Player reviewing' if s.status=='terms_accepted' and s.player_choice=='evaluating'
+         else 'Player declined' if s.status=='terms_accepted' and s.player_choice=='declined'
          else 'Agent counteroffer' if s.status=='countered'
          else 'Cancelled'}}</td>
    <td>{% if not spectator and snap.state=='open' and s.status in ('terms_accepted','countered') %}
@@ -1191,7 +1193,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <input type="hidden" name="csrf" value="{{csrf}}">
 <button>Mark as read</button>
 </form>{% endif %}
-{% if offers or purchases or renewal_requests %}
+{% if offers or purchases or free_signings or renewal_requests %}
 <div class="grid">{% for o in offers %}
 <div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
@@ -1327,6 +1329,47 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  </div>
  {% else %}
  <a href="#transfers" data-desk-tab="transfers" class="desk-inbox-open-negotiation">View transfer negotiations</a>
+ {% endif %}
+</div>
+{% endfor %}
+{% for free in free_signings %}
+<div class="card offer desk-inbox-free-message"
+ data-live-offer-id="free-{{free.signing_id}}" data-desk-side="free"
+ data-desk-player="{{free.player_id}}" data-desk-player-name="{{free.full_name}}"
+ data-desk-buyer="Player's agent" data-desk-status="{{free.status}}"
+ data-desk-player-choice="{{free.player_choice or ''}}">
+ <div class="label">Free agent · Contract negotiation</div>
+ <h3><a href="/world/play/career/{{career_id}}/market/player/{{free.player_id}}">{{free.full_name}}</a></h3>
+ <div class="count">{{money(free.proposed_weekly_wage_gbp)}}/week</div>
+ <div class="desk-offer-briefing">
+  <div class="desk-offer-briefing-title">Free-agent decision <span>No transfer fee</span></div>
+  <div class="desk-offer-briefing-metrics">
+   <div><small>Your offered wage</small><strong>{{money(free.proposed_weekly_wage_gbp)}}</strong></div>
+   <div><small>Agent demand</small><strong>{{money(free.required_weekly_wage_gbp)}}</strong></div>
+   <div><small>Recorded AI rival bids</small><strong>{{free.rivals}}</strong></div>
+   <div><small>Player decision</small><strong>{{free.player_choice|replace('_',' ')|title if free.player_choice else 'Awaiting terms'}}</strong></div>
+  </div>
+  <p class="desk-offer-briefing-note">
+  {% if free.status in ['agreed_future','completed'] %}
+   <b>Confirmed.</b> The signing will register at the deadline.
+  {% elif free.player_choice=='accepted' %}
+   <b>Player accepts.</b> The player has considered the other offers and wants to sign. Confirm paperwork below.
+  {% elif free.player_choice=='declined' %}
+   <b>Player declined.</b> Agent agreement did not guarantee a signature.
+  {% elif free.player_choice=='evaluating' %}
+   <b>Player reviewing offers.</b> No final decision yet.
+  {% else %}{{free.agent_reason}}{% endif %}
+  </p>
+ </div>
+ {% if snap.state=='open' and free.status=='terms_accepted' and free.player_choice=='accepted' %}
+ <div class="actions"><form method="post" action="/world/play/career/{{career_id}}/market/free-agent">
+  <input type="hidden" name="csrf" value="{{csrf}}">
+  <input type="hidden" name="player_id" value="{{free.player_id}}">
+  <button name="action" value="confirm">Confirm signing</button>
+  <button name="action" value="withdraw" class="danger">Cancel</button>
+ </form></div>
+ {% else %}
+ <a href="/world/play/career/{{career_id}}/market/player/{{free.player_id}}" class="desk-inbox-open-negotiation">View player profile</a>
  {% endif %}
 </div>
 {% endfor %}
@@ -2784,11 +2827,21 @@ def create_play_blueprint(db_path, on_career_commit=None):
         free_signings=[]
         if not spectator and db.execute("""SELECT 1 FROM sqlite_master
             WHERE type='table' AND name='world_fc27_free_agent_offers'""").fetchone():
-            free_signings=db.execute("""SELECT f.*,p.full_name
+            free_rows=db.execute("""SELECT f.*,p.full_name
                 FROM world_fc27_free_agent_offers f
                 JOIN world_players p ON p.player_id=f.player_id
                 WHERE f.career_id=? ORDER BY f.signing_id DESC""",
                 (career_id,)).fetchall()
+            from world_fc27_player_review import choice_for,rival_bids
+            for free in free_rows:
+                item=dict(free)
+                review=choice_for(db,career_id=career_id,kind="free_agent",
+                    source_id=free["signing_id"])
+                item["player_choice"]=review["status"] if review else None
+                item["choice_reason"]=review["reason"] if review else None
+                item["rivals"]=len(rival_bids(db,career_id=career_id,
+                    signing_id=free["signing_id"]))
+                free_signings.append(item)
         unread=0
         signed=0
         sale_totals=(db.execute("""SELECT COALESCE(SUM(allocated_gbp),0),
