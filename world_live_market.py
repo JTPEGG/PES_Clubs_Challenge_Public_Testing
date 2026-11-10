@@ -90,6 +90,8 @@ def initialise_live_market(conn):
     initialise_player_morale(conn)
     from world_fc27_contract_renewals import initialise_contract_renewals
     initialise_contract_renewals(conn)
+    from world_fc27_player_review import initialise_player_choices
+    initialise_player_choices(conn)
     conn.commit()
 
 def _market_money(value):
@@ -651,6 +653,8 @@ def process_live_market(conn,*,career_id,now=None,
         generate_player_requests(conn,career_id=career_id,now=t)
         _review_due_manager_buying_offers(conn,career_id=career_id,
             window_id=win,now=t)
+        from world_fc27_player_review import review_due_choices
+        review_due_choices(conn,career_id=career_id,now=t)
     if fc27_activity_scale_qa not in (1,3):
         raise ValueError("Unsupported isolated FC27 activity scenario")
     from world_fc27_market_schedule import (
