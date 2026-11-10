@@ -617,7 +617,8 @@ def run(world,output):
             check(page.locator('#desk-view-player').is_visible() and
                   page.locator('.desk-sidebar').is_visible() and
                   page.locator('#desk-header-clock').is_visible() and
-                  page.url.startswith(base+manager_path+'#player-'),
+                  urlparse(page.url).path==manager_path and
+                  urlparse(page.url).fragment.startswith('player-'),
                   "Clicking a player left the Career Desk shell or hid its navigation")
             page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
             check(page.locator('#desk-view-scouting').is_visible(),
