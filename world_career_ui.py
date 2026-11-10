@@ -1404,6 +1404,9 @@ DASHBOARD_JS = r"""
       .catch(function(){/* Keep badge if server did not confirm the POST. */})
       .finally(function(){inboxMarkInProgress=false;});
   }
+  // The market pulse and the Inbox share the same CSRF-protected read
+  // acknowledgement so messages arriving during an open Inbox are not lost.
+  window.fc27MarkInboxViewed=markInboxViewed;
 
   // Live transfer bids arrive on the authenticated market heartbeat.
   // Never wait for a full page refresh: by that time the 30-minute window
@@ -2532,6 +2535,10 @@ DASHBOARD_JS = r"""
     if(name==='inbox'){
       document.getElementById('desk-offer-toast')?.remove();
       markInboxViewed();
+      // Reconcile server state immediately on opening the Inbox. The 15s
+      // heartbeat alone can otherwise leave newly generated AI mail unread
+      // behind an out-of-date zero badge.
+      if(typeof window.fc27PollMarket==='function')window.fc27PollMarket();
     }
     window.scrollTo({top:0,behavior:'auto'});
   }
