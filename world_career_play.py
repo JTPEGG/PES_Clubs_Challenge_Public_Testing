@@ -1678,7 +1678,7 @@ Rejected and expired offers are not transfers.</p>
              state.csrf,{{career_id|tojson}});
          if(typeof window.fc27SyncContractRequests==='function')
            window.fc27SyncContractRequests(state.contract_updates,
-             {{career_id|tojson}});
+             {{career_id|tojson}},state.csrf);
          if(typeof window.fc27UpdateBudget==='function')
            window.fc27UpdateBudget(state);
          const marketFeed=document.querySelector('#desk-view-news .feed');
@@ -1692,7 +1692,12 @@ Rejected and expired offers are not transfers.</p>
              newestWorldEvent=Math.max(newestWorldEvent,id);
              const card=document.createElement('div');
              card.className='desk-news-card';card.dataset.worldEventId=String(id);
-             const heading=document.createElement('b');
+             const icon=document.createElement('span');
+             icon.className='desk-news-icon';icon.setAttribute('aria-hidden','true');
+             icon.textContent='🤝';
+             const content=document.createElement('div');
+             content.className='desk-news-content';
+             const heading=document.createElement('strong');
              heading.textContent=item.headline;
              const route=document.createElement('div');
              route.className='desk-news-route';
@@ -1708,9 +1713,8 @@ Rejected and expired offers are not transfers.</p>
                span.className=part[1];span.textContent=part[0]||'—';
                route.appendChild(span);
              });
-             const when=document.createElement('small');
-             when.textContent=item.created_at;
-             card.append(heading,route,when);
+             content.append(heading,route);
+             card.append(icon,content);
              marketFeed.prepend(card);
            });
            refreshNewsBadge();
