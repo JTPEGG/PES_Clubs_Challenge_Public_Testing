@@ -736,6 +736,145 @@ def run(world,output):
                             animations="disabled",full_page=True)
             found.append("Source FC27 scouting + page 2 -> offer -> Transfers negotiations; Inbox auto-read stored")
 
+            # New V2 interactions: news notifications stay compact, budgets
+            # remain on Scouting, contracts open in the desk slide-over,
+            # accepted renewals sign with an Inbox receipt, and a separate
+            # renewal can be rejected directly from its Inbox email.
+            page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
+            budget_tiles=page.locator("#desk-view-scouting .desk-scout-finance span")
+            check(budget_tiles.count()==2 and
+                  "Transfer budget" in budget_tiles.first.inner_text() and
+                  "wage" in budget_tiles.nth(1).inner_text().lower(),
+                  "Scouting transfer and wage budgets are missing")
+            page.locator('.desk-sidebar [data-desk-tab="news"]').click()
+            opening=page.locator("#desk-view-news .desk-news-card").filter(
+                has_text="The summer transfer window is open")
+            check(opening.count()==1 and
+                  opening.locator('.desk-news-icon').count()==1 and
+                  opening.locator('.desk-news-detail,small').count()==0,
+                  "Opening notification should be compact, icon-led, without blurb or timestamp")
+            check(opening.inner_text().strip().endswith("The summer transfer window is open"),
+                  "Opening news notification contains surplus text")
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                from world_fc27_contract_renewals import (
+                    wage_signal,renewal_info,renewal_action)
+                from world_careers import wage_budget_breakdown
+                headroom=wage_budget_breakdown(db,CAREER,manager)["remaining"]
+                members=db.execute("""SELECT r.player_id FROM world_career_registrations r
+                    WHERE r.career_id=? AND r.club_id=?
+                    ORDER BY r.player_id""",(CAREER,manager)).fetchall()
+                viable=[]
+                for person in members:
+                    pid=int(person["player_id"])
+                    signal=wage_signal(db,career_id=CAREER,player_id=pid)
+                    renewal=renewal_info(db,career_id=CAREER,player_id=pid)
+                    if signal["demand"] is None or (
+                            renewal and renewal["status"] in
+                            ("agreed_future","completed","declined","expired")):
+                        continue
+                    wage=max(signal["demand"],
+                             renewal["demand_weekly_wage"] if renewal else 0)
+                    wage=((wage+499)//500)*500
+                    if max(0,wage-signal["wage"])<headroom-1000:
+                        viable.append((pid,wage,signal["name"]))
+                    if len(viable)>=2:break
+                check(len(viable)>=2,
+                      "Real manager roster lacks two affordable renewal candidates")
+                renewal_player,renewal_wage,renewal_name=viable[0]
+                reject_player,_,reject_name=viable[1]
+                # Isolated test creates an agent counter so the manager can
+                # reject a renewal straight from an Inbox message.
+                counter=renewal_action(db,career_id=CAREER,
+                    player_id=reject_player,action="offer",
+                    weekly_wage=0,contract_years=1)
+                check(counter["status"]=="countered",
+                      "QA counteroffer did not create a rejectable renewal")
+
+            page.locator('.desk-sidebar [data-desk-tab="squad"]').click()
+            full_desk_url=page.url
+            renewal_link=page.locator(
+                '#desk-view-squad .desk-squad-contract-link[href$="/contract/'+
+                str(renewal_player)+'"]')
+            check(renewal_link.count()==1 and renewal_link.is_visible(),
+                  "Manager squad has no contract negotiation link")
+            renewal_link.click()
+            drawer=page.locator('.desk-contract-layer')
+            check(drawer.is_visible() and
+                  page.locator('.desk-sidebar').is_visible() and
+                  page.url==full_desk_url,
+                  "Contract talks navigated away from manager dashboard")
+            offer_form=drawer.locator(
+                'form[action$="/contract/'+str(renewal_player)+'/decision"]')
+            check(offer_form.is_visible(),
+                  "In-window contract panel did not load its valid negotiation form")
+            offer_form.locator('input[name="weekly_wage"]').fill(str(renewal_wage))
+            with page.expect_response(
+                lambda response:response.url.endswith(
+                    '/contract/'+str(renewal_player)+'/decision') and
+                    response.request.method=="POST",timeout=20000) as renewal_response:
+                offer_form.locator('button[value="offer"]').click()
+            renewal_result=renewal_response.value.json()
+            check(renewal_response.value.status==200 and
+                  renewal_result.get("ok") is True and
+                  renewal_result.get("status")=="agreed_future",
+                  "Accepted renewal didn't sign automatically after wage offer")
+            page.wait_for_function(
+                "()=>location.hash==='#inbox' && "
+                "document.querySelector('.desk-contract-layer').hidden",
+                timeout=15000)
+            check(page.locator('.desk-sidebar').is_visible(),
+                  "Renewal completion lost the manager navigation")
+            signed=page.locator(
+                '#desk-view-inbox .desk-contract-inbox[data-desk-player="'+
+                str(renewal_player)+'"]')
+            check(signed.count()==1 and
+                  signed.get_attribute("data-desk-status")=="agreed_future" and
+                  "New contract signed" in signed.inner_text() and
+                  signed.locator('button[value="confirm"]').count()==0,
+                  "Signed renewal missing authoritative Inbox receipt or requires another confirmation")
+            with closing(sqlite3.connect(world)) as db:
+                row=db.execute("""SELECT status,signed_at FROM
+                    world_career_contract_renewals
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,renewal_player)).fetchone()
+                check(row and row[0]=="agreed_future" and row[1],
+                      "Renewal signing not persisted in disposable career")
+            reject=page.locator(
+                '#desk-view-inbox .desk-contract-inbox[data-desk-player="'+
+                str(reject_player)+'"]')
+            check(reject.count()==1 and
+                  reject.locator('button[value="decline"]').count()==1 and
+                  reject.locator('a.desk-inbox-open-negotiation').count()==1,
+                  "Inbox renewal email lacks Offer renewal and Reject renewal actions")
+            reject_button=reject.locator('button[value="decline"]')
+            # The selected message must be opened in the right-hand reader.
+            reject_item=page.locator('#desk-view-inbox .desk-inbox-item').filter(
+                has=reject)
+            check(reject_item.count()==1,"Renewal Inbox message was not indexed")
+            reject_item.locator('summary').click()
+            reader_profile=page.locator(
+                '#desk-view-inbox .desk-inbox-reader .desk-inbox-player-meta')
+            check("OVR" in reader_profile.inner_text() and
+                  "Age" in reader_profile.inner_text(),
+                  "Player's position, overall and age are absent from Inbox header")
+            with page.expect_response(
+                lambda response:response.url.endswith(
+                    '/contract/'+str(reject_player)+'/decision') and
+                    response.request.method=="POST",timeout=15000) as decline_response:
+                reject_button.click()
+            decline=decline_response.value.json()
+            check(decline_response.value.status==200 and decline.get("ok") is True
+                  and decline.get("status")=="declined",
+                  "Quick Reject renewal did not save through secure manager endpoint")
+            with closing(sqlite3.connect(world)) as db:
+                rejected=db.execute("""SELECT status FROM
+                    world_career_contract_renewals
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,reject_player)).fetchone()[0]
+                check(rejected=="declined","Quick Inbox rejection was not committed")
+            found.append("Compact notification feed, both scouting budgets, contract drawer, signed renewal Inbox mail and one-click reject")
+
             # The spectator endpoint is separately accessible without login
             # but is read-only and does not show managerial POST forms.
             with closing(sqlite3.connect(world)) as db:
