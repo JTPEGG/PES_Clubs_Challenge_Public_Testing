@@ -634,7 +634,7 @@ def _review_due_manager_buying_offers(conn,*,career_id,window_id,now):
 
 
 def process_live_market(conn,*,career_id,now=None,
-                        fc27_activity_scale_qa=1):
+                        fc27_activity_scale_qa=1,yield_to_manager=None):
     """Reconcile due market moments, then close at 30 min; safe on rerun.
 
     Each moment's row is unique and each AI proposal has an immutable request
@@ -683,6 +683,9 @@ def process_live_market(conn,*,career_id,now=None,
     changed=False
     fc27_batch_processed=False
     for index,offset in enumerate(MARKET_MOMENTS):
+        if yield_to_manager is not None and yield_to_manager():
+            # Never start an AI checkpoint while a human action needs the DB.
+            break
         if elapsed<offset:break
         seen=conn.execute("""SELECT 1 FROM world_career_market_moments
             WHERE window_id=? AND moment_index=?""",(win,index)).fetchone()
@@ -740,7 +743,8 @@ def process_live_market(conn,*,career_id,now=None,
             process_fc27_market_interval(conn,career_id=career_id,
                 window_id=win,interval_index=index,when=t,
                 activity_scale_qa=fc27_activity_scale_qa,
-                work_budget_seconds=8)
+                work_budget_seconds=8,
+                should_yield=yield_to_manager)
             fc27_batch_processed=True
         else:
             # IMMUTABLE older careers use their original replay-safe moment
@@ -789,7 +793,8 @@ def process_live_market(conn,*,career_id,now=None,
             process_fc27_market_interval(conn,career_id=career_id,
                 window_id=win,interval_index=chosen,when=t,
                 activity_scale_qa=fc27_activity_scale_qa,
-                work_budget_seconds=8)
+                work_budget_seconds=8,
+                should_yield=yield_to_manager)
             changed=True
     # Freshly accepted agent terms from a due market moment begin their
     # own confirmation timer immediately, not on the next browser visit.
