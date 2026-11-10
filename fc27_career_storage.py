@@ -22,7 +22,7 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 PROJECT_REF = "bjahvrmzcpqrynmoxokb"
-SAVE_KEY = "fc27_manual"
+SAVE_KEY = "fc27_manual_v2"
 MAGIC = b"FC27C1\x00"
 CAREER_PREFIX = "world_career_"
 CAREER_EXTRAS = frozenset(("world_fc27_free_agent_offers",
@@ -38,10 +38,15 @@ def assert_isolated_target(url: str) -> None:
     parsed = urlsplit(url)
     hostname = (parsed.hostname or "").lower()
     username = unquote(parsed.username or "")
+    # Both roles are restricted to this dedicated development project.
+    # The new preview uses its own role and save key, so credentials and
+    # snapshots from the existing FC27 preview are never overwritten.
+    authorised_roles = ("fc27_app", "fc27_v2_app")
     direct = (hostname == f"db.{PROJECT_REF}.supabase.co" and
-              username == "fc27_app" and parsed.port == 5432)
+              username in authorised_roles and parsed.port == 5432)
     pooler = (hostname.endswith(".pooler.supabase.com") and
-              username == f"fc27_app.{PROJECT_REF}" and parsed.port == 5432)
+              username in tuple(f"{role}.{PROJECT_REF}" for role in authorised_roles)
+              and parsed.port == 5432)
     if parsed.scheme not in ("postgres", "postgresql") or not (
             parsed.password and (direct or pooler)):
         raise RuntimeError("FC27 career persistence refused a non-development database target")
