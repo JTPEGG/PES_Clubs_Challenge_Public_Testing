@@ -941,7 +941,43 @@ def actionable_unread_count(conn,*,career_id):
                   AND m.is_read=0 AND m.message_key LIKE
                      ('fc27-renewal:'||r.window_id||':'||r.player_id||':%'))""",
             (career_id,)).fetchone()[0]
-    return offer_unread+contract_unread
+    # Player choice and AI seller outcomes on manager-submitted bids are
+    # Inbox decisions too, not just changes buried in Transfers.
+    buyer_unread=conn.execute("""SELECT COUNT(DISTINCT m.offer_id)
+        FROM world_career_market_inbox m
+        JOIN world_career_offers o ON o.offer_id=m.offer_id
+        JOIN world_career_saves c ON c.career_id=o.career_id
+        LEFT JOIN world_career_player_choices q
+          ON q.career_id=o.career_id AND q.source_id=o.offer_id
+          AND q.window_id=m.window_id AND q.kind='purchase'
+        WHERE m.career_id=? AND m.is_read=0
+          AND o.buying_club_id=c.manager_club_id
+          AND (
+           (o.status='countered' AND m.message_key LIKE 'manager-buy-review:%')
+           OR (o.status='accepted_pending_contract' AND
+               (m.message_key LIKE 'manager-buy-review:%'
+                OR m.message_key LIKE 'agent-opening-wage:%')
+               AND q.status IS NULL)
+           OR (q.status='accepted' AND
+               m.message_key LIKE 'player-review-outcome:purchase:%')
+          )""",(career_id,)).fetchone()[0]
+    sale_unread=conn.execute("""SELECT COUNT(DISTINCT m.offer_id)
+        FROM world_career_market_inbox m
+        JOIN world_career_player_choices q
+          ON q.career_id=m.career_id AND q.window_id=m.window_id
+          AND q.kind='sale' AND q.source_id=m.offer_id
+        WHERE m.career_id=? AND m.is_read=0 AND q.status='accepted'
+          AND m.message_key LIKE 'player-review-outcome:sale:%'""",
+        (career_id,)).fetchone()[0]
+    free_unread=conn.execute("""SELECT COUNT(DISTINCT q.source_id)
+        FROM world_career_player_choices q
+        JOIN world_career_market_inbox m
+          ON m.career_id=q.career_id AND m.window_id=q.window_id
+          AND m.message_key=('player-review-outcome:free_agent:'||q.source_id)
+        WHERE q.career_id=? AND q.kind='free_agent'
+          AND q.status='accepted' AND m.is_read=0""",
+        (career_id,)).fetchone()[0]
+    return offer_unread+contract_unread+buyer_unread+sale_unread+free_unread
 
 
 def market_messages(conn,*,career_id):
