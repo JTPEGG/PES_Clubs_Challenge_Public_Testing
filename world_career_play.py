@@ -2203,6 +2203,54 @@ def create_play_blueprint(db_path, on_career_commit=None):
                     clock=datetime.now(timezone.utc)
                     _review_due_manager_buying_offers(db,career_id=career_id,
                         window_id=snap["window_id"],now=clock)
+                    # Advance the manager's outgoing sales on every short
+                    # priority tick, not only after slow 659-club intervals.
+                    from world_career_incoming import (
+                        advance_incoming_approach,incoming_approach)
+                    from world_live_market import _respond_to_counter,_message
+                    from world_fc27_player_review import queue_choice
+                    due=db.execute("""SELECT o.offer_id,o.player_id,o.status
+                        FROM world_career_offers o
+                        JOIN world_career_preseason_window_offers w
+                          ON w.offer_id=o.offer_id
+                        JOIN world_career_saves c ON c.career_id=o.career_id
+                        WHERE o.career_id=? AND w.window_id=?
+                          AND o.selling_club_id=c.manager_club_id
+                          AND o.status IN ('countered','accepted_pending_contract')
+                        ORDER BY o.offer_id DESC LIMIT 28""",
+                        (career_id,snap["window_id"])).fetchall()
+                    for oid,pid,state in due:
+                        try:
+                            if state=="countered":
+                                _respond_to_counter(db,career_id=career_id,
+                                    offer_id=oid,window_id=snap["window_id"],t=clock)
+                                continue
+                            before=incoming_approach(db,oid)
+                            if before and before["status"] in (
+                                    "terms_accepted","future_agreed",
+                                    "wage_limit","role_refused","player_refused"):
+                                after=before
+                            else:
+                                after=advance_incoming_approach(db,
+                                    career_id=career_id,offer_id=oid)
+                            if after and after["status"]=="terms_accepted":
+                                queue_choice(db,career_id=career_id,kind="sale",
+                                    source_id=oid,player_id=pid,now=clock)
+                            if after and (before is None or
+                                    (after["status"],after["attempts"])!=
+                                    (before["status"],before["attempts"])):
+                                _message(db,career_id=career_id,
+                                    window_id=snap["window_id"],
+                                    key=f"priority-agent:{oid}:{after['status']}:{after['attempts']}",
+                                    headline=("Player agreed provisional terms"
+                                        if after["status"]=="terms_accepted"
+                                        else "Player and agent update"),
+                                    detail=after["decision_reason"],
+                                    offer_id=oid,when=clock)
+                        except (ValueError,sqlite3.OperationalError) as exc:
+                            logging.getLogger(__name__).warning(
+                                "Player approach %s is awaiting further evidence: %s",
+                                oid,str(exc)[:120])
                     review_due_choices(db,career_id=career_id,now=clock)
                     db.commit()
         except Exception:
