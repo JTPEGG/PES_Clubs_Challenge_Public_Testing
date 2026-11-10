@@ -3497,11 +3497,19 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         if not authenticated():
             return jsonify(error="Authentication required"),401
         with connect() as db:
-            career=db.execute("""SELECT manager_club_id FROM world_career_saves
+            career=db.execute("""SELECT manager_club_id,pes_lock_date
+                FROM world_career_saves
                 WHERE career_id=? AND state='sandbox'""",(career_id,)).fetchone()
             if career is None:
                 return jsonify(error="career_not_found",
                     detail="This test career no longer exists on the server, likely after a deployment. Please create a new career."),410
+            def age_for(birth):
+                try:
+                    born=date.fromisoformat(str(birth)[:10])
+                    locked=date.fromisoformat(str(career["pes_lock_date"])[:10])
+                    return locked.year-born.year-((locked.month,locked.day)<(born.month,born.day))
+                except (ValueError,TypeError):
+                    return None
             queue_priority_tick(career_id)
             queue_market_tick(career_id)
             snap=window_snapshot(db,career_id=career_id)
@@ -3513,7 +3521,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     o.status,o.offered_fee,p.full_name,b.name,
                     wo.tagged_at,ia.status AS agent_status,
                     o.demanded_fee,lc.value_gbp,p.primary_position,
-                    x.overall,COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
+                    x.overall,p.birth_date,COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
                     pc.current_role,
                     (SELECT q.status FROM world_career_player_choices q
                      WHERE q.career_id=o.career_id AND q.window_id=wo.window_id
@@ -3543,12 +3551,17 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 fee=fee,player=name,buyer=clean_buyer(buyer),
                 received_at=received,agent_status=agent,
                 demanded_fee=demanded,valuation=valuation,
-                position=position,overall=rating,current_wage=wage,
+                position=position,overall=rating,age=age_for(birth),current_wage=wage,
                 squad_role=role,player_choice=choice)
                 for (oid,pid,status,fee,name,buyer,received,agent,demanded,
-                     valuation,position,rating,wage,role,choice) in offer_rows]
+                     valuation,position,rating,birth,wage,role,choice) in offer_rows]
             buying_rows=db.execute("""SELECT o.offer_id,o.player_id,
                     o.status,o.offered_fee,p.full_name,sc.name,
+                    p.primary_position,p.birth_date,
+                    (SELECT x.overall FROM world_dataset_ratings x
+                     JOIN world_career_saves cc ON cc.career_id=o.career_id
+                     WHERE x.dataset_id=cc.dataset_id AND x.player_id=o.player_id
+                     LIMIT 1) AS overall,
                     t.status,t.demanded_wage_weekly,
                     t.proposed_wage_weekly,t.contract_years,
                     (SELECT q.status FROM world_career_player_choices q
@@ -3570,31 +3583,43 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 fee=fee,player=name,seller=clean_buyer(seller),
                 agent_status=agent,agent_demand=demanded,
                 weekly_wage=wage,contract_years=years,player_choice=choice,
+                position=position,overall=overall,age=age_for(birth),
                 delay_used=bool(delayed))
-                for oid,pid,status,fee,name,seller,agent,demanded,wage,years,choice,delayed
-                in buying_rows]
+                for oid,pid,status,fee,name,seller,position,birth,overall,
+                    agent,demanded,wage,years,choice,delayed in buying_rows]
             from world_fc27_player_review import choice_for,rival_bids
             free_updates=[]
             if snap["window_id"]:
                 free_rows=db.execute("""SELECT f.signing_id,f.player_id,f.status,
-                    f.proposed_weekly_wage_gbp,p.full_name
+                    f.proposed_weekly_wage_gbp,p.full_name,p.primary_position,p.birth_date,
+                    (SELECT x.overall FROM world_dataset_ratings x
+                     JOIN world_career_saves cc ON cc.career_id=f.career_id
+                     WHERE x.dataset_id=cc.dataset_id AND x.player_id=f.player_id
+                     LIMIT 1) AS overall
                     FROM world_fc27_free_agent_offers f
                     JOIN world_players p ON p.player_id=f.player_id
                     WHERE f.career_id=? ORDER BY f.signing_id DESC""",
                     (career_id,)).fetchall()
-                for signing,pid,status,wage,name in free_rows:
+                for signing,pid,status,wage,name,position,birth,overall in free_rows:
                     verdict=choice_for(db,career_id=career_id,
                         kind="free_agent",source_id=signing)
                     free_updates.append(dict(signing_id=signing,
                         player_id=pid,player=name,status=status,wage=wage,
+                        position=position,overall=overall,age=age_for(birth),
                         player_choice=verdict["status"] if verdict else None,
                         rivals=len(rival_bids(db,career_id=career_id,
                             signing_id=signing))))
             contract_updates=[dict(player_id=r[0],status=r[1],
                 current_wage=r[2],peer_wage=r[3],demand=r[4],
-                player=r[5]) for r in db.execute("""SELECT
+                player=r[5],position=r[6],overall=r[7],age=age_for(r[8]))
+                for r in db.execute("""SELECT
                 a.player_id,a.status,a.old_weekly_wage,
-                a.peer_weekly_wage,a.demand_weekly_wage,p.full_name
+                a.peer_weekly_wage,a.demand_weekly_wage,p.full_name,
+                p.primary_position,
+                (SELECT x.overall FROM world_dataset_ratings x
+                 JOIN world_career_saves cc ON cc.career_id=a.career_id
+                 WHERE x.dataset_id=cc.dataset_id AND x.player_id=a.player_id
+                 LIMIT 1),p.birth_date
                 FROM world_career_contract_renewals a
                 JOIN world_players p ON p.player_id=a.player_id
                 WHERE a.career_id=? AND a.window_id=?
