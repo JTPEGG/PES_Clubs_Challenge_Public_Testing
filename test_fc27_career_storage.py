@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fc27_career_storage import (
     CareerSaveStore,
+    SAVE_KEY,
     assert_isolated_target,
     file_sha256,
     make_career_snapshot,
@@ -111,10 +112,13 @@ class CareerSnapshotTests(unittest.TestCase):
 
 class ConnectionIsolationTests(unittest.TestCase):
     def test_development_host_allowed(self):
-        assert_isolated_target(f"postgresql://fc27_app:pw@db.{DEV}.supabase.co:5432/postgres")
-        assert_isolated_target(
-            f"postgresql://fc27_app.{DEV}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
-        )
+        self.assertEqual(SAVE_KEY,"fc27_manual_v2")
+        for role in ("fc27_app","fc27_v2_app"):
+            with self.subTest(role=role):
+                assert_isolated_target(f"postgresql://{role}:pw@db.{DEV}.supabase.co:5432/postgres")
+                assert_isolated_target(
+                    f"postgresql://{role}.{DEV}:pw@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"
+                )
 
     def test_production_and_unrelated_hosts_refused(self):
         for url in (
