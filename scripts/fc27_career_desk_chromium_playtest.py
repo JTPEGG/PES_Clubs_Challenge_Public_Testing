@@ -310,8 +310,8 @@ def run(world,output):
             sancho_row=page.locator(
                 '[data-desk-table="incoming"] tr[data-free-agent-signing-id]'
             ).filter(has_text="Jadon Sancho")
-            check(sancho_row.count()==1 and "FREE" in sancho_row.inner_text(),
-                  "Signed free agent must appear exactly once alongside purchased players in Incoming")
+            check(sancho_row.count()==1 and sancho_row.locator('td').nth(2).inner_text().strip()=='—',
+                  "Signed free agent must appear exactly once in Incoming, with a dash instead of a zero fee")
             check(sancho_row.locator('td').count()==7 and
                   'years' in sancho_row.locator('td').nth(4).inner_text(),
                   "Incoming free agent must show a separate wage and contract length")
