@@ -265,8 +265,12 @@ def run(world,output):
                     ((datetime.now().astimezone()-timedelta(seconds=5)).isoformat(),
                      CAREER,free[0]))
                 db.commit()
-            heartbeat=page.request.get(base+manager_path+'/pulse')
-            check(heartbeat.ok,"Manager heartbeat could not advance decisions")
+            heartbeat=page.evaluate("""async path => {
+                const response=await fetch(path,{credentials:'same-origin',
+                    headers:{Accept:'application/json'}});
+                return {ok:response.ok,status:response.status};
+            }""",manager_path+'/pulse')
+            check(heartbeat['ok'],"Manager heartbeat could not advance decisions")
             player_choice=None
             for _ in range(60):
                 with closing(sqlite3.connect(world)) as db:
