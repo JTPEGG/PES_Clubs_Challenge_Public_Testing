@@ -1669,6 +1669,13 @@ Rejected and expired offers are not transfers.</p>
          const current=Number(state.latest_message_id||0);
          const unread=Number(state.unread||0);
          refreshUnread(unread);
+         // A manager already viewing the Inbox has seen incoming mail.
+         // A fresh action must not leave a permanently stale Inbox (1)
+         // badge until they navigate away and back again.
+         const inboxView=document.getElementById('desk-view-inbox');
+         if(unread>0 && inboxView && !inboxView.hidden &&
+            typeof window.fc27MarkInboxViewed==='function')
+           window.fc27MarkInboxViewed();
          if(typeof window.fc27SyncIncomingOffers==='function')
            window.fc27SyncIncomingOffers(state.offer_updates,state.csrf);
          if(typeof window.fc27SyncBuyingOffers==='function')
