@@ -824,6 +824,10 @@ def run(world,output):
                 """(pid)=>location.hash==='#inbox' && Boolean(
                     document.querySelector('#desk-view-inbox .desk-contract-inbox[data-desk-player="'+pid+'"][data-desk-status="agreed_future"]'))""",
                 arg=str(renewal_player),timeout=15000)
+            # The server-rendered markup can be present before the dashboard
+            # script finishes converting it into split-pane Inbox messages.
+            page.locator('#desk-view-inbox .desk-inbox-split').wait_for(
+                state="visible",timeout=15000)
             check(page.locator('.desk-sidebar').is_visible(),
                   "Renewal completion lost the manager navigation")
             signed=page.locator(
