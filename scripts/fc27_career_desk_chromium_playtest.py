@@ -1116,7 +1116,17 @@ def run(world,output):
                       all(x[1]!='agreed_future' for x in rows) and
                       sum(x[1]=='withdrawn' for x in rows)==1,
                       "Two competing agreed-fee offers did not produce one timely player choice, or were signed without manager approval")
-            found.append("Competing AI offers resolve to one player choice; losing bid closes and winner still needs final manager sign-off")
+                notices=db.execute("""SELECT headline FROM world_career_market_inbox
+                    WHERE career_id=? AND
+                      message_key IN (?,?)""",
+                    (CAREER,
+                     f"player-review-outcome:sale:{paired[0]}",
+                     f"player-review-outcome:sale:{paired[1]}")).fetchall()
+                check(len(notices)==2 and
+                      any("chooses" in row[0] for row in notices) and
+                      any("rejects" in row[0] for row in notices),
+                      "Two real player decisions were not explained in manager Inbox")
+            found.append("Competing AI offers resolve to one player choice, personalised Inbox verdicts, and final manager sign-off")
 
             # Advance ONLY the disposable QA DB to the real deadline. All
             # unfinished bids must be clearly labelled as deadline-expired,
