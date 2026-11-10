@@ -1205,6 +1205,8 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
  data-desk-player-choice="{{o.player_choice or ''}}"
+ data-desk-position="{{o.position or ''}}" data-desk-overall="{{o.overall or ''}}"
+ data-desk-age="{{player_age(o.birth_date) if o.birth_date else ''}}"
  data-desk-buyer="{{o.buyer_name|club_display}}">
  <div class="label">{{o.buyer_name|club_display}} · {{o.status_label}}</div>
  <h3 style="margin:6px 0"><a href="/world/play/career/{{career_id}}/market/player/{{o.player_id}}" class="desk-player-profile">{{o.player_name}}</a></h3>
@@ -1292,6 +1294,8 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  data-buy-offer-id="{{o.offer_id}}" data-desk-side="buy"
  data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-buyer="{{o.seller_name|club_display}}" data-desk-status="{{o.status}}"
+ data-desk-position="{{o.position or ''}}" data-desk-overall="{{o.overall or ''}}"
+ data-desk-age="{{player_age(o.birth_date) if o.birth_date else ''}}"
  data-desk-agent="{{'terms_accepted' if o.agent_status=='accepted' else o.agent_status or ''}}"
  data-desk-player-choice="{{o.player_choice or ''}}">
  <div class="label">{{o.seller_name|club_display}} · {{o.status_label}}</div>
@@ -1344,6 +1348,8 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  data-live-offer-id="free-{{free.signing_id}}" data-desk-side="free"
  data-desk-player="{{free.player_id}}" data-desk-player-name="{{free.full_name}}"
  data-desk-buyer="Player's agent" data-desk-status="{{free.status}}"
+ data-desk-position="{{free.primary_position or ''}}" data-desk-overall="{{free.overall or ''}}"
+ data-desk-age="{{player_age(free.birth_date) if free.birth_date else ''}}"
  data-desk-player-choice="{{free.player_choice or ''}}">
  <div class="label">Free agent · Contract negotiation</div>
  <h3><a href="/world/play/career/{{career_id}}/market/player/{{free.player_id}}">{{free.full_name}}</a></h3>
@@ -1386,8 +1392,11 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  data-desk-player="{{contract.player_id}}"
  data-desk-player-name="{{contract.full_name}}"
  data-desk-buyer="Player representative"
+ data-desk-position="{{contract.primary_position or ''}}"
+ data-desk-overall="{{contract.overall or ''}}"
+ data-desk-age="{{player_age(contract.birth_date) if contract.birth_date else ''}}"
  data-desk-status="{{contract.status}}">
-  <div class="label">Contract renewal · Player representative</div>
+  <div class="label">{{'Contract signed' if contract.status in ('agreed_future','completed') else 'Contract renewal · Player representative'}}</div>
   <h3>{{contract.full_name}}</h3>
   <div class="count">{{money(contract.demand_weekly_wage)}}/wk requested</div>
   <div class="desk-offer-briefing">
@@ -1400,9 +1409,22 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
    </div>
    <p class="desk-offer-briefing-note">A player can seek a competitive renewal without being forced onto the transfer list. A serious unresolved wage dispute can make a transfer request more likely.</p>
   </div>
-  <a class="desk-inbox-open-negotiation"
-   href="/world/play/career/{{career_id}}/market/contract/{{contract.player_id}}">
-   Open contract negotiations</a>
+  {% if contract.status in ('agreed_future','completed') %}
+  <p class="desk-offer-briefing-note"><b>New contract signed.</b>
+  {{money(contract.offered_weekly_wage)}}/week for {{contract.contract_years}} years.
+  {{'Effective at the transfer deadline' if contract.status=='agreed_future' else 'Now effective'}}.
+  No further approval needed.</p>
+  {% elif snap.state=='open' and contract.status in ('requested','countered','negotiating','accepted_terms') %}
+  <div class="desk-renewal-quick-actions">
+   <a class="desk-inbox-open-negotiation"
+    href="/world/play/career/{{career_id}}/market/contract/{{contract.player_id}}">
+    Offer renewal</a>
+   <form method="post" action="/world/play/career/{{career_id}}/market/contract/{{contract.player_id}}/decision">
+    <input type="hidden" name="csrf" value="{{csrf}}">
+    <button type="submit" name="action" value="decline" class="danger">Reject renewal</button>
+   </form>
+  </div>
+  {% endif %}
 </div>
 {% endfor %}</div>
 {% else %}<div class="card" id="desk-inbox-no-offers"><p>No offers have arrived yet. The world is evaluating its squads;
@@ -2846,19 +2868,31 @@ def create_play_blueprint(db_path, on_career_commit=None):
                                       spectator=True)
 
     def live_market_render(db,*,career_id,spectator=False):
-        c=db.execute("""SELECT c.title,c.manager_club_id,cl.name
+        c=db.execute("""SELECT c.title,c.manager_club_id,cl.name,c.pes_lock_date
             FROM world_career_saves c JOIN world_clubs cl
              ON cl.club_id=c.manager_club_id
             WHERE c.career_id=? AND c.state='sandbox'""",
             (career_id,)).fetchone()
         if c is None:abort(404)
+        def age_at_lock(birth):
+            try:
+                born=date.fromisoformat(str(birth)[:10])
+                locked=date.fromisoformat(str(c["pes_lock_date"])[:10])
+                return locked.year-born.year-((locked.month,locked.day)<(born.month,born.day))
+            except (TypeError,ValueError):
+                return None
         snap=window_snapshot(db,career_id=career_id)
         offers=[]
         messages=[]
         free_signings=[]
         if not spectator and db.execute("""SELECT 1 FROM sqlite_master
             WHERE type='table' AND name='world_fc27_free_agent_offers'""").fetchone():
-            free_rows=db.execute("""SELECT f.*,p.full_name
+            free_rows=db.execute("""SELECT f.*,p.full_name,p.primary_position,
+                    p.birth_date,
+                    (SELECT x.overall FROM world_dataset_ratings x
+                     JOIN world_career_saves cc ON cc.career_id=f.career_id
+                     WHERE x.dataset_id=cc.dataset_id AND x.player_id=f.player_id
+                     LIMIT 1) AS overall
                 FROM world_fc27_free_agent_offers f
                 JOIN world_players p ON p.player_id=f.player_id
                 WHERE f.career_id=? ORDER BY f.signing_id DESC""",
@@ -2931,7 +2965,12 @@ def create_play_blueprint(db_path, on_career_commit=None):
             for p in squad["players"]:
                 p["contract_renewal"]=current_renewals.get(p["player_id"])
             if current_renewals:
-                renewal_requests=db.execute("""SELECT r.*,p.full_name
+                renewal_requests=db.execute("""SELECT r.*,p.full_name,
+                    p.primary_position,p.birth_date,
+                    (SELECT x.overall FROM world_dataset_ratings x
+                     JOIN world_career_saves cc ON cc.career_id=r.career_id
+                     WHERE x.dataset_id=cc.dataset_id AND x.player_id=r.player_id
+                     LIMIT 1) AS overall
                     FROM world_career_contract_renewals r
                     JOIN world_players p ON p.player_id=r.player_id
                     WHERE r.career_id=? AND r.window_id=?
@@ -3026,7 +3065,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
                     if valuation is not None and valuation>0 else None)
                 profile=db.execute("""SELECT p.primary_position,x.overall,
                     COALESCE(pc.current_wage_weekly,cs.weekly_wage_gbp),
-                    pc.current_role
+                    pc.current_role,p.birth_date
                     FROM world_players p
                     LEFT JOIN world_dataset_ratings x
                       ON x.dataset_id=? AND x.player_id=p.player_id
@@ -3040,9 +3079,15 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 item["overall"]=profile[1] if profile else None
                 item["current_wage"]=profile[2] if profile else None
                 item["squad_role"]=profile[3] if profile else None
+                item["birth_date"]=profile[4] if profile else None
                 offers.append(item)
             outgoing=db.execute("""SELECT o.offer_id,o.player_id,o.status,o.offered_fee,
                 o.demanded_fee,p.full_name AS player_name,
+                p.primary_position AS position,p.birth_date,
+                (SELECT x.overall FROM world_dataset_ratings x
+                 JOIN world_career_saves cc ON cc.career_id=o.career_id
+                 WHERE x.dataset_id=cc.dataset_id AND x.player_id=o.player_id
+                 LIMIT 1) AS overall,
                 sc.name AS seller_name,t.status AS agent_status,
                 t.demanded_wage_weekly AS agent_demand,
                 t.proposed_wage_weekly AS negotiated_wage,
@@ -3183,6 +3228,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
             purchases=purchases,renewal_requests=renewal_requests,targets=targets,player_search=player_search,
             buy_request_key="manager-buy-v1-"+secrets.token_urlsafe(14),
             messages=messages,news_feed=news_feed,unread=unread,signed=signed,
+            player_age=age_at_lock,
             scout_results=scout_results,scout_attributes=scout_attributes,
             scout_page=scout_page,scout_pages=scout_pages,
             scout_first=scout_first,scout_last=scout_last,
