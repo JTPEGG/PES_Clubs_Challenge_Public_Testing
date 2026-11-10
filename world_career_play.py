@@ -1953,7 +1953,7 @@ value="{{player.market_value if player.market_value is not none else ''}}" requi
 <tr><td>{{item.name|replace('_',' ')|title}}</td><td><b>{{item.value}}</b></td></tr>
 {% endfor %}</table>{% else %}<p class="muted">No source-backed individual attributes currently available.</p>{% endif %}
 </div>
-{% if market_open %}
+{% if market_open and not embedded %}
 <div id="scout-market-pulse-note" class="card" style="display:none" role="status">
  <strong>New Inbox activity</strong>
  <a href="/world/play/career/{{career_id}}/market#inbox">Open Manager's Inbox</a>
@@ -3320,6 +3320,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         response=make_response(render_template_string(SCOUT_PLAYER_PAGE,
             player=player,career_id=career_id,csrf=csrf_value(),money=format_market_gbp,
             market_open=market_open,funds=funds,
+            embedded=request.args.get("panel")=="1",
             free_offer=(db.execute("""SELECT * FROM world_fc27_free_agent_offers
                  WHERE career_id=? AND player_id=?""",(career_id,player_id)).fetchone()
                  if player["free_agent"] else None),
@@ -3381,8 +3382,17 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             if action not in ("save","remove"):raise ValueError("Invalid shortlist action")
             with connect() as db:
                 set_shortlisted(db,career_id=career_id,player_id=player_id,save=action=="save")
+            if request.accept_mimetypes.best=="application/json":
+                response=jsonify(ok=True,player_id=player_id,
+                                 shortlisted=action=="save")
+                response.headers["Cache-Control"]="private, no-store"
+                return response
             return redirect(f"/world/play/career/{career_id}/market/player/{player_id}")
-        except (ValueError,KeyError,sqlite3.Error):
+        except (ValueError,KeyError,sqlite3.Error) as exc:
+            if request.accept_mimetypes.best=="application/json":
+                response=jsonify(ok=False,error=str(exc)[:240])
+                response.headers["Cache-Control"]="private, no-store"
+                return response,400
             return redirect(f"/world/play/career/{career_id}/market#scouting")
 
     @bp.get("/world/play/career/<career_id>/market/scout-feed")
