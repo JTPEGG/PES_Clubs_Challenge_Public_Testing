@@ -25,8 +25,18 @@ PROJECT_REF = "bjahvrmzcpqrynmoxokb"
 SAVE_KEY = "fc27_manual_v2"
 MAGIC = b"FC27C1\x00"
 CAREER_PREFIX = "world_career_"
-CAREER_EXTRAS = frozenset(("world_fc27_free_agent_offers",
-                          "world_fc27_free_agent_events"))
+# Mutable FC27 tables outside the world_career_ prefix MUST survive a
+# redeploy. Static warehouse/ratings/free-agent-pool tables are deliberately
+# excluded, since they are rebuilt from the verified immutable source.
+CAREER_EXTRAS = frozenset((
+    "world_fc27_free_agent_offers",
+    "world_fc27_free_agent_events",
+    "world_fc27_free_agent_rival_bids",
+    "world_fc27_market_intervals",
+    "world_fc27_market_club_intents",
+    "world_fc27_market_club_evaluations",
+    "world_fc27_market_negotiation_diagnostics",
+))
 META_TABLE = "_fc27_career_storage_meta"
 LOG = logging.getLogger(__name__)
 
