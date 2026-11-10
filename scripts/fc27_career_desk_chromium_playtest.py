@@ -236,13 +236,19 @@ def run(world,output):
             # player decision must be rejected by the real authenticated API.
             check(page.locator('#fa-confirm').count()==0,
                   "Free-agent profile incorrectly exposes immediate signing")
-            csrf=page.locator('#fa-contract input[name="csrf"]').input_value()
-            premature=page.request.post(base+manager_path+'/free-agent',
-                data={'csrf':csrf,'player_id':str(free[0]),
-                      'action':'confirm','weekly_wage':'0',
-                      'contract_years':'3','role_promise':'key_player'},
-                headers={'Accept':'application/json'})
-            check(premature.status==400 and not premature.json().get('ok'),
+            premature=page.evaluate("""async () => {
+                const form=document.querySelector('#fa-contract');
+                const data=new FormData(form);
+                data.set('action','confirm');
+                const response=await fetch(form.action,{
+                    method:'POST',body:data,credentials:'same-origin',
+                    headers:{Accept:'application/json'}
+                });
+                return {status:response.status,
+                        payload:await response.json().catch(()=>null)};
+            }""")
+            check(premature['status']==400 and
+                  not (premature['payload'] or {}).get('ok'),
                   "Manager can sign a free agent before player choice")
             with closing(sqlite3.connect(world)) as db:
                 db.row_factory=sqlite3.Row
