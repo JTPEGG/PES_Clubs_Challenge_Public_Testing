@@ -18,6 +18,10 @@ if os.getenv("FC27_PRESEASON_PLAYTEST_ENABLED") != "1":
     raise RuntimeError("Explicit FC27_PRESEASON_PLAYTEST_ENABLED=1 required")
 if not os.getenv("WORLD_MARKET_ACCESS_KEY") or not os.getenv("WORLD_MARKET_COOKIE_SECRET"):
     raise RuntimeError("Refusing public preview without login and session keys")
+# This parallel V2 test service must not accept careers on a Render Free
+# ephemeral disk. Its private Supabase connection must be configured first.
+if not os.getenv("FC27_DATABASE_URL"):
+    raise RuntimeError("FC27 V2 preview requires its isolated persistent save store")
 
 db_path = Path(os.getenv("DATABASE_PATH", "")).resolve()
 if not db_path.is_file():
