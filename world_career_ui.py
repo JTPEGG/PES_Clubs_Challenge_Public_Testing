@@ -1677,6 +1677,27 @@ DASHBOARD_JS = r"""
     completed:'Confirmed',
     withdrawn:'Withdrawn',rejected:'Declined'
   };
+  function saleStatusLabel(offer){
+    const status=offer.status,agent=offer.agent_status,
+          decision=offer.player_choice;
+    if(status==='accepted_pending_contract'){
+      if(decision==='accepted')return 'Player accepts — sign transfer';
+      if(decision==='declined')return 'Player declined';
+      if(decision==='evaluating')return 'Player considering offers';
+      if(agent==='terms_accepted')return 'Agent agreed — awaiting player';
+      if(agent==='agent_counter')return 'Agent negotiating wages';
+      if(agent==='wage_limit')return 'Buyer cannot meet wages';
+      if(agent==='role_refused')return 'Role demands not met';
+      if(agent==='needs_information')return 'Player terms need review';
+    }
+    if(status==='withdrawn'){
+      if(agent==='role_refused'||agent==='wage_limit'||
+         agent==='needs_information'||agent==='player_refused')
+        return 'Personal terms unsuccessful';
+      if(decision==='declined')return 'Player chose another club';
+    }
+    return labels[status]||status;
+  }
   function formFor(offer,verb,csrf){
     const form=document.createElement('form');
     form.method='post';
@@ -1741,7 +1762,7 @@ DASHBOARD_JS = r"""
       refreshInboxList();
       const label=card.querySelector('.label');
       if(label)label.textContent=(card.dataset.deskBuyer||offer.buyer||'Buying club')+
-        ' · '+(labels[status]||status);
+        ' · '+saleStatusLabel(offer);
       if(status==='proposed')continue;
       let actions=card.querySelector('.actions');
       if(actions){
@@ -1781,6 +1802,7 @@ DASHBOARD_JS = r"""
           (offer.player_choice==='accepted'?
             'Player has chosen this buyer. You may confirm the sale in your Inbox.':
             'Player is considering the competing proposals. Finalisation is not yet available.'):
+          agent==='agent_counter'?'Agent is negotiating improved wages with the buyer.':
           'Fee accepted — player/agent talks are in progress.'):
         status==='countered'?'Counter sent — awaiting the buying club.':
         status==='agreed_future'?'Confirmed — registration will take place at the deadline.':
@@ -1794,7 +1816,7 @@ DASHBOARD_JS = r"""
     const row=outgoing.tBodies[0].querySelector(
       '[data-live-offer-id="'+Number(offer.offer_id)+'"]');
     if(row&&row.cells.length>3){
-      row.cells[3].textContent=labels[offer.status]||offer.status;
+      row.cells[3].textContent=saleStatusLabel(offer);
       if(row.cells[4] && !['proposed','countered','accepted_pending_contract'].includes(offer.status))
         row.cells[4].replaceChildren();
     }
@@ -2296,7 +2318,7 @@ DASHBOARD_JS = r"""
         card.dataset.deskBuyer=o.buyer;
         const label=document.createElement('div');
         label.className='label';
-        label.textContent=o.buyer+' · '+(labels[o.status]||o.status);
+        label.textContent=o.buyer+' · '+saleStatusLabel(o);
         const heading=document.createElement('h3');
         const link=document.createElement('a');
         link.href=location.pathname+'/player/'+encodeURIComponent(o.player_id);
@@ -2381,7 +2403,7 @@ DASHBOARD_JS = r"""
         row.cells[0].textContent=o.player;row.cells[1].textContent=o.buyer;
         row.cells[2].textContent=pound(o.fee);
         row.cells[2].dataset.sortValue=String(o.fee);
-        row.cells[3].textContent=labels[o.status]||o.status;
+        row.cells[3].textContent=saleStatusLabel(o);
         row.cells[4].replaceChildren();
         if(['proposed','countered','accepted_pending_contract'].includes(o.status)){
           const form=formFor(o,'cancel',csrf);
