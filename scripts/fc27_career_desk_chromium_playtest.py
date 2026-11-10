@@ -1078,9 +1078,34 @@ def run(world,output):
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').is_visible(),
                   "Transfer Centre has no visible Continue action at top")
-            check('Expired at deadline' in page.locator(
-                  '#desk-view-transfers table[data-desk-table="outgoing"]').inner_text(),
-                  "Unsigned bids at deadline incorrectly labelled as voluntary withdrawals")
+            # A failed agent negotiation should already have withdrawn
+            # and informed the manager. Only bids still genuinely pending
+            # at the deadline should display 'Expired at deadline'.
+            with closing(sqlite3.connect(world)) as db:
+                expired=db.execute("""SELECT COUNT(*) FROM
+                    world_career_offer_events e
+                    JOIN world_career_offers o ON o.offer_id=e.offer_id
+                    WHERE o.career_id=?
+                      AND e.event_type='preseason_deadline_expired'""",
+                    (CAREER,)).fetchone()[0]
+                failed=db.execute("""SELECT COUNT(*) FROM
+                    world_career_offer_events e
+                    JOIN world_career_offers o ON o.offer_id=e.offer_id
+                    WHERE o.career_id=? AND
+                      e.event_type='ai_personal_terms_failed'""",
+                    (CAREER,)).fetchone()[0]
+                leftover=db.execute("""SELECT COUNT(*) FROM
+                    world_career_offers o
+                    JOIN world_career_preseason_window_offers w
+                      ON w.offer_id=o.offer_id
+                    WHERE o.career_id=? AND
+                      o.status IN ('proposed','countered','accepted_pending_contract')""",
+                    (CAREER,)).fetchone()[0]
+            displayed=page.locator(
+                '#desk-view-transfers table[data-desk-table="outgoing"]').inner_text()
+            check(leftover==0 and (expired==0 or 'Expired at deadline' in displayed)
+                  and (failed==0 or 'Personal terms unsuccessful' in displayed),
+                  "Unsigned bids lack accurate deadline-expired or early failed-negotiation labels")
             page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').click()
             check(page.locator('#desk-view-season-setup').is_visible(),
                   "Continue link did not navigate to season setup checklist")
