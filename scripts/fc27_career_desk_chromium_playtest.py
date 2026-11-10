@@ -607,11 +607,49 @@ def run(world,output):
                   "Compact Squad list is missing age or weekly wage")
             found.append("Desktop navigation: Squad, Inbox, Scouting, Transfers, Finances")
 
+            # Open a real linked player from Scouting without losing the
+            # manager sidebar, header clock or current career state.
+            page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
+            first_profile=page.locator(
+                '#desk-view-scouting [data-scout-results] tbody tr a[href*="/market/player/"]').first
+            check(first_profile.count()==1,"Scouting has no linked player profiles")
+            first_profile.click()
+            check(page.locator('#desk-view-player').is_visible() and
+                  page.locator('.desk-sidebar').is_visible() and
+                  page.locator('#desk-header-clock').is_visible() and
+                  page.url.startswith(base+manager_path+'#player-'),
+                  "Clicking a player left the Career Desk shell or hid its navigation")
+            page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
+            check(page.locator('#desk-view-scouting').is_visible(),
+                  "Scouting navigation did not return from player report")
+            found.append("Scouting player links open inside the existing Career Desk sidebar and clock")
+
             target,ref_value=select_target(world,manager)
-            page.goto(base+manager_path+"/player/"+str(target),
+            page.goto(base+manager_path+"#player-"+str(target),
                       wait_until="domcontentloaded")
-            check(page.locator("#scout-buy").is_visible(),
-                  "Cannot bid from a full FC27 player's scouting report")
+            page.locator("#desk-view-player #scout-buy").wait_for(
+                state="visible",timeout=20000)
+            check(page.locator("#scout-buy").is_visible() and
+                  page.locator('.desk-sidebar').is_visible() and
+                  page.locator('#desk-view-player').is_visible(),
+                  "Cannot bid from in-desk FC27 scouting report")
+            check(page.locator('#desk-view-player h1').inner_text() and
+                  page.locator('#desk-view-player .grid>.card').count()>=4,
+                  "Embedded player profile lacks identity or scouting metrics")
+            # Shortlisting also stays in the player view: no standalone
+            # redirect that discards the user's place in the 30-minute window.
+            shortlist_form=page.locator('#desk-view-player form[action$="/market/shortlist"]')
+            if shortlist_form.locator('button[value="save"]').count()==1:
+                with page.expect_response(lambda response:response.url.endswith(
+                        '/market/shortlist') and response.request.method=='POST',
+                        timeout=20000) as shortlist_response:
+                    shortlist_form.locator('button[value="save"]').click()
+                check(shortlist_response.value.status==200 and
+                      shortlist_response.value.json().get("shortlisted") is True and
+                      page.locator('#desk-view-player').is_visible() and
+                      page.locator('.desk-sidebar').is_visible(),
+                      "Shortlisting a player left the Career Desk or failed")
+                found.append("Shortlist button saves in place without reloading the Career Desk")
             offered=round(ref_value*1.6)
             page.locator("#scout-fee").fill(str(offered))
             player_url=page.url
