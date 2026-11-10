@@ -3378,7 +3378,19 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             # Also covers restored/imported QA careers that did not pass
             # through the new-career POST in this Gunicorn process.
             queue_scout_warm(career_id)
-            if snap["state"]!="not_started":
+            if snap["state"]=="deadline_reached":
+                # The 30-minute deadline is authoritative. Registration
+                # must not wait for the next 15-second browser pulse or a
+                # full 659-club market tick before the manager can continue.
+                # Ordinary open-window GETs remain non-blocking.
+                try:
+                    process_live_market(db,career_id=career_id)
+                except sqlite3.OperationalError:
+                    # A concurrent market worker may hold SQLite's write
+                    # lock briefly. Resume via its serialized queue; the
+                    # page will truthfully say 'Deadline processing'.
+                    queue_market_tick(career_id)
+            elif snap["state"]=="open":
                 queue_priority_tick(career_id)
                 queue_market_tick(career_id)
             return live_market_render(db,career_id=career_id)
