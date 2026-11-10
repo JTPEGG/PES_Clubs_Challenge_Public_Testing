@@ -190,6 +190,12 @@ def offer_free_agent(conn,*,career_id,player_id,weekly_wage,years,role,
     if action=="confirm":
         if not original or original["status"]!="terms_accepted":
             raise ValueError("The player has not agreed terms to sign")
+        from world_fc27_player_review import choice_for
+        decision=choice_for(conn,career_id=career_id,kind="free_agent",
+                            source_id=original["signing_id"])
+        if not decision or decision["status"]!="accepted":
+            raise ValueError("The player has not yet accepted the move. "+
+                "Await the separate decision in your Inbox.")
         # Only the manager may sign; the wage ceiling is checked again at
         # confirmation, including other agreed future contracts.
         budget=conn.execute("""SELECT weekly_wage_budget,committed_wages
@@ -247,10 +253,16 @@ def offer_free_agent(conn,*,career_id,player_id,weekly_wage,years,role,
     if age>33:premium*=0.90
     required=max(500,round(row["reference_weekly_wage_gbp"]*
                            role_factor*premium/500)*500)
-    # Salary caps remain genuine club budget checks; proposed wages do not
-    # reserve money until the manager has confirmed the signature.
+    from world_fc27_contract_renewals import market_reference_for_transfer
+    peer_wage=market_reference_for_transfer(conn,dataset=DATASET,
+        player_id=player_id,club_id=career)
+    if peer_wage is not None:
+        required=max(required,int(round(peer_wage*.86/500)*500))
+    # A wage agreement is not player consent. The player's own decision
+    # follows as a separate, time-bounded event after comparing proposals.
     status="terms_accepted" if weekly_wage>=required else "countered"
-    reason=("Agent and player accepted the wage and role; manager confirmation required"
+    reason=("Agent has agreed provisional contract terms. The player will "
+            "now consider competing offers before replying to your Inbox."
             if status=="terms_accepted" else
             "Agent requests £"+format(required,",")+
             " weekly for this role and club's sporting circumstances")
@@ -274,7 +286,13 @@ def offer_free_agent(conn,*,career_id,player_id,weekly_wage,years,role,
         (signing_id,event,detail) VALUES(?,'agent_response',?)""",
         (signing_id,reason))
     conn.commit()
+    review=None
+    if status=="terms_accepted":
+        from world_fc27_player_review import queue_choice
+        review=queue_choice(conn,career_id=career_id,kind="free_agent",
+            source_id=signing_id,player_id=player_id)
     return {"status":status,"message":reason,"required_weekly_wage_gbp":required,
+            "player_review":review["status"] if review else None,
             "player_id":player_id}
 
 def finalise_signed_free_agents(conn,*,career_id,effective_date):
