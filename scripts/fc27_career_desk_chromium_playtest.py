@@ -1049,6 +1049,75 @@ def run(world,output):
                       "Failed agent approach was not idempotently closed")
             found.append("No unusable last-five-second bids; unfundable agent talks end promptly with an Inbox reason")
 
+            # Multiple legitimate fee offers should result in ONE actual
+            # independent player decision. The loser must not remain
+            # indefinitely in 'Player/agent talks', and the winner must still
+            # require the human manager's final signing approval.
+            from world_fc27_player_review import queue_choice,review_due_choices
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                candidate=db.execute("""SELECT r.player_id
+                    FROM world_career_registrations r
+                    JOIN world_dataset_ratings x ON x.player_id=r.player_id
+                        AND x.dataset_id=?
+                    WHERE r.career_id=? AND r.club_id=?
+                      AND x.overall BETWEEN 60 AND 85
+                      AND NOT EXISTS(SELECT 1 FROM world_career_offers o
+                        WHERE o.career_id=r.career_id AND o.player_id=r.player_id)
+                    ORDER BY r.player_id LIMIT 1""",
+                    (DATASET,CAREER,manager)).fetchone()
+                buyers=db.execute("""SELECT l.club_id,l.transfer_budget
+                    FROM world_career_club_ledger l
+                    WHERE l.career_id=? AND l.club_id<>?
+                      AND l.transfer_budget>2000000
+                    ORDER BY l.transfer_budget DESC LIMIT 2""",
+                    (CAREER,manager)).fetchall()
+                check(candidate and len(buyers)==2,
+                      "QA needs one clean source player and two financed buyers")
+                pid=int(candidate["player_id"])
+                reference,_=_player_reference(db,DATASET,pid)
+                now=datetime.now(timezone.utc)
+                paired=[]
+                for index,buyer in enumerate(buyers):
+                    fee=max(10000,min(int(reference or 500000),buyer["transfer_budget"]//3))
+                    oid=propose_offer(db,career_id=CAREER,
+                        request_key="qa-multiple-real-agreed-fees-"+str(index),
+                        player_id=pid,buying_club_id=buyer["club_id"],
+                        offered_fee=fee,agreement_date="2026-07-31",
+                        ai_bid_snapshot={"fee":fee,"buyer_club_id":buyer["club_id"]},
+                        autonomous_inbox=True)
+                    db.execute("""UPDATE world_career_offers
+                        SET status='accepted_pending_contract'
+                        WHERE offer_id=?""",(oid,))
+                    wage=20000+index*3500
+                    db.execute("""INSERT INTO world_career_agent_terms
+                        (offer_id,career_id,demanded_wage_weekly,
+                         proposed_wage_weekly,status,rounds,
+                         contract_years,role_promise)
+                        VALUES(?,?,?,?,'accepted',1,3,'regular_starter')""",
+                        (oid,CAREER,wage,wage))
+                    db.commit()
+                    queue_choice(db,career_id=CAREER,kind="sale",
+                                 source_id=oid,player_id=pid,now=now)
+                    paired.append(oid)
+                review_due_choices(db,career_id=CAREER,
+                                   now=now+timedelta(seconds=100))
+                rows=db.execute("""SELECT o.offer_id,o.status,q.status
+                    FROM world_career_offers o
+                    JOIN world_career_player_choices q
+                      ON q.career_id=o.career_id AND q.source_id=o.offer_id
+                      AND q.kind='sale'
+                    WHERE o.offer_id IN (?,?) ORDER BY o.offer_id""",
+                    (paired[0],paired[1])).fetchall()
+                check(len(rows)==2 and
+                      sum(x[2]=='accepted' for x in rows)==1 and
+                      sum(x[2]=='declined' for x in rows)==1 and
+                      all(x[2]!='evaluating' for x in rows) and
+                      all(x[1]!='agreed_future' for x in rows) and
+                      sum(x[1]=='withdrawn' for x in rows)==1,
+                      "Two competing agreed-fee offers did not produce one timely player choice, or were signed without manager approval")
+            found.append("Competing AI offers resolve to one player choice; losing bid closes and winner still needs final manager sign-off")
+
             # Advance ONLY the disposable QA DB to the real deadline. All
             # unfinished bids must be clearly labelled as deadline-expired,
             # and the manager must have a prominent usable next step.
