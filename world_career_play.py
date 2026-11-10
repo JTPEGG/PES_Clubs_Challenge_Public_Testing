@@ -3685,19 +3685,31 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
         check_write()
         wants_json=request.accept_mimetypes.best=="application/json"
         try:
-            with connect() as db:
-                result=submit_buy_offer(db,career_id=career_id,
-                    player_id=int(request.form["player_id"]),
-                    offered_fee=int(request.form["offered_fee"]),
-                    request_key=request.form["request_key"])
-                message=("Offer already recorded" if result["existing"] else
-                    "Offer submitted. Waiting for the autonomous selling club to review."
-                    if result["status"]=="proposed" else
-                    "Transfer bid submitted; seller response: "+
-                    result["status"].replace("_"," "))
-                if wants_json:
-                    return buy_offer_response(db,career_id,result["offer_id"],
-                        message,existing=result["existing"])
+            # A replay-safe request key ensures a lock retry never creates
+            # two bids, even if the first attempt committed before a later
+            # read met an AI writer. Always use a fresh connection on retry.
+            from time import sleep
+            for attempt in range(3):
+                try:
+                    with closing(connect()) as db:
+                        with db:
+                            result=submit_buy_offer(db,career_id=career_id,
+                                player_id=int(request.form["player_id"]),
+                                offered_fee=int(request.form["offered_fee"]),
+                                request_key=request.form["request_key"])
+                        message=("Offer already recorded" if result["existing"] else
+                            "Offer submitted. Waiting for the autonomous selling club to review."
+                            if result["status"]=="proposed" else
+                            "Transfer bid submitted; seller response: "+
+                            result["status"].replace("_"," "))
+                        if wants_json:
+                            return buy_offer_response(db,career_id,result["offer_id"],
+                                message,existing=result["existing"])
+                    break
+                except sqlite3.OperationalError as exc:
+                    if "locked" not in str(exc).lower() or attempt==2:
+                        raise
+                    sleep(0.15*(attempt+1))
             from urllib.parse import quote
             return redirect("/world/play/career/"+career_id+
                 "/market?notice="+quote(message)+"#purchases")
