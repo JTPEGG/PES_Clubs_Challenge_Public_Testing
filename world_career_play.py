@@ -1694,6 +1694,12 @@ Rejected and expired offers are not transfers.</p>
            lastInboxMessage=current;
            document.body.dataset.lastMessageId=String(current);
          }
+         // A reply can land while the manager is already reading Inbox.
+         // Confirm it server-side instead of leaving a stale unread badge.
+         const inboxPanel=document.getElementById('desk-view-inbox');
+         if(unread>0 && inboxPanel && !inboxPanel.hidden &&
+            typeof window.fc27MarkInboxViewed==='function')
+           window.fc27MarkInboxViewed();
        })
        .catch(function(){
          // The next poll retries naturally; never invent an offer or clear
@@ -1701,6 +1707,7 @@ Rejected and expired offers are not transfers.</p>
        })
        .finally(function(){marketPulseBusy=false;});
    }
+   window.fc27PollMarket=marketHeartbeat;
    setInterval(marketHeartbeat,15000);
   }
  }
