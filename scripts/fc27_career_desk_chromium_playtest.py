@@ -973,6 +973,82 @@ def run(world,output):
                             animations="disabled",full_page=True)
             found.append("Mobile 390px Inbox/Squad navigation with no whole-page overflow")
 
+            # Prevent the exact live-playtest failure: a new manager-club
+            # bid at T-5 seconds cannot reach fee, agent, independent player
+            # decision and manager sign-off before a 30-minute deadline.
+            # No artificial 'deal complete' is invented.
+            from world_live_market import (
+                _consider_bid,close_failed_human_sale_talks)
+            from world_career_incoming import _save,incoming_approach
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                snapshot=window_snapshot(db,career_id=CAREER)
+                deadline=datetime.fromisoformat(snapshot["deadline_at"])
+                before=db.execute("""SELECT COUNT(*) FROM world_career_offers
+                    WHERE career_id=? AND request_key LIKE 'live-v1-%'""",
+                    (CAREER,)).fetchone()[0]
+                offered,rejection=_consider_bid(db,career_id=CAREER,
+                    window_id=snapshot["window_id"],slot=11,
+                    t=deadline-timedelta(seconds=5))
+                after=db.execute("""SELECT COUNT(*) FROM world_career_offers
+                    WHERE career_id=? AND request_key LIKE 'live-v1-%'""",
+                    (CAREER,)).fetchone()[0]
+                check(offered is None and before==after and
+                      "insufficient time" in rejection,
+                      "AI generated a fresh five-seconds-before-deadline bid")
+                # A real agent cannot make a credible wage promise if the
+                # buying club lacks headroom. This must be an explained
+                # withdrawal, not an endless Player/agent talks card.
+                from world_careers import propose_offer
+                candidate=db.execute("""SELECT r.player_id FROM
+                    world_career_registrations r
+                    JOIN world_dataset_ratings x ON x.player_id=r.player_id
+                         AND x.dataset_id=?
+                    WHERE r.career_id=? AND r.club_id=?
+                    AND x.overall BETWEEN 60 AND 85
+                    ORDER BY r.player_id LIMIT 1""",
+                    (DATASET,CAREER,manager)).fetchone()
+                rival=db.execute("""SELECT club_id,transfer_budget FROM
+                    world_career_club_ledger
+                    WHERE career_id=? AND club_id<>? AND transfer_budget>2000000
+                    ORDER BY transfer_budget DESC LIMIT 1""",
+                    (CAREER,manager)).fetchone()
+                check(candidate and rival,
+                      "No source-backed QA player and solvent buyer for salary refusal")
+                from world_careers import _player_reference
+                value,_=_player_reference(db,DATASET,candidate[0])
+                fee=max(10000,min(int(value or 500000),rival[1]//3))
+                refused_id=propose_offer(db,career_id=CAREER,
+                    request_key="qa-ai-personal-terms-not-stalled",
+                    player_id=candidate[0],buying_club_id=rival[0],
+                    offered_fee=fee,agreement_date="2026-07-31",
+                    ai_bid_snapshot={"fee":fee,"buyer_club_id":rival[0]},
+                    autonomous_inbox=True)
+                db.execute("""UPDATE world_career_offers
+                    SET status='accepted_pending_contract'
+                    WHERE offer_id=?""",(refused_id,))
+                db.commit()
+                no_wages=_save(db,career_id=CAREER,offer_id=refused_id,
+                    status="wage_limit",
+                    reason="AI buyer cannot fund the player's contractual wage",
+                    agent_wage=45000)
+                closed=close_failed_human_sale_talks(db,career_id=CAREER,
+                    window_id=snapshot["window_id"],offer_id=refused_id,
+                    agent_state=no_wages,now=datetime.now(timezone.utc))
+                final=db.execute("""SELECT status FROM world_career_offers
+                    WHERE offer_id=?""",(refused_id,)).fetchone()[0]
+                email=db.execute("""SELECT COUNT(*) FROM
+                    world_career_market_inbox
+                    WHERE career_id=? AND message_key=?""",
+                    (CAREER,f"ai-personal-terms-failed:{refused_id}")).fetchone()[0]
+                check(closed and final=="withdrawn" and email==1,
+                      "AI buyer with impossible wages stalled, or manager was not told")
+                check(not close_failed_human_sale_talks(db,career_id=CAREER,
+                      window_id=snapshot["window_id"],offer_id=refused_id,
+                      agent_state=no_wages),
+                      "Failed agent approach was not idempotently closed")
+            found.append("No unusable last-five-second bids; unfundable agent talks end promptly with an Inbox reason")
+
             # Advance ONLY the disposable QA DB to the real deadline. All
             # unfinished bids must be clearly labelled as deadline-expired,
             # and the manager must have a prominent usable next step.
