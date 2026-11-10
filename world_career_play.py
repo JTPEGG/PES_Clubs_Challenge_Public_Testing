@@ -978,6 +978,8 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 </select></label>
 <label>Min OVR<br><input name="scout_min_overall" type="number" min="1" max="99" value="{{scout_min_overall}}" style="width:80px"></label>
 <label>Max age<br><input name="scout_max_age" type="number" min="16" max="65" value="{{scout_max_age}}" style="width:80px"></label>
+<label>Minimum height (cm)<br><input name="scout_min_height" type="number" min="120" max="230" value="{{scout_min_height}}" placeholder="Any"></label>
+<label>Maximum height (cm)<br><input name="scout_max_height" type="number" min="120" max="230" value="{{scout_max_height}}" placeholder="Any"></label>
 <label>Maximum market value (£)<br><input name="scout_max_value" type="number" min="0" step="100000" value="{{scout_max_value}}" placeholder="No limit" style="width:160px"></label>
 <label>Maximum weekly wage (£)<br><input name="scout_max_wage" type="number" min="0" step="1000" value="{{scout_max_wage}}" placeholder="No limit" style="width:160px"></label>
 <button type="button" data-scout-budget>Use available budget</button>
@@ -996,7 +998,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 </select></label>
 <label><input type="checkbox" name="scout_squad" value="1" {% if scout_squad %}checked{% endif %}> My squad only</label>
 <label>Sort by<br><select name="scout_sort">
-{% for key in ['overall','age','market_value','pace','shooting','passing','dribbling','defending','physicality','years_left','full_name'] %}
+{% for key in ['overall','age','market_value','pace','shooting','passing','dribbling','defending','physicality','years_left','height_cm','full_name'] %}
 <option value="{{key}}" {% if scout_sort==key %}selected{% endif %}>{{key|replace('_',' ')|title}}</option>{% endfor %}
 </select></label>
 <label>Order<br><select name="scout_order"><option value="desc" {% if scout_order=='desc' %}selected{% endif %}>Highest first</option>
@@ -1007,7 +1009,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 </form>
 <div class="desk-scout-table-tools"><button type="button" data-scout-attributes-toggle aria-expanded="false">Show attributes</button></div>
 <div class="scout-table" data-scout-scroll><table data-scout-results>
-<thead><tr><th>Player</th><th>Club</th><th>Pos</th><th>OVR</th><th>Age</th><th>Value</th>
+<thead><tr><th>Player</th><th>Club</th><th>Pos</th><th>OVR</th><th>Age</th><th>Height</th><th>Value</th>
 <th title="Current game wage, or free-agent reference wage. Not an agreed transfer demand.">Wage / wk</th>
 <th>Contract (game)</th><th>Years left</th><th class="desk-scout-extra">Pace</th><th class="desk-scout-extra">Shoot</th><th class="desk-scout-extra">Pass</th>
 <th class="desk-scout-extra">Dribble</th><th class="desk-scout-extra">Defend</th><th class="desk-scout-extra">Physical</th>
@@ -1016,6 +1018,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <tr class="{{'owned' if p.owned else ''}}">
 <td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a>{% if p.shortlisted %} ★{% endif %}</td><td>{{'—' if p.free_agent else p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td>
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
+<td>{{p.height_cm ~ ' cm' if p.height_cm is not none else '—'}}</td>
 <td>{{'FREE' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
 <td title="{{'Reference game wage, not confirmed agent demand' if p.free_agent else 'Current game wage, not future agent demand'}}">{{('Est. ' if p.free_agent else '') + money(p.current_wage) if p.current_wage is not none else '—'}}</td>
 <td>{{'Unattached' if p.free_agent else p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
@@ -2861,6 +2864,8 @@ def create_play_blueprint(db_path, on_career_commit=None):
         scout_listed=request.args.get("scout_listed")=="1" if not spectator else False
         scout_min_overall=filter_value("scout_min_overall")
         scout_max_age=filter_value("scout_max_age")
+        scout_min_height=filter_value("scout_min_height")
+        scout_max_height=filter_value("scout_max_height")
         scout_category=request.args.get("scout_category","") if not spectator else ""
         scout_min_category=filter_value("scout_min_category")
         scout_attribute=request.args.get("scout_attribute","") if not spectator else ""
@@ -2911,6 +2916,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
             position=scout_position,position_codes=scout_positions,
             exclude_manager_players=scout_hide_mine,listed_only=scout_listed,
             min_overall=scout_min_overall,max_age=scout_max_age,
+            min_height_cm=scout_min_height,max_height_cm=scout_max_height,
             category=scout_category,min_category=scout_min_category,
             attribute=scout_attribute,min_attribute=scout_min_attribute,
             contract=scout_contract,squad_only=scout_squad,sort_by=scout_sort,
@@ -3145,7 +3151,10 @@ def create_play_blueprint(db_path, on_career_commit=None):
             manager_club_name=club_display(db.execute("""SELECT name FROM world_clubs
                 WHERE club_id=?""",(c["manager_club_id"],)).fetchone()[0]),
             scout_min_overall=scout_min_overall or "",
-            scout_max_age=scout_max_age or "",scout_category=scout_category,
+            scout_max_age=scout_max_age or "",
+            scout_min_height=scout_min_height if scout_min_height is not None else "",
+            scout_max_height=scout_max_height if scout_max_height is not None else "",
+            scout_category=scout_category,
             scout_min_category=scout_min_category or "",scout_attribute=scout_attribute,
             scout_min_attribute=scout_min_attribute or "",scout_contract=scout_contract,
             scout_max_value=scout_max_value if scout_max_value is not None else "",
@@ -3311,6 +3320,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                     listed_only=request.args.get("scout_listed")=="1",
                     min_overall=positive_number("scout_min_overall"),
                     max_age=positive_number("scout_max_age"),
+                    min_height_cm=positive_number("scout_min_height"),
+                    max_height_cm=positive_number("scout_max_height"),
                     category=request.args.get("scout_category",""),
                     min_category=positive_number("scout_min_category"),
                     attribute=request.args.get("scout_attribute",""),
@@ -3336,6 +3347,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 club=("-" if p["free_agent"] else re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",p["club_name"])),
                 position=p["primary_position"] or "—",
                 overall=p["overall"],age=p["age"],
+                height=(str(p["height_cm"])+" cm" if p["height_cm"] is not None else "—"),
                 value=(format_market_gbp(p["market_value"])
                        if p["market_value"] is not None else "—"),
                 wage=(("Est. " if p["free_agent"] else "")+
