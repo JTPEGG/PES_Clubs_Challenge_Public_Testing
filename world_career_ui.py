@@ -506,6 +506,19 @@ body.desk-contract-open{overflow:hidden}
  .desk-player-report .card{padding:12px}.desk-player-report form{align-items:stretch}
  .desk-player-report label,.desk-player-report form input[type=number]{width:100%;max-width:100%}}
 
+/* Contract negotiations are a native Career Desk view, not a separate modal. */
+body.desk-contract-open{overflow:auto}
+.desk-contract-layer{display:block;position:static;inset:auto;z-index:auto;min-height:0;width:100%}
+.desk-contract-scrim{display:none}
+.desk-contract-panel{width:100%;max-width:980px;height:auto;min-height:380px;
+ background:var(--desk-panel);border:1px solid var(--desk-stroke);
+ border-radius:12px;box-shadow:none;overflow:hidden}
+.desk-contract-body{overflow:visible;padding:18px 22px 28px}
+.desk-contract-notice{position:fixed;z-index:125;bottom:22px;right:22px;max-width:440px;
+ padding:12px 16px;border-radius:9px;border:1px solid #519d9b;
+ background:#153b3c;color:#e9fff7;box-shadow:0 12px 30px #02061080;font-size:13px}
+.desk-contract-notice[data-error="1"]{border-color:#ba6464;background:#522e39}
+
 """
 
 DASHBOARD_JS = r"""
@@ -514,11 +527,11 @@ DASHBOARD_JS = r"""
   const source=document.getElementById('desk-screen-source');
   const host=document.getElementById('desk-view-host');
   if(!source||!host||source.dataset.initialized==='1')return;
-  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup','player'];
+  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup','player','contract'];
   const titles={
     dashboard:'Manager overview',inbox:"Manager's Inbox",transfers:'Transfer Centre',
     squad:'Squad planner',scouting:'Scouting',shortlist:'My shortlist',finances:'Club finances',
-    news:'Market news','season-setup':'Season setup',player:'Player profile'
+    news:'Market news','season-setup':'Season setup',player:'Player profile',contract:'Contract negotiations'
   };
   const views={};
   names.forEach(function(name){
@@ -534,17 +547,17 @@ DASHBOARD_JS = r"""
   // Keep the manager's navigation visible during contract talks. Fetch only
   // the existing source-backed contract form; no full dashboard navigation
   // or duplicate transfer-authorisation endpoint is introduced.
-  const contractLayer=document.createElement('div');
-  contractLayer.className='desk-contract-layer';contractLayer.hidden=true;
+  const contractLayer=views.contract;
+  contractLayer.className='desk-view desk-contract-layer';contractLayer.hidden=true;
   contractLayer.innerHTML='<div class="desk-contract-scrim" data-contract-close></div>'+
     '<aside class="desk-contract-panel" role="dialog" aria-modal="true" aria-label="Contract negotiations">'+
     '<div class="desk-contract-header"><div><strong>Contract negotiations</strong>'+
     '<small>Career Desk · 30-minute window remains open</small></div>'+
     '<button class="desk-contract-close" type="button" data-contract-close aria-label="Close negotiations">×</button></div>'+
     '<div class="desk-contract-body" data-contract-body></div></aside>';
-  document.body.appendChild(contractLayer);
   const contractBody=contractLayer.querySelector('[data-contract-body]');
   let contractRequest=null,contractUrlOpen=null,contractFocus=null;
+  let contractReturnView='inbox';
   function validContractUrl(href){
     const url=new URL(href,location.href);
     if(url.origin!==location.origin||
@@ -558,7 +571,22 @@ DASHBOARD_JS = r"""
     contractLayer.hidden=true;
     document.body.classList.remove('desk-contract-open');
     contractUrlOpen=null;
+    switchView(contractReturnView,false);
     if(contractFocus?.isConnected)contractFocus.focus();
+  }
+  function contractNotice(message,isError=false){
+    let toast=document.getElementById('desk-contract-notice');
+    if(!toast){
+      toast=document.createElement('div');
+      toast.id='desk-contract-notice';
+      toast.className='desk-contract-notice';
+      toast.setAttribute('role','status');
+      document.body.appendChild(toast);
+    }
+    toast.textContent=message;
+    toast.dataset.error=isError?'1':'0';
+    clearTimeout(contractNotice.dismiss);
+    contractNotice.dismiss=setTimeout(()=>toast.remove(),7500);
   }
   async function loadContractDrawer(url){
     contractRequest?.abort();
@@ -595,10 +623,10 @@ DASHBOARD_JS = r"""
     const url=validContractUrl(link.href);
     if(!url)return;
     event.preventDefault();
+    contractReturnView=names.find(name=>name!=='contract'&&!views[name].hidden)||'inbox';
     contractFocus=link;
     contractUrlOpen=url;
-    contractLayer.hidden=false;
-    document.body.classList.add('desk-contract-open');
+    switchView('contract',true);
     contractLayer.querySelector('.desk-contract-close').focus();
     loadContractDrawer(url);
   },true);
@@ -621,12 +649,11 @@ DASHBOARD_JS = r"""
     if(form.dataset.saving==='1')return;
     const data=new FormData(form);
     data.set('action',pressed.value);
-    const buttons=Array.from(form.querySelectorAll('button'));
-    const feedback=document.createElement('p');
-    feedback.className='desk-contract-feedback';feedback.setAttribute('role','status');
-    feedback.textContent='Sending your decision to the player’s agent…';
-    form.appendChild(feedback);
-    form.dataset.saving='1';buttons.forEach(b=>b.disabled=true);
+    // The server remains authoritative, but does not lock the reader or
+    // steal the entire screen while processing the decision.
+    form.dataset.saving='1';
+    closeContractDrawer();
+    contractNotice('Decision submitted. You can continue using your Inbox.');
     try{
       const response=await fetch(url.pathname,{
         method:'POST',credentials:'same-origin',body:data,
@@ -634,24 +661,14 @@ DASHBOARD_JS = r"""
       const result=await response.json().catch(()=>null);
       if(!response.ok||!result?.ok)
         throw new Error(result?.error||'Contract decision was not saved');
-      feedback.textContent=result.message||'Contract decision saved.';
-      if(['agreed_future','completed','declined','withdrawn'].includes(result.status)){
-        closeContractDrawer();
-        // The Inbox now contains the actual signed/rejected decision, sourced
-        // from the committed server transaction rather than a fake toast.
-        location.hash='#inbox';
-        location.reload();
-      }else if(!contractLayer.hidden&&contractUrlOpen){
-        await loadContractDrawer(contractUrlOpen);
-      }else{
-        location.hash='#inbox';location.reload();
-      }
+      contractNotice(result.message||'Contract decision saved.');
+      // Ask the existing heartbeat to reconcile the real saved Inbox state,
+      // without discarding the user's current tab, search or scroll position.
+      window.fc27PollMarket?.();
     }catch(error){
-      feedback.textContent=String(error.message||error);
-      feedback.dataset.error='1';
+      contractNotice(String(error.message||error),true);
     }finally{
       form.dataset.saving='0';
-      buttons.forEach(button=>{if(button.isConnected)button.disabled=false;});
     }
   },true);
 
