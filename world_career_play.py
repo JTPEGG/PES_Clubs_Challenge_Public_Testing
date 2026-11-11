@@ -2917,6 +2917,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
         snap=window_snapshot(db,career_id=career_id)
         offers=[]
         messages=[]
+        letters=[]
         free_signings=[]
         if not spectator and db.execute("""SELECT 1 FROM sqlite_master
             WHERE type='table' AND name='world_fc27_free_agent_offers'""").fetchone():
