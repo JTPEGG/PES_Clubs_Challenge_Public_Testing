@@ -193,6 +193,25 @@ def run(world,output):
                   "Navigation is still centred instead of flush with the screen's left edge")
             check(dimensions["background"]=="rgb(14, 16, 21)",
                   "Previous dark workspace background was not restored")
+            # Regression for the white-on-white/grey-on-dark card mismatch:
+            # verify real rendered CSS, not just the existence of selectors.
+            palette=page.evaluate("""() => {
+              const rgb=el=>Array.from(getComputedStyle(el).backgroundColor
+                .matchAll(/[0-9]+/g)).slice(0,3).map(x=>Number(x[0]));
+              const foreground=el=>Array.from(getComputedStyle(el).color
+                .matchAll(/[0-9]+/g)).slice(0,3).map(x=>Number(x[0]));
+              const card=document.querySelector('#desk-view-dashboard .card');
+              const title=card?.querySelector('h2,h3,strong')||card;
+              const topbar=document.querySelector('.desk-topbar');
+              return {card:card?rgb(card):null,
+                heading:title?foreground(title):null,
+                topbar:rgb(topbar)};
+            }""")
+            check(palette["card"] is not None and
+                  max(palette["card"])<90 and
+                  min(palette["heading"])>175 and
+                  max(palette["topbar"])<80,
+                  "Card/topbar backgrounds or heading colours are not legible in dark mode")
             page.set_viewport_size({"width":1440,"height":900})
             found.append("Wide desktop navigation is anchored to x=0; dark canvas restored")
             page.screenshot(path=str(output/"01-desktop-before-start.png"),
