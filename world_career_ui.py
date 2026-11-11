@@ -810,6 +810,104 @@ body.desk-ui .desk-setup-step button:hover{background:#fff8d8!important}
  .desk-mail-stages{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 
+/* Scouting usability V2: light Anderlecht workspace and clean currency inputs. */
+body.desk-ui{background:#f4f5f3!important}
+body.desk-ui .desk-shell{background:#f4f5f3!important}
+body.desk-ui .desk-workspace{background:#f4f5f3!important;min-height:calc(100vh - 66px)}
+body.desk-ui .desk-view[data-view="scouting"]{background:transparent}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar{
+ background:#ffffff!important;border:1px solid #e4e9e0!important;
+ box-shadow:0 4px 22px rgba(20,36,20,.035);border-radius:12px}
+body.desk-ui .desk-view[data-view="scouting"] .scout-filters{
+ background:transparent!important}
+body.desk-ui .desk-scout-searchbar>label,
+body.desk-ui .desk-scout-quick>label{color:#4d5b4d!important}
+body.desk-ui .desk-scout-quick{border-top:1px solid #e9ede7!important;
+ gap:10px;padding-top:15px;align-items:center}
+body.desk-ui .desk-scout-quick>label.desk-scout-quick-number{
+ flex:1 1 260px!important;min-width:235px;max-width:330px}
+body.desk-ui .desk-scout-money{display:flex;flex-direction:column;gap:6px;
+ min-width:0;width:100%;border:1px solid #e0e7db;border-radius:10px;
+ background:#fafbf8;padding:7px}
+body.desk-ui .desk-scout-money-entry{display:flex;align-items:center;gap:3px;
+ min-height:38px;background:#fff;border:1px solid #dce4d9;border-radius:7px;
+ padding:3px;min-width:0}
+body.desk-ui .desk-scout-money-pound{color:#587058;font-size:13px;font-weight:850}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual{
+ flex:1 1 85px;width:70px;min-width:55px;border:0!important;
+ box-shadow:none!important;outline:0!important;background:transparent!important;
+ padding:3px 2px!important;text-align:center;color:#233323!important;
+ font-variant-numeric:tabular-nums;font-size:14px!important;font-weight:800}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual:focus{
+ outline:2px solid #e4bc3e!important;outline-offset:2px!important;
+ background:#fffef6!important;border-radius:4px}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual[aria-invalid="true"]{
+ background:#fff0f0!important;outline:2px solid #ce7373!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step{
+ flex:0 0 32px;display:grid;place-items:center;min-width:32px!important;
+ min-height:32px!important;border-radius:6px!important;padding:0!important;
+ border:1px solid #e1e7df!important;background:#f2f5f0!important;
+ color:#354833!important;box-shadow:none!important;font-size:18px!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step:hover{
+ background:#fff1ba!important;border-color:#e1c656!important}
+body.desk-ui .desk-view .desk-scout-money select.desk-scout-money-preset{
+ appearance:none;-webkit-appearance:none;
+ width:100%;height:33px;min-height:33px!important;background-color:#fff!important;
+ color:#4f5e4c!important;border:1px solid #dce4d9!important;
+ border-radius:6px!important;font-size:11px!important;font-weight:700!important;
+ padding:5px 27px 5px 10px!important;
+ background-image:linear-gradient(45deg,transparent 50%,#687d68 50%),
+ linear-gradient(135deg,#687d68 50%,transparent 50%)!important;
+ background-position:calc(100% - 16px) 13px,calc(100% - 11px) 13px!important;
+ background-size:5px 5px!important;background-repeat:no-repeat!important}
+body.desk-ui .desk-scout-money-hint{
+ font-size:10px;color:#8b9789;line-height:1.35;
+ padding:0 1px;white-space:normal}
+body.desk-ui .desk-scout-searchbar select:not(.desk-scout-money-preset){
+ background:#fff!important;color:#263526!important;
+ border:1px solid #dce4d9!important;border-radius:7px!important;
+ padding-right:30px!important}
+body.desk-ui .desk-scout-quick-check{
+ border:1px solid #e2e7e0!important;background:#f8faf6!important;
+ color:#354434!important;border-radius:8px;padding:9px 11px;
+ min-height:38px}
+body.desk-ui .desk-scout-quick-check:has(input:checked){
+ background:#fff8de!important;border-color:#e6d495!important}
+body.desk-ui .desk-scout-quick-check input{accent-color:#b89520}
+body.desk-ui .desk-scout-add{
+ background:#ffd230!important;color:#2d2c1d!important;
+ border:1px solid #e7c64b!important}
+body.desk-ui .desk-scout-add:hover{background:#ffe177!important}
+body.desk-ui .desk-scout-clear{
+ background:#fff!important;color:#53604d!important;
+ border:1px solid #dbe2d8!important}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results]:not(.desk-show-attributes){
+ table-layout:auto!important;min-width:1150px!important;width:100%!important}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th{
+ width:auto!important;min-width:48px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td:first-child,
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td:nth-child(2){
+ max-width:none!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:first-child{
+ min-width:162px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(2){
+ min-width:130px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(7),
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(8){
+ min-width:102px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-estimate{
+ color:#75631c;font-weight:740}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-actual{
+ color:#2e6d49;font-weight:850}
+body.desk-ui .desk-view[data-view="scouting"] .scout-table{
+ background:#fff!important;box-shadow:0 3px 16px #182b1908;
+ overflow-x:auto!important}
+@media(max-width:780px){
+ body.desk-ui .desk-scout-quick>label.desk-scout-quick-number{
+ flex:1 1 100%!important;max-width:none}
+ body.desk-ui .desk-workspace{padding:18px 14px 50px}
+}
+
 """
 
 DASHBOARD_JS = r"""
