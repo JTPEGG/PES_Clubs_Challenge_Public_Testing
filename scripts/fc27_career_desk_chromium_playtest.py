@@ -672,7 +672,7 @@ def run(world,output):
                 lambda response:response.url.endswith('/market/buy')
                     and response.request.method=='POST',
                 timeout=20000) as buy_response:
-                page.locator("#scout-buy button").click()
+                page.locator('#scout-buy button[type="submit"]').click()
             saved_buy=buy_response.value.json()
             check(buy_response.value.status==200 and saved_buy.get('ok')
                   and 'data-buy-offer-id' in saved_buy.get('html',''),
