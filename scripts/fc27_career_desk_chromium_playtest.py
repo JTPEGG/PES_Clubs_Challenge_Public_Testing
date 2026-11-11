@@ -547,20 +547,6 @@ def run(world,output):
             check(page.locator('.desk-scout-money-manual').count()==2 and
                   page.locator('.desk-scout-money-preset').count()==2,
                   "Visible exact-entry and preset currency controls missing")
-            preset=page.locator('.desk-scout-money-preset').first
-            preset.select_option('2000000')
-            check(page.locator('input[name="scout_max_value"]').input_value()=='2000000' and
-                  page.locator('.desk-scout-money-manual').first.input_value()=='2,000,000',
-                  "Preset must update the plain GBP value and readable formatted amount")
-            page.locator('.desk-scout-money-entry button').nth(1).click()
-            check(page.locator('input[name="scout_max_value"]').input_value()=='2500000',
-                  "Transfer value smart + must step £2m to £2.5m")
-            amount=page.locator('.desk-scout-money-manual').first
-            amount.fill('1,250,000')
-            check(page.locator('input[name="scout_max_value"]').input_value()=='1250000',
-                  "Comma-formatted manual amount must round-trip to exact GBP")
-            amount.fill('')
-            amount.blur()
             check(page.locator('input[name="scout_interest"]').is_visible(),
                   "Quick interested-player toggle missing")
             check(page.locator('.desk-scout-quick input[type="checkbox"]').count()>=2,
@@ -586,6 +572,21 @@ def run(world,output):
                   "Automatic infinite scrolling did not load subsequent players")
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").first.inner_text()==first,
                   "Infinite scrolling replaced the first page instead of appending")
+            preset=page.locator('.desk-scout-money-preset').first
+            preset.select_option('2000000')
+            check(page.locator('input[name="scout_max_value"]').input_value()=='2000000' and
+                  page.locator('.desk-scout-money-manual').first.input_value()=='2,000,000',
+                  "Preset must update the plain GBP value and readable formatted amount")
+            page.locator('.desk-scout-money-entry button').nth(1).click()
+            check(page.locator('input[name="scout_max_value"]').input_value()=='2500000',
+                  "Transfer value smart + must step £2m to £2.5m")
+            amount=page.locator('.desk-scout-money-manual').first
+            amount.fill('1,250,000')
+            check(page.locator('input[name="scout_max_value"]').input_value()=='1250000',
+                  "Comma-formatted manual amount must round-trip to exact GBP")
+            amount.fill('')
+            amount.blur()
+
             # A warmed filter must return promptly even while autonomous
             # FC27 market jobs run in the background. This measures the
             # actual live browser -> authenticated Flask JSON response.
