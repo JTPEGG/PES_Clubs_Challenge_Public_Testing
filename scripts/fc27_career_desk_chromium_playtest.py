@@ -177,6 +177,43 @@ def run(world,output):
                   "One 30-minute start action missing")
             check(page.locator('#desk-view-dashboard').is_visible(),
                   "Client-side dashboard not visibly initialised")
+            # The old max-width shell visually centred the navigation on
+            # wide monitors. Anchor the desktop sidebar to x=0 instead.
+            page.set_viewport_size({"width":1920,"height":900})
+            dimensions=page.evaluate("""() => ({
+                sidebarX:document.querySelector('.desk-sidebar').getBoundingClientRect().left,
+                canvasX:document.querySelector('.desk-workspace').getBoundingClientRect().left,
+                background:getComputedStyle(document.querySelector('.desk-workspace')).backgroundColor,
+                viewport:window.innerWidth,
+                shell:document.querySelector('.desk-shell').getBoundingClientRect().width
+            })""")
+            check(abs(dimensions["sidebarX"])<=1 and
+                  abs(dimensions["shell"]-1920)<=1 and
+                  dimensions["canvasX"]>=220,
+                  "Navigation is still centred instead of flush with the screen's left edge")
+            check(dimensions["background"]=="rgb(14, 16, 21)",
+                  "Previous dark workspace background was not restored")
+            # Regression for the white-on-white/grey-on-dark card mismatch:
+            # verify real rendered CSS, not just the existence of selectors.
+            palette=page.evaluate("""() => {
+              const rgb=el=>Array.from(getComputedStyle(el).backgroundColor
+                .matchAll(/[0-9]+/g)).slice(0,3).map(x=>Number(x[0]));
+              const foreground=el=>Array.from(getComputedStyle(el).color
+                .matchAll(/[0-9]+/g)).slice(0,3).map(x=>Number(x[0]));
+              const card=document.querySelector('#desk-view-dashboard .card');
+              const title=card?.querySelector('h2,h3,strong')||card;
+              const topbar=document.querySelector('.desk-topbar');
+              return {card:card?rgb(card):null,
+                heading:title?foreground(title):null,
+                topbar:rgb(topbar)};
+            }""")
+            check(palette["card"] is not None and
+                  max(palette["card"])<90 and
+                  min(palette["heading"])>175 and
+                  max(palette["topbar"])<80,
+                  "Card/topbar backgrounds or heading colours are not legible in dark mode")
+            page.set_viewport_size({"width":1440,"height":900})
+            found.append("Wide desktop navigation is anchored to x=0; dark canvas restored")
             page.screenshot(path=str(output/"01-desktop-before-start.png"),
                             animations="disabled",full_page=True)
             found.append("Pre-start dashboard and single-window button")
@@ -291,6 +328,12 @@ def run(world,output):
             check(sancho_inbox.count()==1 and
                   sancho_inbox.get_attribute('data-desk-player-choice')=='accepted',
                   "Player decision was not delivered to the manager Inbox")
+            # Multiple real emails may precede the actionable offer.
+            # Select Sancho's message from the left-hand Inbox list first.
+            if not sancho_inbox.is_visible():
+                item=page.locator('.desk-inbox-item').filter(has=sancho_inbox)
+                check(item.count()==1,"Sancho's decision has no indexed Inbox row")
+                item.locator('summary').click()
             sancho_inbox.locator('button[name="action"][value="confirm"]').click()
             page.wait_for_load_state('domcontentloaded')
             with closing(sqlite3.connect(world)) as db:
@@ -310,8 +353,8 @@ def run(world,output):
             sancho_row=page.locator(
                 '[data-desk-table="incoming"] tr[data-free-agent-signing-id]'
             ).filter(has_text="Jadon Sancho")
-            check(sancho_row.count()==1 and "FREE" in sancho_row.inner_text(),
-                  "Signed free agent must appear exactly once alongside purchased players in Incoming")
+            check(sancho_row.count()==1 and sancho_row.locator('td').nth(2).inner_text().strip()=='—',
+                  "Signed free agent must appear exactly once in Incoming, with a dash instead of a zero fee")
             check(sancho_row.locator('td').count()==7 and
                   'years' in sancho_row.locator('td').nth(4).inner_text(),
                   "Incoming free agent must show a separate wage and contract length")
@@ -516,7 +559,7 @@ def run(world,output):
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()>=80,
                   "FC27 scouting did not render its first 80 players")
             scout_row=page.locator("#desk-view-scouting [data-scout-results] tbody tr").first
-            wage=scout_row.locator("td").nth(7).inner_text()
+            wage=scout_row.locator("td").nth(8).inner_text()
             check(wage.startswith("£") and wage!="—",
                   "Game source weekly wage must appear immediately after transfer value")
             extra_header=page.locator("#desk-view-scouting th.desk-scout-extra").first
@@ -525,17 +568,22 @@ def run(world,output):
             page.locator("[data-scout-attributes-toggle]").click()
             check(extra_header.is_visible(),
                   "Show attributes must reveal the optional scouting columns")
-            first_pace=scout_row.locator("td").nth(10).inner_text()
+            first_pace=scout_row.locator("td").nth(11).inner_text()
             check(first_pace.isdigit(),"FC27 six-category scouting source data is missing")
             page.locator("[data-scout-attributes-toggle]").click()
             check(not extra_header.is_visible(),
                   "Hide attributes must restore compact scouting view")
             attrs=page.locator('select[name="scout_attribute"] option').count()
             check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
-            check(page.locator('input[name="scout_max_value"]').is_visible(),
-                  "Quick market value filter missing")
-            check(page.locator('input[name="scout_max_wage"]').is_visible(),
-                  "Quick weekly wage estimate filter missing")
+            check(page.locator('input[name="scout_max_value"]').count()==1 and
+                  page.locator('input[name="scout_max_value"]').get_attribute('type')=='hidden',
+                  "Canonical value filter must stay available for server FormData")
+            check(page.locator('input[name="scout_max_wage"]').count()==1 and
+                  page.locator('input[name="scout_max_wage"]').get_attribute('type')=='hidden',
+                  "Canonical wage filter must stay available for server FormData")
+            check(page.locator('.desk-scout-money-manual').count()==2 and
+                  page.locator('.desk-scout-money-preset').count()==2,
+                  "Visible exact-entry and preset currency controls missing")
             check(page.locator('input[name="scout_interest"]').is_visible(),
                   "Quick interested-player toggle missing")
             check(page.locator('.desk-scout-quick input[type="checkbox"]').count()>=2,
@@ -561,6 +609,21 @@ def run(world,output):
                   "Automatic infinite scrolling did not load subsequent players")
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").first.inner_text()==first,
                   "Infinite scrolling replaced the first page instead of appending")
+            preset=page.locator('.desk-scout-money-preset').first
+            preset.select_option('2000000')
+            check(page.locator('input[name="scout_max_value"]').input_value()=='2000000' and
+                  page.locator('.desk-scout-money-manual').first.input_value()=='2,000,000',
+                  "Preset must update the plain GBP value and readable formatted amount")
+            page.locator('.desk-scout-money-entry button').nth(1).click()
+            check(page.locator('input[name="scout_max_value"]').input_value()=='2500000',
+                  "Transfer value smart + must step £2m to £2.5m")
+            amount=page.locator('.desk-scout-money-manual').first
+            amount.fill('1,250,000')
+            check(page.locator('input[name="scout_max_value"]').input_value()=='1250000',
+                  "Comma-formatted manual amount must round-trip to exact GBP")
+            amount.fill('')
+            amount.blur()
+
             # A warmed filter must return promptly even while autonomous
             # FC27 market jobs run in the background. This measures the
             # actual live browser -> authenticated Flask JSON response.
@@ -598,6 +661,55 @@ def run(world,output):
                   f"Cached FC27 interest filter took {interest_seconds:.2f}s")
             found.append(f"Prewarmed would-consider-a-move response {interest_seconds:.2f}s")
             page.locator('input[name="scout_interest"]').uncheck()
+            # The saved game date, not the browser clock, defines "within
+            # 12 months". Verify the genuine AJAX contract filter and dates.
+            expiring=page.locator('.desk-scout-quick-check').filter(
+                has_text='Expires within 12 months').locator('input[type="checkbox"]')
+            with page.expect_response(
+                lambda response:'/market/scout-feed?' in response.url
+                    and 'scout_contract=expiring' in response.url
+                    and response.status==200,
+                timeout=15000) as expiry_request:
+                expiring.check()
+            expiry_payload=expiry_request.value.json()
+            with closing(sqlite3.connect(world)) as db:
+                start_date=db.execute('SELECT pes_lock_date FROM world_career_saves WHERE career_id=?',
+                    (CAREER,)).fetchone()[0]
+            start=datetime.fromisoformat(start_date).date()
+            cutoff=start.replace(year=start.year+1)
+            check(expiry_payload['total']<17804,
+                'Expiring checkbox must actually narrow the all-player population')
+            for player in expiry_payload['players']:
+                date_string=player['contract']
+                try: due=datetime.fromisoformat(date_string).date()
+                except (TypeError,ValueError):
+                    raise AssertionError('Expiring search included a player with no known date')
+                check(start<due<=cutoff,
+                    'Expiring search included an already expired or >12-month contract')
+            with page.expect_response(
+                lambda response:'/market/scout-feed?' in response.url
+                    and 'scout_contract=expiring' not in response.url
+                    and response.status==200,
+                timeout=15000):
+                expiring.uncheck()
+            # Transfer-listed players expose either an actual seller quote
+            # or a clearly labelled, non-binding estimated asking price.
+            # Transfer-listed is a quick-bar checkbox, so do not open the
+            # conditions modal over it (the modal intentionally blocks
+            # interaction with the rest of the page).
+            with page.expect_response(
+                lambda response:'/market/scout-feed?' in response.url
+                    and 'scout_listed=1' in response.url
+                    and response.status==200,
+                timeout=15000) as listed_request:
+                page.locator('input[name="scout_listed"]').check()
+            listed_payload=listed_request.value.json()
+            check(listed_payload['total']>0,'Source world should have listed players')
+            check(all(p['listed'] and p['asking_price']!='—'
+                      for p in listed_payload['players']),
+                  'Transfer-listed rows must show a real seller quote or estimated asking price')
+            page.locator('input[name="scout_listed"]').uncheck()
+            found.append('12-month contract expiry, transfer-listed asking prices and smart currency controls validated')
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator('#desk-view-transfers .desk-table-filter-row').count()==0,
                   "Transfer Centre should not have column search boxes")
@@ -607,19 +719,72 @@ def run(world,output):
                   "Compact Squad list is missing age or weekly wage")
             found.append("Desktop navigation: Squad, Inbox, Scouting, Transfers, Finances")
 
+            # Open a real linked player from Scouting without losing the
+            # manager sidebar, header clock or current career state.
+            page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
+            first_profile=page.locator(
+                '#desk-view-scouting [data-scout-results] tbody tr a[href*="/market/player/"]').first
+            check(first_profile.count()==1,"Scouting has no linked player profiles")
+            first_profile.click()
+            check(page.locator('#desk-view-player').is_visible() and
+                  page.locator('.desk-sidebar').is_visible() and
+                  page.locator('#desk-header-clock').is_visible() and
+                  urlparse(page.url).path==manager_path and
+                  urlparse(page.url).fragment.startswith('player-'),
+                  "Clicking a player left the Career Desk shell or hid its navigation")
+            page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
+            check(page.locator('#desk-view-scouting').is_visible(),
+                  "Scouting navigation did not return from player report")
+            found.append("Scouting player links open inside the existing Career Desk sidebar and clock")
+
             target,ref_value=select_target(world,manager)
-            page.goto(base+manager_path+"/player/"+str(target),
+            page.goto(base+manager_path+"#player-"+str(target),
                       wait_until="domcontentloaded")
-            check(page.locator("#scout-buy").is_visible(),
-                  "Cannot bid from a full FC27 player's scouting report")
+            page.locator("#desk-view-player #scout-buy").wait_for(
+                state="visible",timeout=20000)
+            check(page.locator("#scout-buy").is_visible() and
+                  page.locator('.desk-sidebar').is_visible() and
+                  page.locator('#desk-view-player').is_visible(),
+                  "Cannot bid from in-desk FC27 scouting report")
+            check(page.locator('#desk-view-player h1').inner_text() and
+                  page.locator('#desk-view-player .grid>.card').count()>=4,
+                  "Embedded player profile lacks identity or scouting metrics")
+            # Shortlisting also stays in the player view: no standalone
+            # redirect that discards the user's place in the 30-minute window.
+            shortlist_form=page.locator('#desk-view-player form[action$="/market/shortlist"]')
+            if shortlist_form.locator('button[value="save"]').count()==1:
+                with page.expect_response(lambda response:response.url.endswith(
+                        '/market/shortlist') and response.request.method=='POST',
+                        timeout=20000) as shortlist_response:
+                    shortlist_form.locator('button[value="save"]').click()
+                check(shortlist_response.value.status==200 and
+                      shortlist_response.value.json().get("shortlisted") is True and
+                      page.locator('#desk-view-player').is_visible() and
+                      page.locator('.desk-sidebar').is_visible(),
+                      "Shortlisting a player left the Career Desk or failed")
+                found.append("Shortlist button saves in place without reloading the Career Desk")
             offered=round(ref_value*1.6)
-            page.locator("#scout-fee").fill(str(offered))
+            # Check the actual increment interaction before arranging the
+            # exact fixture bid (the production widget uses fixed increments).
+            fee=page.locator("#scout-fee")
+            money=page.locator("#scout-buy .desk-money-control")
+            check(money.count()==1 and money.is_visible(),
+                  "Player-profile bid has no compact £ amount control")
+            before_fee=int(fee.input_value())
+            money.locator('select.desk-money-increment').select_option('100000')
+            money.locator('button.desk-money-step').last.click()
+            check(int(fee.input_value())==before_fee+100000,
+                  "Transfer price plus button did not change the submitted integer")
+            fee.evaluate("""(el,value)=>{
+                el.value=String(value);
+                el.dispatchEvent(new Event('input',{bubbles:true}));
+            }""",offered)
             player_url=page.url
             with page.expect_response(
                 lambda response:response.url.endswith('/market/buy')
                     and response.request.method=='POST',
                 timeout=20000) as buy_response:
-                page.locator("#scout-buy button").click()
+                page.locator('#scout-buy button[type="submit"]').click()
             saved_buy=buy_response.value.json()
             check(buy_response.value.status==200 and saved_buy.get('ok')
                   and 'data-buy-offer-id' in saved_buy.get('html',''),
@@ -736,6 +901,169 @@ def run(world,output):
                             animations="disabled",full_page=True)
             found.append("Source FC27 scouting + page 2 -> offer -> Transfers negotiations; Inbox auto-read stored")
 
+            # New V2 interactions: news notifications stay compact, budgets
+            # remain on Scouting, contracts open in the desk slide-over,
+            # accepted renewals sign with an Inbox receipt, and a separate
+            # renewal can be rejected directly from its Inbox email.
+            page.locator('.desk-sidebar [data-desk-tab="scouting"]').click()
+            budget_tiles=page.locator("#desk-view-scouting .desk-scout-finance span")
+            check(budget_tiles.count()==2 and
+                  "Transfer budget" in budget_tiles.first.inner_text() and
+                  "wage" in budget_tiles.nth(1).inner_text().lower(),
+                  "Scouting transfer and wage budgets are missing")
+            page.locator('.desk-sidebar [data-desk-tab="news"]').click()
+            opening=page.locator("#desk-view-news .desk-news-card").filter(
+                has_text="The summer transfer window is open")
+            check(opening.count()==1 and
+                  opening.locator('.desk-news-icon').count()==1 and
+                  opening.locator('.desk-news-detail,small').count()==0,
+                  "Opening notification should be compact, icon-led, without blurb or timestamp")
+            check(opening.inner_text().strip().endswith("The summer transfer window is open"),
+                  "Opening news notification contains surplus text")
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                from world_fc27_contract_renewals import (
+                    wage_signal,renewal_info,renewal_action)
+                from world_careers import wage_budget_breakdown
+                headroom=wage_budget_breakdown(db,CAREER,manager)["remaining"]
+                members=db.execute("""SELECT r.player_id FROM world_career_registrations r
+                    WHERE r.career_id=? AND r.club_id=?
+                    ORDER BY r.player_id""",(CAREER,manager)).fetchall()
+                viable=[]
+                for person in members:
+                    pid=int(person["player_id"])
+                    signal=wage_signal(db,career_id=CAREER,player_id=pid)
+                    renewal=renewal_info(db,career_id=CAREER,player_id=pid)
+                    if signal["demand"] is None or (
+                            renewal and renewal["status"] in
+                            ("agreed_future","completed","declined","expired")):
+                        continue
+                    wage=max(signal["demand"],
+                             renewal["demand_weekly_wage"] if renewal else 0)
+                    wage=((wage+499)//500)*500
+                    if max(0,wage-signal["wage"])<headroom-1000:
+                        viable.append((pid,wage,signal["name"]))
+                    if len(viable)>=2:break
+                check(len(viable)>=2,
+                      "Real manager roster lacks two affordable renewal candidates")
+                renewal_player,renewal_wage,renewal_name=viable[0]
+                reject_player,_,reject_name=viable[1]
+                # Isolated test creates an agent counter so the manager can
+                # reject a renewal straight from an Inbox message.
+                counter=renewal_action(db,career_id=CAREER,
+                    player_id=reject_player,action="offer",
+                    weekly_wage=0,contract_years=1)
+                check(counter["status"]=="countered",
+                      "QA counteroffer did not create a rejectable renewal")
+
+            page.locator('.desk-sidebar [data-desk-tab="squad"]').click()
+            full_desk_url=page.url
+            renewal_link=page.locator(
+                '#desk-view-squad .desk-squad-contract-link[href$="/contract/'+
+                str(renewal_player)+'"]')
+            check(renewal_link.count()==1 and renewal_link.is_visible(),
+                  "Manager squad has no contract negotiation link")
+            renewal_link.click()
+            drawer=page.locator('.desk-contract-layer')
+            check(drawer.is_visible() and
+                  page.locator('.desk-sidebar').is_visible() and
+                  page.url.split('#')[0]==full_desk_url.split('#')[0] and
+                  page.url.endswith('#contract'),
+                  "Contract talks should be an integrated Career Desk view")
+            offer_form=drawer.locator(
+                'form[action$="/contract/'+str(renewal_player)+'/decision"]')
+            offer_form.wait_for(state="visible",timeout=12000)
+            check(offer_form.is_visible(),
+                  "In-window contract panel did not load its valid negotiation form")
+            # Money fields are now compact read-only native-number inputs
+            # with displayed £ amounts and selectable +/- increments.
+            amount=offer_form.locator('input[name="weekly_wage"]')
+            check(int(amount.input_value())==renewal_wage and
+                  offer_form.locator('.desk-money-control').is_visible(),
+                  "Contract value and compact amount stepper are incorrect")
+            with page.expect_response(
+                lambda response:response.url.endswith(
+                    '/contract/'+str(renewal_player)+'/decision') and
+                    response.request.method=="POST",timeout=20000) as renewal_response:
+                offer_form.locator('button[value="offer"]').click()
+            # Submission closes only the integrated contract view; the
+            # manager can continue using Squad/Inbox while the request saves.
+            check(renewal_response.value.status==200,
+                  "Accepted renewal HTTP response failed")
+            page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
+            page.evaluate("window.fc27PollMarket?.()")
+            page.wait_for_function(
+                """(pid)=>location.hash==='#inbox' && Boolean(
+                    document.querySelector('#desk-view-inbox .desk-contract-inbox[data-desk-player="'+pid+'"][data-desk-status="agreed_future"]'))""",
+                arg=str(renewal_player),timeout=15000)
+            # The server-rendered markup can be present before the dashboard
+            # script finishes converting it into split-pane Inbox messages.
+            page.locator('#desk-view-inbox .desk-inbox-split').wait_for(
+                state="visible",timeout=15000)
+            check(page.locator('.desk-sidebar').is_visible(),
+                  "Renewal completion lost the manager navigation")
+            signed=page.locator(
+                '#desk-view-inbox .desk-contract-inbox[data-desk-player="'+
+                str(renewal_player)+'"]')
+            check(signed.count()==1 and
+                  signed.get_attribute("data-desk-status")=="agreed_future" and
+                  signed.locator('button[value="confirm"]').count()==0,
+                  "Signed renewal missing authoritative Inbox receipt or requires another confirmation")
+            # The selected Inbox card lives in the right-hand reader,
+            # outside its original summary row. If already selected, it is
+            # visible and no list re-selection is necessary.
+            if not signed.is_visible():
+                signed_item=page.locator('#desk-view-inbox .desk-inbox-item').filter(
+                    has=page.locator('.desk-contract-inbox[data-desk-player="'+
+                        str(renewal_player)+'"]'))
+                check(signed_item.count()==1,
+                      "Signed renewal not indexed as a manager Inbox email")
+                signed_item.locator('summary').click()
+            check("New contract signed" in
+                  page.locator('#desk-view-inbox .desk-inbox-reader').inner_text(),
+                  "Signed renewal Inbox email does not confirm the agreed contract")
+            with closing(sqlite3.connect(world)) as db:
+                row=db.execute("""SELECT status,signed_at FROM
+                    world_career_contract_renewals
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,renewal_player)).fetchone()
+                check(row and row[0]=="agreed_future" and row[1],
+                      "Renewal signing not persisted in disposable career")
+            reject=page.locator(
+                '#desk-view-inbox .desk-contract-inbox[data-desk-player="'+
+                str(reject_player)+'"]')
+            check(reject.count()==1 and
+                  reject.locator('button[value="decline"]').count()==1 and
+                  reject.locator('a.desk-inbox-open-negotiation').count()==1,
+                  "Inbox renewal email lacks Offer renewal and Reject renewal actions")
+            reject_button=reject.locator('button[value="decline"]')
+            # The selected message must be opened in the right-hand reader.
+            if not reject.is_visible():
+                reject_item=page.locator('#desk-view-inbox .desk-inbox-item').filter(
+                    has=page.locator('.desk-contract-inbox[data-desk-player="'+
+                        str(reject_player)+'"]'))
+                check(reject_item.count()==1,"Renewal Inbox message was not indexed")
+                reject_item.locator('summary').click()
+            reader_profile=page.locator(
+                '#desk-view-inbox .desk-inbox-reader .desk-inbox-player-meta')
+            check("OVR" in reader_profile.inner_text() and
+                  "Age" in reader_profile.inner_text(),
+                  "Player's position, overall and age are absent from Inbox header")
+            with page.expect_response(
+                lambda response:response.url.endswith(
+                    '/contract/'+str(reject_player)+'/decision') and
+                    response.request.method=="POST",timeout=15000) as decline_response:
+                reject_button.click()
+            check(decline_response.value.status==200,
+                  "Quick Reject renewal HTTP endpoint failed")
+            with closing(sqlite3.connect(world)) as db:
+                rejected=db.execute("""SELECT status FROM
+                    world_career_contract_renewals
+                    WHERE career_id=? AND player_id=?""",
+                    (CAREER,reject_player)).fetchone()[0]
+                check(rejected=="declined","Quick Inbox rejection was not committed")
+            found.append("Compact news, Scouting budgets, integrated contract view, signed Inbox receipt and non-blocking renewal rejection")
+
             # The spectator endpoint is separately accessible without login
             # but is read-only and does not show managerial POST forms.
             with closing(sqlite3.connect(world)) as db:
@@ -778,6 +1106,161 @@ def run(world,output):
                             animations="disabled",full_page=True)
             found.append("Mobile 390px Inbox/Squad navigation with no whole-page overflow")
 
+            # Prevent the exact live-playtest failure: a new manager-club
+            # bid at T-5 seconds cannot reach fee, agent, independent player
+            # decision and manager sign-off before a 30-minute deadline.
+            # No artificial 'deal complete' is invented.
+            from world_live_market import (
+                _consider_bid,close_failed_human_sale_talks)
+            from world_career_incoming import _save,incoming_approach
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                snapshot=window_snapshot(db,career_id=CAREER)
+                deadline=datetime.fromisoformat(snapshot["deadline_at"])
+                before=db.execute("""SELECT COUNT(*) FROM world_career_offers
+                    WHERE career_id=? AND request_key LIKE 'live-v1-%'""",
+                    (CAREER,)).fetchone()[0]
+                offered,rejection=_consider_bid(db,career_id=CAREER,
+                    window_id=snapshot["window_id"],slot=11,
+                    t=deadline-timedelta(seconds=5))
+                after=db.execute("""SELECT COUNT(*) FROM world_career_offers
+                    WHERE career_id=? AND request_key LIKE 'live-v1-%'""",
+                    (CAREER,)).fetchone()[0]
+                check(offered is None and before==after and
+                      "insufficient time" in rejection,
+                      "AI generated a fresh five-seconds-before-deadline bid")
+                # A real agent cannot make a credible wage promise if the
+                # buying club lacks headroom. This must be an explained
+                # withdrawal, not an endless Player/agent talks card.
+                from world_careers import propose_offer
+                candidate=db.execute("""SELECT r.player_id FROM
+                    world_career_registrations r
+                    JOIN world_dataset_ratings x ON x.player_id=r.player_id
+                         AND x.dataset_id=?
+                    WHERE r.career_id=? AND r.club_id=?
+                    AND x.overall BETWEEN 60 AND 85
+                    ORDER BY r.player_id LIMIT 1""",
+                    (DATASET,CAREER,manager)).fetchone()
+                rival=db.execute("""SELECT club_id,transfer_budget FROM
+                    world_career_club_ledger
+                    WHERE career_id=? AND club_id<>? AND transfer_budget>2000000
+                    ORDER BY transfer_budget DESC LIMIT 1""",
+                    (CAREER,manager)).fetchone()
+                check(candidate and rival,
+                      "No source-backed QA player and solvent buyer for salary refusal")
+                from world_careers import _player_reference
+                value,_=_player_reference(db,DATASET,candidate[0])
+                fee=max(10000,min(int(value or 500000),rival[1]//3))
+                refused_id=propose_offer(db,career_id=CAREER,
+                    request_key="qa-ai-personal-terms-not-stalled",
+                    player_id=candidate[0],buying_club_id=rival[0],
+                    offered_fee=fee,agreement_date="2026-07-31",
+                    ai_bid_snapshot={"fee":fee,"buyer_club_id":rival[0]},
+                    autonomous_inbox=True)
+                db.execute("""UPDATE world_career_offers
+                    SET status='accepted_pending_contract'
+                    WHERE offer_id=?""",(refused_id,))
+                db.commit()
+                no_wages=_save(db,career_id=CAREER,offer_id=refused_id,
+                    status="wage_limit",
+                    reason="AI buyer cannot fund the player's contractual wage",
+                    agent_wage=45000)
+                closed=close_failed_human_sale_talks(db,career_id=CAREER,
+                    window_id=snapshot["window_id"],offer_id=refused_id,
+                    agent_state=no_wages,now=datetime.now(timezone.utc))
+                final=db.execute("""SELECT status FROM world_career_offers
+                    WHERE offer_id=?""",(refused_id,)).fetchone()[0]
+                email=db.execute("""SELECT COUNT(*) FROM
+                    world_career_market_inbox
+                    WHERE career_id=? AND message_key=?""",
+                    (CAREER,f"ai-personal-terms-failed:{refused_id}")).fetchone()[0]
+                check(closed and final=="withdrawn" and email==1,
+                      "AI buyer with impossible wages stalled, or manager was not told")
+                check(not close_failed_human_sale_talks(db,career_id=CAREER,
+                      window_id=snapshot["window_id"],offer_id=refused_id,
+                      agent_state=no_wages),
+                      "Failed agent approach was not idempotently closed")
+            found.append("No unusable last-five-second bids; unfundable agent talks end promptly with an Inbox reason")
+
+            # Multiple legitimate fee offers should result in ONE actual
+            # independent player decision. The loser must not remain
+            # indefinitely in 'Player/agent talks', and the winner must still
+            # require the human manager's final signing approval.
+            from world_fc27_player_review import queue_choice,review_due_choices
+            with closing(sqlite3.connect(world,timeout=30)) as db:
+                db.row_factory=sqlite3.Row
+                candidate=db.execute("""SELECT r.player_id
+                    FROM world_career_registrations r
+                    JOIN world_dataset_ratings x ON x.player_id=r.player_id
+                        AND x.dataset_id=?
+                    WHERE r.career_id=? AND r.club_id=?
+                      AND x.overall BETWEEN 60 AND 85
+                      AND NOT EXISTS(SELECT 1 FROM world_career_offers o
+                        WHERE o.career_id=r.career_id AND o.player_id=r.player_id)
+                    ORDER BY r.player_id LIMIT 1""",
+                    (DATASET,CAREER,manager)).fetchone()
+                buyers=db.execute("""SELECT l.club_id,l.transfer_budget
+                    FROM world_career_club_ledger l
+                    WHERE l.career_id=? AND l.club_id<>?
+                      AND l.transfer_budget>2000000
+                    ORDER BY l.transfer_budget DESC LIMIT 2""",
+                    (CAREER,manager)).fetchall()
+                check(candidate and len(buyers)==2,
+                      "QA needs one clean source player and two financed buyers")
+                pid=int(candidate["player_id"])
+                reference,_=_player_reference(db,DATASET,pid)
+                now=datetime.now(timezone.utc)
+                paired=[]
+                for index,buyer in enumerate(buyers):
+                    fee=max(10000,min(int(reference or 500000),buyer["transfer_budget"]//3))
+                    oid=propose_offer(db,career_id=CAREER,
+                        request_key="qa-multiple-real-agreed-fees-"+str(index),
+                        player_id=pid,buying_club_id=buyer["club_id"],
+                        offered_fee=fee,agreement_date="2026-07-31",
+                        ai_bid_snapshot={"fee":fee,"buyer_club_id":buyer["club_id"]},
+                        autonomous_inbox=True)
+                    db.execute("""UPDATE world_career_offers
+                        SET status='accepted_pending_contract'
+                        WHERE offer_id=?""",(oid,))
+                    wage=20000+index*3500
+                    db.execute("""INSERT INTO world_career_agent_terms
+                        (offer_id,career_id,demanded_wage_weekly,
+                         proposed_wage_weekly,status,rounds,
+                         contract_years,role_promise)
+                        VALUES(?,?,?,?,'accepted',1,3,'regular_starter')""",
+                        (oid,CAREER,wage,wage))
+                    db.commit()
+                    queue_choice(db,career_id=CAREER,kind="sale",
+                                 source_id=oid,player_id=pid,now=now)
+                    paired.append(oid)
+                review_due_choices(db,career_id=CAREER,
+                                   now=now+timedelta(seconds=100))
+                rows=db.execute("""SELECT o.offer_id,o.status,q.status
+                    FROM world_career_offers o
+                    JOIN world_career_player_choices q
+                      ON q.career_id=o.career_id AND q.source_id=o.offer_id
+                      AND q.kind='sale'
+                    WHERE o.offer_id IN (?,?) ORDER BY o.offer_id""",
+                    (paired[0],paired[1])).fetchall()
+                check(len(rows)==2 and
+                      sum(x[2]=='accepted' for x in rows)==1 and
+                      sum(x[2]=='declined' for x in rows)==1 and
+                      all(x[2]!='evaluating' for x in rows) and
+                      all(x[1]!='agreed_future' for x in rows) and
+                      sum(x[1]=='withdrawn' for x in rows)==1,
+                      "Two competing agreed-fee offers did not produce one timely player choice, or were signed without manager approval")
+                notices=db.execute("""SELECT headline FROM world_career_market_inbox
+                    WHERE career_id=? AND
+                      message_key IN (?,?)""",
+                    (CAREER,
+                     f"player-review-outcome:sale:{paired[0]}",
+                     f"player-review-outcome:sale:{paired[1]}")).fetchall()
+                check(len(notices)==2 and
+                      any("chooses" in row[0] for row in notices) and
+                      any("rejects" in row[0] for row in notices),
+                      "Two real player decisions were not explained in manager Inbox")
+            found.append("Competing AI offers resolve to one player choice, personalised Inbox verdicts, and final manager sign-off")
+
             # Advance ONLY the disposable QA DB to the real deadline. All
             # unfinished bids must be clearly labelled as deadline-expired,
             # and the manager must have a prominent usable next step.
@@ -807,9 +1290,34 @@ def run(world,output):
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').is_visible(),
                   "Transfer Centre has no visible Continue action at top")
-            check('Expired at deadline' in page.locator(
-                  '#desk-view-transfers table[data-desk-table="outgoing"]').inner_text(),
-                  "Unsigned bids at deadline incorrectly labelled as voluntary withdrawals")
+            # A failed agent negotiation should already have withdrawn
+            # and informed the manager. Only bids still genuinely pending
+            # at the deadline should display 'Expired at deadline'.
+            with closing(sqlite3.connect(world)) as db:
+                expired=db.execute("""SELECT COUNT(*) FROM
+                    world_career_offer_events e
+                    JOIN world_career_offers o ON o.offer_id=e.offer_id
+                    WHERE o.career_id=?
+                      AND e.event_type='preseason_deadline_expired'""",
+                    (CAREER,)).fetchone()[0]
+                failed=db.execute("""SELECT COUNT(*) FROM
+                    world_career_offer_events e
+                    JOIN world_career_offers o ON o.offer_id=e.offer_id
+                    WHERE o.career_id=? AND
+                      e.event_type='ai_personal_terms_failed'""",
+                    (CAREER,)).fetchone()[0]
+                leftover=db.execute("""SELECT COUNT(*) FROM
+                    world_career_offers o
+                    JOIN world_career_preseason_window_offers w
+                      ON w.offer_id=o.offer_id
+                    WHERE o.career_id=? AND
+                      o.status IN ('proposed','countered','accepted_pending_contract')""",
+                    (CAREER,)).fetchone()[0]
+            displayed=page.locator(
+                '#desk-view-transfers table[data-desk-table="outgoing"]').inner_text()
+            check(leftover==0 and (expired==0 or 'Expired at deadline' in displayed)
+                  and (failed==0 or 'Personal terms unsuccessful' in displayed),
+                  "Unsigned bids lack accurate deadline-expired or early failed-negotiation labels")
             page.locator('#desk-view-transfers [data-post-window-continue] [data-desk-tab="season-setup"]').click()
             check(page.locator('#desk-view-season-setup').is_visible(),
                   "Continue link did not navigate to season setup checklist")

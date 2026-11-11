@@ -258,6 +258,22 @@ def offer_free_agent(conn,*,career_id,player_id,weekly_wage,years,role,
         player_id=player_id,club_id=career)
     if peer_wage is not None:
         required=max(required,int(round(peer_wage*.86/500)*500))
+    # Benchmark the player's ability against the WORLD market too. Using
+    # only the prospective club's local wage distribution makes 82–83 OVR
+    # free agents look implausibly cheap to lower-division managers.
+    # This is source-driven, not a fixed minimum salary for star players.
+    from world_fc27_contract_renewals import _peer_market_wage
+    world_peers=_peer_market_wage(conn,dataset=DATASET,club_id=-1,
+        overall=ovr,position=row["primary_position"])
+    world_wage=world_peers["reference"]
+    if world_wage is not None:
+        # Unattached players may compromise, but a major step down in
+        # sporting opportunity must be reflected in financial terms.
+        prestige_factor=.82+min(.45,gap*.012)
+        if age>=34:
+            prestige_factor*=.87
+        required=max(required,round(world_wage*role_factor*
+                                    prestige_factor/500)*500)
     # A wage agreement is not player consent. The player's own decision
     # follows as a separate, time-bounded event after comparing proposals.
     status="terms_accepted" if weekly_wage>=required else "countered"

@@ -401,13 +401,21 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-counter-stepper input{width:123px!important;font-size:13px!important;font-variant-numeric:tabular-nums;padding:7px!important}
 .desk-counter-stepper button{padding:7px 10px!important;min-width:32px;background:#29465d!important;border:1px solid #50768c!important}
 .desk-counter-preview{font-size:12px;color:#8ef0ce;min-width:56px;font-weight:800}
-.desk-view[data-view="news"] .desk-news-card{background:#142a40;border:1px solid #38536c;border-radius:8px;margin:0 0 9px;padding:14px}
-.desk-news-route{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 0;color:#e1f5ff}
+.desk-view[data-view="news"] .desk-news-feed{max-width:930px;display:grid;gap:7px}
+.desk-view[data-view="news"] .desk-news-card{display:flex;align-items:flex-start;gap:11px;
+ background:#14283d;border:1px solid #314c63;border-radius:9px;margin:0;padding:10px 12px;
+ box-shadow:inset 3px 0 #426e85;min-height:48px}
+.desk-news-icon{width:29px;height:29px;flex:0 0 29px;display:grid;place-items:center;
+ border-radius:7px;background:#233f54;border:1px solid #3c617b;font-size:15px}
+.desk-news-content{min-width:0;flex:1}
+.desk-news-content>strong{display:block;font-size:13px;line-height:1.45;color:#e8f5ff}
+.desk-news-detail{font-size:12px;color:#b6cedc;margin:3px 0 0;line-height:1.5}
+.desk-news-route{display:flex;gap:7px;align-items:center;flex-wrap:wrap;padding:3px 0 0;
+ color:#e1f5ff;font-size:12px}
 .desk-news-route .desk-news-player{font-weight:780;color:#fff}
-.desk-news-route .desk-news-arrow{color:#74d5c6;font-weight:900;font-size:18px}
+.desk-news-route .desk-news-arrow{color:#74d5c6;font-weight:900;font-size:14px}
 .desk-news-route .desk-news-club{color:#bad8e7}
 .desk-news-fee{color:#89e8bf;font-weight:750}
-.desk-view[data-view="news"] .desk-news-card small{color:#9aafc1}
 @media(max-width:1120px){.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:630px){.desk-position-grid{grid-template-columns:repeat(3,1fr)}.desk-offer-briefing-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.desk-view[data-view="scouting"] .desk-scout-searchbar{grid-template-columns:1fr}.desk-scout-quick>label.desk-scout-quick-number{flex:1 1 125px}}
 
@@ -420,6 +428,840 @@ body.desk-ui main .clock{font-size:clamp(36px,4vw,53px)}
 .desk-inbox-profile-link{font-size:16px;font-weight:750;color:#eaf6ff;
  text-decoration:none}.desk-inbox-profile-link:hover{text-decoration:underline;color:#8be1fa}
 .desk-inbox-free-message .actions form{display:flex;gap:8px;flex-wrap:wrap}
+/* Contracts open in a lightweight drawer: the desk sidebar remains in place. */
+body.desk-contract-open{overflow:hidden}
+.desk-contract-layer{position:fixed;inset:0;z-index:110;display:flex;justify-content:flex-end}
+.desk-contract-scrim{position:absolute;inset:0;background:#04111bcc}
+.desk-contract-panel{position:relative;display:flex;flex-direction:column;width:min(650px,100vw);
+ height:100%;background:#101f30;border-left:1px solid #456a84;box-shadow:-24px 0 60px #020710a8}
+.desk-contract-header{display:flex;justify-content:space-between;align-items:center;gap:12px;
+ padding:14px 18px;border-bottom:1px solid #31516a;background:#172c40}
+.desk-contract-header strong{font-size:15px}.desk-contract-header small{display:block;color:#9cb9cb;font-size:11px}
+.desk-contract-close{font-size:22px;line-height:1;border:1px solid #536f82;
+ background:#294259;border-radius:7px;padding:6px 12px;color:white;cursor:pointer}
+.desk-contract-body{overflow-y:auto;flex:1;padding:15px 20px 50px;min-height:0}
+.desk-contract-body main{max-width:none;margin:0;padding:0}
+.desk-contract-body main>a:first-child{display:none}
+.desk-contract-body h1{font-size:21px;margin:0 0 7px}
+.desk-contract-body .muted,.desk-contract-body .note{color:#afc7d7;font-size:12px}
+.desk-contract-body .card{background:#182e43;border:1px solid #38556d;border-radius:9px;padding:15px;margin:13px 0}
+.desk-contract-body .card h2{font-size:16px;margin:0 0 9px}
+.desk-contract-body .metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.desk-contract-body .metric{border:1px solid #3c5d77;background:#1c3850;border-radius:7px;padding:10px}
+.desk-contract-body .metric small{font-size:11px;color:#a9c7d9;display:block}
+.desk-contract-body .metric strong{font-size:17px;display:block;margin-top:4px}
+.desk-contract-body .fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.desk-contract-body label{display:block;font-size:12px;color:#c2d8e8}
+.desk-contract-body input,.desk-contract-body select{display:block;width:100%;padding:10px;
+ border:1px solid #56758c;background:#102639;border-radius:6px;color:white;margin-top:5px}
+.desk-contract-body .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.desk-contract-body button{border:1px solid #63aecb;border-radius:6px;background:#246c91;color:#fff;
+ padding:9px 13px;cursor:pointer}
+.desk-contract-body button.secondary{background:#2b455a}.desk-contract-body button.danger{background:#713c49}
+.desk-contract-body .error{color:#ffcbc9}.desk-contract-body .notice{color:#abebd7}
+.desk-contract-body .badge{background:#23465e;border-radius:14px;padding:3px 9px}
+.desk-contract-feedback{font-size:13px;padding:10px 0;color:#b8e5f3}
+.desk-contract-feedback[data-error="1"]{color:#ffb5ab}
+.desk-inbox-player-meta{display:block!important;color:#9fe3d7!important;font-size:12px!important;margin:3px 0}
+.desk-renewal-quick-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.desk-renewal-quick-actions button,.desk-renewal-quick-actions a{font-size:12px;padding:7px 11px;border-radius:7px}
+@media(max-width:550px){.desk-contract-body .fields{grid-template-columns:1fr}.desk-contract-body .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Player reports share the Career Desk's existing sidebar, header and clock. */
+.desk-view[data-view="player"]{min-width:0}
+.desk-player-report{max-width:1120px;min-width:0}
+.desk-player-report .desk-player-back{display:inline-flex;align-items:center;gap:8px;
+ padding:8px 11px;color:#b6d4e5;text-decoration:none;font-size:12px;
+ border-radius:7px;border:1px solid #344f67;background:#162a3d}
+.desk-player-report .desk-player-back:hover{color:white;background:#22425a}
+.desk-player-report h1{margin:18px 0 3px;font-size:clamp(23px,3vw,30px);line-height:1.25;letter-spacing:-.025em}
+.desk-player-report>p.muted{margin:0 0 20px;font-size:13px}
+.desk-view[data-view="player"] .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.desk-view[data-view="player"] .grid>.card{min-height:92px;margin:0;padding:15px 16px;
+ border-radius:10px;color:#b1ccdd;font-size:12px}
+.desk-view[data-view="player"] .grid>.card b{display:block;margin-top:5px;
+ color:#f5faff;font-size:21px;line-height:1.2}
+.desk-player-report .card{padding:15px 18px;margin:13px 0}
+.desk-player-report h2{margin:26px 0 12px;font-size:18px}
+.desk-player-report .card p{font-size:13px;line-height:1.5}
+.desk-player-report form{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.desk-player-report form label{display:flex;flex-direction:column;gap:5px;font-size:12px}
+.desk-player-report button{padding:9px 14px;border-radius:7px}
+.desk-player-report input,.desk-player-report select{padding:9px 10px;border:1px solid #52738c;
+ background:#11263b;color:#f5fbff;border-radius:7px;min-width:0}
+.desk-player-report form input[type="hidden"]{display:none}
+.desk-player-report #scout-budget-preview{margin:8px 0;color:#a3d6ca;font-size:13px}
+.desk-player-report .card table{border-collapse:collapse;width:100%;font-size:13px}
+.desk-player-report .card td{border-bottom:1px solid #304c65;padding:8px}
+.desk-player-report .card td b{font-size:13px}
+.desk-player-report .muted{color:#aac1d2;font-size:12px}
+.desk-player-report .desk-player-response{font-size:12px;margin:8px 0;color:#a9edcf}
+.desk-player-report .desk-player-response[data-error="1"]{color:#ffaaa3}
+.desk-player-report #scout-buy-result>.offer{margin:13px 0;border:1px solid #355874;
+ border-left:3px solid #5ab9dc;padding:14px;border-radius:8px;background:#1a3148}
+.desk-player-report #scout-buy-result>.offer .card{margin:5px 0}
+.desk-player-report #scout-buy-result button{margin:4px 0}
+@media(max-width:1140px){.desk-view[data-view="player"] .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.desk-player-report{width:100%}.desk-view[data-view="player"] .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .desk-view[data-view="player"] .grid>.card{padding:12px;min-height:88px}
+ .desk-player-report .card{padding:12px}.desk-player-report form{align-items:stretch}
+ .desk-player-report label,.desk-player-report form input[type=number]{width:100%;max-width:100%}}
+
+/* Contract negotiations are a native Career Desk view, not a separate modal. */
+body.desk-contract-open{overflow:auto}
+.desk-contract-layer{display:block;position:static;inset:auto;z-index:auto;min-height:0;width:100%}
+.desk-contract-scrim{display:none}
+.desk-contract-panel{width:100%;max-width:980px;height:auto;min-height:380px;
+ background:var(--desk-panel);border:1px solid var(--desk-stroke);
+ border-radius:12px;box-shadow:none;overflow:hidden}
+.desk-contract-body{overflow:visible;padding:18px 22px 28px}
+.desk-contract-notice{position:fixed;z-index:125;bottom:22px;right:22px;max-width:440px;
+ padding:12px 16px;border-radius:9px;border:1px solid #519d9b;
+ background:#153b3c;color:#e9fff7;box-shadow:0 12px 30px #02061080;font-size:13px}
+.desk-contract-notice[data-error="1"]{border-color:#ba6464;background:#522e39}
+
+/* Freeze-pane Scouting: keep budgets and filters visible while results scroll. */
+@media(min-width:761px) and (min-height:620px){
+ .desk-view[data-view="scouting"]{height:calc(100dvh - 102px);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+ .desk-view[data-view="scouting"]>h2{flex:none;margin-top:0}
+ .desk-view[data-view="scouting"]>.desk-scout-finance{flex:none}
+ .desk-view[data-view="scouting"] .card:has(>form.scout-filters){display:flex;flex-direction:column;
+  flex:1;min-height:0;overflow:visible;padding-bottom:4px}
+ .desk-view[data-view="scouting"] .scout-filters,
+ .desk-view[data-view="scouting"] .desk-scout-table-tools{flex:none}
+ .desk-view[data-view="scouting"] .scout-table[data-scout-scroll]{flex:1;min-height:0;
+  max-height:none;overflow:auto}
+ .desk-view[data-view="scouting"] .scout-table[data-scout-scroll] thead th{position:sticky;top:0;z-index:5}
+ .desk-view[data-view="scouting"] [data-scout-progress]{flex:none;min-height:34px}
+}
+.desk-view[data-view="scouting"] .scout-filters{position:relative}
+.desk-scout-position-trigger{min-height:37px;border:1px solid #4b728b;border-radius:6px;
+ background:#10293b;color:#f5fbff;padding:7px 12px;white-space:nowrap;font-size:12px}
+.desk-view[data-view="scouting"] .desk-position-chooser{position:absolute;z-index:70;
+ top:75px;left:13px;width:min(620px,calc(100% - 26px));max-height:50dvh;overflow-y:auto;
+ box-shadow:0 18px 40px #020711c4}
+
+/* Graphite, white and gold from the new PES Challenge manager desk. */
+:root{
+ --desk-bg:#0e1015;--desk-panel:#1b1e25;--desk-panel2:#252a33;
+ --desk-stroke:#353941;--desk-accent:#e3bd49;--desk-green:#e3bd49;
+ --desk-faint:#b1b5bc
+}
+body.desk-ui{background:var(--desk-bg);color:#f6f6f7}
+.desk-topbar{background:#171a20;border-bottom-color:#363941;box-shadow:0 5px 18px #00000045}
+.desk-sidebar{background:#16191f;border-right-color:#363941}
+.desk-brand small,.desk-nav-label,.desk-section-kicker{color:#b0b4bc}
+.desk-logo{background:linear-gradient(140deg,#f4d76a,#b68b2a);color:#141518}
+.desk-tab{color:#c4c8cf}
+.desk-tab:hover{background:#2a2c34}
+.desk-tab[aria-current="page"]{background:#383326;color:#fff2be;border-color:#5c4b27;
+ box-shadow:inset 3px 0 var(--desk-accent)}
+.desk-view .card{background:var(--desk-panel);border-color:var(--desk-stroke)}
+.desk-view .offer{background:#20242b}
+.desk-view .offer:focus-within{background:#2a2b2c;border-color:var(--desk-accent)}
+.desk-view .scout-table th{background:#2b2e34}
+.desk-view .scout-table,.desk-view .scout-filters,
+.desk-scout-searchbar,.desk-scout-dialog,.desk-position-chooser{background:#1c2027!important;
+ border-color:#45474e!important}
+.desk-scout-finance span,.desk-view .pill,.desk-money-control{background:#292b31;border-color:#4a4c53}
+.desk-view .scout-table tbody tr:hover{background:#2c2e36}
+.desk-view .scout-table a,.desk-view .muted a{color:#f1d072}
+.desk-view .desk-scout-searchbar select,.desk-view .desk-scout-searchbar input,
+.desk-money-control select,.desk-position-grid label{background:#25282e!important;
+ color:#f7f7f7!important;border-color:#53555e!important}
+.desk-scout-quick-check,.desk-position-grid label{background:#25282e!important;border-color:#454951!important}
+.desk-scout-quick-check input,.desk-position-grid input{accent-color:#efc94c}
+.desk-position-grid label:has(input:checked){background:#4c4228!important;border-color:#efd56c!important}
+.desk-scout-add,.desk-counter-stepper button,.desk-money-step{background:#6d5929!important;
+ border-color:#af903d!important;color:#fff}
+.desk-contract-panel{background:#202329;border-color:#474850}
+.desk-contract-header{background:#282a30;border-color:#494b50}
+.desk-contract-body .card,.desk-contract-body .metric{background:#2a2e35;border-color:#474c53}
+.desk-contract-body button{background:#6c592f;border-color:#bb9a48}
+.desk-live-status,.desk-view .count,.desk-counter-preview,.desk-news-fee{color:#f0cc67}
+.desk-live-status:before{background:#efd067;box-shadow:0 0 0 4px #efd06720}
+.desk-news-card,.desk-offer-briefing,.desk-offer-briefing-metrics>div{background:#23262d!important;border-color:#40444b!important}
+.desk-news-icon{background:#33302a;border-color:#655735}
+.desk-news-route .desk-news-arrow{color:#e9c458}
+.desk-money-control{display:inline-flex;gap:5px;align-items:center;border:1px solid #4c4f58;
+ border-radius:7px;padding:4px;min-height:38px;max-width:100%;vertical-align:middle}
+.desk-money-control .desk-money-step{font-weight:800;min-width:27px;min-height:27px;
+ border-radius:5px;padding:2px 7px}
+.desk-money-preview{min-width:66px;font-weight:750;font-variant-numeric:tabular-nums;
+ text-align:center;font-size:13px;color:#fff3cb}
+.desk-money-increment{font-size:11px!important;min-width:60px;min-height:27px!important;
+ padding:2px 6px!important;border-radius:5px!important}
+.desk-money-native{position:absolute!important;width:1px!important;height:1px!important;
+ border:0!important;opacity:0!important;padding:0!important;pointer-events:none!important}
+@media(max-width:760px){.desk-money-control{flex-wrap:wrap}.desk-money-increment{max-width:76px}}
+
+/* FC27 Career Desk unified with the Anderlecht Manager Desk visual system.
+   The original blue page styles above remain a non-JS fallback only. */
+:root{color-scheme:light;--desk-bg:#f4f5f3;--desk-panel:#ffffff;
+ --desk-panel2:#f8f9f7;--desk-stroke:#e5e9e3;--desk-accent:#ffd230;
+ --desk-green:#4f7457;--desk-faint:#767f75;--desk-ink:#222922}
+body.desk-ui{color-scheme:light;background:var(--desk-bg);color:var(--desk-ink);
+ font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body.desk-ui a{color:#455f44}
+body.desk-ui [hidden]{display:none!important}
+body.desk-ui .desk-topbar{background:#ffffff;border-bottom:1px solid #e4e9e2;box-shadow:0 2px 15px #161d1708}
+body.desk-ui .desk-brand{color:#202720;text-decoration:none}
+body.desk-ui .desk-brand strong{color:#1f271f;font-size:16px;letter-spacing:-.02em}
+body.desk-ui .desk-brand small{color:#7e887d;font-size:10px;letter-spacing:.02em;text-transform:none}
+.desk-club-crest,.desk-page-crest{display:grid;place-items:center;background:#f7f8f4;
+ border:1px solid #e8ece6;overflow:hidden;flex:0 0 auto}
+.desk-club-crest{width:49px;height:49px;border-radius:12px;padding:4px}
+.desk-club-crest img,.desk-page-crest img{width:100%;height:100%;object-fit:contain}
+.desk-crest-fallback{display:grid;place-items:center;width:100%;height:100%;
+ background:#2b352c;border-radius:8px;color:#ffe078;font-size:13px;font-weight:900;letter-spacing:-.025em}
+.desk-page-crest{width:59px;height:59px;border-radius:13px;padding:6px}
+.desk-page-crest .desk-crest-fallback{font-size:15px}
+body.desk-ui .desk-header-tag{color:#818a7e}
+body.desk-ui .desk-header-tag strong{color:#222922}
+body.desk-ui .desk-live-status{color:#3d7557}
+body.desk-ui .desk-live-status:before{background:#6aab78;box-shadow:0 0 0 4px #6aab7821}
+body.desk-ui .desk-header-clock{border-left-color:#e4e9e3}
+body.desk-ui .desk-header-clock small{color:#7f877d}
+body.desk-ui .desk-header-clock strong{color:#1e281e}
+body.desk-ui .desk-shell{max-width:1680px;grid-template-columns:230px minmax(0,1fr)}
+body.desk-ui .desk-sidebar{background:#171917;color:#f1f4ef;border-right:1px solid #2c322b}
+body.desk-ui .desk-sidebar a{color:#b4bcb3}
+body.desk-ui .desk-nav-label{color:#8b9489}
+body.desk-ui .desk-tab{color:#b5bfb4}
+body.desk-ui .desk-sidebar .desk-tab:hover{background:#2b302a;color:#fff}
+body.desk-ui .desk-sidebar .desk-tab[aria-current="page"]{background:#30382e;color:#fff;
+ border-color:#424c40;box-shadow:inset 3px 0 #ffd230}
+body.desk-ui .desk-sidebar .desk-tab[aria-current="page"] .desk-nav-icon{color:#ffd230}
+body.desk-ui .desk-nav-count{background:#3b4039;color:#ffdf72}
+body.desk-ui .desk-sidebar-foot{border-top-color:#343934;color:#9ba59a}
+body.desk-ui .desk-sidebar-foot a{color:#d7dfd5}
+body.desk-ui .desk-workspace{padding:28px clamp(22px,3vw,48px) 68px}
+body.desk-ui .desk-view{color:#263026}
+body.desk-ui .desk-view .muted,body.desk-ui .desk-view .time-note,
+body.desk-ui .desk-view small{color:#7c857a}
+body.desk-ui .desk-view .card,body.desk-ui .desk-view .offer,
+body.desk-ui .desk-setup-card{background:#fff!important;border:1px solid #e3e8e2!important;
+ box-shadow:0 4px 22px #1d2a1c08!important;border-radius:13px;color:#263126}
+body.desk-ui .desk-view .offer{border-left:3px solid #e4c34b!important}
+body.desk-ui .desk-view .offer:focus-within{background:#fffefa!important;border-color:#ddc45e!important}
+body.desk-ui .desk-view .card label,body.desk-ui .desk-view label{color:#485347}
+body.desk-ui .desk-view h1,body.desk-ui .desk-view h2,
+body.desk-ui .desk-view h3,body.desk-ui .desk-view strong{color:#252d25}
+body.desk-ui .desk-view .label{color:#879083}
+body.desk-ui .desk-view .count{color:#355b42}
+body.desk-ui .desk-view .pill{background:#f5f7f3!important;color:#586756;border:1px solid #e7ebe4}
+body.desk-ui .desk-view .scout-table{border:1px solid #e5eae3!important;border-radius:9px;background:#fff}
+body.desk-ui .desk-view table{background:#fff;border-collapse:collapse;color:#283028}
+body.desk-ui .desk-view table th{background:#f8f9f6!important;color:#737e72;
+ border-bottom:1px solid #e2e8e1;font-size:11px;letter-spacing:.045em}
+body.desk-ui .desk-view table td{border-bottom:1px solid #edf0ea;color:#29322a}
+body.desk-ui .desk-view table tbody tr:hover{background:#fffbed!important}
+body.desk-ui .desk-view table tbody tr.owned{background:#f3f7ee!important}
+body.desk-ui .desk-view .desk-table-filter-row input{background:#fff!important}
+body.desk-ui .desk-view .desk-table-sort{color:#515d50!important}
+body.desk-ui .desk-view .desk-table-sort::after{color:#ae8c15}
+body.desk-ui .desk-view input:not([type="checkbox"]):not([type="radio"]),
+body.desk-ui .desk-view select,body.desk-ui .desk-view textarea,
+body.desk-ui .desk-inbox-tools input{background:#fff!important;color:#243024!important;
+ border:1px solid #dbe2d9!important;border-radius:7px}
+body.desk-ui .desk-view input::placeholder{color:#99a297}
+body.desk-ui .desk-view input[type=checkbox]{accent-color:#d6ac14}
+body.desk-ui .desk-view button:not(.danger):not(.desk-table-sort):not(.desk-filter-button),
+body.desk-ui .desk-view .desk-page-link{background:#ffd230;color:#252923;border:1px solid #e4c035;
+ border-radius:8px;font-weight:750;box-shadow:none}
+body.desk-ui .desk-view button:not(.danger):not(.desk-table-sort):not(.desk-filter-button):hover{background:#ffe079}
+body.desk-ui .desk-view button.danger{background:#fff1f1;color:#b6373e;border:1px solid #edc9ce}
+body.desk-ui .desk-view button:focus-visible,body.desk-ui a:focus-visible{
+ outline:2px solid #c89e08;outline-offset:2px}
+body.desk-ui .desk-filter-button{background:#fff;color:#53614e;border:1px solid #dbe3d9}
+body.desk-ui .desk-filter-button[aria-pressed="true"]{background:#fff2b1;color:#292a20;border-color:#eac43e}
+body.desk-ui .desk-filter-button:hover{background:#faf7e8;color:#2e392d}
+body.desk-ui .desk-view .desk-scout-finance span{background:#fff!important;border:1px solid #e5eae2!important;
+ color:#778176;box-shadow:0 4px 14px #20291c06}
+body.desk-ui .desk-view .desk-scout-finance b{color:#253326}
+body.desk-ui .desk-view .scout-filters,body.desk-ui .desk-view .desk-scout-searchbar,
+body.desk-ui .desk-view .desk-scout-dialog,body.desk-ui .desk-view .desk-position-chooser{
+ background:#fff!important;color:#253024;border-color:#e2e8df!important}
+body.desk-ui .desk-scout-searchbar input,body.desk-ui .desk-scout-searchbar select,
+body.desk-ui .desk-scout-dialog input,body.desk-ui .desk-scout-dialog select,
+body.desk-ui .desk-money-control select{background:#fff!important;color:#263026!important;
+ border-color:#d9e0d5!important}
+body.desk-ui .desk-scout-quick-check,body.desk-ui .desk-position-grid label{
+ background:#f7f8f5!important;color:#475646;border:1px solid #e3e9df!important}
+body.desk-ui .desk-position-grid label:has(input:checked){background:#fff2b2!important;
+ border-color:#e7ca5c!important}
+body.desk-ui .desk-scout-position-trigger{background:#fff!important;color:#344432!important;
+ border:1px solid #d9e1d6!important}
+body.desk-ui .desk-scout-chips>*{background:#fff7d8!important;color:#524c2b!important;
+ border-color:#e8d89d!important}
+body.desk-ui .desk-scout-add,body.desk-ui .desk-scout-clear{background:#ffda48!important;color:#202a20!important;
+ border-color:#e3c33c!important}
+body.desk-ui .desk-scout-dialog-shade{background:#12171373}
+body.desk-ui .desk-inbox-split{background:#fff;border:1px solid #e4e8e1;border-radius:13px;
+ box-shadow:0 6px 24px #1e271e0a}
+body.desk-ui .desk-inbox-split .desk-inbox-list{background:#fff;border-right:1px solid #e7ebe4;
+ border-radius:13px 0 0 13px}
+body.desk-ui .desk-inbox-columns{background:#f8f9f6;color:#879083}
+body.desk-ui .desk-inbox-item{border-bottom:1px solid #eef0eb}
+body.desk-ui .desk-inbox-item>summary{background:#fff;color:#263125}
+body.desk-ui .desk-inbox-item>summary:hover{background:#faf9ed}
+body.desk-ui .desk-inbox-item[data-selected="true"]>summary{background:#fff4c2;
+ box-shadow:inset 3px 0 #d7ae18}
+body.desk-ui .desk-inbox-item[data-action-needed="true"]>summary{background:#fffdf2}
+body.desk-ui .desk-inbox-subject{color:#283128}
+body.desk-ui .desk-inbox-sender{color:#7b8678}
+body.desk-ui .desk-inbox-state{color:#5c6e59}
+body.desk-ui .desk-inbox-fee{color:#41624c}
+body.desk-ui .desk-inbox-item .desk-inbox-detail{background:#fff}
+body.desk-ui .desk-inbox-reader{background:#fff;color:#2c372c}
+body.desk-ui .desk-inbox-reader-header{background:#f9faf7;border-bottom:1px solid #e6ebe2}
+body.desk-ui .desk-inbox-reader-header a{color:#2f3c2f}
+body.desk-ui .desk-inbox-reader-header small{color:#758273}
+body.desk-ui .desk-inbox-reader .desk-inbox-detail{background:#fff}
+body.desk-ui .desk-inbox-reader .desk-inbox-detail .offer{background:#fff!important}
+body.desk-ui .desk-inbox-reader-empty{color:#82907e}
+body.desk-ui .desk-offer-briefing,body.desk-ui .desk-offer-briefing-metrics>div{
+ background:#f8f9f6!important;border:1px solid #e8ede5!important;color:#334133!important}
+body.desk-ui .desk-offer-briefing-note{color:#546153}
+body.desk-ui .desk-inbox-profile-link{color:#3b5038}
+body.desk-ui .desk-contract-panel{background:#fff;border-color:#e5e9e3}
+body.desk-ui .desk-contract-header{background:#fafbf8;border-color:#e8ece7}
+body.desk-ui .desk-contract-body .card,
+body.desk-ui .desk-contract-body .metric{background:#f9faf8!important;border-color:#e4eae1!important;color:#273227}
+body.desk-ui .desk-contract-body .metric strong{color:#273126}
+body.desk-ui .desk-contract-notice{background:#254330;border-color:#638d68;color:#fff}
+body.desk-ui .desk-news-card{background:#fff!important;border:1px solid #e5eae3!important;
+ box-shadow:0 4px 18px #20321a05}
+body.desk-ui .desk-news-content strong{color:#293329}
+body.desk-ui .desk-news-route{color:#53624e}
+body.desk-ui .desk-news-icon{background:#fff6d7;border-color:#eddb9e}
+body.desk-ui .desk-news-fee{color:#4a684a}
+body.desk-ui .desk-actions-bar{margin:2px 0 15px;gap:10px}
+body.desk-ui .desk-action-tile{background:#fff!important;color:#2c3529!important;
+ border:1px solid #e1e7de!important;border-radius:12px;box-shadow:0 4px 20px #101b1009;
+ padding:16px 19px;min-height:84px}
+body.desk-ui .desk-action-tile:hover{background:#fff9df!important;transform:translateY(-1px)}
+body.desk-ui .desk-action-tile strong{color:#273227;font-size:15px}
+body.desk-ui .desk-action-tile small{color:#829082}
+body.desk-ui .desk-finance-grid .card{background:#fff!important}
+body.desk-ui .desk-finance-value{color:#202e22}
+body.desk-ui .desk-finance-track{background:#edf0e8}
+body.desk-ui .desk-finance-fill{background:#dec137}
+body.desk-ui .desk-tactics-toolbar,body.desk-ui .desk-tactics-group{
+ background:#fff;border-color:#e2e9df;color:#2d392e}
+body.desk-ui .desk-tactics-toolbar label,body.desk-ui .desk-tactics-group strong{color:#263326}
+body.desk-ui .desk-tactics-group>header{background:#f8f9f6;border-color:#e3e8e1}
+body.desk-ui .desk-tactics-player{background:#f9faf7;color:#273327;border-color:#e3e9e0}
+body.desk-ui .desk-tactics-pos,body.desk-ui .desk-tactics-group header span{color:#60735d}
+body.desk-ui .desk-tactics-player .desk-tactics-ovr{color:#426b43}
+body.desk-ui .desk-tactics-player[data-selected="true"]{background:#fff6d6;border-color:#e4c044}
+body.desk-ui .desk-pitch-token .desk-player-disc{background:var(--club-kit,#293b29)!important;
+ color:var(--club-kit-text,#fff)!important;border:2px solid var(--club-kit-trim,#ffd230)!important;
+ box-shadow:0 4px 14px #0007}
+body.desk-ui .desk-pitch-token[data-selected="true"] .desk-player-disc{outline:3px solid #ffd230;
+ outline-offset:2px}
+body.desk-ui .desk-money-control{background:#f9faf7;border-color:#e2e8df}
+body.desk-ui .desk-money-preview{color:#2d3a2d}
+body.desk-ui .desk-money-control .desk-money-step{background:#ffdb4b!important;
+ border-color:#e4c347!important;color:#272922!important}
+body.desk-ui .desk-global-message{background:#fff;border:1px solid #e3e9df;color:#3e503e}
+body.desk-ui .desk-global-message.alert{background:#fff6f2;border-color:#eddccf;color:#664d41}
+body.desk-ui .desk-global-message a{color:#516b43}
+body.desk-ui .desk-view .desk-pitch-token .desk-player-name{color:#fff}
+body.desk-ui .desk-player-report{color:#2e3b2e}
+.desk-page-heading{display:flex;align-items:center;gap:15px;margin:0 0 18px;
+ padding:0 0 17px;border-bottom:1px solid #e5eae2}
+.desk-page-title h1{margin:0!important;font-size:25px!important;line-height:1.12!important;
+ font-weight:850;letter-spacing:-.045em;color:#202920}
+.desk-page-title small{display:block;margin-top:6px;color:#879084;
+ font-size:11px;text-transform:none;letter-spacing:.01em}
+body.desk-ui .desk-original-heading{display:none!important}
+body.desk-ui .desk-shortlist-card{padding:10px!important}
+body.desk-ui .desk-shortlist-card .scout-table{margin:0!important}
+body.desk-ui .desk-inbox-list .desk-inbox-flag{border-color:#d5dccf}
+body.desk-ui .desk-inbox-item[data-action-needed="true"] .desk-inbox-flag{
+ color:#2f321f;background:#ffd230;border-color:#d3b22f}
+.desk-correspondence-email .desk-mail-letter{padding:3px 1px 0}
+.desk-mail-letter>p{font-size:13px;line-height:1.6;max-width:750px;color:#445142}
+.desk-mail-letter .desk-mail-secondary{background:#f7f9f5;border-left:2px solid #e0c64f;
+ padding:10px 12px;border-radius:0 6px 6px 0;color:#536150;font-size:12px}
+.desk-mail-stages{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;
+ margin:18px 0 14px;max-width:920px}
+.desk-mail-stages span{font-size:10px;line-height:1.2;color:#818b7d;background:#f2f5f0;
+ border:1px solid #e8eee5;border-radius:7px;padding:8px 5px;text-align:center}
+.desk-mail-stages span.is-current{background:#fff1ad;color:#39391e;
+ border-color:#e7c13b;font-weight:850}
+.desk-mail-footer{font-size:10px!important;color:#919b8f!important;letter-spacing:.02em}
+body.desk-ui .desk-news-card p{color:#556455}
+body.desk-ui .desk-setup-step button{background:#fafbf8!important;border:1px solid #e4e9e1!important;color:#2e382f!important}
+body.desk-ui .desk-setup-step button:hover{background:#fff8d8!important}
+@media(max-width:940px){
+ body.desk-ui .desk-shell{grid-template-columns:70px minmax(0,1fr)}
+}
+@media(max-width:650px){
+ body.desk-ui .desk-shell{display:block}
+ body.desk-ui .desk-mobile-tabs{background:#fff;border-bottom:1px solid #e2e8e0}
+ body.desk-ui .desk-mobile-tabs .desk-tab{color:#495748}
+ body.desk-ui .desk-mobile-tabs .desk-tab[aria-current="page"]{color:#292d21;
+   background:#fff0ab;border-color:#e6c43b;box-shadow:inset 0 -2px #dcb332}
+ body.desk-ui .desk-workspace{padding:17px 12px 52px}
+ .desk-page-heading{gap:10px;margin-bottom:14px}
+ .desk-page-crest{width:46px;height:46px}
+ .desk-page-title h1{font-size:21px!important}
+ .desk-mail-stages{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
+/* Scouting usability V2: light Anderlecht workspace and clean currency inputs. */
+body.desk-ui{background:#f4f5f3!important}
+body.desk-ui .desk-shell{background:#f4f5f3!important}
+body.desk-ui .desk-workspace{background:#f4f5f3!important;min-height:calc(100vh - 66px)}
+body.desk-ui .desk-view[data-view="scouting"]{background:transparent}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar{
+ background:#ffffff!important;border:1px solid #e4e9e0!important;
+ box-shadow:0 4px 22px rgba(20,36,20,.035);border-radius:12px}
+body.desk-ui .desk-view[data-view="scouting"] .scout-filters{
+ background:transparent!important}
+body.desk-ui .desk-scout-searchbar>label,
+body.desk-ui .desk-scout-quick>label{color:#4d5b4d!important}
+body.desk-ui .desk-scout-quick{border-top:1px solid #e9ede7!important;
+ gap:10px;padding-top:15px;align-items:center}
+body.desk-ui .desk-scout-quick>label.desk-scout-quick-number{
+ flex:1 1 260px!important;min-width:235px;max-width:330px}
+body.desk-ui .desk-scout-money{display:flex;flex-direction:column;gap:6px;
+ min-width:0;width:100%;border:1px solid #e0e7db;border-radius:10px;
+ background:#fafbf8;padding:7px}
+body.desk-ui .desk-scout-money-entry{display:flex;align-items:center;gap:3px;
+ min-height:38px;background:#fff;border:1px solid #dce4d9;border-radius:7px;
+ padding:3px;min-width:0}
+body.desk-ui .desk-scout-money-pound{color:#587058;font-size:13px;font-weight:850}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual{
+ flex:1 1 85px;width:70px;min-width:55px;border:0!important;
+ box-shadow:none!important;outline:0!important;background:transparent!important;
+ padding:3px 2px!important;text-align:center;color:#233323!important;
+ font-variant-numeric:tabular-nums;font-size:14px!important;font-weight:800}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual:focus{
+ outline:2px solid #e4bc3e!important;outline-offset:2px!important;
+ background:#fffef6!important;border-radius:4px}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual[aria-invalid="true"]{
+ background:#fff0f0!important;outline:2px solid #ce7373!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step{
+ flex:0 0 32px;display:grid;place-items:center;min-width:32px!important;
+ min-height:32px!important;border-radius:6px!important;padding:0!important;
+ border:1px solid #e1e7df!important;background:#f2f5f0!important;
+ color:#354833!important;box-shadow:none!important;font-size:18px!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step:hover{
+ background:#fff1ba!important;border-color:#e1c656!important}
+body.desk-ui .desk-view .desk-scout-money select.desk-scout-money-preset{
+ appearance:none;-webkit-appearance:none;
+ width:100%;height:33px;min-height:33px!important;background-color:#fff!important;
+ color:#4f5e4c!important;border:1px solid #dce4d9!important;
+ border-radius:6px!important;font-size:11px!important;font-weight:700!important;
+ padding:5px 27px 5px 10px!important;
+ background-image:linear-gradient(45deg,transparent 50%,#687d68 50%),
+ linear-gradient(135deg,#687d68 50%,transparent 50%)!important;
+ background-position:calc(100% - 16px) 13px,calc(100% - 11px) 13px!important;
+ background-size:5px 5px!important;background-repeat:no-repeat!important}
+body.desk-ui .desk-scout-money-hint{
+ font-size:10px;color:#8b9789;line-height:1.35;
+ padding:0 1px;white-space:normal}
+body.desk-ui .desk-scout-searchbar select:not(.desk-scout-money-preset){
+ background:#fff!important;color:#263526!important;
+ border:1px solid #dce4d9!important;border-radius:7px!important;
+ padding-right:30px!important}
+body.desk-ui .desk-scout-quick-check{
+ border:1px solid #e2e7e0!important;background:#f8faf6!important;
+ color:#354434!important;border-radius:8px;padding:9px 11px;
+ min-height:38px}
+body.desk-ui .desk-scout-quick-check:has(input:checked){
+ background:#fff8de!important;border-color:#e6d495!important}
+body.desk-ui .desk-scout-quick-check input{accent-color:#b89520}
+body.desk-ui .desk-scout-add{
+ background:#ffd230!important;color:#2d2c1d!important;
+ border:1px solid #e7c64b!important}
+body.desk-ui .desk-scout-add:hover{background:#ffe177!important}
+body.desk-ui .desk-scout-clear{
+ background:#fff!important;color:#53604d!important;
+ border:1px solid #dbe2d8!important}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results]:not(.desk-show-attributes){
+ table-layout:auto!important;min-width:1150px!important;width:100%!important}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th{
+ width:auto!important;min-width:48px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td:first-child,
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td:nth-child(2){
+ max-width:none!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:first-child{
+ min-width:162px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(2){
+ min-width:130px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(7),
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(8){
+ min-width:102px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-estimate{
+ color:#75631c;font-weight:740}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-actual{
+ color:#2e6d49;font-weight:850}
+body.desk-ui .desk-view[data-view="scouting"] .scout-table{
+ background:#fff!important;box-shadow:0 3px 16px #182b1908;
+ overflow-x:auto!important}
+@media(max-width:780px){
+ body.desk-ui .desk-scout-quick>label.desk-scout-quick-number{
+ flex:1 1 100%!important;max-width:none}
+ body.desk-ui .desk-workspace{padding:18px 14px 50px}
+}
+
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:not([multiple]),
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:not([multiple]):not(.desk-scout-money-preset){
+ appearance:none;-webkit-appearance:none;
+ background-color:#fff!important;color:#263626!important;
+ border:1px solid #dbe3d9!important;border-radius:7px!important;
+ background-image:linear-gradient(45deg,transparent 50%,#768573 50%),
+ linear-gradient(135deg,#768573 50%,transparent 50%)!important;
+ background-position:calc(100% - 17px) center,calc(100% - 12px) center!important;
+ background-size:5px 5px!important;background-repeat:no-repeat!important;
+ padding-right:29px!important;box-shadow:none!important}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select option,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select option{
+ background:#fff;color:#273527}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:focus-visible,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:focus-visible{
+ outline:2px solid #d0ad3a;outline-offset:2px}
+
+/* Layout correction — viewport-anchored sidebar as in Anderlecht.
+   Restore the dark, neutral workspace canvas used before the latest
+   pale grey background pass. Existing white content cards remain intact. */
+body.desk-ui{
+  --desk-workspace-bg:#0e1015;
+  background:var(--desk-workspace-bg)!important;
+}
+body.desk-ui .desk-shell{
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:0!important;
+  grid-template-columns:230px minmax(0,1fr);
+  background:var(--desk-workspace-bg)!important;
+}
+body.desk-ui .desk-workspace{
+  background:var(--desk-workspace-bg)!important;
+  min-width:0;
+  width:100%;
+  margin:0!important;
+}
+body.desk-ui .desk-view[data-view="scouting"]{
+  background:transparent!important;
+}
+body.desk-ui .desk-page-heading{
+  border-bottom-color:#353a3b;
+}
+body.desk-ui .desk-page-title h1{
+  color:#f6f7f5!important;
+}
+body.desk-ui .desk-page-title small{
+  color:#a8ada8!important;
+}
+body.desk-ui .desk-view>h1,
+body.desk-ui .desk-view>h2,
+body.desk-ui .desk-view>h3{
+  color:#f4f5f2!important;
+}
+body.desk-ui .desk-workspace>.desk-view{
+  color:#e7ece6;
+}
+body.desk-ui .desk-sidebar{
+  margin-left:0!important;
+  left:0;
+}
+@media(min-width:651px){
+  body.desk-ui .desk-sidebar{
+    position:sticky;
+    top:68px;
+    align-self:start;
+    height:calc(100dvh - 68px);
+    overflow-y:auto;
+    scrollbar-width:thin;
+  }
+}
+@media (min-width:651px) and (max-width:940px){
+  body.desk-ui .desk-shell{
+    grid-template-columns:70px minmax(0,1fr);
+  }
+}
+@media(max-width:650px){
+  body.desk-ui .desk-shell{
+    display:block;
+  }
+  body.desk-ui .desk-sidebar{
+    display:none;
+  }
+  body.desk-ui .desk-workspace{
+    width:100%;
+  }
+}
+
+/* Contrast restoration — dark Career Desk cards on dark canvas.
+   Keep the flush-left sidebar and all existing UI behaviour; override the
+   earlier pale Anderlecht card skin that made mixed-theme text unreadable.
+   This block must remain LAST in DASHBOARD_CSS. */
+:root{
+  color-scheme:dark;
+  --desk-bg:#0e1015;
+  --desk-panel:#202630;
+  --desk-panel2:#29323e;
+  --desk-stroke:#3f4c58;
+  --desk-accent:#f0cd60;
+  --desk-ink:#f1f5f7;
+  --desk-faint:#b2bfcb;
+}
+body.desk-ui{color-scheme:dark;color:#f0f4f7!important;background:#0e1015!important}
+body.desk-ui .desk-shell,
+body.desk-ui .desk-workspace{background:#0e1015!important}
+body.desk-ui .desk-topbar{background:#191f27!important;border-bottom:1px solid #36434c!important;
+ box-shadow:0 3px 18px #04060a66!important}
+body.desk-ui .desk-brand,
+body.desk-ui .desk-brand strong,
+body.desk-ui .desk-header-tag strong,
+body.desk-ui .desk-header-clock strong{color:#f1f4f6!important}
+body.desk-ui .desk-brand small,body.desk-ui .desk-header-tag,
+body.desk-ui .desk-header-clock small{color:#b3bdc6!important}
+body.desk-ui .desk-header-clock{border-left-color:#46535c!important}
+body.desk-ui .desk-view{color:#e5ebef!important}
+body.desk-ui .desk-view .card,
+body.desk-ui .desk-view .offer,
+body.desk-ui .desk-setup-card,
+body.desk-ui .desk-start-card,
+body.desk-ui .desk-shortlist-card{
+ background:#202630!important;color:#eef2f6!important;
+ border:1px solid #40505e!important;border-radius:12px;
+ box-shadow:0 5px 24px #03060930!important
+}
+body.desk-ui .desk-view .offer{border-left:3px solid #e8bf55!important}
+body.desk-ui .desk-view .offer:focus-within{background:#263341!important;
+ border-color:#a98741!important}
+body.desk-ui .desk-view .card p,
+body.desk-ui .desk-view .offer p,
+body.desk-ui .desk-view .card li,
+body.desk-ui .desk-view .offer li,
+body.desk-ui .desk-view .card section,
+body.desk-ui .desk-view .offer section{color:#dbe3e9}
+body.desk-ui .desk-view h1,
+body.desk-ui .desk-view h2,
+body.desk-ui .desk-view h3,
+body.desk-ui .desk-view strong,
+body.desk-ui .desk-view .card b,
+body.desk-ui .desk-view .offer b{color:#f5f7f8!important}
+body.desk-ui .desk-view .label,
+body.desk-ui .desk-view .muted,
+body.desk-ui .desk-view .time-note,
+body.desk-ui .desk-view small,
+body.desk-ui .desk-view .card label,
+body.desk-ui .desk-view label{color:#b7c4cd!important}
+body.desk-ui .desk-view .count,
+body.desk-ui .desk-finance-value,
+body.desk-ui .desk-news-fee{color:#f2d277!important}
+body.desk-ui .desk-view a,
+body.desk-ui .desk-news-route a,
+body.desk-ui .desk-inbox-profile-link{color:#f3d57c!important}
+body.desk-ui .desk-view a:hover{text-decoration:underline}
+body.desk-ui .desk-view .pill,
+body.desk-ui .desk-view .badge{
+ background:#303b45!important;color:#e9f0f5!important;
+ border:1px solid #52616b!important
+}
+body.desk-ui .desk-view .scout-table,
+body.desk-ui .desk-shortlist-card .scout-table,
+body.desk-ui .desk-view[data-view="scouting"] .scout-table{
+ background:#222a33!important;border-color:#46535d!important;
+ box-shadow:none!important
+}
+body.desk-ui .desk-view table,
+body.desk-ui .desk-view table tbody,
+body.desk-ui .desk-view table tr,
+body.desk-ui .desk-view .scout-table table{background:#222a33!important;color:#edf1f4!important}
+body.desk-ui .desk-view table th{
+ background:#303d49!important;color:#e5edf1!important;
+ border-bottom:1px solid #53616d!important
+}
+body.desk-ui .desk-view table td{
+ background:transparent!important;color:#ecf1f5!important;
+ border-bottom:1px solid #394653!important
+}
+body.desk-ui .desk-view table tbody tr:hover{background:#33424e!important}
+body.desk-ui .desk-view table tbody tr.owned{background:#33453e!important}
+body.desk-ui .desk-view table tbody tr.owned:hover{background:#3d5147!important}
+body.desk-ui .desk-view .desk-table-sort{color:#dce7ec!important}
+body.desk-ui .desk-view .desk-table-sort::after{color:#f2cf6a!important}
+body.desk-ui .desk-view .desk-asking-estimate,
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-estimate{
+ color:#f3d277!important
+}
+body.desk-ui .desk-view .desk-asking-actual,
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-actual{
+ color:#8de2b8!important
+}
+body.desk-ui .desk-view input:not([type="checkbox"]):not([type="radio"]),
+body.desk-ui .desk-view select,
+body.desk-ui .desk-view textarea,
+body.desk-ui .desk-inbox-tools input{
+ background:#303944!important;color:#f1f6f9!important;
+ border:1px solid #51606a!important;
+}
+body.desk-ui .desk-view input::placeholder,
+body.desk-ui .desk-inbox-tools input::placeholder{color:#bac5cc!important}
+body.desk-ui .desk-view select option{background:#2a343f!important;color:#f2f7f9!important}
+body.desk-ui .desk-view .desk-scout-finance span{
+ background:#293440!important;color:#bbcad4!important;
+ border:1px solid #485665!important;box-shadow:none!important
+}
+body.desk-ui .desk-view .desk-scout-finance b{color:#f5f7f8!important}
+body.desk-ui .desk-view .scout-filters,
+body.desk-ui .desk-view .desk-scout-searchbar,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar,
+body.desk-ui .desk-view .desk-scout-dialog,
+body.desk-ui .desk-view .desk-position-chooser{
+ background:#202630!important;color:#e9eef2!important;
+ border-color:#46535e!important;box-shadow:none!important
+}
+body.desk-ui .desk-scout-money{background:#29343f!important;border-color:#485763!important}
+body.desk-ui .desk-scout-money-entry{background:#303c48!important;border-color:#53626d!important}
+body.desk-ui .desk-scout-money-pound{color:#e2edf3!important}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual{
+ color:#f8f9f9!important;background:#303c48!important
+}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual:focus{
+ background:#344555!important
+}
+body.desk-ui .desk-view .desk-scout-money select.desk-scout-money-preset,
+body.desk-ui .desk-scout-searchbar input,
+body.desk-ui .desk-scout-searchbar select,
+body.desk-ui .desk-scout-dialog input,
+body.desk-ui .desk-scout-dialog select,
+body.desk-ui .desk-money-control select,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:not([multiple]),
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:not([multiple]){
+ background-color:#303d49!important;color:#f2f7f9!important;
+ border-color:#53616d!important
+}
+body.desk-ui .desk-scout-money-hint{color:#b9c6ce!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step{
+ background:#3a4651!important;color:#f8f5e9!important;border-color:#5b6871!important
+}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step:hover{
+ background:#5c4b30!important;border-color:#cda950!important
+}
+body.desk-ui .desk-scout-quick{border-top-color:#42515c!important}
+body.desk-ui .desk-scout-searchbar>label,
+body.desk-ui .desk-scout-quick>label{color:#e0e7eb!important}
+body.desk-ui .desk-scout-quick-check,
+body.desk-ui .desk-position-grid label{
+ background:#2b3641!important;color:#e6edf2!important;border-color:#53616d!important
+}
+body.desk-ui .desk-scout-quick-check:has(input:checked),
+body.desk-ui .desk-position-grid label:has(input:checked){
+ background:#493f30!important;color:#fff1c7!important;border-color:#b7984b!important
+}
+body.desk-ui .desk-scout-position-trigger{
+ background:#2d3b47!important;color:#edf4f7!important;border:1px solid #53616d!important
+}
+body.desk-ui .desk-scout-clear{background:#34414d!important;color:#f2f7f9!important;border-color:#576773!important}
+body.desk-ui .desk-scout-chips>*{
+ background:#473f31!important;color:#ffe2a0!important;border-color:#8a784b!important
+}
+body.desk-ui .desk-inbox-split,
+body.desk-ui .desk-inbox-split .desk-inbox-list,
+body.desk-ui .desk-inbox-reader,
+body.desk-ui .desk-inbox-reader .desk-inbox-detail,
+body.desk-ui .desk-inbox-item .desk-inbox-detail{
+ background:#222a33!important;color:#edf3f7!important;border-color:#455360!important
+}
+body.desk-ui .desk-inbox-columns,
+body.desk-ui .desk-inbox-reader-header{
+ background:#2d3945!important;color:#c9d5dd!important;border-color:#495967!important
+}
+body.desk-ui .desk-inbox-item{border-bottom:1px solid #3e4b56!important}
+body.desk-ui .desk-inbox-item>summary{background:#26313b!important;color:#f0f4f7!important}
+body.desk-ui .desk-inbox-item>summary:hover{background:#354454!important}
+body.desk-ui .desk-inbox-item[data-selected="true"]>summary{
+ background:#4c432d!important;box-shadow:inset 3px 0 #e3c35c!important
+}
+body.desk-ui .desk-inbox-item[data-action-needed="true"]>summary{background:#384236!important}
+body.desk-ui .desk-inbox-subject,
+body.desk-ui .desk-inbox-reader-header a,
+body.desk-ui .desk-inbox-reader-header strong{color:#f4f6f7!important}
+body.desk-ui .desk-inbox-sender,
+body.desk-ui .desk-inbox-state,
+body.desk-ui .desk-inbox-reader-header small,
+body.desk-ui .desk-inbox-reader-empty{color:#bbcad4!important}
+body.desk-ui .desk-inbox-fee{color:#f4d57a!important}
+body.desk-ui .desk-offer-briefing,
+body.desk-ui .desk-offer-briefing-metrics>div{
+ background:#2b3742!important;color:#eaf0f4!important;border-color:#52616b!important
+}
+body.desk-ui .desk-offer-briefing-note{color:#cbd6de!important}
+body.desk-ui .desk-contract-panel,
+body.desk-ui .desk-contract-body .card,
+body.desk-ui .desk-contract-body .metric{
+ background:#202b36!important;color:#ecf3f6!important;border-color:#4d5b66!important
+}
+body.desk-ui .desk-contract-header{background:#2c3945!important;border-color:#4e5e69!important}
+body.desk-ui .desk-contract-body .metric strong{color:#f2f6f8!important}
+body.desk-ui .desk-news-card,
+body.desk-ui .desk-news-content,
+body.desk-ui .desk-global-message{
+ background:#202b36!important;color:#ebf0f4!important;border-color:#465562!important;
+ box-shadow:none!important
+}
+body.desk-ui .desk-news-content strong{color:#f5f7f9!important}
+body.desk-ui .desk-news-card p,
+body.desk-ui .desk-news-route{color:#cfdae0!important}
+body.desk-ui .desk-news-fee{color:#f2d070!important}
+body.desk-ui .desk-action-tile{
+ background:#25313b!important;color:#edf2f6!important;
+ border:1px solid #4a5c67!important;box-shadow:0 4px 16px #0002!important
+}
+body.desk-ui .desk-action-tile:hover{background:#34434e!important}
+body.desk-ui .desk-action-tile strong{color:#f6f7f8!important}
+body.desk-ui .desk-action-tile small{color:#c0ccd3!important}
+body.desk-ui .desk-finance-grid .card{background:#222b35!important}
+body.desk-ui .desk-finance-value{color:#f3d277!important}
+body.desk-ui .desk-finance-track{background:#3b4751!important}
+body.desk-ui .desk-tactics-toolbar,
+body.desk-ui .desk-tactics-group,
+body.desk-ui .desk-tactics-player{
+ background:#232f39!important;color:#edf2f6!important;border-color:#495a65!important
+}
+body.desk-ui .desk-tactics-group>header{background:#2e3b47!important;border-color:#53616c!important}
+body.desk-ui .desk-tactics-player[data-selected="true"]{
+ background:#493f30!important;border-color:#bba358!important
+}
+body.desk-ui .desk-tactics-toolbar label,
+body.desk-ui .desk-tactics-group strong{color:#f1f4f6!important}
+body.desk-ui .desk-tactics-pos,
+body.desk-ui .desk-tactics-group header span{color:#d4dfe4!important}
+body.desk-ui .desk-tactics-player .desk-tactics-ovr{color:#f4d27b!important}
+body.desk-ui .desk-money-control{background:#303d47!important;border-color:#52636b!important}
+body.desk-ui .desk-money-preview{color:#f9edc8!important}
+body.desk-ui .desk-mail-letter>p{color:#e6edf1!important}
+body.desk-ui .desk-mail-letter .desk-mail-secondary{
+ background:#2c3b47!important;color:#ccd8df!important;border-left-color:#e2c65f
+}
+body.desk-ui .desk-mail-stages span{
+ background:#2c3740!important;color:#cbd7de!important;border-color:#4c5b64!important
+}
+body.desk-ui .desk-mail-stages span.is-current{
+ background:#514631!important;color:#ffe9af!important;border-color:#bb9d54!important
+}
+body.desk-ui .desk-mail-footer{color:#c1ccd4!important}
+body.desk-ui .desk-setup-step button{
+ background:#303d48!important;color:#f1f4f7!important;border-color:#55636e!important
+}
+body.desk-ui .desk-setup-step button:hover{background:#453d2d!important}
+body.desk-ui .desk-page-heading{border-bottom-color:#3d4750!important}
+body.desk-ui .desk-page-title h1{color:#f3f6f7!important}
+body.desk-ui .desk-page-title small{color:#bac7cf!important}
+body.desk-ui .desk-mobile-tabs{background:#26323c!important;border-bottom-color:#465560!important}
+body.desk-ui .desk-mobile-tabs .desk-tab{color:#e5edf3!important}
+body.desk-ui .desk-mobile-tabs .desk-tab[aria-current="page"]{
+ background:#51452b!important;color:#fff2c8!important;border-color:#a18b4d!important
+}
 
 """
 
@@ -429,11 +1271,11 @@ DASHBOARD_JS = r"""
   const source=document.getElementById('desk-screen-source');
   const host=document.getElementById('desk-view-host');
   if(!source||!host||source.dataset.initialized==='1')return;
-  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup'];
+  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup','player','contract'];
   const titles={
     dashboard:'Manager overview',inbox:"Manager's Inbox",transfers:'Transfer Centre',
     squad:'Squad planner',scouting:'Scouting',shortlist:'My shortlist',finances:'Club finances',
-    news:'Market news','season-setup':'Season setup'
+    news:'Market news','season-setup':'Season setup',player:'Player profile',contract:'Contract negotiations'
   };
   const views={};
   names.forEach(function(name){
@@ -446,6 +1288,134 @@ DASHBOARD_JS = r"""
     views[name]=pane;
     host.appendChild(pane);
   });
+  // Keep the manager's navigation visible during contract talks. Fetch only
+  // the existing source-backed contract form; no full dashboard navigation
+  // or duplicate transfer-authorisation endpoint is introduced.
+  const contractLayer=views.contract;
+  contractLayer.className='desk-view desk-contract-layer';contractLayer.hidden=true;
+  contractLayer.innerHTML='<div class="desk-contract-scrim" data-contract-close></div>'+
+    '<aside class="desk-contract-panel" role="dialog" aria-modal="true" aria-label="Contract negotiations">'+
+    '<div class="desk-contract-header"><div><strong>Contract negotiations</strong>'+
+    '<small>Career Desk · 30-minute window remains open</small></div>'+
+    '<button class="desk-contract-close" type="button" data-contract-close aria-label="Close negotiations">×</button></div>'+
+    '<div class="desk-contract-body" data-contract-body></div></aside>';
+  const contractBody=contractLayer.querySelector('[data-contract-body]');
+  let contractRequest=null,contractUrlOpen=null,contractFocus=null;
+  let contractReturnView='inbox';
+  function validContractUrl(href){
+    const url=new URL(href,location.href);
+    if(url.origin!==location.origin||
+       !/^\/world\/play\/career\/[^/]+\/market\/contract\/\d+$/.test(url.pathname))
+      return null;
+    // Do not open another career's negotiation route from this page.
+    return url.pathname.startsWith(location.pathname+'/contract/')?url:null;
+  }
+  function closeContractDrawer(){
+    contractRequest?.abort();contractRequest=null;
+    contractLayer.hidden=true;
+    document.body.classList.remove('desk-contract-open');
+    contractUrlOpen=null;
+    switchView(contractReturnView,true);
+    if(contractFocus?.isConnected)contractFocus.focus();
+  }
+  function contractNotice(message,isError=false){
+    let toast=document.getElementById('desk-contract-notice');
+    if(!toast){
+      toast=document.createElement('div');
+      toast.id='desk-contract-notice';
+      toast.className='desk-contract-notice';
+      toast.setAttribute('role','status');
+      document.body.appendChild(toast);
+    }
+    toast.textContent=message;
+    toast.dataset.error=isError?'1':'0';
+    clearTimeout(contractNotice.dismiss);
+    contractNotice.dismiss=setTimeout(()=>toast.remove(),7500);
+  }
+  async function loadContractDrawer(url){
+    contractRequest?.abort();
+    const requestControl=new AbortController();
+    contractRequest=requestControl;
+    contractBody.textContent='Loading contract details…';
+    try{
+      const response=await fetch(url.pathname+'?panel=1',{
+        cache:'no-store',credentials:'same-origin',
+        signal:requestControl.signal,headers:{Accept:'text/html'}});
+      if(!response.ok||!validContractUrl(response.url))
+        throw new Error('Contract negotiations are not available right now');
+      const html=await response.text();
+      const documentFromServer=new DOMParser().parseFromString(html,'text/html');
+      const main=documentFromServer.querySelector('main');
+      if(!main)throw new Error('The player contract details could not be read');
+      contractBody.replaceChildren(document.importNode(main,true));
+      contractBody.scrollTop=0;
+    }catch(error){
+      if(error.name==='AbortError')return;
+      contractBody.textContent=String(error.message||error);
+    }finally{
+      if(contractRequest===requestControl)contractRequest=null;
+    }
+  }
+  document.addEventListener('click',function(event){
+    const close=event.target.closest('[data-contract-close]');
+    if(close&&contractLayer.contains(close)){
+      event.preventDefault();closeContractDrawer();return;
+    }
+    const link=event.target.closest('a[href]');
+    if(!link||event.defaultPrevented||event.button!==0||
+       event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    const url=validContractUrl(link.href);
+    if(!url)return;
+    event.preventDefault();
+    contractReturnView=names.find(name=>name!=='contract'&&!views[name].hidden)||'inbox';
+    contractFocus=link;
+    contractUrlOpen=url;
+    switchView('contract',true);
+    contractLayer.querySelector('.desk-contract-close').focus();
+    loadContractDrawer(url);
+  },true);
+  document.addEventListener('keydown',function(event){
+    if(event.key==='Escape'&&!contractLayer.hidden){
+      event.preventDefault();closeContractDrawer();
+    }
+  });
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||
+       !(contractLayer.contains(form)||views.inbox.contains(form)))return;
+    const url=new URL(form.getAttribute('action')||'',location.href);
+    if(!/^\/world\/play\/career\/[^/]+\/market\/contract\/\d+\/decision$/.test(url.pathname)||
+       url.origin!==location.origin||
+       !url.pathname.startsWith(location.pathname+'/contract/'))return;
+    const pressed=event.submitter;
+    if(!pressed||pressed.name!=='action')return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    const data=new FormData(form);
+    data.set('action',pressed.value);
+    // The server remains authoritative. Close only an open contract view;
+    // a quick Reject renewal inside Inbox must NOT navigate back to Squad.
+    form.dataset.saving='1';
+    if(!contractLayer.hidden&&contractLayer.contains(form))closeContractDrawer();
+    contractNotice('Decision submitted. You can continue using your Inbox.');
+    try{
+      const response=await fetch(url.pathname,{
+        method:'POST',credentials:'same-origin',body:data,
+        headers:{Accept:'application/json'},cache:'no-store'});
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'Contract decision was not saved');
+      contractNotice(result.message||'Contract decision saved.');
+      // Ask the existing heartbeat to reconcile the real saved Inbox state,
+      // without discarding the user's current tab, search or scroll position.
+      window.fc27PollMarket?.();
+    }catch(error){
+      contractNotice(String(error.message||error),true);
+    }finally{
+      form.dataset.saving='0';
+    }
+  },true);
+
   const redirects={
     overview:'dashboard','overview-anchor':'dashboard',
     recruitment:'scouting','buy-players':'scouting',
@@ -454,6 +1424,7 @@ DASHBOARD_JS = r"""
   };
   function viewForHash(){
     const key=decodeURIComponent((location.hash||'#dashboard').slice(1));
+    if(/^player-[1-9]\d*$/.test(key))return 'player';
     return views[key]?key:(redirects[key]||
       (document.body.dataset.windowState==='closed'?'transfers':'dashboard'));
   }
@@ -487,6 +1458,34 @@ DASHBOARD_JS = r"""
   source.dataset.initialized='1';
   source.hidden=true;
 
+  // Only show accessible views. A newly created career has no live Scouting
+  // before the window starts; an orphaned explanatory panel is not a feature.
+  const unavailableViews=new Set();
+  if(!views.scouting.querySelector('form.scout-filters')){
+    unavailableViews.add('scouting');
+    document.querySelectorAll('[data-desk-tab="scouting"]').forEach(x=>x.hidden=true);
+  }
+
+  // Same crest and compact header on every actual manager workspace page.
+  const crest=document.querySelector('.desk-brand .desk-club-crest');
+  const managerClub=document.body.dataset.managerClub||'Club';
+  names.forEach(name=>{
+    if(unavailableViews.has(name)||name==='contract'||name==='player')return;
+    const head=document.createElement('div');
+    head.className='desk-page-heading';
+    const emblem=document.createElement('span');
+    emblem.className='desk-page-crest';
+    if(crest)emblem.append(...Array.from(crest.childNodes).map(node=>node.cloneNode(true)));
+    const label=document.createElement('div');
+    label.className='desk-page-title';
+    const h=document.createElement('h1');h.textContent=titles[name];
+    const sub=document.createElement('small');sub.textContent=managerClub;
+    label.append(h,sub);head.append(emblem,label);
+    views[name].prepend(head);
+    // Retain the hidden ID anchors used by the transfer desk navigation.
+    views[name].querySelectorAll(':scope > h2').forEach(h2=>h2.classList.add('desk-original-heading'));
+  });
+
   // The complete shortlist section is routed to its own tab above.
   // Never leave an orphan explanatory panel in Scouting.
   const noticeText='Your shortlist is saved to this career and remains available after the window closes.';
@@ -509,28 +1508,12 @@ DASHBOARD_JS = r"""
   const numSaved=Number(document.body.dataset.saved||0);
   const state=document.body.dataset.windowState||'not_started';
 
-  // Provide a concise, actionable overview with the original financial
-  // cards immediately underneath. The figures remain sourced from the server.
-  const intro=document.createElement('div');
-  intro.className='desk-view-header';
-  const titleWrap=document.createElement('div');
-  const h2=document.createElement('h2');
-  h2.textContent='Your transfer window';
-  const desc=document.createElement('p');
-  desc.className='muted';
-  desc.textContent=state==='open'?
-    'Keep on top of offers, negotiations and recruitment before the deadline.':
-    state==='closed'?'The window is closed. Review results and registrations.':
-    'Review your squad and saved targets before starting the clock.';
-  titleWrap.appendChild(h2);titleWrap.appendChild(desc);
-  intro.appendChild(titleWrap);
-  views.dashboard.insertBefore(intro,views.dashboard.firstChild);
   const quick=document.createElement('div');
   quick.className='desk-actions-bar';
   [
-    {label:"Manager's Inbox",description:numOffers+' incoming offers · '+numUnread+' unread',screen:'inbox'},
-    {label:'Transfer Centre',description:numSigned+' signed deals · all bids',screen:'transfers'},
-    {label:'Scouting',description:'Discover players and evaluate targets',screen:'scouting'}
+    {label:"Manager's Inbox",description:numUnread+' action(s) · '+numOffers+' bids',screen:'inbox'},
+    {label:'Transfer Centre',description:numSigned+' confirmed deal(s)',screen:'transfers'},
+    ...(!unavailableViews.has('scouting')?[{label:'Scouting',description:'Search players',screen:'scouting'}]:[])
   ].forEach(function(entry){
     const b=document.createElement('button');
     b.type='button';b.className='desk-action-tile';
@@ -539,7 +1522,7 @@ DASHBOARD_JS = r"""
     const small=document.createElement('small');small.textContent=entry.description;
     b.appendChild(strong);b.appendChild(small);quick.appendChild(b);
   });
-  intro.insertAdjacentElement('afterend',quick);
+  views.dashboard.querySelector('.desk-page-heading')?.insertAdjacentElement('afterend',quick);
   if(state==='closed'){
     const next=document.createElement('div');
     next.className='card desk-post-window-next';
@@ -550,7 +1533,7 @@ DASHBOARD_JS = r"""
     continueLink.dataset.deskTab='season-setup';
     continueLink.textContent='Continue to season setup →';
     next.append(explanation,continueLink);
-    quick.insertAdjacentElement('beforebegin',next);
+    quick.insertAdjacentElement('afterend',next);
   }
 
   // Use the authoritative budget breakdown already rendered on the page.
@@ -602,20 +1585,11 @@ DASHBOARD_JS = r"""
   function gbp(value){
     const negative=value<0?'-':'';
     value=Math.abs(value);
-    return negative+'£'+(value>=1000000?(value/1000000).toFixed(2)+'m':
-      value>=1000?Math.round(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
+    const trimmed=v=>String(Number(v.toFixed(2)));
+    return negative+'£'+(value>=1000000?trimmed(value/1000000)+'m':
+      value>=1000?trimmed(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
   }
-  if(!views.inbox.children.length)
-    views.inbox.appendChild(emptyPanel('No inbox activity','Offers will appear once clubs begin approaching your players.'));
-  if(!views.transfers.children.length)
-    views.transfers.appendChild(emptyPanel('No transfers underway','Scouting, shortlisting and recruitment are available from the navigation.'));
-  if(!views.squad.children.length)
-    views.squad.appendChild(emptyPanel('No squad data','Open a career to manage your registered players.'));
-  if(!views['season-setup'].children.length)
-    views['season-setup'].appendChild(emptyPanel('Season setup opens at the deadline',
-      'Complete your transfer window before preparing your PES squads.'));
-  if(!views.scouting.children.length)
-    views.scouting.appendChild(emptyPanel('Scouting is not active on this screen','You can still open saved scouting profiles from your shortlist.'));
+  // Empty states use genuine blank tables and no orphaned explanatory cards.
 
   // Inbox is a compact FM-like message list. Every offer remains a separate
   // message so competing bids are readable and each has its own actions.
@@ -655,12 +1629,23 @@ DASHBOARD_JS = r"""
     const strong=document.createElement('a');
     strong.className='desk-inbox-profile-link';
     strong.href=location.pathname+'/player/'+encodeURIComponent(card.dataset.deskPlayer||'');
-    strong.textContent=card.dataset.deskPlayerName||'Transfer';
+    strong.textContent=card.dataset.mailSubject||
+      card.dataset.deskPlayerName||'Transfer';
     strong.title='Open this player’s scouting profile';
+    const meta=document.createElement('span');
+    meta.className='desk-inbox-player-meta';
+    meta.textContent=[
+      card.dataset.mailSubject?'Player: '+(card.dataset.deskPlayerName||''):'',
+      card.dataset.deskPosition||'',
+      card.dataset.deskOverall?'OVR '+card.dataset.deskOverall:'',
+      card.dataset.deskAge?'Age '+card.dataset.deskAge:''
+    ].filter(Boolean).join(' · ');
+    if(!meta.textContent)meta.hidden=true;
     const small=document.createElement('small');
     small.textContent=cleanInboxClub(card.dataset.deskBuyer||'')+
-      ' · '+(inboxLabels[card.dataset.deskStatus]||'Transfer update');
-    intro.append(strong,small);heading.appendChild(intro);
+      ' · '+(card.dataset.mailStageLabel||
+       inboxLabels[card.dataset.deskStatus]||'Transfer update');
+    intro.append(strong,meta,small);heading.appendChild(intro);
     inboxReader.append(heading,selectedInboxDetail);
   }
   const offerCards=Array.from(inboxGrid.querySelectorAll(':scope > .offer[data-desk-player]'));
@@ -682,6 +1667,7 @@ DASHBOARD_JS = r"""
     return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
+    if(card.dataset.deskSide==='mail')return false;
     if(card.dataset.deskSide==='free')
       return card.dataset.deskStatus==='terms_accepted'&&
         card.dataset.deskPlayerChoice==='accepted';
@@ -697,6 +1683,26 @@ DASHBOARD_JS = r"""
        card.dataset.deskAgent==='terms_accepted'&&
        card.dataset.deskPlayerChoice==='accepted');
   }
+  function offerSubject(card){
+    const name=card.dataset.deskPlayerName||'Player';
+    const side=card.dataset.deskSide;
+    const status=card.dataset.deskStatus||'';
+    if(side==='contract')return ['agreed_future','completed'].includes(status)?
+      'New contract signed: '+name:'Contract request: '+name;
+    if(side==='free')return ['agreed_future','completed'].includes(status)?
+      'Free-agent signing confirmed: '+name:
+      card.dataset.deskPlayerChoice==='accepted'?'Finalise signing: '+name:
+      'Free-agent contract: '+name;
+    if(side==='buy')return ['agreed_future','completed'].includes(status)?
+      'Transfer confirmed: '+name:
+      status==='countered'?'Offer response: '+name:
+      card.dataset.deskPlayerChoice==='accepted'?'Finalise deal: '+name:
+      status==='accepted_pending_contract'?'Contract negotiations: '+name:
+      'Transfer bid: '+name;
+    return ['agreed_future','completed'].includes(status)?
+      'Transfer completed: '+name:status==='proposed'?
+      'Bid received for '+name:'Outgoing transfer: '+name;
+  }
   function refreshInboxItem(card){
     const holder=inboxCardItems.get(card)||card.closest('.desk-inbox-item');
     if(!holder)return;
@@ -706,9 +1712,9 @@ DASHBOARD_JS = r"""
     holder.dataset.status=status;
     holder.querySelector('.desk-inbox-flag').textContent=required?'!':'';
     holder.querySelector('.desk-inbox-subject').textContent=
-      card.dataset.deskPlayerName||'Player transfer';
+      card.dataset.mailSubject||offerSubject(card);
     holder.querySelector('.desk-inbox-sender').textContent=
-      cleanInboxClub(card.dataset.deskBuyer||'Buying club');
+      cleanInboxClub(card.dataset.mailSender||card.dataset.deskBuyer||'Buying club');
     holder.querySelector('.desk-inbox-fee').textContent=
       card.querySelector('.count')?.textContent.trim()||'—';
     const buyingStages={proposed:'Seller reviewing',countered:'Counteroffer',
@@ -732,42 +1738,15 @@ DASHBOARD_JS = r"""
       agreed_future:'Renewed',completed:'Renewed',
       declined:'Declined',withdrawn:'Withdrawn',expired:'Expired'};
     holder.querySelector('.desk-inbox-state').textContent=
-      (card.dataset.deskSide==='contract'?renewalStages[status]:
+      (card.dataset.deskSide==='mail'?(card.dataset.mailStageLabel||'Correspondence'):
+       card.dataset.deskSide==='contract'?renewalStages[status]:
        card.dataset.deskSide==='free'?freeStages[status]:
        card.dataset.deskSide==='buy'?buyingStages[status]:saleStages[status])||status;
   }
 
   function enhanceCounter(card){
-    if(!card)return;
-    card.querySelectorAll('input[name="counter_fee"]').forEach(input=>{
-      if(input.dataset.stepper==='1')return;
-      input.dataset.stepper='1';
-      const original=Number(input.min)||0;
-      const step=original>=10000000?250000:original>=1000000?50000:
-        original>=200000?10000:original>=20000?2500:500;
-      const wrapper=document.createElement('span');
-      wrapper.className='desk-counter-stepper';
-      input.before(wrapper);wrapper.appendChild(input);
-      const preview=document.createElement('strong');
-      preview.className='desk-counter-preview';
-      function repaint(){preview.textContent=gbp(Number(input.value)||0);}
-      function adjust(delta){
-        const low=Number(input.min)||0,high=Number(input.max)||1000000000;
-        const next=Math.max(low,Math.min(high,(Number(input.value)||low)+delta));
-        input.value=String(next);repaint();
-      }
-      const minus=document.createElement('button');
-      minus.type='button';minus.textContent='−';minus.title='Reduce counter by '+gbp(step);
-      minus.setAttribute('aria-label','Reduce counteroffer by '+gbp(step));
-      minus.addEventListener('click',()=>adjust(-step));
-      const plus=document.createElement('button');
-      plus.type='button';plus.textContent='+';plus.title='Increase counter by '+gbp(step);
-      plus.setAttribute('aria-label','Increase counteroffer by '+gbp(step));
-      plus.addEventListener('click',()=>adjust(step));
-      wrapper.append(minus,plus,preview);
-      input.addEventListener('input',repaint);
-      repaint();
-    });
+    // All money controls use the same compact £ amount and step selector.
+    enhanceMoneyInputs(card);
   }
 
   function makeInboxItem(card){
@@ -788,16 +1767,82 @@ DASHBOARD_JS = r"""
     item.append(summary,body);
     body.appendChild(card);
     inboxCardItems.set(card,item);
+    inboxGrid.hidden=false;
+    inboxLayout.hidden=false;
     summary.addEventListener('click',function(event){
       event.preventDefault();
       selectInboxCard(card);
     });
     refreshInboxItem(card);
   }
+  // Record-backed letters are separate Inbox messages, not synthetic
+  // client-side "success" states. The 15s heartbeat supplies new commits.
+  window.fc27SyncCorrespondence=function(items){
+    if(!Array.isArray(items))return;
+    const stages=['Bid','Offer response','Contract offer',
+                  'Contract accepted','Finalise deal','Transfer confirmed'];
+    let changed=false;
+    for(const mail of items.slice().reverse()){
+      const id=String(mail.message_id||'');
+      if(!(/^[1-9][0-9]*$/.test(id)||/^(?:fa|action)-[1-9][0-9]*$/.test(id))||
+         inboxGrid.querySelector('[data-message-id="'+id+'"]'))continue;
+      const card=document.createElement('div');
+      card.className='card offer desk-correspondence-email';
+      card.dataset.liveOfferId='mail-'+id;
+      card.dataset.messageId=String(id);
+      card.dataset.deskSide='mail';card.dataset.deskStatus='mail';
+      card.dataset.deskPlayer=String(mail.player_id||'');
+      card.dataset.deskPlayerName=String(mail.player||'Player');
+      card.dataset.deskBuyer=String(mail.sender||'Football operations');
+      card.dataset.mailSender=String(mail.sender||'Football operations');
+      card.dataset.mailSubject=String(mail.subject||'Transfer update');
+      card.dataset.mailStage=String(mail.stage);
+      card.dataset.mailStageLabel=String(mail.stage_label||'Update');
+      const heading=document.createElement('div');heading.className='label';
+      heading.textContent=card.dataset.mailSender+' · '+card.dataset.mailStageLabel;
+      const subject=document.createElement('h3');
+      subject.textContent=card.dataset.mailSubject;
+      const fee=document.createElement('div');fee.className='count';
+      fee.textContent=mail.fee||mail.stage_label||'Update';
+      const body=document.createElement('div');body.className='desk-mail-letter';
+      const p=document.createElement('p');p.textContent=mail.body||'';
+      body.appendChild(p);
+      if(mail.detail){
+        const note=document.createElement('p');
+        note.className='desk-mail-secondary';note.textContent=mail.detail;
+        body.appendChild(note);
+      }
+      const trail=document.createElement('nav');trail.className='desk-mail-stages';
+      trail.setAttribute('aria-label','Transfer progression');
+      stages.forEach((label,index)=>{
+        const step=document.createElement('span');
+        step.textContent=label;
+        if(index===Number(mail.stage))step.className='is-current';
+        trail.appendChild(step);
+      });
+      body.appendChild(trail);
+      const date=document.createElement('p');date.className='desk-mail-footer';
+      date.textContent='Correspondence recorded '+String(mail.created_at||'').slice(0,16).replace('T',' ');
+      body.appendChild(date);
+      const link=document.createElement('a');
+      link.href='#transfers';link.dataset.deskTab='transfers';
+      link.className='desk-inbox-open-negotiation';
+      link.textContent='Open transfer negotiations';
+      body.appendChild(link);
+      card.append(heading,subject,fee,body);
+      inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+      offerCards.unshift(card);makeInboxItem(card);
+      changed=true;
+    }
+    if(changed){
+      if(!selectedInboxCard)selectInboxCard(offerCards[0]);
+      refreshInboxList();
+    }
+  };
   offerCards.forEach(makeInboxItem);
   if(offerCards.length)selectInboxCard(offerCards[0]);
   else inboxReader.innerHTML='<div class="desk-inbox-reader-empty">Select a message to read it here.</div>';
-  if(!offerCards.length)inboxGrid.hidden=true;
+  if(!offerCards.length){inboxGrid.hidden=true;inboxLayout.hidden=true;}
   // Fast client-side inbox filters. Refreshing the market fetches genuine
   // updates from Flask, but switching views and narrowing visible cards
   // never needs a page request.
@@ -856,9 +1901,12 @@ DASHBOARD_JS = r"""
       if(activeFilter==='action')
         statusMatch=actionRequired(card);
       else if(activeFilter==='talks')
-        statusMatch=(status==='countered'||status==='accepted_pending_contract');
+        statusMatch=(status==='countered'||status==='accepted_pending_contract'||
+          (card.dataset.deskSide==='mail'&&Number(card.dataset.mailStage)>=1&&
+           Number(card.dataset.mailStage)<=4));
       else if(activeFilter==='signed')
-        statusMatch=(status==='agreed_future'||status==='completed');
+        statusMatch=(status==='agreed_future'||status==='completed'||
+          (card.dataset.deskSide==='mail'&&card.dataset.mailStage==='5'));
       else if(activeFilter==='closed')
         statusMatch=(status==='withdrawn'||status==='rejected');
       return matches&&statusMatch;
@@ -1046,10 +2094,12 @@ DASHBOARD_JS = r"""
 
     const quick=document.createElement('div');
     quick.className='desk-scout-quick';
-    for(const name of ['scout_max_value','scout_max_wage','scout_interest']){
+    for(const name of ['scout_max_value','scout_max_wage','scout_interest',
+                        'scout_listed','scout_free_only']){
       const setting=available.find(entry=>entry.name===name);
       if(!setting)continue;
-      setting.field.classList.add(name==='scout_interest'?
+      setting.field.classList.add(
+        ['scout_interest','scout_listed','scout_free_only'].includes(name)?
         'desk-scout-quick-check':'desk-scout-quick-number');
       if(name==='scout_max_value'){
         setting.field.firstChild.textContent='Max market value (£)';
@@ -1076,21 +2126,30 @@ DASHBOARD_JS = r"""
       compactForm.requestSubmit();
     });
     quick.appendChild(showTeam);
+    const expiring=document.createElement('label');
+    expiring.className='desk-scout-quick-check';
+    const expiringBox=document.createElement('input');
+    expiringBox.type='checkbox';
+    const contractField=available.find(entry=>entry.name==='scout_contract');
+    expiringBox.checked=contractField?.input.value==='expiring';
+    const expiringLabel=document.createElement('span');
+    expiringLabel.textContent='Expires within 12 months';
+    expiring.title='Known contract dates after the career start and within the following 12 months';
+    expiring.append(expiringBox,expiringLabel);
+    expiringBox.addEventListener('change',()=>{
+      if(contractField)contractField.input.value=expiringBox.checked?'expiring':'';
+      compactForm.requestSubmit();
+    });
+    quick.appendChild(expiring);
     quick.appendChild(resetButton);
     searchBar.appendChild(quick);
 
     const oldPosition=available.find(entry=>entry.name==='scout_position');
     if(oldPosition){
-      // Keep a quick broad-position selector on the main scouting toolbar.
-      // Detailed multi-position checkboxes remain inside Add condition.
-      oldPosition.field.classList.add('desk-scout-main-position');
-      searchBar.insertBefore(oldPosition.field,openButton);
+      // The broad four-option selector is superseded by the exact
+      // position pop-out; keep the field hidden for compatible form posts.
+      oldPosition.field.hidden=true;
       available.splice(available.indexOf(oldPosition),1);
-      oldPosition.input.addEventListener('change',()=>{
-        const detailed=compactForm.querySelector('[data-scout-positions]');
-        if(detailed)detailed.value='';
-        compactForm.requestSubmit();
-      });
     }
     const positions=[
       ['GK','Goalkeeper'],['CB','Centre-back'],['LB','Left-back'],
@@ -1109,6 +2168,14 @@ DASHBOARD_JS = r"""
     const positionsGrid=document.createElement('div');
     positionsGrid.className='desk-position-grid';
     const selectedCodes=new Set((positionsInput?.value||'').split(',').filter(Boolean));
+    if(!selectedCodes.size&&oldPosition?.input.value){
+      const groups={GK:['GK'],DEF:['CB','LB','RB','LWB','RWB'],
+        MID:['DMF','CMF','AMF','LMF','RMF'],
+        FWD:['LWF','RWF','SS','CF']};
+      (groups[oldPosition.input.value]||[]).forEach(code=>selectedCodes.add(code));
+      if(positionsInput)positionsInput.value=[...selectedCodes].join(',');
+    }
+    if(oldPosition)oldPosition.input.value='';
     const boxes=[];
     positions.forEach(([code,name])=>{
       const label=document.createElement('label');
@@ -1127,7 +2194,31 @@ DASHBOARD_JS = r"""
         renderChips();compactForm.requestSubmit();
       });
     });
-    positionsPanel.append(positionsTitle,positionsGrid);grid.prepend(positionsPanel);
+    positionsPanel.append(positionsTitle,positionsGrid);
+    positionsPanel.hidden=true;
+    compactForm.appendChild(positionsPanel);
+    const positionButton=document.createElement('button');
+    positionButton.type='button';
+    positionButton.className='desk-scout-position-trigger';
+    function positionCaption(){
+      const n=boxes.filter(box=>box.checked).length;
+      positionButton.textContent=n?'Positions · '+n+' selected':'All positions';
+      positionButton.setAttribute('aria-expanded',String(!positionsPanel.hidden));
+    }
+    positionCaption();
+    searchBar.insertBefore(positionButton,openButton);
+    positionButton.addEventListener('click',()=>{
+      positionsPanel.hidden=!positionsPanel.hidden;
+      positionCaption();
+    });
+    document.addEventListener('click',event=>{
+      if(!positionsPanel.contains(event.target)&&
+         event.target!==positionButton){
+        positionsPanel.hidden=true;
+        positionCaption();
+      }
+    });
+    positionsGrid.addEventListener('change',positionCaption);
     if(positionsInput)available.push({input:positionsInput,
       field:positionsPanel,name:'scout_positions'});
 
@@ -1187,7 +2278,8 @@ DASHBOARD_JS = r"""
     function renderChips(){
       chips.replaceChildren();
       for(const {input,name} of available){
-        if(['scout_max_value','scout_max_wage','scout_interest'].includes(name))continue;
+        if(['scout_max_value','scout_max_wage','scout_interest',
+            'scout_listed','scout_free_only','scout_contract'].includes(name))continue;
         if(!hasCondition(input))continue;
         const chip=document.createElement('span');chip.className='desk-scout-chip';
         const label=document.createElement('span');
@@ -1205,15 +2297,23 @@ DASHBOARD_JS = r"""
       openButton.textContent='+ Add condition'+(chips.children.length?
         ' ('+chips.children.length+')':'');
     }
-    compactForm.addEventListener('change',renderChips);
+    compactForm.addEventListener('change',event=>{
+      if(event.target===contractField?.input)
+        expiringBox.checked=contractField.input.value==='expiring';
+      renderChips();
+    });
     compactForm.addEventListener('input',renderChips);
     resetButton.addEventListener('click',()=>{
       available.forEach(({input})=>{
         if(input.type==='checkbox')input.checked=false;else input.value='';
+        if(['scout_max_value','scout_max_wage'].includes(input.name))
+          input.dispatchEvent(new Event('input',{bubbles:true}));
       });
       boxes.forEach(b=>b.checked=false);
       showTeamCheckbox.checked=true;
+      expiringBox.checked=false;
       if(hideOwn)hideOwn.value='0';
+      positionCaption();
       compactForm.requestSubmit();renderChips();
     });
     const explanation=views.scouting.querySelector('.desk-scout-finance + p.muted');
@@ -1260,16 +2360,23 @@ DASHBOARD_JS = r"""
         if(player.shortlisted)first.appendChild(document.createTextNode(' ★'));
         row.appendChild(first);
         const fields=[player.club,player.position,player.overall,player.age,
-          player.value,player.wage,player.contract,player.years_left,player.pace,
-          player.shooting,player.passing,player.dribbling,
-          player.defending,player.physicality];
+          player.height,player.value,player.asking_price,player.wage,
+          player.contract,player.years_left,player.pace,player.shooting,
+          player.passing,player.dribbling,player.defending,player.physicality];
         if(scoutForm.elements.scout_attribute.value)
           fields.push(player.detail_attribute);
         fields.forEach(function(value,index){
           const cell=document.createElement('td');
           cell.textContent=display(value);
-          if(index>=8&&index<=13)cell.className='desk-scout-extra';
-          if(index===5)cell.title=player.club==='Free agent'?
+          if(index>=10&&index<=15)cell.className='desk-scout-extra';
+          if(index===6 && player.asking_price!=='—'){
+            cell.className=player.asking_estimated?
+              'desk-asking-estimate':'desk-asking-actual';
+            cell.title=player.asking_estimated?
+              'Non-binding game-model asking estimate, not a seller quote':
+              'Actual asking price in the selling club’s counteroffer';
+          }
+          if(index===7)cell.title=player.club==='Free agent'?
             'Reference game wage, not confirmed agent demand':
             'Current game wage, not future agent demand';
           row.appendChild(cell);
@@ -1284,6 +2391,8 @@ DASHBOARD_JS = r"""
         if(active)active.abort();
         active=null;
         page=0;shown=0;hasMore=true;
+        tableBody.replaceChildren();
+        counter.textContent='Updating scouting results…';
         status.textContent='Applying filters…';
         const search=new URLSearchParams(new FormData(scoutForm));
         history.replaceState(null,'',window.location.pathname+'?'+
@@ -1334,6 +2443,7 @@ DASHBOARD_JS = r"""
       limitControl.addEventListener('click',function(){
         valueControl.value=String(Math.max(0,Math.floor(
           Number(document.body.dataset.feeRemaining)||0)));
+        valueControl.dispatchEvent(new Event('input',{bubbles:true}));
         scoutForm.requestSubmit();
       });
     }
@@ -1348,6 +2458,9 @@ DASHBOARD_JS = r"""
     let searchTimer;
     scoutForm.querySelectorAll('input[type=text],input:not([type]),input[type=number]')
       .forEach(function(input){
+        // The enhanced currency fields have their own debounced/exact
+        // handler and must not issue a duplicate search 550ms later.
+        if(['scout_max_value','scout_max_wage'].includes(input.name))return;
         input.addEventListener('input',function(){
           clearTimeout(searchTimer);
           searchTimer=setTimeout(function(){
@@ -1366,7 +2479,8 @@ DASHBOARD_JS = r"""
       },{rootMargin:'500px'});
       observer.observe(scoutProgress);
     }else{
-      window.addEventListener('scroll',function(){
+      (views.scouting.querySelector('[data-scout-scroll]')||window)
+        .addEventListener('scroll',function(){
         const box=scoutProgress.getBoundingClientRect();
         if(!views.scouting.hidden&&box.top<window.innerHeight+500)
           loadScout(false);
@@ -1380,8 +2494,21 @@ DASHBOARD_JS = r"""
   let inboxMarkInProgress=false;
   function markInboxViewed(){
     if(Number(document.body.dataset.unread||0)<=0||inboxMarkInProgress)return;
-    const form=views.inbox.querySelector('form[data-mark-inbox-read]');
-    if(!form)return;
+    let form=views.inbox.querySelector('form[data-mark-inbox-read]');
+    if(!form){
+      // When the first bid arrives after the original page render, the
+      // server hasn't yet rendered a read-form. Acknowledge new mail using
+      // the same manager CSRF token as all the other authenticated actions.
+      const csrf=document.querySelector('input[name="csrf"]')?.value;
+      if(!csrf)return;
+      form=document.createElement('form');
+      form.method='post';form.action=location.pathname+'/read';
+      form.dataset.markInboxRead='';
+      const field=document.createElement('input');
+      field.type='hidden';field.name='csrf';field.value=csrf;
+      form.append(field);form.hidden=true;
+      views.inbox.appendChild(form);
+    }
     inboxMarkInProgress=true;
     fetch(form.getAttribute('action'),{method:'POST',body:new FormData(form),
       credentials:'same-origin',headers:{'Accept':'application/json'}})
@@ -1417,8 +2544,10 @@ DASHBOARD_JS = r"""
       el=>Number(el.dataset.liveOfferId)));
   const pound=n=>{
     n=Number(n)||0;const abs=Math.abs(n);
-    return (n<0?'-':'')+'£'+(abs>=1e6?(abs/1e6).toFixed(2)+'m':
-      abs>=1e3?Math.round(abs/1e3)+'k':Math.round(abs).toLocaleString('en-GB'));
+    const trimmed=v=>String(Number(v.toFixed(2)));
+    return (n<0?'-':'')+'£'+(abs>=1e6?trimmed(abs/1e6)+'m':
+      abs>=1e3?trimmed(abs/1e3)+'k':
+      Math.round(abs).toLocaleString('en-GB'));
   };
   function updateSaleBudgetUI(result){
     if(result.available_transfer_budget===undefined)return;
@@ -1451,6 +2580,206 @@ DASHBOARD_JS = r"""
       pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
       pound(result.sale_board_withheld||0)+' retained by the board.';
   }
+  // Scouting gets a legible amount field with optional exact entry, preset
+  // starting points and automatic step sizes. The canonical GBP integer is
+  // still the original named form field, never a formatted £ string.
+  function enhanceScoutMoney(input){
+    input.dataset.moneyStepper='1';
+    const wage=input.name==='scout_max_wage';
+    const initial=input.value;
+    const options=wage?
+      [2500,5000,10000,15000,20000,30000,50000,75000,100000,150000,250000]:
+      [100000,250000,500000,1000000,2000000,5000000,10000000,
+       20000000,50000000,100000000];
+    const control=document.createElement('div');
+    control.className='desk-scout-money';
+    const row=document.createElement('div');
+    row.className='desk-scout-money-entry';
+    const less=document.createElement('button');
+    less.type='button';less.className='desk-scout-money-step';
+    less.textContent='−';less.setAttribute('aria-label','Reduce '+input.name);
+    less.title='Smart decrease';
+    const prefix=document.createElement('span');prefix.className='desk-scout-money-pound';
+    prefix.textContent='£';
+    const manual=document.createElement('input');
+    manual.type='text';manual.inputMode='numeric';
+    manual.className='desk-scout-money-manual';manual.autocomplete='off';
+    manual.setAttribute('aria-label',(wage?'Maximum weekly wage':'Maximum market value')+' in pounds');
+    manual.placeholder='Any amount';
+    const more=document.createElement('button');
+    more.type='button';more.className='desk-scout-money-step';
+    more.textContent='+';more.setAttribute('aria-label','Increase '+input.name);
+    more.title='Smart increase';
+    const preset=document.createElement('select');
+    preset.className='desk-scout-money-preset';
+    preset.setAttribute('aria-label','Choose a '+(wage?'weekly wage':'market value')+' starting amount');
+    const none=document.createElement('option');none.value='';none.textContent='No limit';
+    preset.appendChild(none);
+    for(const amount of options){
+      const option=document.createElement('option');
+      option.value=String(amount);option.textContent=wage?
+        '£'+(amount/1000).toLocaleString('en-GB')+'k':
+        amount>=1000000?'£'+(amount/1000000).toLocaleString('en-GB')+'m':
+        '£'+(amount/1000).toLocaleString('en-GB')+'k';
+      preset.appendChild(option);
+    }
+    const custom=document.createElement('option');
+    custom.value='custom';custom.textContent='Custom amount';
+    preset.appendChild(custom);
+    const hint=document.createElement('small');
+    hint.className='desk-scout-money-hint';
+    hint.textContent='Type an exact amount or use the smart + / −';
+    const format=value=>value===''?'':Number(value).toLocaleString('en-GB');
+    function display(){
+      manual.value=format(input.value);
+      preset.value=(input.value===''||options.includes(Number(input.value)))?
+        String(input.value):'custom';
+      if(!preset.value && input.value!=='')preset.value='custom';
+    }
+    function setValue(value,notify){
+      input.value=value===''?'':String(Math.max(0,Math.min(1000000000,Math.floor(Number(value)||0))));
+      manual.removeAttribute('aria-invalid');
+      display();
+      if(notify){
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        input.form?.requestSubmit();
+      }
+    }
+    function smartStep(amount){
+      if(wage)return amount<10000?500:amount<50000?2500:
+        amount<100000?5000:10000;
+      return amount<500000?50000:amount<2000000?100000:
+        amount<10000000?500000:amount<50000000?2000000:5000000;
+    }
+    function move(direction){
+      const current=input.value===''?0:Number(input.value);
+      const step=smartStep(current);
+      const next=direction>0?
+        Math.floor(current/step)*step+step:
+        Math.max(0,Math.ceil(current/step)*step-step);
+      setValue(next,true);
+    }
+    less.addEventListener('click',()=>move(-1));
+    more.addEventListener('click',()=>move(1));
+    preset.addEventListener('change',event=>{
+      event.stopPropagation();
+      if(preset.value==='custom'){manual.focus();manual.select();return;}
+      setValue(preset.value,true);
+    });
+    let timer;
+    manual.addEventListener('input',()=>{
+      clearTimeout(timer);
+      const raw=manual.value.trim();
+      // Commas, spaces and the £ symbol are purely a display affordance.
+      // Reject malformed values instead of submitting a wrong integer.
+      const valid=/^£?\s*[0-9][0-9,\s]*$/.test(raw);
+      if(raw!==''&&!valid){
+        manual.setAttribute('aria-invalid','true');
+        return;
+      }
+      manual.removeAttribute('aria-invalid');
+      const stripped=raw.replace(/[^0-9]/g,'');
+      input.value=stripped===''?'':String(Math.min(1000000000,Number(stripped)));
+      preset.value=input.value!==''&&options.includes(Number(input.value))?
+        input.value:input.value===''?'':'custom';
+      clearTimeout(timer);
+      timer=setTimeout(()=>input.form?.requestSubmit(),500);
+    });
+    manual.addEventListener('blur',()=>{
+      if(manual.getAttribute('aria-invalid')==='true')return;
+      clearTimeout(timer);
+      display();
+      input.form?.requestSubmit();
+    });
+    input.type='hidden'; // FormData still sends the original plain GBP integer.
+    input.before(control);
+    control.append(row,preset,hint);
+    row.append(less,prefix,manual,more);
+    control.appendChild(input);
+    input.addEventListener('input',display); // supports reset and Use budget.
+    input.value=initial;
+    display();
+  }
+  // Compact money values are display-only. Original integer GBP inputs
+  // remain in the form so all existing server validation and CSRF work.
+  // Buttons and increment chooser replace error-prone manual £ entries.
+  function enhanceMoneyInputs(root){
+    if(!(root instanceof Element||root instanceof Document))return;
+    const fields=root.querySelectorAll('input[type="number"][name]');
+    fields.forEach(input=>{
+      if(input.dataset.moneyStepper==='1'||input.dataset.stepper==='1')return;
+      if(!/^(offered_fee|negotiated_fee|counter_fee|weekly_wage|wage_weekly|current_wage_weekly|scout_max_value|scout_max_wage|investment_pool)$/.test(input.name))return;
+      if(input.name==='scout_max_value'||input.name==='scout_max_wage'){
+        enhanceScoutMoney(input);return;
+      }
+      // The old dedicated counter stepper is also replaced by this compact
+      // component when not already initialised.
+      input.dataset.moneyStepper='1';
+      const wage=/wage/.test(input.name);
+      const initial=Number(input.value)||0;
+      const suggested=wage?(initial>=50000?1000:500):
+        initial>=10000000?250000:initial>=1000000?50000:initial>=200000?10000:5000;
+      const steps=wage?[250,500,1000,2500,5000,10000,25000]:
+        [1000,5000,10000,25000,50000,100000,250000,500000,1000000];
+      const control=document.createElement('span');
+      control.className='desk-money-control';
+      const less=document.createElement('button');
+      less.type='button';less.className='desk-money-step';less.textContent='−';
+      const preview=document.createElement('output');
+      preview.className='desk-money-preview';preview.setAttribute('aria-live','off');
+      const more=document.createElement('button');
+      more.type='button';more.className='desk-money-step';more.textContent='+';
+      const increment=document.createElement('select');
+      increment.className='desk-money-increment';
+      increment.setAttribute('aria-label','Change amount in increments of');
+      for(const value of steps){
+        const option=document.createElement('option');
+        option.value=String(value);option.textContent=pound(value);
+        increment.appendChild(option);
+      }
+      increment.value=String(suggested);
+      if(!increment.value)increment.value=String(steps[0]);
+      function repaint(){
+        preview.textContent=input.value===''?'Any amount':pound(Number(input.value));
+        const title=input.value===''?'No amount selected':pound(Number(input.value));
+        preview.title=title;
+      }
+      function move(direction){
+        const step=Number(increment.value);
+        const low=input.min===''?-Infinity:Number(input.min);
+        const high=input.max===''?Infinity:Number(input.max);
+        const base=input.value===''?Math.max(0,Number.isFinite(low)?low:0):Number(input.value);
+        const revised=Math.max(low,Math.min(high,Math.round(base+direction*step)));
+        if(!Number.isFinite(revised))return;
+        input.value=String(revised);
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        repaint();
+      }
+      less.addEventListener('click',()=>move(-1));
+      more.addEventListener('click',()=>move(1));
+      increment.addEventListener('change',event=>event.stopPropagation());
+      less.setAttribute('aria-label','Decrease '+input.name.replaceAll('_',' ')+' amount');
+      more.setAttribute('aria-label','Increase '+input.name.replaceAll('_',' ')+' amount');
+      input.step='1';input.readOnly=true;
+      input.classList.add('desk-money-native');
+      input.before(control);
+      control.append(less,preview,more,increment,input);
+      input.addEventListener('input',repaint);
+      repaint();
+    });
+  }
+  const moneyObserver=new MutationObserver(entries=>{
+    for(const entry of entries){
+      for(const node of entry.addedNodes){
+        if(node.nodeType!==1)continue;
+        if(node.matches?.('input[type="number"][name]')||
+            node.querySelector?.('input[type="number"][name]'))
+          enhanceMoneyInputs(node.parentElement||node);
+      }
+    }
+  });
+  moneyObserver.observe(host,{subtree:true,childList:true});
+  enhanceMoneyInputs(host);
   window.fc27UpdateBudget=updateSaleBudgetUI;
   const labels={
     proposed:'New offer',countered:'Awaiting buyer',
@@ -1459,6 +2788,27 @@ DASHBOARD_JS = r"""
     completed:'Confirmed',
     withdrawn:'Withdrawn',rejected:'Declined'
   };
+  function saleStatusLabel(offer){
+    const status=offer.status,agent=offer.agent_status,
+          decision=offer.player_choice;
+    if(status==='accepted_pending_contract'){
+      if(decision==='accepted')return 'Player accepts — sign transfer';
+      if(decision==='declined')return 'Player declined';
+      if(decision==='evaluating')return 'Player considering offers';
+      if(agent==='terms_accepted')return 'Agent agreed — awaiting player';
+      if(agent==='agent_counter')return 'Agent negotiating wages';
+      if(agent==='wage_limit')return 'Buyer cannot meet wages';
+      if(agent==='role_refused')return 'Role demands not met';
+      if(agent==='needs_information')return 'Player terms need review';
+    }
+    if(status==='withdrawn'){
+      if(agent==='role_refused'||agent==='wage_limit'||
+         agent==='needs_information'||agent==='player_refused')
+        return 'Personal terms unsuccessful';
+      if(decision==='declined')return 'Player chose another club';
+    }
+    return labels[status]||status;
+  }
   function formFor(offer,verb,csrf){
     const form=document.createElement('form');
     form.method='post';
@@ -1523,7 +2873,7 @@ DASHBOARD_JS = r"""
       refreshInboxList();
       const label=card.querySelector('.label');
       if(label)label.textContent=(card.dataset.deskBuyer||offer.buyer||'Buying club')+
-        ' · '+(labels[status]||status);
+        ' · '+saleStatusLabel(offer);
       if(status==='proposed')continue;
       let actions=card.querySelector('.actions');
       if(actions){
@@ -1563,6 +2913,7 @@ DASHBOARD_JS = r"""
           (offer.player_choice==='accepted'?
             'Player has chosen this buyer. You may confirm the sale in your Inbox.':
             'Player is considering the competing proposals. Finalisation is not yet available.'):
+          agent==='agent_counter'?'Agent is negotiating improved wages with the buyer.':
           'Fee accepted — player/agent talks are in progress.'):
         status==='countered'?'Counter sent — awaiting the buying club.':
         status==='agreed_future'?'Confirmed — registration will take place at the deadline.':
@@ -1576,7 +2927,7 @@ DASHBOARD_JS = r"""
     const row=outgoing.tBodies[0].querySelector(
       '[data-live-offer-id="'+Number(offer.offer_id)+'"]');
     if(row&&row.cells.length>3){
-      row.cells[3].textContent=labels[offer.status]||offer.status;
+      row.cells[3].textContent=saleStatusLabel(offer);
       if(row.cells[4] && !['proposed','countered','accepted_pending_contract'].includes(offer.status))
         row.cells[4].replaceChildren();
     }
@@ -1801,14 +3152,15 @@ DASHBOARD_JS = r"""
   },true);
 
 
-  window.fc27SyncContractRequests=function(items,careerId){
+  window.fc27SyncContractRequests=function(items,careerId,csrf){
     if(!Array.isArray(items))return;
     for(const item of items){
       const playerId=Number(item.player_id);
       if(!Number.isSafeInteger(playerId)||playerId<=0)continue;
       let card=views.inbox.querySelector(
         '[data-live-offer-id="contract-'+playerId+'"]');
-      if(!card){
+      const fresh=!card;
+      if(fresh){
         card=document.createElement('div');
         card.className='card offer desk-contract-inbox';
         card.dataset.liveOfferId='contract-'+playerId;
@@ -1826,27 +3178,55 @@ DASHBOARD_JS = r"""
         const explanation=document.createElement('p');
         explanation.className='desk-offer-briefing-note';
         brief.append(title,explanation);
-        const link=document.createElement('a');link.className='desk-inbox-open-negotiation';
-        link.href='/world/play/career/'+encodeURIComponent(careerId)+
-          '/market/contract/'+playerId;
-        link.textContent='Open contract negotiations';
-        card.append(label,heading,count,brief,link);
+        card.append(label,heading,count,brief);
         inboxGrid.hidden=false;
         inboxGrid.insertBefore(card,inboxColumns.nextSibling);
         offerCards.push(card);makeInboxItem(card);
       }
-      if(card.dataset.deskStatus===item.status &&
+      card.dataset.deskPosition=item.position||'';
+      card.dataset.deskOverall=item.overall||'';
+      card.dataset.deskAge=item.age||'';
+      if(!fresh&&card.dataset.deskStatus===item.status &&
          card.dataset.demand===String(item.demand))continue;
       card.dataset.deskStatus=item.status;
       card.dataset.demand=String(item.demand);
-      card.querySelector('.count').textContent=pound(item.demand)+'/wk';
-      card.querySelector('.desk-offer-briefing-note').textContent=
-        'Current £'+Number(item.current_wage).toLocaleString('en-GB')+
-        '/week · comparable FC27 wage £'+Number(item.peer_wage||0).toLocaleString('en-GB')+
-        '/week. Agent status: '+String(item.status).replaceAll('_',' ')+
-        '. Renegotiation does not force a transfer.';
-      refreshInboxItem(card);
-      refreshInboxList();
+      const signed=item.status==='agreed_future'||item.status==='completed';
+      card.querySelector('.label').textContent=signed?
+        'Contract signed':'Contract renewal · Player representative';
+      card.querySelector('.count').textContent=pound(item.demand)+'/wk requested';
+      card.querySelector('.desk-offer-briefing-note').textContent=signed?
+        'New contract signed: '+item.player+' has agreed a '+
+        String(item.contract_years||'new')+'-year renewal on '+
+        pound(item.signed_wage||item.demand)+'/week. The new contract takes '+
+        'effect at the transfer deadline.':
+        'Current '+pound(item.current_wage)+'/week · comparable game wage '+
+        pound(item.peer_wage||0)+'/week. Agent status: '+
+        String(item.status).replaceAll('_',' ')+'.';
+      card.querySelectorAll(':scope > .desk-renewal-quick-actions')
+        .forEach(el=>el.remove());
+      if(['requested','countered','negotiating','accepted_terms'].includes(item.status)){
+        const actions=document.createElement('div');
+        actions.className='desk-renewal-quick-actions';
+        const link=document.createElement('a');
+        link.className='desk-inbox-open-negotiation';
+        link.href='/world/play/career/'+encodeURIComponent(careerId)+
+          '/market/contract/'+playerId;
+        link.textContent='Offer renewal';actions.appendChild(link);
+        if(csrf){
+          const form=document.createElement('form');
+          form.method='post';
+          form.setAttribute('action','/world/play/career/'+encodeURIComponent(careerId)+
+            '/market/contract/'+playerId+'/decision');
+          const input=document.createElement('input');
+          input.type='hidden';input.name='csrf';input.value=String(csrf);
+          const button=document.createElement('button');
+          button.name='action';button.value='decline';button.type='submit';
+          button.className='danger';button.textContent='Reject renewal';
+          form.append(input,button);actions.appendChild(form);
+        }
+        card.appendChild(actions);
+      }
+      refreshInboxItem(card);refreshInboxList();
     }
   };
   window.fc27SyncFreeAgentOffers=function(items,csrf,careerId){
@@ -1885,6 +3265,9 @@ DASHBOARD_JS = r"""
         const empty=views.inbox.querySelector('#desk-inbox-no-offers');
         if(empty)empty.hidden=true;
       }
+      card.dataset.deskPosition=o.position||'';
+      card.dataset.deskOverall=o.overall||'';
+      card.dataset.deskAge=o.age||'';
       const choice=o.player_choice||'';
       if(!fresh&&card.dataset.deskStatus===o.status&&
          card.dataset.deskPlayerChoice===choice)return;
@@ -1968,6 +3351,9 @@ DASHBOARD_JS = r"""
         offerCards.push(card);makeInboxItem(card);
         if(!selectedInboxCard)selectInboxCard(card);
       }
+      card.dataset.deskPosition=o.position||'';
+      card.dataset.deskOverall=o.overall||'';
+      card.dataset.deskAge=o.age||'';
       const newAgent=o.agent_status==='accepted'?'terms_accepted':o.agent_status||'';
       const prevBuyStatus=card.dataset.deskStatus;
       if(!fresh&&card.dataset.deskStatus===o.status&&
@@ -1992,7 +3378,7 @@ DASHBOARD_JS = r"""
         o.status==='rejected'?'Seller rejected your fee. You can make an improved bid.':
         o.status==='accepted_pending_contract'?'Seller accepted your fee. Negotiate the player contract in Transfers.':
         o.status==='agreed_future'||o.status==='completed'?'Transfer confirmed and reflected in the projected squad.':
-        o.status==='proposed'?'The selling club is reviewing your bid.':'Transfer talks are closed.';
+        o.status==='proposed'?o.seller+' are reviewing your bid for '+o.player+'.':'Transfer talks are closed.';
       card.querySelectorAll(':scope > .actions,:scope > .desk-inbox-open-negotiation').forEach(x=>x.remove());
       if(o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'&&
          o.player_choice==='accepted'){
@@ -2040,10 +3426,13 @@ DASHBOARD_JS = r"""
         card.className='card offer';card.dataset.liveOfferId=String(id);
         card.dataset.deskPlayer=String(o.player_id);
         card.dataset.deskPlayerName=o.player;card.dataset.deskStatus=o.status;
+        card.dataset.deskPosition=o.position||'';
+        card.dataset.deskOverall=o.overall||'';
+        card.dataset.deskAge=o.age||'';
         card.dataset.deskBuyer=o.buyer;
         const label=document.createElement('div');
         label.className='label';
-        label.textContent=o.buyer+' · '+(labels[o.status]||o.status);
+        label.textContent=o.buyer+' · '+saleStatusLabel(o);
         const heading=document.createElement('h3');
         const link=document.createElement('a');
         link.href=location.pathname+'/player/'+encodeURIComponent(o.player_id);
@@ -2111,6 +3500,9 @@ DASHBOARD_JS = r"""
       const saleCard=views.inbox.querySelector('[data-live-offer-id="'+id+'"]');
       if(saleCard){
         saleCard.dataset.deskPlayerChoice=o.player_choice||'';
+        saleCard.dataset.deskPosition=o.position||'';
+        saleCard.dataset.deskOverall=o.overall||'';
+        saleCard.dataset.deskAge=o.age||'';
         refreshInboxItem(saleCard);
       }
       if(outgoing){
@@ -2125,7 +3517,7 @@ DASHBOARD_JS = r"""
         row.cells[0].textContent=o.player;row.cells[1].textContent=o.buyer;
         row.cells[2].textContent=pound(o.fee);
         row.cells[2].dataset.sortValue=String(o.fee);
-        row.cells[3].textContent=labels[o.status]||o.status;
+        row.cells[3].textContent=saleStatusLabel(o);
         row.cells[4].replaceChildren();
         if(['proposed','countered','accepted_pending_contract'].includes(o.status)){
           const form=formFor(o,'cancel',csrf);
@@ -2517,20 +3909,176 @@ DASHBOARD_JS = r"""
     }
   }
 
+  // Player links open an authentic server-backed scout report in this same
+  // workspace. The single market heartbeat and left navigation remain alive.
+  // Source report JS is executed only after its own DOM has been mounted.
+  let playerRequest=null,playerOpened=0;
+  function profileIdFromHash(){
+    const match=/^#player-([1-9]\d*)$/.exec(location.hash);
+    const id=match?Number(match[1]):0;
+    return Number.isSafeInteger(id)?id:0;
+  }
+  function profileIdFromLink(link){
+    if(!link||!link.href)return 0;
+    const url=new URL(link.href,location.href);
+    const prefix=location.pathname+'/player/';
+    if(url.origin!==location.origin||!url.pathname.startsWith(prefix))return 0;
+    const suffix=url.pathname.slice(prefix.length);
+    if(!/^[1-9]\d*$/.test(suffix))return 0;
+    const id=Number(suffix);
+    return Number.isSafeInteger(id)?id:0;
+  }
+  async function loadPlayerReport(id){
+    if(!id)return;
+    const pane=views.player;
+    if(pane.dataset.playerId===String(id)&&pane.dataset.loaded==='1')return;
+    playerRequest?.abort();
+    const controller=new AbortController();
+    playerRequest=controller;
+    pane.dataset.playerId=String(id);
+    pane.dataset.loaded='0';
+    pane.innerHTML='<div class="desk-empty" role="status">Loading player report…</div>';
+    try{
+      const target=location.pathname+'/player/'+id;
+      const response=await fetch(target+'?panel=1',{
+        credentials:'same-origin',cache:'no-store',
+        headers:{Accept:'text/html'},signal:controller.signal
+      });
+      const finalUrl=new URL(response.url,location.href);
+      if(!response.ok||finalUrl.origin!==location.origin||
+         finalUrl.pathname!==target)
+        throw new Error('The player report could not be opened. Try again.');
+      const page= new DOMParser().parseFromString(await response.text(),'text/html');
+      const main=page.querySelector('main');
+      if(!main)throw new Error('Player information is unavailable.');
+      const inner=document.importNode(main,true);
+      const scriptBodies=Array.from(inner.querySelectorAll('script'))
+        .map(script=>script.textContent||'');
+      inner.querySelectorAll('script').forEach(script=>script.remove());
+      const report=document.createElement('div');
+      report.className='desk-player-report';
+      while(inner.firstChild)report.appendChild(inner.firstChild);
+      const back=report.querySelector('a[href*="#recruitment"]');
+      if(back){
+        back.href='#scouting';
+        back.dataset.deskTab='scouting';
+        back.classList.add('desk-player-back');
+        back.textContent='← Back to Scouting';
+      }
+      if(playerRequest!==controller)return;
+      pane.replaceChildren(report);
+      pane.dataset.loaded='1';
+      // Only same-origin scripts present in our own verified player-report
+      // template execute. The separately rendered page handles bidding and
+      // free-agent negotiation through the original secure endpoints.
+      for(const source of scriptBodies){
+        if(source.includes('setInterval(updateMarket,15000)'))continue;
+        const script=document.createElement('script');
+        script.textContent=source;
+        report.appendChild(script);
+        script.remove();
+      }
+    }catch(error){
+      if(error.name==='AbortError')return;
+      if(playerRequest!==controller)return;
+      pane.dataset.loaded='0';
+      const notice=document.createElement('div');
+      notice.className='desk-empty';
+      const message=document.createElement('p');
+      message.textContent=String(error.message||error);
+      const fallback=document.createElement('a');
+      fallback.href=location.pathname+'/player/'+id;
+      fallback.textContent='Open the player report separately';
+      notice.append(message,fallback);
+      pane.replaceChildren(notice);
+    }finally{
+      if(playerRequest===controller)playerRequest=null;
+    }
+  }
+  document.addEventListener('click',function(event){
+    const link=event.target.closest('a[href]');
+    if(!link||event.defaultPrevented||event.button!==0||
+       event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||
+       link.target==='_blank'||link.hasAttribute('download'))return;
+    const id=profileIdFromLink(link);
+    if(!id)return;
+    event.preventDefault();
+    playerOpened=id;
+    history.pushState(null,'','#player-'+id);
+    switchView('player',false);
+  },true);
+
+  // Shortlist changes inside the report are saved via the original CSRF
+  // endpoint without navigating away or interrupting the live window.
+  document.addEventListener('submit',async function(event){
+    const form=event.target;
+    if(!(form instanceof HTMLFormElement)||!views.player.contains(form))return;
+    const target=new URL(form.getAttribute('action')||'',location.href);
+    if(target.origin!==location.origin||
+       target.pathname!==location.pathname+'/shortlist')return;
+    event.preventDefault();
+    if(form.dataset.saving==='1')return;
+    const button=event.submitter||form.querySelector('button[type=submit],button');
+    const action=(button?.value||'save');
+    const feedback=document.createElement('p');
+    feedback.className='desk-player-response';
+    feedback.setAttribute('role','status');
+    feedback.textContent='Saving shortlist…';
+    form.insertAdjacentElement('afterend',feedback);
+    form.dataset.saving='1';
+    if(button)button.disabled=true;
+    try{
+      const data=new FormData(form);
+      data.set('action',action);
+      const response=await fetch(target.pathname,{
+        method:'POST',credentials:'same-origin',body:data,
+        cache:'no-store',headers:{Accept:'application/json'}
+      });
+      const result=await response.json().catch(()=>null);
+      if(!response.ok||!result?.ok)
+        throw new Error(result?.error||'Shortlist change could not be saved');
+      feedback.textContent=result.shortlisted?'Added to your shortlist':'Removed from shortlist';
+      if(button){
+        button.value=result.shortlisted?'remove':'save';
+        button.textContent=result.shortlisted?'Remove from shortlist':'Add to shortlist';
+      }
+      const total=Math.max(0,Number(document.body.dataset.saved||0)+(result.shortlisted?1:-1));
+      document.body.dataset.saved=String(total);
+      document.querySelectorAll('[data-desk-tab="shortlist"] .desk-nav-count')
+        .forEach(count=>{count.textContent=String(total);});
+      views.shortlist.dataset.stale='1';
+    }catch(error){
+      feedback.textContent=String(error.message||error);
+      feedback.dataset.error='1';
+    }finally{
+      form.dataset.saving='0';
+      if(button&&button.isConnected)button.disabled=false;
+    }
+  },true);
+
   // Sidebar, mobile bar, overview buttons and legacy #section links use
   // the same one-page view switcher; no cross-page navigation is required.
   function switchView(name,changeUrl){
-    if(!views[name])name='dashboard';
+    if(!views[name]||unavailableViews.has(name))name='dashboard';
+    if(name==='shortlist'&&views.shortlist.dataset.stale==='1'){
+      location.hash='#shortlist';
+      location.reload();
+      return;
+    }
     names.forEach(function(other){views[other].hidden=other!==name;});
     document.querySelectorAll('[data-desk-tab]').forEach(function(link){
-      const active=link.dataset.deskTab===name;
+      const active=link.dataset.deskTab===(name==='player'?'scouting':name);
       if(active)link.setAttribute('aria-current','page');
       else link.removeAttribute('aria-current');
     });
     const label=document.getElementById('desk-current-view');
     if(label)label.textContent=titles[name];
-    if(changeUrl&&location.hash!=='#'+name){
+    if(changeUrl&&location.hash!=='#'+name&&name!=='player'){
       history.pushState(null,'','#'+name);
+    }
+    if(name==='player'){
+      const id=profileIdFromHash()||playerOpened;
+      if(id)loadPlayerReport(id);
     }
     if(name==='inbox'){
       document.getElementById('desk-offer-toast')?.remove();

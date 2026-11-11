@@ -6,6 +6,9 @@ on:
       - 'scripts/fc27_career_desk_chromium_playtest.py'
       - 'world_career_play.py'
       - 'world_career_ui.py'
+      - 'world_career_branding.py'
+      - 'world_career_correspondence.py'
+      - 'scripts/fc27_mail_brand_qa.py'
       - '.github/workflows/fc27-career-desk-chromium-playtest.yml'
 permissions:
   contents: read
@@ -27,6 +30,8 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install playwright==1.55.0
           google-chrome --version
+      - name: Verify club identity and recorded manager correspondence
+        run: python -m scripts.fc27_mail_brand_qa
       - name: Download and validate pristine 659-club world plus additive free agents
         run: |
           mkdir -p e2e

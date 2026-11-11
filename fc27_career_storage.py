@@ -22,11 +22,21 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 PROJECT_REF = "bjahvrmzcpqrynmoxokb"
-SAVE_KEY = "fc27_manual"
+SAVE_KEY = "fc27_manual_v2"
 MAGIC = b"FC27C1\x00"
 CAREER_PREFIX = "world_career_"
-CAREER_EXTRAS = frozenset(("world_fc27_free_agent_offers",
-                          "world_fc27_free_agent_events"))
+# Mutable FC27 tables outside the world_career_ prefix MUST survive a
+# redeploy. Static warehouse/ratings/free-agent-pool tables are deliberately
+# excluded, since they are rebuilt from the verified immutable source.
+CAREER_EXTRAS = frozenset((
+    "world_fc27_free_agent_offers",
+    "world_fc27_free_agent_events",
+    "world_fc27_free_agent_rival_bids",
+    "world_fc27_market_intervals",
+    "world_fc27_market_club_intents",
+    "world_fc27_market_club_evaluations",
+    "world_fc27_market_negotiation_diagnostics",
+))
 META_TABLE = "_fc27_career_storage_meta"
 LOG = logging.getLogger(__name__)
 
@@ -38,10 +48,12 @@ def assert_isolated_target(url: str) -> None:
     parsed = urlsplit(url)
     hostname = (parsed.hostname or "").lower()
     username = unquote(parsed.username or "")
+    # The parallel V2 preview has its OWN role, private schema and key.
+    # Never accept credentials belonging to the existing FC27 or PES app.
     direct = (hostname == f"db.{PROJECT_REF}.supabase.co" and
-              username == "fc27_app" and parsed.port == 5432)
+              username == "fc27_v2_app" and parsed.port == 5432)
     pooler = (hostname.endswith(".pooler.supabase.com") and
-              username == f"fc27_app.{PROJECT_REF}" and parsed.port == 5432)
+              username == f"fc27_v2_app.{PROJECT_REF}" and parsed.port == 5432)
     if parsed.scheme not in ("postgres", "postgresql") or not (
             parsed.password and (direct or pooler)):
         raise RuntimeError("FC27 career persistence refused a non-development database target")
@@ -197,7 +209,7 @@ class CareerSaveStore:
         with self._connect_pg() as pg:
             with pg.cursor() as cur:
                 cur.execute(
-                    "SELECT db_bytes FROM fc27_storage.pes_save_store WHERE save_key=%s",
+                    "SELECT db_bytes FROM fc27_storage_v2.pes_save_store WHERE save_key=%s",
                     (SAVE_KEY,),
                 )
                 row = cur.fetchone()
@@ -214,7 +226,7 @@ class CareerSaveStore:
         with self._connect_pg() as pg:
             with pg.cursor() as cur:
                 cur.execute(
-                    """INSERT INTO fc27_storage.pes_save_store(save_key,db_bytes,updated_at)
+                    """INSERT INTO fc27_storage_v2.pes_save_store(save_key,db_bytes,updated_at)
                        VALUES(%s,%s,NOW())
                        ON CONFLICT(save_key)
                        DO UPDATE SET db_bytes=EXCLUDED.db_bytes,updated_at=NOW()""",

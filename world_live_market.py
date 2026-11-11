@@ -30,6 +30,11 @@ VERSION="inbox-autonomous-market-v2-projected-squads"
 # Irregular spacing is deliberate: a market does not mechanically bid once
 # every minute. Each slot can also produce NO offer.
 MARKET_MOMENTS=(35,175,355,545,735,945,1165,1385,1580,1720,1740,1765)
+# A fresh human-club approach needs time for four independent stages: manager
+# fee review, up to two AI agent rounds, player consideration and final manager
+# sign-off. AI-to-AI world activity continues until the actual deadline.
+# This is workflow feasibility, not a quota or forced transfer decision.
+MIN_NEW_HUMAN_BID_LEAD_SECONDS=180
 
 SCHEMA="""
 CREATE TABLE IF NOT EXISTS world_career_live_market_access(
@@ -415,6 +420,11 @@ def _club_led_opportunities(conn, *, career_id, window_id, candidates, slot):
 
 def _consider_bid(conn,*,career_id,window_id,slot,t):
     """Exactly one plausible proposal opportunity per due market moment."""
+    remaining=window_snapshot(conn,career_id=career_id,now=t)["remaining_seconds"]
+    if remaining is not None and remaining<MIN_NEW_HUMAN_BID_LEAD_SECONDS:
+        return None,("No new human-club approach: insufficient time for fee "
+                     "acceptance, agent terms, independent player choice and "
+                     "manager signature before the deadline")
     from world_recruitment_strategy import prospect_fee_cap
     from world_fc27_ai_recruitment import read_fc27_profiles
     row=conn.execute("""SELECT c.dataset_id,c.manager_club_id,c.pes_lock_date
@@ -567,6 +577,45 @@ def _respond_to_counter(conn,*,career_id,offer_id,window_id,t):
     conn.commit()
     return True
 
+def close_failed_human_sale_talks(conn,*,career_id,window_id,offer_id,
+                                  agent_state,previous=None,now=None):
+    """Report actual failed AI personal terms instead of an eternal 'talks' label.
+
+    No consent is invented: an unwilling player or a club that cannot supply
+    the required wage/role withdraws its UNSIGNED bid. Missing evidence gets
+    one retry so a transient lookup never immediately cancels the approach.
+    """
+    if not agent_state:return False
+    state=agent_state["status"]
+    definitive=state in ("role_refused","wage_limit","player_refused")
+    unresolved=(state=="needs_information" and previous is not None
+                and previous["status"]=="needs_information")
+    if not (definitive or unresolved):return False
+    row=conn.execute("""SELECT o.status,p.full_name,c.name
+        FROM world_career_offers o
+        JOIN world_players p ON p.player_id=o.player_id
+        JOIN world_clubs c ON c.club_id=o.buying_club_id
+        WHERE o.career_id=? AND o.offer_id=?""",
+        (career_id,offer_id)).fetchone()
+    if not row or row[0]!="accepted_pending_contract":return False
+    detail=(agent_state.get("decision_reason") or
+            "Buyer and player's agent could not complete personal terms.")
+    conn.execute("""UPDATE world_career_offers SET status='withdrawn'
+        WHERE career_id=? AND offer_id=? AND status='accepted_pending_contract'""",
+        (career_id,offer_id))
+    conn.execute("""INSERT INTO world_career_offer_events
+        (offer_id,event_type,detail) VALUES(?,'ai_personal_terms_failed',?)""",
+        (offer_id,detail))
+    _message(conn,career_id=career_id,window_id=window_id,
+        key=f"ai-personal-terms-failed:{offer_id}",
+        headline=f"Transfer talks ended: {row[1]}",
+        detail=f"{row[2]} could not agree personal terms. {detail} "
+               "The player remains at your club; this is not a completed sale.",
+        offer_id=offer_id,when=now)
+    conn.commit()
+    return True
+
+
 def _review_due_manager_buying_offers(conn,*,career_id,window_id,now):
     """Actually evaluate submitted human buy bids after the club's decision time.
 
@@ -605,17 +654,27 @@ def _review_due_manager_buying_offers(conn,*,career_id,window_id,now):
                 detail=str(exc)[:240],offer_id=oid,when=now)
             conn.commit()
             continue
-        headline={"accepted_pending_contract":"Selling club accepted your fee",
-            "countered":"Selling club made a counteroffer",
-            "rejected":"Selling club rejected your offer"}.get(status,
-                "Selling club responded")
+        demand_row=conn.execute("""SELECT demanded_fee FROM world_career_offers
+            WHERE career_id=? AND offer_id=?""",(career_id,oid)).fetchone()
+        demand=demand_row[0] if demand_row else None
+        headline=(
+            f"{seller} accept your fee for {player}"
+            if status=="accepted_pending_contract" else
+            f"{seller} want £{demand:,} for {player}"
+            if status=="countered" and demand is not None else
+            f"{seller} declined your offer for {player}"
+            if status=="rejected" else
+            f"{seller} have responded to your bid for {player}"
+        )
         _message(conn,career_id=career_id,window_id=window_id,
             key=f"manager-buy-review:{oid}",
             headline=headline,
-            detail=f"{seller} has evaluated your submitted offer for {player}. "+
-                ("Player and agent negotiations are now required." if
-                 status=="accepted_pending_contract" else
-                 "Review the club response in your Transfer Centre."),
+            detail=(
+                "Personal terms can now be negotiated."
+                if status=="accepted_pending_contract" else
+                f"Open Transfers to respond to {seller}'s £{demand:,} asking price."
+                if status=="countered" and demand is not None else
+                "You can review the outcome in Transfers."),
             offer_id=oid,when=now)
         conn.commit()
         if status=="accepted_pending_contract":
@@ -634,7 +693,7 @@ def _review_due_manager_buying_offers(conn,*,career_id,window_id,now):
 
 
 def process_live_market(conn,*,career_id,now=None,
-                        fc27_activity_scale_qa=1):
+                        fc27_activity_scale_qa=1,yield_to_manager=None):
     """Reconcile due market moments, then close at 30 min; safe on rerun.
 
     Each moment's row is unique and each AI proposal has an immutable request
@@ -683,6 +742,9 @@ def process_live_market(conn,*,career_id,now=None,
     changed=False
     fc27_batch_processed=False
     for index,offset in enumerate(MARKET_MOMENTS):
+        if yield_to_manager is not None and yield_to_manager():
+            # Never start an AI checkpoint while a human action needs the DB.
+            break
         if elapsed<offset:break
         seen=conn.execute("""SELECT 1 FROM world_career_market_moments
             WHERE window_id=? AND moment_index=?""",(win,index)).fetchone()
@@ -708,7 +770,14 @@ def process_live_market(conn,*,career_id,now=None,
             else:
                 try:
                     before=incoming_approach(conn,oid)
-                    after=advance_incoming_approach(conn,career_id=career_id,offer_id=oid)
+                    if before and before["status"] in ("terms_accepted","future_agreed"):
+                        after=before
+                    else:
+                        after=advance_incoming_approach(conn,career_id=career_id,offer_id=oid)
+                    if close_failed_human_sale_talks(conn,career_id=career_id,
+                            window_id=win,offer_id=oid,agent_state=after,
+                            previous=before,now=t):
+                        continue
                     if (after and after["status"]!="needs_information" and
                         (before is None or after["status"]!=before["status"])):
                         _message(conn,career_id=career_id,window_id=win,
@@ -740,7 +809,8 @@ def process_live_market(conn,*,career_id,now=None,
             process_fc27_market_interval(conn,career_id=career_id,
                 window_id=win,interval_index=index,when=t,
                 activity_scale_qa=fc27_activity_scale_qa,
-                work_budget_seconds=8)
+                work_budget_seconds=8,
+                should_yield=yield_to_manager)
             fc27_batch_processed=True
         else:
             # IMMUTABLE older careers use their original replay-safe moment
@@ -789,7 +859,8 @@ def process_live_market(conn,*,career_id,now=None,
             process_fc27_market_interval(conn,career_id=career_id,
                 window_id=win,interval_index=chosen,when=t,
                 activity_scale_qa=fc27_activity_scale_qa,
-                work_budget_seconds=8)
+                work_budget_seconds=8,
+                should_yield=yield_to_manager)
             changed=True
     # Freshly accepted agent terms from a due market moment begin their
     # own confirmation timer immediately, not on the next browser visit.
@@ -981,15 +1052,18 @@ def actionable_unread_count(conn,*,career_id):
 
 
 def market_messages(conn,*,career_id):
-    rows=conn.execute("""SELECT m.message_id,m.headline,m.detail,m.created_at,
-        m.is_read,m.offer_id,p.full_name AS player_name,
-        b.name AS buyer_name,o.status AS offer_status,o.offered_fee,
-        o.demanded_fee,ia.status AS player_status,
-        ia.decision_reason AS player_reason
+    rows=conn.execute("""SELECT m.message_id,m.message_key,m.headline,
+        m.detail,m.created_at,m.is_read,m.offer_id,
+        p.player_id,p.full_name AS player_name,
+        b.name AS buyer_name,s.name AS seller_name,
+        o.buying_club_id,o.selling_club_id,
+        o.status AS offer_status,o.offered_fee,o.demanded_fee,
+        ia.status AS player_status,ia.decision_reason AS player_reason
         FROM world_career_market_inbox m
         LEFT JOIN world_career_offers o ON o.offer_id=m.offer_id
         LEFT JOIN world_players p ON p.player_id=o.player_id
         LEFT JOIN world_clubs b ON b.club_id=o.buying_club_id
+        LEFT JOIN world_clubs s ON s.club_id=o.selling_club_id
         LEFT JOIN world_career_incoming_approaches ia ON ia.offer_id=o.offer_id
         WHERE m.career_id=? ORDER BY m.message_id DESC LIMIT 70""",
         (career_id,)).fetchall()

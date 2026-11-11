@@ -45,6 +45,25 @@ def _stable(*parts):
     raw=":".join(map(str,("fc27-player-choices-v1",*parts))).encode()
     return int.from_bytes(hashlib.sha256(raw).digest()[:8],"big")/2**64
 
+def free_agent_wait_probability(*, overall, club_appeal, wage_ratio, role, age):
+    """Soft outside-option risk: a player can wait for a better level of club.
+
+    No rating/league ban. Higher wages, an assured role and being late in
+    a career can make an otherwise surprising free-agent signing credible.
+    """
+    expectation=max(40,min(92,round(35+max(0,overall-61)*2.0)))
+    gap=max(0,expectation-club_appeal)
+    # High-OVR free agents are likely to hold out if a club is several
+    # sporting levels below their realistic market; no deterministic ban.
+    chance=max(0,gap-10)*.022+max(0,overall-77)*.044
+    chance-=min(.25,max(0,wage_ratio-1)*.22)
+    chance-={"key_player":.085,"regular_starter":.035,
+             "rotation":0,"fringe":-.035}.get(role,0)
+    if age>=32:
+        chance-=min(.20,(age-31)*.035)
+    return min(.82,max(.02,chance))
+
+
 def _now(now=None):
     if now is None:return datetime.now(timezone.utc)
     if isinstance(now,str):now=datetime.fromisoformat(now.replace("Z","+00:00"))
@@ -184,17 +203,22 @@ def review_due_choices(conn,*,career_id,now=None):
                    AND o.status='accepted_pending_contract'
                    AND t.status='accepted' AND t.proposed_wage_weekly IS NOT NULL
                  ORDER BY o.offer_id""",(career_id,pid)).fetchall()
-            # The player decides at the documented decision checkpoint.
-            # Revisit a candidate if there is no recorded valid contract.
-            if not contenders:continue
-            ranked=[(float(appeal or 50)+min(20,wage/5000),
-                oid) for oid,club,wage,appeal in contenders]
-            winner=max(ranked,key=lambda x:(x[0],-x[1]))[1]
-            status="accepted" if identifier==winner else "declined"
-            reason=("Player selects your club after weighing "+
-                    str(len(contenders))+" final wage proposal(s)" if
-                    status=="accepted" else
-                    "Player prefers a competing club's agreed sporting and wage terms")
+            # A player must make an actual decision at the due checkpoint.
+            # Pending fee-only bids do NOT stall a valid, agreed-wage deal.
+            # If a buyer withdraws in the meantime, close that attempt;
+            # never leave the player's choice indefinitely 'evaluating'.
+            if not contenders:
+                status="declined"
+                reason="No active buying club has an accepted agent contract; this proposed move cannot proceed"
+            else:
+                ranked=[(float(appeal or 50)+min(20,wage/5000),
+                    oid) for oid,club,wage,appeal in contenders]
+                winner=max(ranked,key=lambda x:(x[0],-x[1]))[1]
+                status="accepted" if identifier==winner else "declined"
+                reason=("Player chooses this buying club after comparing "+
+                        str(len(contenders))+" valid agreed-wage proposal(s)" if
+                        status=="accepted" else
+                        "Player prefers a competing club's agreed sporting and wage terms")
         elif kind=="purchase":
             from world_career_incoming import competing_player_choice
             choice=competing_player_choice(conn,career_id=career_id,
@@ -213,11 +237,13 @@ def review_due_choices(conn,*,career_id,now=None):
         else:
             row=conn.execute("""SELECT f.status,f.buying_club_id,
                  f.proposed_weekly_wage_gbp,f.required_weekly_wage_gbp,
-                 f.squad_role,p.full_name
+                 f.squad_role,p.full_name,x.overall,p.birth_date
                  FROM world_fc27_free_agent_offers f
                  JOIN world_players p ON p.player_id=f.player_id
+                 JOIN world_dataset_ratings x ON x.dataset_id=? AND
+                      x.player_id=f.player_id
                  WHERE f.career_id=? AND f.signing_id=?""",
-                 (career_id,identifier)).fetchone()
+                 (DATASET,career_id,identifier)).fetchone()
             if not row or row[0]!="terms_accepted":
                 continue
             from world_fc27_ai_recruitment import read_fc27_profiles
@@ -237,22 +263,67 @@ def review_due_choices(conn,*,career_id,now=None):
                 reason=("Player preferred a competing club's financial and "
                         "sporting opportunity after considering the offers")
             else:
-                status="accepted"
-                reason=("Player wants to sign after comparing "+
-                        str(len(rivals))+" credible AI-club offer(s)")
+                from datetime import date
+                birth=date.fromisoformat(row[7])
+                season=date(2026,8,1)
+                age=season.year-birth.year-(
+                    (season.month,season.day)<(birth.month,birth.day))
+                wait_risk=free_agent_wait_probability(
+                    overall=row[6],club_appeal=manager_appeal,
+                    wage_ratio=row[2]/max(1,row[3]),
+                    role=row[4],age=age)
+                if _stable(career_id,identifier,"wait-for-better-club")<wait_risk:
+                    status="declined"
+                    reason=("Player prefers to remain available for a club "
+                            "matching his sporting ambitions, despite "
+                            "acceptable contract terms")
+                else:
+                    status="accepted"
+                    reason=("Player wants to sign after comparing "+
+                            str(len(rivals))+" credible AI-club offer(s)")
+        if kind=="sale" and status=="declined":
+            # An agent can agree wages for more than one club; the PLAYER
+            # chooses one. The other unsigned offers must visibly end and
+            # never remain as phantom pending transfers until the deadline.
+            current=conn.execute("""SELECT status FROM world_career_offers
+                WHERE career_id=? AND offer_id=?""",
+                (career_id,identifier)).fetchone()
+            if current and current[0]=="accepted_pending_contract":
+                conn.execute("""UPDATE world_career_offers SET status='withdrawn'
+                    WHERE career_id=? AND offer_id=?
+                      AND status='accepted_pending_contract'""",
+                    (career_id,identifier))
+                conn.execute("""INSERT INTO world_career_offer_events
+                    (offer_id,event_type,detail)
+                    VALUES (?,'player_declined_sale',?)""",
+                    (identifier,reason))
         conn.execute("""UPDATE world_career_player_choices
             SET status=?,reason=?,decided_at=? WHERE career_id=?
             AND window_id=? AND kind=? AND source_id=? AND status='evaluating'""",
             (status,reason,clock.isoformat(),career_id,
              snap["window_id"],kind,identifier))
+        if kind=="sale":
+            club=conn.execute("""SELECT p.full_name,c.name
+                FROM world_career_offers o
+                JOIN world_players p ON p.player_id=o.player_id
+                JOIN world_clubs c ON c.club_id=o.buying_club_id
+                WHERE o.offer_id=? AND o.career_id=?""",
+                (identifier,career_id)).fetchone()
+            player_name,buyer_name=club if club else ("Player","buying club")
+            headline=(f"{player_name} chooses {buyer_name}" if status=="accepted"
+                      else f"{player_name} rejects {buyer_name}'s offer")
+            detail=reason+(". You can now approve this outgoing transfer in the Inbox."
+                if status=="accepted" else
+                ". This unsigned offer cannot be finalised.")
+        else:
+            headline=("Player accepts your contract" if status=="accepted"
+                      else "Player declines your contract")
+            detail=reason+(". Open your Inbox to confirm the signing."
+                   if status=="accepted" else ". No paperwork can be signed.")
         _message(conn,career_id=career_id,window_id=snap["window_id"],
             key=f"player-review-outcome:{kind}:{identifier}",
             offer_id=identifier if kind in ("purchase","sale") else None,
-            headline=("Player accepts your contract" if status=="accepted"
-                      else "Player declines your contract"),
-            detail=reason+(". Open your Inbox to confirm the signing."
-                   if status=="accepted" else ". No paperwork can be signed."),
-            when=clock)
+            headline=headline,detail=detail,when=clock)
         changes+=1
     if rows:conn.commit()
     return changes

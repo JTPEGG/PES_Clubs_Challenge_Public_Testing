@@ -259,7 +259,7 @@ def submit_buy_offer(conn,*,career_id,player_id,offered_fee,request_key,now=None
         headline=("Your bid is awaiting the selling club"
                   if status=="proposed" else
                   "Transfer bid rejected by selling club" if status=="rejected"
-                  else "Selling club makes a counteroffer" if status=="countered"
+                  else f"{club} have countered your bid for {target['name']}" if status=="countered"
                   else "Transfer fee agreed, player talks pending"
                   if status=="accepted_pending_contract"
                   else "Your transfer offer submitted"),
@@ -303,6 +303,11 @@ def negotiate_seller_counter(conn, *, career_id, offer_id, offered_fee, now=None
             or row[1] is None):
         raise ValueError("No selling-club counteroffer is available to negotiate")
     old_bid,asking,_,player_id,buyer,_=row
+    source=conn.execute("""SELECT cl.name,p.full_name FROM world_career_offers o
+        JOIN world_clubs cl ON cl.club_id=o.selling_club_id
+        JOIN world_players p ON p.player_id=o.player_id
+        WHERE o.offer_id=?""",(offer_id,)).fetchone()
+    seller_name,player_name=source if source else ("Selling club","the player")
     if not old_bid<offered_fee<asking:
         raise ValueError("Your revised bid must exceed your last bid and remain below the asking price")
     used=conn.execute("""SELECT COUNT(*) FROM world_career_offer_events
@@ -326,8 +331,8 @@ def negotiate_seller_counter(conn, *, career_id, offer_id, offered_fee, now=None
     if offered_fee>=threshold:
         status="accepted_pending_contract"
         demanded=None
-        result=("Selling club accepts your revised fee of "
-                f"{offered_fee:,} GBP. Player terms are now available.")
+        result=(f"{seller_name} accept £{offered_fee:,} for {player_name}. "
+                "You can now negotiate personal terms.")
         event="seller_revised_bid_accepted"
     else:
         # The AI seller stands by its original desire to retain value,
@@ -336,8 +341,8 @@ def negotiate_seller_counter(conn, *, career_id, offer_id, offered_fee, now=None
                   min(asking,round_up_fee((offered_fee+asking)/2)))
         if demanded<=offered_fee:demanded=asking
         status="countered"
-        result=(f"Selling club counters at {demanded:,} GBP after reviewing "
-                f"your revised {offered_fee:,} GBP bid.")
+        result=(f"{seller_name} want £{demanded:,} for {player_name} "
+                f"after your revised £{offered_fee:,} bid.")
         event="seller_revised_asking"
     conn.execute("""UPDATE world_career_offers SET offered_fee=?,
         demanded_fee=?,status=? WHERE career_id=? AND offer_id=?""",
@@ -350,8 +355,8 @@ def negotiate_seller_counter(conn, *, career_id, offer_id, offered_fee, now=None
         (offer_id,event,str(demanded) if demanded is not None else result))
     _message(conn,career_id=career_id,window_id=snap["window_id"],
         key=f"seller-counter-response:{offer_id}:{used+1}",
-        headline=("Seller accepts your negotiated fee" if demanded is None else
-                  "Seller makes a revised counteroffer"),
+        headline=(f"{seller_name} accept your offer for {player_name}" if demanded is None else
+                  f"{seller_name} want £{demanded:,} for {player_name}"),
         detail=result,offer_id=offer_id,when=now)
     conn.commit()
     return result

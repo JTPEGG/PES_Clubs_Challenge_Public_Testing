@@ -256,6 +256,8 @@ def renewal_action(conn,*,career_id,player_id,action,weekly_wage=None,
     status=renewal_info(conn,career_id=career_id,player_id=player_id)
     if status and status["status"] in ("agreed_future","completed","expired"):
         raise ValueError("This renewal has already been finalised or expired")
+    if status and status["status"]=="declined" and action=="offer":
+        raise ValueError("Contract talks have ended for this window")
     if action not in ("offer","confirm","decline","withdraw"):
         raise ValueError("Unsupported contract decision")
     if action=="offer":
@@ -283,30 +285,57 @@ def renewal_action(conn,*,career_id,player_id,action,weekly_wage=None,
             # Agents weigh length of security too, rather than an artificial
             # same-number acceptance rule for every contract.
             acceptable=demand*(1-.017*max(0,contract_years-2))
-            outcome="accepted_terms" if weekly_wage>=acceptable else "countered"
-            if weekly_wage<demand*.65 and status and status["rounds"]>=2:
+            # Manager's submitted offer IS the authorisation. Once the agent
+            # agrees, the new contract is binding without a second click.
+            outcome="agreed_future" if weekly_wage>=acceptable else "countered"
+            previous_offer=(status["offered_weekly_wage"] if status else None)
+            no_progress=(previous_offer is not None and
+                         weekly_wage<=previous_offer)
+            rounds=(status["rounds"] if status else 0)
+            # A real counter should change, but agents also have limits:
+            # repeated unchanged bids and the sixth unsuccessful round
+            # conclude talks rather than generating endless £12k demands.
+            if outcome=="countered" and (
+                (no_progress and rounds>=2) or rounds>=5 or
+                (weekly_wage<demand*.65 and rounds>=2)):
                 outcome="declined"
-            new_demand=demand if outcome=="accepted_terms" else int(
-                round(max(weekly_wage+500,demand*(.992 if contract_years>=3 else 1.0))/500)*500)
-            if outcome=="accepted_terms":
+            concession=(.019 + min(rounds,3)*.006 +
+                        (.012 if contract_years>=3 else 0))
+            new_demand=(demand if outcome!="countered" else int(
+                round(max(weekly_wage+250,demand*(1-concession))/250)*250))
+            if outcome=="countered" and new_demand>=demand:
+                new_demand=max(weekly_wage+250,demand-250)
+            if outcome=="agreed_future":
                 wage=wage_budget_breakdown(conn,career_id,target["club"])
                 increment=max(0,weekly_wage-(status["old_weekly_wage"] if status else target["wage"]))
                 if increment>wage["remaining"]:
                     raise ValueError("Renewal increase exceeds remaining weekly wage budget")
+            signed_at=(datetime.now(timezone.utc).isoformat(timespec="seconds")
+                       if outcome=="agreed_future" else None)
             conn.execute("""UPDATE world_career_contract_renewals
                 SET status=?,offered_weekly_wage=?,contract_years=?,
-                    demand_weekly_wage=?,rounds=rounds+1,
+                    demand_weekly_wage=?,rounds=rounds+1,signed_at=?,
                     updated_at=CURRENT_TIMESTAMP
                 WHERE career_id=? AND window_id=? AND player_id=?""",
-                (outcome,weekly_wage,contract_years,new_demand,
+                (outcome,weekly_wage,contract_years,new_demand,signed_at,
                  career_id,snap["window_id"],player_id))
-            message=(f"{target['name']} and agent accepted £{weekly_wage:,}/week "
-                f"for {contract_years} years. Confirm the paperwork to make it binding."
-                if outcome=="accepted_terms" else
+            message=(f"{target['name']}'s new {contract_years}-year contract is signed "
+                f"at £{weekly_wage:,}/week. It becomes effective at the "
+                f"pre-season deadline."
+                if outcome=="agreed_future" else
                 f"{target['name']}'s agent counters at £{new_demand:,}/week."
                 if outcome=="countered" else
                 f"{target['name']}'s agent ended contract negotiations.")
-            event="offer-"+str((status["rounds"] if status else 0)+1)
+            if outcome=="agreed_future" and conn.execute("""SELECT 1
+                FROM sqlite_master WHERE type='table'
+                AND name='world_career_player_morale'""").fetchone():
+                conn.execute("""DELETE FROM world_career_player_morale
+                    WHERE career_id=? AND window_id=? AND player_id=?
+                    AND status='transfer_requested'
+                    AND reason LIKE 'Wage dissatisfaction:%'""",
+                    (career_id,snap["window_id"],player_id))
+            event=("confirmed" if outcome=="agreed_future" else
+                   "offer-"+str((status["rounds"] if status else 0)+1))
         elif action=="confirm":
             diff=max(0,status["offered_weekly_wage"]-status["old_weekly_wage"])
             available=wage_budget_breakdown(conn,career_id,target["club"])["remaining"]
@@ -485,8 +514,7 @@ It is a simulation benchmark, not a verified real salary or guaranteed player de
    </select></label>
  </div>
  <div class="actions"><button name="action" value="offer">Submit terms to agent</button>
- {% if renewal and renewal.status=='accepted_terms' %}
- <button name="action" value="confirm">Confirm new contract</button>{% endif %}
+
  {% if renewal and renewal.status in ('requested','countered','accepted_terms','negotiating') %}
  <button class="secondary" name="action" value="withdraw" formnovalidate>Withdraw offer</button>
  <button class="danger" name="action" value="decline" formnovalidate>Decline renewal</button>
@@ -495,8 +523,8 @@ It is a simulation benchmark, not a verified real salary or guaranteed player de
 {% if renewal and renewal.rounds>0 %}
 <p class="note">Negotiation round {{renewal.rounds}} of 6.
 {% if renewal.status=='countered' %}The agent has countered your terms.
-{% elif renewal.status=='accepted_terms' %}The agent accepts, but the contract
-is not binding until you select Confirm.{% endif %}</p>{% endif %}
+{% elif renewal.status=='accepted_terms' %}Previously accepted terms can be
+submitted again to complete the agreement.{% endif %}</p>{% endif %}
 {% endif %}
 </div>
 </main></body></html>"""
