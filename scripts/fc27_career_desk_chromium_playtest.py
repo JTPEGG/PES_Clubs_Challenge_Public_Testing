@@ -652,7 +652,21 @@ def run(world,output):
                       "Shortlisting a player left the Career Desk or failed")
                 found.append("Shortlist button saves in place without reloading the Career Desk")
             offered=round(ref_value*1.6)
-            page.locator("#scout-fee").fill(str(offered))
+            # Check the actual increment interaction before arranging the
+            # exact fixture bid (the production widget uses fixed increments).
+            fee=page.locator("#scout-fee")
+            money=page.locator("#scout-buy .desk-money-control")
+            check(money.count()==1 and money.is_visible(),
+                  "Player-profile bid has no compact £ amount control")
+            before_fee=int(fee.input_value())
+            money.locator('select.desk-money-increment').select_option('100000')
+            money.locator('button.desk-money-step').last.click()
+            check(int(fee.input_value())==before_fee+100000,
+                  "Transfer price plus button did not change the submitted integer")
+            fee.evaluate("""(el,value)=>{
+                el.value=String(value);
+                el.dispatchEvent(new Event('input',{bubbles:true}));
+            }""",offered)
             player_url=page.url
             with page.expect_response(
                 lambda response:response.url.endswith('/market/buy')
