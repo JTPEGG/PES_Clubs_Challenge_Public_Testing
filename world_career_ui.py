@@ -540,6 +540,60 @@ body.desk-contract-open{overflow:auto}
  top:75px;left:13px;width:min(620px,calc(100% - 26px));max-height:50dvh;overflow-y:auto;
  box-shadow:0 18px 40px #020711c4}
 
+/* Graphite, white and gold from the new PES Challenge manager desk. */
+:root{
+ --desk-bg:#0e1015;--desk-panel:#1b1e25;--desk-panel2:#252a33;
+ --desk-stroke:#353941;--desk-accent:#e3bd49;--desk-green:#e3bd49;
+ --desk-faint:#b1b5bc
+}
+body.desk-ui{background:var(--desk-bg);color:#f6f6f7}
+.desk-topbar{background:#171a20;border-bottom-color:#363941;box-shadow:0 5px 18px #00000045}
+.desk-sidebar{background:#16191f;border-right-color:#363941}
+.desk-brand small,.desk-nav-label,.desk-section-kicker{color:#b0b4bc}
+.desk-logo{background:linear-gradient(140deg,#f4d76a,#b68b2a);color:#141518}
+.desk-tab{color:#c4c8cf}
+.desk-tab:hover{background:#2a2c34}
+.desk-tab[aria-current="page"]{background:#383326;color:#fff2be;border-color:#5c4b27;
+ box-shadow:inset 3px 0 var(--desk-accent)}
+.desk-view .card{background:var(--desk-panel);border-color:var(--desk-stroke)}
+.desk-view .offer{background:#20242b}
+.desk-view .offer:focus-within{background:#2a2b2c;border-color:var(--desk-accent)}
+.desk-view .scout-table th{background:#2b2e34}
+.desk-view .scout-table,.desk-view .scout-filters,
+.desk-scout-searchbar,.desk-scout-dialog,.desk-position-chooser{background:#1c2027!important;
+ border-color:#45474e!important}
+.desk-scout-finance span,.desk-view .pill,.desk-money-control{background:#292b31;border-color:#4a4c53}
+.desk-view .scout-table tbody tr:hover{background:#2c2e36}
+.desk-view .scout-table a,.desk-view .muted a{color:#f1d072}
+.desk-view .desk-scout-searchbar select,.desk-view .desk-scout-searchbar input,
+.desk-money-control select,.desk-position-grid label{background:#25282e!important;
+ color:#f7f7f7!important;border-color:#53555e!important}
+.desk-scout-quick-check,.desk-position-grid label{background:#25282e!important;border-color:#454951!important}
+.desk-scout-quick-check input,.desk-position-grid input{accent-color:#efc94c}
+.desk-position-grid label:has(input:checked){background:#4c4228!important;border-color:#efd56c!important}
+.desk-scout-add,.desk-counter-stepper button,.desk-money-step{background:#6d5929!important;
+ border-color:#af903d!important;color:#fff}
+.desk-contract-panel{background:#202329;border-color:#474850}
+.desk-contract-header{background:#282a30;border-color:#494b50}
+.desk-contract-body .card,.desk-contract-body .metric{background:#2a2e35;border-color:#474c53}
+.desk-contract-body button{background:#6c592f;border-color:#bb9a48}
+.desk-live-status,.desk-view .count,.desk-counter-preview,.desk-news-fee{color:#f0cc67}
+.desk-live-status:before{background:#efd067;box-shadow:0 0 0 4px #efd06720}
+.desk-news-card,.desk-offer-briefing,.desk-offer-briefing-metrics>div{background:#23262d!important;border-color:#40444b!important}
+.desk-news-icon{background:#33302a;border-color:#655735}
+.desk-news-route .desk-news-arrow{color:#e9c458}
+.desk-money-control{display:inline-flex;gap:5px;align-items:center;border:1px solid #4c4f58;
+ border-radius:7px;padding:4px;min-height:38px;max-width:100%;vertical-align:middle}
+.desk-money-control .desk-money-step{font-weight:800;min-width:27px;min-height:27px;
+ border-radius:5px;padding:2px 7px}
+.desk-money-preview{min-width:66px;font-weight:750;font-variant-numeric:tabular-nums;
+ text-align:center;font-size:13px;color:#fff3cb}
+.desk-money-increment{font-size:11px!important;min-width:60px;min-height:27px!important;
+ padding:2px 6px!important;border-radius:5px!important}
+.desk-money-native{position:absolute!important;width:1px!important;height:1px!important;
+ border:0!important;opacity:0!important;padding:0!important;pointer-events:none!important}
+@media(max-width:760px){.desk-money-control{flex-wrap:wrap}.desk-money-increment{max-width:76px}}
+
 """
 
 DASHBOARD_JS = r"""
@@ -1737,7 +1791,8 @@ DASHBOARD_JS = r"""
   const pound=n=>{
     n=Number(n)||0;const abs=Math.abs(n);
     return (n<0?'-':'')+'£'+(abs>=1e6?(abs/1e6).toFixed(2)+'m':
-      abs>=1e3?Math.round(abs/1e3)+'k':Math.round(abs).toLocaleString('en-GB'));
+      abs>=1e3?(abs<1e5&&abs%1000?(abs/1000).toFixed(1):Math.round(abs/1000))+'k':
+      Math.round(abs).toLocaleString('en-GB'));
   };
   function updateSaleBudgetUI(result){
     if(result.available_transfer_budget===undefined)return;
@@ -1770,6 +1825,83 @@ DASHBOARD_JS = r"""
       pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
       pound(result.sale_board_withheld||0)+' retained by the board.';
   }
+  // Compact money values are display-only. Original integer GBP inputs
+  // remain in the form so all existing server validation and CSRF work.
+  // Buttons and increment chooser replace error-prone manual £ entries.
+  function enhanceMoneyInputs(root){
+    if(!(root instanceof Element||root instanceof Document))return;
+    const fields=root.querySelectorAll('input[type="number"][name]');
+    fields.forEach(input=>{
+      if(input.dataset.moneyStepper==='1'||input.dataset.stepper==='1')return;
+      if(!/^(offered_fee|negotiated_fee|counter_fee|weekly_wage|wage_weekly|current_wage_weekly|scout_max_value|scout_max_wage|investment_pool)$/.test(input.name))return;
+      // The old dedicated counter stepper is also replaced by this compact
+      // component when not already initialised.
+      input.dataset.moneyStepper='1';
+      const wage=/wage/.test(input.name);
+      const initial=Number(input.value)||0;
+      const suggested=wage?(initial>=50000?1000:500):
+        initial>=10000000?250000:initial>=1000000?50000:initial>=200000?10000:5000;
+      const steps=wage?[250,500,1000,2500,5000,10000,25000]:
+        [1000,5000,10000,25000,50000,100000,250000,500000,1000000];
+      const control=document.createElement('span');
+      control.className='desk-money-control';
+      const less=document.createElement('button');
+      less.type='button';less.className='desk-money-step';less.textContent='−';
+      const preview=document.createElement('output');
+      preview.className='desk-money-preview';preview.setAttribute('aria-live','off');
+      const more=document.createElement('button');
+      more.type='button';more.className='desk-money-step';more.textContent='+';
+      const increment=document.createElement('select');
+      increment.className='desk-money-increment';
+      increment.setAttribute('aria-label','Change amount in increments of');
+      for(const value of steps){
+        const option=document.createElement('option');
+        option.value=String(value);option.textContent=pound(value);
+        increment.appendChild(option);
+      }
+      increment.value=String(suggested);
+      if(!increment.value)increment.value=String(steps[0]);
+      function repaint(){
+        preview.textContent=input.value===''?'Any amount':pound(Number(input.value));
+        const title=input.value===''?'No amount selected':pound(Number(input.value));
+        preview.title=title;
+      }
+      function move(direction){
+        const step=Number(increment.value);
+        const low=input.min===''?-Infinity:Number(input.min);
+        const high=input.max===''?Infinity:Number(input.max);
+        const base=input.value===''?Math.max(0,Number.isFinite(low)?low:0):Number(input.value);
+        const revised=Math.max(low,Math.min(high,Math.round(base+direction*step)));
+        if(!Number.isFinite(revised))return;
+        input.value=String(revised);
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        repaint();
+      }
+      less.addEventListener('click',()=>move(-1));
+      more.addEventListener('click',()=>move(1));
+      increment.addEventListener('change',event=>event.stopPropagation());
+      less.setAttribute('aria-label','Decrease '+input.name.replaceAll('_',' ')+' amount');
+      more.setAttribute('aria-label','Increase '+input.name.replaceAll('_',' ')+' amount');
+      input.step='1';input.readOnly=true;
+      input.classList.add('desk-money-native');
+      input.before(control);
+      control.append(less,preview,more,increment,input);
+      input.addEventListener('input',repaint);
+      repaint();
+    });
+  }
+  const moneyObserver=new MutationObserver(entries=>{
+    for(const entry of entries){
+      for(const node of entry.addedNodes){
+        if(node.nodeType!==1)continue;
+        if(node.matches?.('input[type="number"][name]')||
+            node.querySelector?.('input[type="number"][name]'))
+          enhanceMoneyInputs(node.parentElement||node);
+      }
+    }
+  });
+  moneyObserver.observe(host,{subtree:true,childList:true});
+  enhanceMoneyInputs(host);
   window.fc27UpdateBudget=updateSaleBudgetUI;
   const labels={
     proposed:'New offer',countered:'Awaiting buyer',
