@@ -594,6 +594,222 @@ body.desk-ui{background:var(--desk-bg);color:#f6f6f7}
  border:0!important;opacity:0!important;padding:0!important;pointer-events:none!important}
 @media(max-width:760px){.desk-money-control{flex-wrap:wrap}.desk-money-increment{max-width:76px}}
 
+/* FC27 Career Desk unified with the Anderlecht Manager Desk visual system.
+   The original blue page styles above remain a non-JS fallback only. */
+:root{color-scheme:light;--desk-bg:#f4f5f3;--desk-panel:#ffffff;
+ --desk-panel2:#f8f9f7;--desk-stroke:#e5e9e3;--desk-accent:#ffd230;
+ --desk-green:#4f7457;--desk-faint:#767f75;--desk-ink:#222922}
+body.desk-ui{color-scheme:light;background:var(--desk-bg);color:var(--desk-ink);
+ font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body.desk-ui a{color:#455f44}
+body.desk-ui [hidden]{display:none!important}
+body.desk-ui .desk-topbar{background:#ffffff;border-bottom:1px solid #e4e9e2;box-shadow:0 2px 15px #161d1708}
+body.desk-ui .desk-brand{color:#202720;text-decoration:none}
+body.desk-ui .desk-brand strong{color:#1f271f;font-size:16px;letter-spacing:-.02em}
+body.desk-ui .desk-brand small{color:#7e887d;font-size:10px;letter-spacing:.02em;text-transform:none}
+.desk-club-crest,.desk-page-crest{display:grid;place-items:center;background:#f7f8f4;
+ border:1px solid #e8ece6;overflow:hidden;flex:0 0 auto}
+.desk-club-crest{width:49px;height:49px;border-radius:12px;padding:4px}
+.desk-club-crest img,.desk-page-crest img{width:100%;height:100%;object-fit:contain}
+.desk-crest-fallback{display:grid;place-items:center;width:100%;height:100%;
+ background:#2b352c;border-radius:8px;color:#ffe078;font-size:13px;font-weight:900;letter-spacing:-.025em}
+.desk-page-crest{width:59px;height:59px;border-radius:13px;padding:6px}
+.desk-page-crest .desk-crest-fallback{font-size:15px}
+body.desk-ui .desk-header-tag{color:#818a7e}
+body.desk-ui .desk-header-tag strong{color:#222922}
+body.desk-ui .desk-live-status{color:#3d7557}
+body.desk-ui .desk-live-status:before{background:#6aab78;box-shadow:0 0 0 4px #6aab7821}
+body.desk-ui .desk-header-clock{border-left-color:#e4e9e3}
+body.desk-ui .desk-header-clock small{color:#7f877d}
+body.desk-ui .desk-header-clock strong{color:#1e281e}
+body.desk-ui .desk-shell{max-width:1680px;grid-template-columns:230px minmax(0,1fr)}
+body.desk-ui .desk-sidebar{background:#171917;color:#f1f4ef;border-right:1px solid #2c322b}
+body.desk-ui .desk-sidebar a{color:#b4bcb3}
+body.desk-ui .desk-nav-label{color:#8b9489}
+body.desk-ui .desk-tab{color:#b5bfb4}
+body.desk-ui .desk-sidebar .desk-tab:hover{background:#2b302a;color:#fff}
+body.desk-ui .desk-sidebar .desk-tab[aria-current="page"]{background:#30382e;color:#fff;
+ border-color:#424c40;box-shadow:inset 3px 0 #ffd230}
+body.desk-ui .desk-sidebar .desk-tab[aria-current="page"] .desk-nav-icon{color:#ffd230}
+body.desk-ui .desk-nav-count{background:#3b4039;color:#ffdf72}
+body.desk-ui .desk-sidebar-foot{border-top-color:#343934;color:#9ba59a}
+body.desk-ui .desk-sidebar-foot a{color:#d7dfd5}
+body.desk-ui .desk-workspace{padding:28px clamp(22px,3vw,48px) 68px}
+body.desk-ui .desk-view{color:#263026}
+body.desk-ui .desk-view .muted,body.desk-ui .desk-view .time-note,
+body.desk-ui .desk-view small{color:#7c857a}
+body.desk-ui .desk-view .card,body.desk-ui .desk-view .offer,
+body.desk-ui .desk-setup-card{background:#fff!important;border:1px solid #e3e8e2!important;
+ box-shadow:0 4px 22px #1d2a1c08!important;border-radius:13px;color:#263126}
+body.desk-ui .desk-view .offer{border-left:3px solid #e4c34b!important}
+body.desk-ui .desk-view .offer:focus-within{background:#fffefa!important;border-color:#ddc45e!important}
+body.desk-ui .desk-view .card label,body.desk-ui .desk-view label{color:#485347}
+body.desk-ui .desk-view h1,body.desk-ui .desk-view h2,
+body.desk-ui .desk-view h3,body.desk-ui .desk-view strong{color:#252d25}
+body.desk-ui .desk-view .label{color:#879083}
+body.desk-ui .desk-view .count{color:#355b42}
+body.desk-ui .desk-view .pill{background:#f5f7f3!important;color:#586756;border:1px solid #e7ebe4}
+body.desk-ui .desk-view .scout-table{border:1px solid #e5eae3!important;border-radius:9px;background:#fff}
+body.desk-ui .desk-view table{background:#fff;border-collapse:collapse;color:#283028}
+body.desk-ui .desk-view table th{background:#f8f9f6!important;color:#737e72;
+ border-bottom:1px solid #e2e8e1;font-size:11px;letter-spacing:.045em}
+body.desk-ui .desk-view table td{border-bottom:1px solid #edf0ea;color:#29322a}
+body.desk-ui .desk-view table tbody tr:hover{background:#fffbed!important}
+body.desk-ui .desk-view table tbody tr.owned{background:#f3f7ee!important}
+body.desk-ui .desk-view .desk-table-filter-row input{background:#fff!important}
+body.desk-ui .desk-view .desk-table-sort{color:#515d50!important}
+body.desk-ui .desk-view .desk-table-sort::after{color:#ae8c15}
+body.desk-ui .desk-view input:not([type="checkbox"]):not([type="radio"]),
+body.desk-ui .desk-view select,body.desk-ui .desk-view textarea,
+body.desk-ui .desk-inbox-tools input{background:#fff!important;color:#243024!important;
+ border:1px solid #dbe2d9!important;border-radius:7px}
+body.desk-ui .desk-view input::placeholder{color:#99a297}
+body.desk-ui .desk-view input[type=checkbox]{accent-color:#d6ac14}
+body.desk-ui .desk-view button:not(.danger):not(.desk-table-sort):not(.desk-filter-button),
+body.desk-ui .desk-view .desk-page-link{background:#ffd230;color:#252923;border:1px solid #e4c035;
+ border-radius:8px;font-weight:750;box-shadow:none}
+body.desk-ui .desk-view button:not(.danger):not(.desk-table-sort):not(.desk-filter-button):hover{background:#ffe079}
+body.desk-ui .desk-view button.danger{background:#fff1f1;color:#b6373e;border:1px solid #edc9ce}
+body.desk-ui .desk-view button:focus-visible,body.desk-ui a:focus-visible{
+ outline:2px solid #c89e08;outline-offset:2px}
+body.desk-ui .desk-filter-button{background:#fff;color:#53614e;border:1px solid #dbe3d9}
+body.desk-ui .desk-filter-button[aria-pressed="true"]{background:#fff2b1;color:#292a20;border-color:#eac43e}
+body.desk-ui .desk-filter-button:hover{background:#faf7e8;color:#2e392d}
+body.desk-ui .desk-view .desk-scout-finance span{background:#fff!important;border:1px solid #e5eae2!important;
+ color:#778176;box-shadow:0 4px 14px #20291c06}
+body.desk-ui .desk-view .desk-scout-finance b{color:#253326}
+body.desk-ui .desk-view .scout-filters,body.desk-ui .desk-view .desk-scout-searchbar,
+body.desk-ui .desk-view .desk-scout-dialog,body.desk-ui .desk-view .desk-position-chooser{
+ background:#fff!important;color:#253024;border-color:#e2e8df!important}
+body.desk-ui .desk-scout-searchbar input,body.desk-ui .desk-scout-searchbar select,
+body.desk-ui .desk-scout-dialog input,body.desk-ui .desk-scout-dialog select,
+body.desk-ui .desk-money-control select{background:#fff!important;color:#263026!important;
+ border-color:#d9e0d5!important}
+body.desk-ui .desk-scout-quick-check,body.desk-ui .desk-position-grid label{
+ background:#f7f8f5!important;color:#475646;border:1px solid #e3e9df!important}
+body.desk-ui .desk-position-grid label:has(input:checked){background:#fff2b2!important;
+ border-color:#e7ca5c!important}
+body.desk-ui .desk-scout-position-trigger{background:#fff!important;color:#344432!important;
+ border:1px solid #d9e1d6!important}
+body.desk-ui .desk-scout-chips>*{background:#fff7d8!important;color:#524c2b!important;
+ border-color:#e8d89d!important}
+body.desk-ui .desk-scout-add,body.desk-ui .desk-scout-clear{background:#ffda48!important;color:#202a20!important;
+ border-color:#e3c33c!important}
+body.desk-ui .desk-scout-dialog-shade{background:#12171373}
+body.desk-ui .desk-inbox-split{background:#fff;border:1px solid #e4e8e1;border-radius:13px;
+ box-shadow:0 6px 24px #1e271e0a}
+body.desk-ui .desk-inbox-split .desk-inbox-list{background:#fff;border-right:1px solid #e7ebe4;
+ border-radius:13px 0 0 13px}
+body.desk-ui .desk-inbox-columns{background:#f8f9f6;color:#879083}
+body.desk-ui .desk-inbox-item{border-bottom:1px solid #eef0eb}
+body.desk-ui .desk-inbox-item>summary{background:#fff;color:#263125}
+body.desk-ui .desk-inbox-item>summary:hover{background:#faf9ed}
+body.desk-ui .desk-inbox-item[data-selected="true"]>summary{background:#fff4c2;
+ box-shadow:inset 3px 0 #d7ae18}
+body.desk-ui .desk-inbox-item[data-action-needed="true"]>summary{background:#fffdf2}
+body.desk-ui .desk-inbox-subject{color:#283128}
+body.desk-ui .desk-inbox-sender{color:#7b8678}
+body.desk-ui .desk-inbox-state{color:#5c6e59}
+body.desk-ui .desk-inbox-fee{color:#41624c}
+body.desk-ui .desk-inbox-item .desk-inbox-detail{background:#fff}
+body.desk-ui .desk-inbox-reader{background:#fff;color:#2c372c}
+body.desk-ui .desk-inbox-reader-header{background:#f9faf7;border-bottom:1px solid #e6ebe2}
+body.desk-ui .desk-inbox-reader-header a{color:#2f3c2f}
+body.desk-ui .desk-inbox-reader-header small{color:#758273}
+body.desk-ui .desk-inbox-reader .desk-inbox-detail{background:#fff}
+body.desk-ui .desk-inbox-reader .desk-inbox-detail .offer{background:#fff!important}
+body.desk-ui .desk-inbox-reader-empty{color:#82907e}
+body.desk-ui .desk-offer-briefing,body.desk-ui .desk-offer-briefing-metrics>div{
+ background:#f8f9f6!important;border:1px solid #e8ede5!important;color:#334133!important}
+body.desk-ui .desk-offer-briefing-note{color:#546153}
+body.desk-ui .desk-inbox-profile-link{color:#3b5038}
+body.desk-ui .desk-contract-panel{background:#fff;border-color:#e5e9e3}
+body.desk-ui .desk-contract-header{background:#fafbf8;border-color:#e8ece7}
+body.desk-ui .desk-contract-body .card,
+body.desk-ui .desk-contract-body .metric{background:#f9faf8!important;border-color:#e4eae1!important;color:#273227}
+body.desk-ui .desk-contract-body .metric strong{color:#273126}
+body.desk-ui .desk-contract-notice{background:#254330;border-color:#638d68;color:#fff}
+body.desk-ui .desk-news-card{background:#fff!important;border:1px solid #e5eae3!important;
+ box-shadow:0 4px 18px #20321a05}
+body.desk-ui .desk-news-content strong{color:#293329}
+body.desk-ui .desk-news-route{color:#53624e}
+body.desk-ui .desk-news-icon{background:#fff6d7;border-color:#eddb9e}
+body.desk-ui .desk-news-fee{color:#4a684a}
+body.desk-ui .desk-actions-bar{margin:2px 0 15px;gap:10px}
+body.desk-ui .desk-action-tile{background:#fff!important;color:#2c3529!important;
+ border:1px solid #e1e7de!important;border-radius:12px;box-shadow:0 4px 20px #101b1009;
+ padding:16px 19px;min-height:84px}
+body.desk-ui .desk-action-tile:hover{background:#fff9df!important;transform:translateY(-1px)}
+body.desk-ui .desk-action-tile strong{color:#273227;font-size:15px}
+body.desk-ui .desk-action-tile small{color:#829082}
+body.desk-ui .desk-finance-grid .card{background:#fff!important}
+body.desk-ui .desk-finance-value{color:#202e22}
+body.desk-ui .desk-finance-track{background:#edf0e8}
+body.desk-ui .desk-finance-fill{background:#dec137}
+body.desk-ui .desk-tactics-toolbar,body.desk-ui .desk-tactics-group{
+ background:#fff;border-color:#e2e9df;color:#2d392e}
+body.desk-ui .desk-tactics-toolbar label,body.desk-ui .desk-tactics-group strong{color:#263326}
+body.desk-ui .desk-tactics-group>header{background:#f8f9f6;border-color:#e3e8e1}
+body.desk-ui .desk-tactics-player{background:#f9faf7;color:#273327;border-color:#e3e9e0}
+body.desk-ui .desk-tactics-pos,body.desk-ui .desk-tactics-group header span{color:#60735d}
+body.desk-ui .desk-tactics-player .desk-tactics-ovr{color:#426b43}
+body.desk-ui .desk-tactics-player[data-selected="true"]{background:#fff6d6;border-color:#e4c044}
+body.desk-ui .desk-pitch-token .desk-player-disc{background:var(--club-kit,#293b29)!important;
+ color:var(--club-kit-text,#fff)!important;border:2px solid var(--club-kit-trim,#ffd230)!important;
+ box-shadow:0 4px 14px #0007}
+body.desk-ui .desk-pitch-token[data-selected="true"] .desk-player-disc{outline:3px solid #ffd230;
+ outline-offset:2px}
+body.desk-ui .desk-money-control{background:#f9faf7;border-color:#e2e8df}
+body.desk-ui .desk-money-preview{color:#2d3a2d}
+body.desk-ui .desk-money-control .desk-money-step{background:#ffdb4b!important;
+ border-color:#e4c347!important;color:#272922!important}
+body.desk-ui .desk-global-message{background:#fff;border:1px solid #e3e9df;color:#3e503e}
+body.desk-ui .desk-global-message.alert{background:#fff6f2;border-color:#eddccf;color:#664d41}
+body.desk-ui .desk-global-message a{color:#516b43}
+body.desk-ui .desk-view .desk-pitch-token .desk-player-name{color:#fff}
+body.desk-ui .desk-player-report{color:#2e3b2e}
+.desk-page-heading{display:flex;align-items:center;gap:15px;margin:0 0 18px;
+ padding:0 0 17px;border-bottom:1px solid #e5eae2}
+.desk-page-title h1{margin:0!important;font-size:25px!important;line-height:1.12!important;
+ font-weight:850;letter-spacing:-.045em;color:#202920}
+.desk-page-title small{display:block;margin-top:6px;color:#879084;
+ font-size:11px;text-transform:none;letter-spacing:.01em}
+body.desk-ui .desk-original-heading{display:none!important}
+body.desk-ui .desk-shortlist-card{padding:10px!important}
+body.desk-ui .desk-shortlist-card .scout-table{margin:0!important}
+body.desk-ui .desk-inbox-list .desk-inbox-flag{border-color:#d5dccf}
+body.desk-ui .desk-inbox-item[data-action-needed="true"] .desk-inbox-flag{
+ color:#2f321f;background:#ffd230;border-color:#d3b22f}
+.desk-correspondence-email .desk-mail-letter{padding:3px 1px 0}
+.desk-mail-letter>p{font-size:13px;line-height:1.6;max-width:750px;color:#445142}
+.desk-mail-letter .desk-mail-secondary{background:#f7f9f5;border-left:2px solid #e0c64f;
+ padding:10px 12px;border-radius:0 6px 6px 0;color:#536150;font-size:12px}
+.desk-mail-stages{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;
+ margin:18px 0 14px;max-width:920px}
+.desk-mail-stages span{font-size:10px;line-height:1.2;color:#818b7d;background:#f2f5f0;
+ border:1px solid #e8eee5;border-radius:7px;padding:8px 5px;text-align:center}
+.desk-mail-stages span.is-current{background:#fff1ad;color:#39391e;
+ border-color:#e7c13b;font-weight:850}
+.desk-mail-footer{font-size:10px!important;color:#919b8f!important;letter-spacing:.02em}
+body.desk-ui .desk-news-card p{color:#556455}
+body.desk-ui .desk-setup-step button{background:#fafbf8!important;border:1px solid #e4e9e1!important;color:#2e382f!important}
+body.desk-ui .desk-setup-step button:hover{background:#fff8d8!important}
+@media(max-width:940px){
+ body.desk-ui .desk-shell{grid-template-columns:70px minmax(0,1fr)}
+}
+@media(max-width:650px){
+ body.desk-ui .desk-shell{display:block}
+ body.desk-ui .desk-mobile-tabs{background:#fff;border-bottom:1px solid #e2e8e0}
+ body.desk-ui .desk-mobile-tabs .desk-tab{color:#495748}
+ body.desk-ui .desk-mobile-tabs .desk-tab[aria-current="page"]{color:#292d21;
+   background:#fff0ab;border-color:#e6c43b;box-shadow:inset 0 -2px #dcb332}
+ body.desk-ui .desk-workspace{padding:17px 12px 52px}
+ .desk-page-heading{gap:10px;margin-bottom:14px}
+ .desk-page-crest{width:46px;height:46px}
+ .desk-page-title h1{font-size:21px!important}
+ .desk-mail-stages{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
 """
 
 DASHBOARD_JS = r"""
