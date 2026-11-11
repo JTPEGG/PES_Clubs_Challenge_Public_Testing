@@ -53,7 +53,9 @@ def free_agent_wait_probability(*, overall, club_appeal, wage_ratio, role, age):
     """
     expectation=max(40,min(92,round(35+max(0,overall-61)*2.0)))
     gap=max(0,expectation-club_appeal)
-    chance=max(0,gap-10)*.014+max(0,overall-77)*.038
+    # High-OVR free agents are likely to hold out if a club is several
+    # sporting levels below their realistic market; no deterministic ban.
+    chance=max(0,gap-10)*.022+max(0,overall-77)*.044
     chance-=min(.25,max(0,wage_ratio-1)*.22)
     chance-={"key_player":.085,"regular_starter":.035,
              "rotation":0,"fringe":-.035}.get(role,0)
