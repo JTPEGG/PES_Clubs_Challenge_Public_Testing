@@ -657,7 +657,9 @@ def run(world,output):
                 expiring.uncheck()
             # Transfer-listed players expose either an actual seller quote
             # or a clearly labelled, non-binding estimated asking price.
-            page.locator('.desk-scout-add').first.click()
+            # Transfer-listed is a quick-bar checkbox, so do not open the
+            # conditions modal over it (the modal intentionally blocks
+            # interaction with the rest of the page).
             with page.expect_response(
                 lambda response:'/market/scout-feed?' in response.url
                     and 'scout_listed=1' in response.url
@@ -670,7 +672,6 @@ def run(world,output):
                       for p in listed_payload['players']),
                   'Transfer-listed rows must show a real seller quote or estimated asking price')
             page.locator('input[name="scout_listed"]').uncheck()
-            page.locator('.desk-scout-dialog-close').click()
             found.append('12-month contract expiry, transfer-listed asking prices and smart currency controls validated')
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator('#desk-view-transfers .desk-table-filter-row').count()==0,
