@@ -1330,8 +1330,8 @@ DASHBOARD_JS = r"""
                   'Contract accepted','Finalise deal','Transfer confirmed'];
     let changed=false;
     for(const mail of items.slice().reverse()){
-      const id=Number(mail.message_id);
-      if(!Number.isSafeInteger(id)||id<=0||
+      const id=String(mail.message_id||'');
+      if(!(/^[1-9]\\d*$/.test(id)||/^fa-[1-9]\\d*$/.test(id))||
          inboxGrid.querySelector('[data-message-id="'+id+'"]'))continue;
       const card=document.createElement('div');
       card.className='card offer desk-correspondence-email';
