@@ -2292,7 +2292,10 @@ DASHBOARD_JS = r"""
         'Contract signed':'Contract renewal · Player representative';
       card.querySelector('.count').textContent=pound(item.demand)+'/wk requested';
       card.querySelector('.desk-offer-briefing-note').textContent=signed?
-        'Signed contract confirmed. New terms become effective at the transfer deadline.':
+        'New contract signed: '+item.player+' has agreed a '+
+        String(item.contract_years||'new')+'-year renewal on '+
+        pound(item.signed_wage||item.demand)+'/week. The new contract takes '+
+        'effect at the transfer deadline.':
         'Current '+pound(item.current_wage)+'/week · comparable game wage '+
         pound(item.peer_wage||0)+'/week. Agent status: '+
         String(item.status).replaceAll('_',' ')+'.';
