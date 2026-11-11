@@ -1017,7 +1017,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{p.height_cm ~ ' cm' if p.height_cm is not none else '—'}}</td>
 <td>{{'—' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
-<td title="{{'Non-binding game estimate, not a selling club quote' if p.asking_estimated else 'Seller counteroffer received' if p.asking_price is not none else 'No asking price: player is not transfer-listed'}}">{{('Est. ' if p.asking_estimated else '') + money(p.asking_price) if p.asking_price is not none else '—'}}</td>
+<td class="{{'desk-asking-estimate' if p.asking_estimated else 'desk-asking-actual' if p.asking_price is not none else ''}}" title="{{'Non-binding game estimate, not a selling club quote' if p.asking_estimated else 'Seller counteroffer received' if p.asking_price is not none else 'No asking price: player is not transfer-listed'}}">{{('Est. ' if p.asking_estimated else '') + money(p.asking_price) if p.asking_price is not none else '—'}}</td>
 <td title="{{'Reference game wage, not confirmed agent demand' if p.free_agent else 'Current game wage, not future agent demand'}}">{{('Est. ' if p.free_agent else '') + money(p.current_wage) if p.current_wage is not none else '—'}}</td>
 <td>{{'Unattached' if p.free_agent else p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
 <td class="desk-scout-extra">{{p.pace if p.pace is not none else '—'}}</td>
