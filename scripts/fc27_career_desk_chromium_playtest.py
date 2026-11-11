@@ -177,6 +177,24 @@ def run(world,output):
                   "One 30-minute start action missing")
             check(page.locator('#desk-view-dashboard').is_visible(),
                   "Client-side dashboard not visibly initialised")
+            # The old max-width shell visually centred the navigation on
+            # wide monitors. Anchor the desktop sidebar to x=0 instead.
+            page.set_viewport_size({"width":1920,"height":900})
+            dimensions=page.evaluate("""() => ({
+                sidebarX:document.querySelector('.desk-sidebar').getBoundingClientRect().left,
+                canvasX:document.querySelector('.desk-workspace').getBoundingClientRect().left,
+                background:getComputedStyle(document.querySelector('.desk-workspace')).backgroundColor,
+                viewport:window.innerWidth,
+                shell:document.querySelector('.desk-shell').getBoundingClientRect().width
+            })""")
+            check(abs(dimensions["sidebarX"])<=1 and
+                  abs(dimensions["shell"]-1920)<=1 and
+                  dimensions["canvasX"]>=220,
+                  "Navigation is still centred instead of flush with the screen's left edge")
+            check(dimensions["background"]=="rgb(14, 16, 21)",
+                  "Previous dark workspace background was not restored")
+            page.set_viewport_size({"width":1440,"height":900})
+            found.append("Wide desktop navigation is anchored to x=0; dark canvas restored")
             page.screenshot(path=str(output/"01-desktop-before-start.png"),
                             animations="disabled",full_page=True)
             found.append("Pre-start dashboard and single-window button")
