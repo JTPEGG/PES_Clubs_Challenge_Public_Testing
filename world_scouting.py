@@ -409,7 +409,8 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         if dataset=="fc27-warehouse-659-mens-2026-27" else set())
     manager_listings=dict(conn.execute("""SELECT player_id,transfer_listed
         FROM world_career_player_circumstances WHERE career_id=?""",
-        (career_id,)).fetchall()) if (listed_only or modelled_listings) else {}
+        (career_id,)).fetchall()) if (listed_only or
+            dataset=="fc27-warehouse-659-mens-2026-27") else {}
     # A genuine seller counteroffer overrides any simulated asking price.
     # Restrict to the human buyer and pending counteroffers; old/historical
     # quotes must not look like the seller's current demand.
