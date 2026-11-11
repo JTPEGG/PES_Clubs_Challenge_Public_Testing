@@ -15,11 +15,13 @@ def _money(value):
     if value is None:
         return ""
     n=int(value)
-    return ("£"+(f"{n/1000000:,.2f}m" if abs(n)>=1000000
-                else f"{n/1000:,.2f}k".rstrip("0").rstrip(".")
-                if abs(n)>=1000 else f"{n:,}"))
+    if abs(n)>=1000000:
+        return f"£{n/1000000:,.2f}m"
+    if abs(n)>=1000:
+        return "£"+f"{n/1000:,.2f}".rstrip("0").rstrip(".")+"k"
+    return f"£{n:,}"
 
-def correspondence(messages,manager_club_id):
+def correspondence(messages,manager_club_id,*,conn=None,career_id=None):
     result=[]
     for row in messages:
         m=dict(row)
@@ -46,7 +48,10 @@ def correspondence(messages,manager_club_id):
             stage=1
             if "want" in headline or "counter" in headline:
                 subject=f"{other} counter our bid for {player}"
-                body=f"{other} have requested revised terms for {player}. Review their asking price and either accept it, negotiate, or withdraw the offer."
+                ask=_money(m.get("demanded_fee"))
+                body=(f"{other} want {ask} for {player}. " if ask else
+                      f"{other} have made a counteroffer for {player}. ")
+                body+="Review the fee and either accept, negotiate, or withdraw."
             elif "declined" in headline or "rejected" in headline:
                 subject=f"{other} reject our bid for {player}"
                 body=f"{other} have turned down our proposed transfer fee. You can consider a revised approach if the window remains open."
@@ -126,4 +131,103 @@ def correspondence(messages,manager_club_id):
             subject=subject,body=body,detail=extra,fee=fee,stage=stage,
             stage_label=STEPS[stage],created_at=m["created_at"],
             is_read=bool(m["is_read"]),side="buy" if buying else "sale"))
-    return result
+    if conn is not None and career_id is not None:
+        result.extend(_contract_and_free_agent_letters(conn,career_id,messages))
+    return sorted(result,key=lambda x:(str(x["created_at"]),str(x["message_id"])),
+                  reverse=True)
+
+
+def _contract_and_free_agent_letters(conn,career_id,messages):
+    """Add genuine renewal and free-agent events without a second mail ledger."""
+    out=[]
+    rows=conn.execute("""SELECT p.player_id,p.full_name FROM world_players p
+        JOIN world_career_contract_renewals a ON a.player_id=p.player_id
+        WHERE a.career_id=?""",(career_id,)).fetchall() if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='world_career_contract_renewals'"
+    ).fetchone() else []
+    player_names={int(r[0]):r[1] for r in rows}
+    free_rows=conn.execute("""SELECT f.signing_id,f.player_id,p.full_name
+        FROM world_fc27_free_agent_offers f
+        JOIN world_players p ON p.player_id=f.player_id
+        WHERE f.career_id=?""",(career_id,)).fetchall() if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='world_fc27_free_agent_offers'"
+    ).fetchone() else []
+    free_by_signing={int(r[0]):(int(r[1]),r[2]) for r in free_rows}
+    for row in messages:
+        m=dict(row)
+        key=str(m.get("message_key") or "")
+        if key.startswith("fc27-renewal:"):
+            parts=key.split(":")
+            if len(parts)<4 or not parts[2].isdigit():continue
+            pid=int(parts[2])
+            if pid not in player_names:continue
+            name=player_names[pid]
+            event=parts[3]
+            detail=_clean(m.get("detail"))
+            if event=="request":
+                subject=f"{name} requests a new contract"
+                body=f"{name}'s representative would like to discuss improved terms. Open Squad to review the request and make an offer."
+                stage=2;sender=f"{name}'s agent"
+            elif event=="confirmed":
+                subject=f"New contract signed: {name}"
+                body=detail or f"{name} has signed a new contract for the club."
+                stage=5;sender="Football operations"
+            elif event.startswith("offer-"):
+                subject=(f"{name}'s agent ends negotiations" if "ended" in detail else
+                         f"Contract offer response: {name}")
+                body=detail or "The representative has replied to your contract proposal."
+                stage=3;sender=f"{name}'s agent"
+            else:
+                subject=f"Contract discussions ended: {name}"
+                body=detail or f"Negotiations with {name} have been closed."
+                stage=4;sender="Football operations"
+            out.append(dict(message_id=m["message_id"],offer_id=None,
+                player_id=pid,player=name,sender=sender,subject=subject,body=body,
+                detail="",fee="",stage=stage,stage_label=STEPS[stage],
+                created_at=m["created_at"],is_read=bool(m["is_read"]),
+                side="renewal"))
+        elif key.startswith("player-review-outcome:free_agent:"):
+            sid=key.rsplit(":",1)[-1]
+            if not sid.isdigit() or int(sid) not in free_by_signing:continue
+            pid,name=free_by_signing[int(sid)]
+            accepted="accept" in str(m.get("headline") or "").lower()
+            subject=f"{name} accepts our contract" if accepted else f"{name} declines our contract"
+            body=(f"{name} has accepted our terms. Manager approval is now required to complete this free-agent signing."
+                  if accepted else f"{name} has rejected the move. This free-agent deal cannot proceed.")
+            out.append(dict(message_id=m["message_id"],offer_id=None,
+                player_id=pid,player=name,sender=f"{name}'s representative",
+                subject=subject,body=body,detail="",fee="",stage=3,
+                stage_label=STEPS[3],created_at=m["created_at"],
+                is_read=bool(m["is_read"]),side="free"))
+    if free_by_signing and conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='world_fc27_free_agent_events'"
+    ).fetchone():
+        entries=conn.execute("""SELECT e.event_id,e.signing_id,e.event,
+            e.detail,e.recorded_at,f.proposed_weekly_wage_gbp,f.contract_years
+            FROM world_fc27_free_agent_events e
+            JOIN world_fc27_free_agent_offers f ON f.signing_id=e.signing_id
+            WHERE f.career_id=? ORDER BY e.event_id DESC LIMIT 50""",
+            (career_id,)).fetchall()
+        for eid,sid,event,detail,stamp,wage,years in entries:
+            if int(sid) not in free_by_signing:continue
+            pid,name=free_by_signing[int(sid)]
+            if event=="agent_response":
+                agreed="agreed provisional" in str(detail).lower()
+                subject=(f"{name}'s agent accepts proposed terms" if agreed
+                         else f"{name}'s agent requests improved terms")
+                body=(f"The representative has provisionally agreed terms with {name} at {_money(wage)}/week. The player must now make a separate decision."
+                      if agreed else f"The representative has requested revised contract terms for {name}. The move has not been agreed.")
+                stage=2;sender=f"{name}'s agent"
+            elif event=="manager_confirmed":
+                subject=f"Free-agent signing confirmed: {name}"
+                body=f"Your club has signed {name} to a {years}-year contract at {_money(wage)}/week. Registration will occur at the transfer deadline."
+                stage=5;sender="Football operations"
+            else:
+                continue
+            out.append(dict(message_id=f"fa-{eid}",offer_id=None,
+                player_id=pid,player=name,sender=sender,subject=subject,body=body,
+                detail="",fee=_money(wage),stage=stage,
+                stage_label=STEPS[stage],created_at=stamp,
+                is_read=True,side="free"))
+    return out
+
