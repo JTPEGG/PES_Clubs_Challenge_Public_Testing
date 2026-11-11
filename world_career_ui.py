@@ -1106,6 +1106,70 @@ DASHBOARD_JS = r"""
     });
     refreshInboxItem(card);
   }
+  // Record-backed letters are separate Inbox messages, not synthetic
+  // client-side "success" states. The 15s heartbeat supplies new commits.
+  window.fc27SyncCorrespondence=function(items){
+    if(!Array.isArray(items))return;
+    const stages=['Bid','Offer response','Contract offer',
+                  'Contract accepted','Finalise deal','Transfer confirmed'];
+    let changed=false;
+    for(const mail of items.slice().reverse()){
+      const id=Number(mail.message_id);
+      if(!Number.isSafeInteger(id)||id<=0||
+         inboxGrid.querySelector('[data-message-id="'+id+'"]'))continue;
+      const card=document.createElement('div');
+      card.className='card offer desk-correspondence-email';
+      card.dataset.liveOfferId='mail-'+id;
+      card.dataset.messageId=String(id);
+      card.dataset.deskSide='mail';card.dataset.deskStatus='mail';
+      card.dataset.deskPlayer=String(mail.player_id||'');
+      card.dataset.deskPlayerName=String(mail.player||'Player');
+      card.dataset.deskBuyer=String(mail.sender||'Football operations');
+      card.dataset.mailSender=String(mail.sender||'Football operations');
+      card.dataset.mailSubject=String(mail.subject||'Transfer update');
+      card.dataset.mailStage=String(mail.stage);
+      card.dataset.mailStageLabel=String(mail.stage_label||'Update');
+      const heading=document.createElement('div');heading.className='label';
+      heading.textContent=card.dataset.mailSender+' · '+card.dataset.mailStageLabel;
+      const subject=document.createElement('h3');
+      subject.textContent=card.dataset.mailSubject;
+      const fee=document.createElement('div');fee.className='count';
+      fee.textContent=mail.fee||mail.stage_label||'Update';
+      const body=document.createElement('div');body.className='desk-mail-letter';
+      const p=document.createElement('p');p.textContent=mail.body||'';
+      body.appendChild(p);
+      if(mail.detail){
+        const note=document.createElement('p');
+        note.className='desk-mail-secondary';note.textContent=mail.detail;
+        body.appendChild(note);
+      }
+      const trail=document.createElement('nav');trail.className='desk-mail-stages';
+      trail.setAttribute('aria-label','Transfer progression');
+      stages.forEach((label,index)=>{
+        const step=document.createElement('span');
+        step.textContent=label;
+        if(index===Number(mail.stage))step.className='is-current';
+        trail.appendChild(step);
+      });
+      body.appendChild(trail);
+      const date=document.createElement('p');date.className='desk-mail-footer';
+      date.textContent='Correspondence recorded '+String(mail.created_at||'').slice(0,16).replace('T',' ');
+      body.appendChild(date);
+      const link=document.createElement('a');
+      link.href='#transfers';link.dataset.deskTab='transfers';
+      link.className='desk-inbox-open-negotiation';
+      link.textContent='Open transfer negotiations';
+      body.appendChild(link);
+      card.append(heading,subject,fee,body);
+      inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+      offerCards.unshift(card);makeInboxItem(card);
+      changed=true;
+    }
+    if(changed){
+      if(!selectedInboxCard)selectInboxCard(offerCards[0]);
+      refreshInboxList();
+    }
+  };
   offerCards.forEach(makeInboxItem);
   if(offerCards.length)selectInboxCard(offerCards[0]);
   else inboxReader.innerHTML='<div class="desk-inbox-reader-empty">Select a message to read it here.</div>';
