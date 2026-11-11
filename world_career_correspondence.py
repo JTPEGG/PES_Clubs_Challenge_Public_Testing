@@ -131,10 +131,33 @@ def correspondence(messages,manager_club_id,*,conn=None,career_id=None):
             subject=subject,body=body,detail=extra,fee=fee,stage=stage,
             stage_label=STEPS[stage],created_at=m["created_at"],
             is_read=bool(m["is_read"]),side="buy" if buying else "sale"))
+    # A player accepting a transfer creates an actionable SIGN-OFF
+    # request, not an automatic signature. It is only shown while the offer
+    # remains unsigned; both letters reference the same durable decision.
+    for m in map(dict,messages):
+        key=str(m.get("message_key") or "")
+        if (not key.startswith(("player-review-outcome:purchase:",
+                                "player-review-outcome:sale:")) or
+            m.get("offer_status")!="accepted_pending_contract" or
+            "accept" not in str(m.get("headline") or "").lower()):
+            continue
+        player=_clean(m.get("player_name")) or "the player"
+        other=_clean(m.get("seller_name") if "purchase:" in key else
+                     m.get("buyer_name"))
+        result.append(dict(message_id="action-"+str(m["message_id"]),
+            offer_id=m["offer_id"],player_id=m["player_id"],player=player,
+            sender="Football operations",
+            subject=f"Finalise deal: {player}",
+            body=(f"{player} has accepted the transfer terms with {other}. "
+                  "Please review the agreement and confirm, delay or cancel "
+                  "the signing before the transfer deadline."),
+            detail="",fee=_money(m.get("offered_fee")),stage=4,
+            stage_label=STEPS[4],created_at=m["created_at"],
+            is_read=bool(m["is_read"]),side="buy" if "purchase:" in key else "sale"))
     if conn is not None and career_id is not None:
         result.extend(_contract_and_free_agent_letters(conn,career_id,messages))
-    return sorted(result,key=lambda x:(str(x["created_at"]),str(x["message_id"])),
-                  reverse=True)
+    return sorted(result,key=lambda x:(str(x["created_at"]).replace(" ","T"),
+                                      str(x["message_id"])),reverse=True)
 
 
 def _contract_and_free_agent_letters(conn,career_id,messages):
