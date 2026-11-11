@@ -1201,7 +1201,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
  data-desk-player-name="{{mail.player}}" data-desk-buyer="{{mail.sender}}"
  data-desk-status="mail" data-mail-stage="{{mail.stage}}"
  data-mail-subject="{{mail.subject}}" data-mail-sender="{{mail.sender}}"
- data-mail-date="{{mail.created_at}}">
+ data-mail-stage-label="{{mail.stage_label}}" data-mail-date="{{mail.created_at}}">
  <div class="label">{{mail.sender}} · {{mail.stage_label}}</div>
  <h3>{{mail.subject}}</h3>
  <div class="count">{{mail.fee or mail.stage_label}}</div>
@@ -3167,7 +3167,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 for r in outgoing]
             signed=sum(o["status"] in ("agreed_future","completed") for o in offers+purchases)
             messages=market_messages(db,career_id=career_id)
-            letters=correspondence(messages,c["manager_club_id"])
+            letters=correspondence(messages,c["manager_club_id"],conn=db,career_id=career_id)
             # General market news must not light up the manager's Inbox.
             unread=actionable_unread_count(db,career_id=career_id)
 
@@ -3729,7 +3729,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 free_agent_updates=free_updates,
                 contract_updates=contract_updates,csrf=csrf_value(),
                 world_updates=world_updates,
-                mail_updates=correspondence(market_messages(db,career_id=career_id),manager_id),
+                mail_updates=correspondence(market_messages(db,career_id=career_id),manager_id,
+                    conn=db,career_id=career_id),
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
         response.headers["Cache-Control"]="private, no-store"
