@@ -525,7 +525,7 @@ body.desk-contract-open{overflow:auto}
  .desk-view[data-view="scouting"]>h2{flex:none;margin-top:0}
  .desk-view[data-view="scouting"]>.desk-scout-finance{flex:none}
  .desk-view[data-view="scouting"] .card:has(>form.scout-filters){display:flex;flex-direction:column;
-  flex:1;min-height:0;overflow:hidden;padding-bottom:4px}
+  flex:1;min-height:0;overflow:visible;padding-bottom:4px}
  .desk-view[data-view="scouting"] .scout-filters,
  .desk-view[data-view="scouting"] .desk-scout-table-tools{flex:none}
  .desk-view[data-view="scouting"] .scout-table[data-scout-scroll]{flex:1;min-height:0;
