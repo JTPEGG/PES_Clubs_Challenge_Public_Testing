@@ -45,6 +45,23 @@ def _stable(*parts):
     raw=":".join(map(str,("fc27-player-choices-v1",*parts))).encode()
     return int.from_bytes(hashlib.sha256(raw).digest()[:8],"big")/2**64
 
+def free_agent_wait_probability(*, overall, club_appeal, wage_ratio, role, age):
+    """Soft outside-option risk: a player can wait for a better level of club.
+
+    No rating/league ban. Higher wages, an assured role and being late in
+    a career can make an otherwise surprising free-agent signing credible.
+    """
+    expectation=max(40,min(92,round(35+max(0,overall-61)*2.0)))
+    gap=max(0,expectation-club_appeal)
+    chance=max(0,gap-10)*.014+max(0,overall-77)*.038
+    chance-=min(.25,max(0,wage_ratio-1)*.22)
+    chance-={"key_player":.085,"regular_starter":.035,
+             "rotation":0,"fringe":-.035}.get(role,0)
+    if age>=32:
+        chance-=min(.20,(age-31)*.035)
+    return min(.82,max(.02,chance))
+
+
 def _now(now=None):
     if now is None:return datetime.now(timezone.utc)
     if isinstance(now,str):now=datetime.fromisoformat(now.replace("Z","+00:00"))
@@ -218,11 +235,13 @@ def review_due_choices(conn,*,career_id,now=None):
         else:
             row=conn.execute("""SELECT f.status,f.buying_club_id,
                  f.proposed_weekly_wage_gbp,f.required_weekly_wage_gbp,
-                 f.squad_role,p.full_name
+                 f.squad_role,p.full_name,x.overall,p.birth_date
                  FROM world_fc27_free_agent_offers f
                  JOIN world_players p ON p.player_id=f.player_id
+                 JOIN world_dataset_ratings x ON x.dataset_id=? AND
+                      x.player_id=f.player_id
                  WHERE f.career_id=? AND f.signing_id=?""",
-                 (career_id,identifier)).fetchone()
+                 (DATASET,career_id,identifier)).fetchone()
             if not row or row[0]!="terms_accepted":
                 continue
             from world_fc27_ai_recruitment import read_fc27_profiles
@@ -242,9 +261,24 @@ def review_due_choices(conn,*,career_id,now=None):
                 reason=("Player preferred a competing club's financial and "
                         "sporting opportunity after considering the offers")
             else:
-                status="accepted"
-                reason=("Player wants to sign after comparing "+
-                        str(len(rivals))+" credible AI-club offer(s)")
+                from datetime import date
+                birth=date.fromisoformat(row[7])
+                season=date(2026,8,1)
+                age=season.year-birth.year-(
+                    (season.month,season.day)<(birth.month,birth.day))
+                wait_risk=free_agent_wait_probability(
+                    overall=row[6],club_appeal=manager_appeal,
+                    wage_ratio=row[2]/max(1,row[3]),
+                    role=row[4],age=age)
+                if _stable(career_id,identifier,"wait-for-better-club")<wait_risk:
+                    status="declined"
+                    reason=("Player prefers to remain available for a club "
+                            "matching his sporting ambitions, despite "
+                            "acceptable contract terms")
+                else:
+                    status="accepted"
+                    reason=("Player wants to sign after comparing "+
+                            str(len(rivals))+" credible AI-club offer(s)")
         if kind=="sale" and status=="declined":
             # An agent can agree wages for more than one club; the PLAYER
             # chooses one. The other unsigned offers must visibly end and
