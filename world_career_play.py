@@ -655,11 +655,9 @@ def format_market_gbp(value):
     sign="-" if amount<0 else ""
     absolute=abs(amount)
     if absolute>=1_000_000:
-        return f"{sign}£{absolute/1_000_000:,.2f}m"
+        return f"{sign}£{absolute/1_000_000:,.2f}".rstrip("0").rstrip(".")+"m"
     if absolute>=1_000:
-        thousands=absolute/1_000
-        precision=1 if absolute<100_000 and absolute%1_000 else 0
-        return f"{sign}£{thousands:,.{precision}f}k"
+        return f"{sign}£{absolute/1_000:,.2f}".rstrip("0").rstrip(".")+"k"
     return f"{sign}£{absolute:,}"
 
 LIVE_MARKET_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
