@@ -58,3 +58,31 @@ def modelled_ai_listed_ids(conn,*,career_id,dataset,manager,rows,asof):
             financial_pressure=pressures.get(club,0))>=0.54:
             eligible.add(pid)
     return eligible
+
+
+
+def estimated_listed_asking_price(market_value, years_left=None):
+    """Non-binding first-enquiry price, NOT a seller quote or acceptance.
+
+    Derived from the FC27 converted game-market valuation and the same
+    transfer-list / short-contract discount direction as the seller policy.
+    The club's actual financial/sporting and replacement decision is only
+    made when a bid is submitted. Keep this deliberately conservative and
+    label it an estimate everywhere it is displayed.
+    """
+    if market_value is None or int(market_value)<=0:
+        return None
+    amount=int(market_value)
+    # Listing normally lowers the opening expectation, while a short
+    # remaining contract makes the estimated fee more negotiable. A source
+    # with no known expiry is not treated as an expiring contract.
+    ratio=.90
+    if years_left is not None and 0<=years_left<=1:
+        ratio-=.12
+    elif years_left is not None and 1<years_left<=2:
+        ratio-=.06
+    target=int(amount*ratio)
+    step=(1_000 if target<100_000 else
+          10_000 if target<1_000_000 else
+          50_000 if target<10_000_000 else 250_000)
+    return max(step,((target+step-1)//step)*step)
