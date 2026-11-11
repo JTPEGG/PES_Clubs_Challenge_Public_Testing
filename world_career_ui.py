@@ -904,8 +904,9 @@ DASHBOARD_JS = r"""
   function gbp(value){
     const negative=value<0?'-':'';
     value=Math.abs(value);
-    return negative+'£'+(value>=1000000?(value/1000000).toFixed(2)+'m':
-      value>=1000?Math.round(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
+    const trimmed=v=>String(Number(v.toFixed(2)));
+    return negative+'£'+(value>=1000000?trimmed(value/1000000)+'m':
+      value>=1000?trimmed(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
   }
   if(!views.inbox.children.length)
     views.inbox.appendChild(emptyPanel('No inbox activity','Offers will appear once clubs begin approaching your players.'));
@@ -1763,7 +1764,7 @@ DASHBOARD_JS = r"""
       el=>Number(el.dataset.liveOfferId)));
   const pound=n=>{
     n=Number(n)||0;const abs=Math.abs(n);
-    const trimmed=v=>v.toFixed(2).replace(/\\.?0+$/,'');
+    const trimmed=v=>String(Number(v.toFixed(2)));
     return (n<0?'-':'')+'£'+(abs>=1e6?trimmed(abs/1e6)+'m':
       abs>=1e3?trimmed(abs/1e3)+'k':
       Math.round(abs).toLocaleString('en-GB'));
