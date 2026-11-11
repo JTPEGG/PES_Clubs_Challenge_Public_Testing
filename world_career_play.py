@@ -655,7 +655,7 @@ def format_market_gbp(value):
     sign="-" if amount<0 else ""
     absolute=abs(amount)
     if absolute>=1_000_000:
-        return f"{sign}£{absolute/1_000_000:,.2f}".rstrip("0").rstrip(".")+"m"
+        return f"{sign}£{absolute/1_000_000:,.2f}m"
     if absolute>=1_000:
         return f"{sign}£{absolute/1_000:,.2f}".rstrip("0").rstrip(".")+"k"
     return f"{sign}£{absolute:,}"
