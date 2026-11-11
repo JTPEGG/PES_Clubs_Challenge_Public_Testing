@@ -594,6 +594,222 @@ body.desk-ui{background:var(--desk-bg);color:#f6f6f7}
  border:0!important;opacity:0!important;padding:0!important;pointer-events:none!important}
 @media(max-width:760px){.desk-money-control{flex-wrap:wrap}.desk-money-increment{max-width:76px}}
 
+/* FC27 Career Desk unified with the Anderlecht Manager Desk visual system.
+   The original blue page styles above remain a non-JS fallback only. */
+:root{color-scheme:light;--desk-bg:#f4f5f3;--desk-panel:#ffffff;
+ --desk-panel2:#f8f9f7;--desk-stroke:#e5e9e3;--desk-accent:#ffd230;
+ --desk-green:#4f7457;--desk-faint:#767f75;--desk-ink:#222922}
+body.desk-ui{color-scheme:light;background:var(--desk-bg);color:var(--desk-ink);
+ font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body.desk-ui a{color:#455f44}
+body.desk-ui [hidden]{display:none!important}
+body.desk-ui .desk-topbar{background:#ffffff;border-bottom:1px solid #e4e9e2;box-shadow:0 2px 15px #161d1708}
+body.desk-ui .desk-brand{color:#202720;text-decoration:none}
+body.desk-ui .desk-brand strong{color:#1f271f;font-size:16px;letter-spacing:-.02em}
+body.desk-ui .desk-brand small{color:#7e887d;font-size:10px;letter-spacing:.02em;text-transform:none}
+.desk-club-crest,.desk-page-crest{display:grid;place-items:center;background:#f7f8f4;
+ border:1px solid #e8ece6;overflow:hidden;flex:0 0 auto}
+.desk-club-crest{width:49px;height:49px;border-radius:12px;padding:4px}
+.desk-club-crest img,.desk-page-crest img{width:100%;height:100%;object-fit:contain}
+.desk-crest-fallback{display:grid;place-items:center;width:100%;height:100%;
+ background:#2b352c;border-radius:8px;color:#ffe078;font-size:13px;font-weight:900;letter-spacing:-.025em}
+.desk-page-crest{width:59px;height:59px;border-radius:13px;padding:6px}
+.desk-page-crest .desk-crest-fallback{font-size:15px}
+body.desk-ui .desk-header-tag{color:#818a7e}
+body.desk-ui .desk-header-tag strong{color:#222922}
+body.desk-ui .desk-live-status{color:#3d7557}
+body.desk-ui .desk-live-status:before{background:#6aab78;box-shadow:0 0 0 4px #6aab7821}
+body.desk-ui .desk-header-clock{border-left-color:#e4e9e3}
+body.desk-ui .desk-header-clock small{color:#7f877d}
+body.desk-ui .desk-header-clock strong{color:#1e281e}
+body.desk-ui .desk-shell{max-width:1680px;grid-template-columns:230px minmax(0,1fr)}
+body.desk-ui .desk-sidebar{background:#171917;color:#f1f4ef;border-right:1px solid #2c322b}
+body.desk-ui .desk-sidebar a{color:#b4bcb3}
+body.desk-ui .desk-nav-label{color:#8b9489}
+body.desk-ui .desk-tab{color:#b5bfb4}
+body.desk-ui .desk-sidebar .desk-tab:hover{background:#2b302a;color:#fff}
+body.desk-ui .desk-sidebar .desk-tab[aria-current="page"]{background:#30382e;color:#fff;
+ border-color:#424c40;box-shadow:inset 3px 0 #ffd230}
+body.desk-ui .desk-sidebar .desk-tab[aria-current="page"] .desk-nav-icon{color:#ffd230}
+body.desk-ui .desk-nav-count{background:#3b4039;color:#ffdf72}
+body.desk-ui .desk-sidebar-foot{border-top-color:#343934;color:#9ba59a}
+body.desk-ui .desk-sidebar-foot a{color:#d7dfd5}
+body.desk-ui .desk-workspace{padding:28px clamp(22px,3vw,48px) 68px}
+body.desk-ui .desk-view{color:#263026}
+body.desk-ui .desk-view .muted,body.desk-ui .desk-view .time-note,
+body.desk-ui .desk-view small{color:#7c857a}
+body.desk-ui .desk-view .card,body.desk-ui .desk-view .offer,
+body.desk-ui .desk-setup-card{background:#fff!important;border:1px solid #e3e8e2!important;
+ box-shadow:0 4px 22px #1d2a1c08!important;border-radius:13px;color:#263126}
+body.desk-ui .desk-view .offer{border-left:3px solid #e4c34b!important}
+body.desk-ui .desk-view .offer:focus-within{background:#fffefa!important;border-color:#ddc45e!important}
+body.desk-ui .desk-view .card label,body.desk-ui .desk-view label{color:#485347}
+body.desk-ui .desk-view h1,body.desk-ui .desk-view h2,
+body.desk-ui .desk-view h3,body.desk-ui .desk-view strong{color:#252d25}
+body.desk-ui .desk-view .label{color:#879083}
+body.desk-ui .desk-view .count{color:#355b42}
+body.desk-ui .desk-view .pill{background:#f5f7f3!important;color:#586756;border:1px solid #e7ebe4}
+body.desk-ui .desk-view .scout-table{border:1px solid #e5eae3!important;border-radius:9px;background:#fff}
+body.desk-ui .desk-view table{background:#fff;border-collapse:collapse;color:#283028}
+body.desk-ui .desk-view table th{background:#f8f9f6!important;color:#737e72;
+ border-bottom:1px solid #e2e8e1;font-size:11px;letter-spacing:.045em}
+body.desk-ui .desk-view table td{border-bottom:1px solid #edf0ea;color:#29322a}
+body.desk-ui .desk-view table tbody tr:hover{background:#fffbed!important}
+body.desk-ui .desk-view table tbody tr.owned{background:#f3f7ee!important}
+body.desk-ui .desk-view .desk-table-filter-row input{background:#fff!important}
+body.desk-ui .desk-view .desk-table-sort{color:#515d50!important}
+body.desk-ui .desk-view .desk-table-sort::after{color:#ae8c15}
+body.desk-ui .desk-view input:not([type="checkbox"]):not([type="radio"]),
+body.desk-ui .desk-view select,body.desk-ui .desk-view textarea,
+body.desk-ui .desk-inbox-tools input{background:#fff!important;color:#243024!important;
+ border:1px solid #dbe2d9!important;border-radius:7px}
+body.desk-ui .desk-view input::placeholder{color:#99a297}
+body.desk-ui .desk-view input[type=checkbox]{accent-color:#d6ac14}
+body.desk-ui .desk-view button:not(.danger):not(.desk-table-sort):not(.desk-filter-button),
+body.desk-ui .desk-view .desk-page-link{background:#ffd230;color:#252923;border:1px solid #e4c035;
+ border-radius:8px;font-weight:750;box-shadow:none}
+body.desk-ui .desk-view button:not(.danger):not(.desk-table-sort):not(.desk-filter-button):hover{background:#ffe079}
+body.desk-ui .desk-view button.danger{background:#fff1f1;color:#b6373e;border:1px solid #edc9ce}
+body.desk-ui .desk-view button:focus-visible,body.desk-ui a:focus-visible{
+ outline:2px solid #c89e08;outline-offset:2px}
+body.desk-ui .desk-filter-button{background:#fff;color:#53614e;border:1px solid #dbe3d9}
+body.desk-ui .desk-filter-button[aria-pressed="true"]{background:#fff2b1;color:#292a20;border-color:#eac43e}
+body.desk-ui .desk-filter-button:hover{background:#faf7e8;color:#2e392d}
+body.desk-ui .desk-view .desk-scout-finance span{background:#fff!important;border:1px solid #e5eae2!important;
+ color:#778176;box-shadow:0 4px 14px #20291c06}
+body.desk-ui .desk-view .desk-scout-finance b{color:#253326}
+body.desk-ui .desk-view .scout-filters,body.desk-ui .desk-view .desk-scout-searchbar,
+body.desk-ui .desk-view .desk-scout-dialog,body.desk-ui .desk-view .desk-position-chooser{
+ background:#fff!important;color:#253024;border-color:#e2e8df!important}
+body.desk-ui .desk-scout-searchbar input,body.desk-ui .desk-scout-searchbar select,
+body.desk-ui .desk-scout-dialog input,body.desk-ui .desk-scout-dialog select,
+body.desk-ui .desk-money-control select{background:#fff!important;color:#263026!important;
+ border-color:#d9e0d5!important}
+body.desk-ui .desk-scout-quick-check,body.desk-ui .desk-position-grid label{
+ background:#f7f8f5!important;color:#475646;border:1px solid #e3e9df!important}
+body.desk-ui .desk-position-grid label:has(input:checked){background:#fff2b2!important;
+ border-color:#e7ca5c!important}
+body.desk-ui .desk-scout-position-trigger{background:#fff!important;color:#344432!important;
+ border:1px solid #d9e1d6!important}
+body.desk-ui .desk-scout-chips>*{background:#fff7d8!important;color:#524c2b!important;
+ border-color:#e8d89d!important}
+body.desk-ui .desk-scout-add,body.desk-ui .desk-scout-clear{background:#ffda48!important;color:#202a20!important;
+ border-color:#e3c33c!important}
+body.desk-ui .desk-scout-dialog-shade{background:#12171373}
+body.desk-ui .desk-inbox-split{background:#fff;border:1px solid #e4e8e1;border-radius:13px;
+ box-shadow:0 6px 24px #1e271e0a}
+body.desk-ui .desk-inbox-split .desk-inbox-list{background:#fff;border-right:1px solid #e7ebe4;
+ border-radius:13px 0 0 13px}
+body.desk-ui .desk-inbox-columns{background:#f8f9f6;color:#879083}
+body.desk-ui .desk-inbox-item{border-bottom:1px solid #eef0eb}
+body.desk-ui .desk-inbox-item>summary{background:#fff;color:#263125}
+body.desk-ui .desk-inbox-item>summary:hover{background:#faf9ed}
+body.desk-ui .desk-inbox-item[data-selected="true"]>summary{background:#fff4c2;
+ box-shadow:inset 3px 0 #d7ae18}
+body.desk-ui .desk-inbox-item[data-action-needed="true"]>summary{background:#fffdf2}
+body.desk-ui .desk-inbox-subject{color:#283128}
+body.desk-ui .desk-inbox-sender{color:#7b8678}
+body.desk-ui .desk-inbox-state{color:#5c6e59}
+body.desk-ui .desk-inbox-fee{color:#41624c}
+body.desk-ui .desk-inbox-item .desk-inbox-detail{background:#fff}
+body.desk-ui .desk-inbox-reader{background:#fff;color:#2c372c}
+body.desk-ui .desk-inbox-reader-header{background:#f9faf7;border-bottom:1px solid #e6ebe2}
+body.desk-ui .desk-inbox-reader-header a{color:#2f3c2f}
+body.desk-ui .desk-inbox-reader-header small{color:#758273}
+body.desk-ui .desk-inbox-reader .desk-inbox-detail{background:#fff}
+body.desk-ui .desk-inbox-reader .desk-inbox-detail .offer{background:#fff!important}
+body.desk-ui .desk-inbox-reader-empty{color:#82907e}
+body.desk-ui .desk-offer-briefing,body.desk-ui .desk-offer-briefing-metrics>div{
+ background:#f8f9f6!important;border:1px solid #e8ede5!important;color:#334133!important}
+body.desk-ui .desk-offer-briefing-note{color:#546153}
+body.desk-ui .desk-inbox-profile-link{color:#3b5038}
+body.desk-ui .desk-contract-panel{background:#fff;border-color:#e5e9e3}
+body.desk-ui .desk-contract-header{background:#fafbf8;border-color:#e8ece7}
+body.desk-ui .desk-contract-body .card,
+body.desk-ui .desk-contract-body .metric{background:#f9faf8!important;border-color:#e4eae1!important;color:#273227}
+body.desk-ui .desk-contract-body .metric strong{color:#273126}
+body.desk-ui .desk-contract-notice{background:#254330;border-color:#638d68;color:#fff}
+body.desk-ui .desk-news-card{background:#fff!important;border:1px solid #e5eae3!important;
+ box-shadow:0 4px 18px #20321a05}
+body.desk-ui .desk-news-content strong{color:#293329}
+body.desk-ui .desk-news-route{color:#53624e}
+body.desk-ui .desk-news-icon{background:#fff6d7;border-color:#eddb9e}
+body.desk-ui .desk-news-fee{color:#4a684a}
+body.desk-ui .desk-actions-bar{margin:2px 0 15px;gap:10px}
+body.desk-ui .desk-action-tile{background:#fff!important;color:#2c3529!important;
+ border:1px solid #e1e7de!important;border-radius:12px;box-shadow:0 4px 20px #101b1009;
+ padding:16px 19px;min-height:84px}
+body.desk-ui .desk-action-tile:hover{background:#fff9df!important;transform:translateY(-1px)}
+body.desk-ui .desk-action-tile strong{color:#273227;font-size:15px}
+body.desk-ui .desk-action-tile small{color:#829082}
+body.desk-ui .desk-finance-grid .card{background:#fff!important}
+body.desk-ui .desk-finance-value{color:#202e22}
+body.desk-ui .desk-finance-track{background:#edf0e8}
+body.desk-ui .desk-finance-fill{background:#dec137}
+body.desk-ui .desk-tactics-toolbar,body.desk-ui .desk-tactics-group{
+ background:#fff;border-color:#e2e9df;color:#2d392e}
+body.desk-ui .desk-tactics-toolbar label,body.desk-ui .desk-tactics-group strong{color:#263326}
+body.desk-ui .desk-tactics-group>header{background:#f8f9f6;border-color:#e3e8e1}
+body.desk-ui .desk-tactics-player{background:#f9faf7;color:#273327;border-color:#e3e9e0}
+body.desk-ui .desk-tactics-pos,body.desk-ui .desk-tactics-group header span{color:#60735d}
+body.desk-ui .desk-tactics-player .desk-tactics-ovr{color:#426b43}
+body.desk-ui .desk-tactics-player[data-selected="true"]{background:#fff6d6;border-color:#e4c044}
+body.desk-ui .desk-pitch-token .desk-player-disc{background:var(--club-kit,#293b29)!important;
+ color:var(--club-kit-text,#fff)!important;border:2px solid var(--club-kit-trim,#ffd230)!important;
+ box-shadow:0 4px 14px #0007}
+body.desk-ui .desk-pitch-token[data-selected="true"] .desk-player-disc{outline:3px solid #ffd230;
+ outline-offset:2px}
+body.desk-ui .desk-money-control{background:#f9faf7;border-color:#e2e8df}
+body.desk-ui .desk-money-preview{color:#2d3a2d}
+body.desk-ui .desk-money-control .desk-money-step{background:#ffdb4b!important;
+ border-color:#e4c347!important;color:#272922!important}
+body.desk-ui .desk-global-message{background:#fff;border:1px solid #e3e9df;color:#3e503e}
+body.desk-ui .desk-global-message.alert{background:#fff6f2;border-color:#eddccf;color:#664d41}
+body.desk-ui .desk-global-message a{color:#516b43}
+body.desk-ui .desk-view .desk-pitch-token .desk-player-name{color:#fff}
+body.desk-ui .desk-player-report{color:#2e3b2e}
+.desk-page-heading{display:flex;align-items:center;gap:15px;margin:0 0 18px;
+ padding:0 0 17px;border-bottom:1px solid #e5eae2}
+.desk-page-title h1{margin:0!important;font-size:25px!important;line-height:1.12!important;
+ font-weight:850;letter-spacing:-.045em;color:#202920}
+.desk-page-title small{display:block;margin-top:6px;color:#879084;
+ font-size:11px;text-transform:none;letter-spacing:.01em}
+body.desk-ui .desk-original-heading{display:none!important}
+body.desk-ui .desk-shortlist-card{padding:10px!important}
+body.desk-ui .desk-shortlist-card .scout-table{margin:0!important}
+body.desk-ui .desk-inbox-list .desk-inbox-flag{border-color:#d5dccf}
+body.desk-ui .desk-inbox-item[data-action-needed="true"] .desk-inbox-flag{
+ color:#2f321f;background:#ffd230;border-color:#d3b22f}
+.desk-correspondence-email .desk-mail-letter{padding:3px 1px 0}
+.desk-mail-letter>p{font-size:13px;line-height:1.6;max-width:750px;color:#445142}
+.desk-mail-letter .desk-mail-secondary{background:#f7f9f5;border-left:2px solid #e0c64f;
+ padding:10px 12px;border-radius:0 6px 6px 0;color:#536150;font-size:12px}
+.desk-mail-stages{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;
+ margin:18px 0 14px;max-width:920px}
+.desk-mail-stages span{font-size:10px;line-height:1.2;color:#818b7d;background:#f2f5f0;
+ border:1px solid #e8eee5;border-radius:7px;padding:8px 5px;text-align:center}
+.desk-mail-stages span.is-current{background:#fff1ad;color:#39391e;
+ border-color:#e7c13b;font-weight:850}
+.desk-mail-footer{font-size:10px!important;color:#919b8f!important;letter-spacing:.02em}
+body.desk-ui .desk-news-card p{color:#556455}
+body.desk-ui .desk-setup-step button{background:#fafbf8!important;border:1px solid #e4e9e1!important;color:#2e382f!important}
+body.desk-ui .desk-setup-step button:hover{background:#fff8d8!important}
+@media(max-width:940px){
+ body.desk-ui .desk-shell{grid-template-columns:70px minmax(0,1fr)}
+}
+@media(max-width:650px){
+ body.desk-ui .desk-shell{display:block}
+ body.desk-ui .desk-mobile-tabs{background:#fff;border-bottom:1px solid #e2e8e0}
+ body.desk-ui .desk-mobile-tabs .desk-tab{color:#495748}
+ body.desk-ui .desk-mobile-tabs .desk-tab[aria-current="page"]{color:#292d21;
+   background:#fff0ab;border-color:#e6c43b;box-shadow:inset 0 -2px #dcb332}
+ body.desk-ui .desk-workspace{padding:17px 12px 52px}
+ .desk-page-heading{gap:10px;margin-bottom:14px}
+ .desk-page-crest{width:46px;height:46px}
+ .desk-page-title h1{font-size:21px!important}
+ .desk-mail-stages{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
 """
 
 DASHBOARD_JS = r"""
@@ -789,6 +1005,34 @@ DASHBOARD_JS = r"""
   source.dataset.initialized='1';
   source.hidden=true;
 
+  // Only show accessible views. A newly created career has no live Scouting
+  // before the window starts; an orphaned explanatory panel is not a feature.
+  const unavailableViews=new Set();
+  if(!views.scouting.querySelector('form.scout-filters')){
+    unavailableViews.add('scouting');
+    document.querySelectorAll('[data-desk-tab="scouting"]').forEach(x=>x.hidden=true);
+  }
+
+  // Same crest and compact header on every actual manager workspace page.
+  const crest=document.querySelector('.desk-brand .desk-club-crest');
+  const managerClub=document.body.dataset.managerClub||'Club';
+  names.forEach(name=>{
+    if(unavailableViews.has(name)||name==='contract'||name==='player')return;
+    const head=document.createElement('div');
+    head.className='desk-page-heading';
+    const emblem=document.createElement('span');
+    emblem.className='desk-page-crest';
+    if(crest)emblem.append(...Array.from(crest.childNodes).map(node=>node.cloneNode(true)));
+    const label=document.createElement('div');
+    label.className='desk-page-title';
+    const h=document.createElement('h1');h.textContent=titles[name];
+    const sub=document.createElement('small');sub.textContent=managerClub;
+    label.append(h,sub);head.append(emblem,label);
+    views[name].prepend(head);
+    // Retain the hidden ID anchors used by the transfer desk navigation.
+    views[name].querySelectorAll(':scope > h2').forEach(h2=>h2.classList.add('desk-original-heading'));
+  });
+
   // The complete shortlist section is routed to its own tab above.
   // Never leave an orphan explanatory panel in Scouting.
   const noticeText='Your shortlist is saved to this career and remains available after the window closes.';
@@ -811,28 +1055,12 @@ DASHBOARD_JS = r"""
   const numSaved=Number(document.body.dataset.saved||0);
   const state=document.body.dataset.windowState||'not_started';
 
-  // Provide a concise, actionable overview with the original financial
-  // cards immediately underneath. The figures remain sourced from the server.
-  const intro=document.createElement('div');
-  intro.className='desk-view-header';
-  const titleWrap=document.createElement('div');
-  const h2=document.createElement('h2');
-  h2.textContent='Your transfer window';
-  const desc=document.createElement('p');
-  desc.className='muted';
-  desc.textContent=state==='open'?
-    'Keep on top of offers, negotiations and recruitment before the deadline.':
-    state==='closed'?'The window is closed. Review results and registrations.':
-    'Review your squad and saved targets before starting the clock.';
-  titleWrap.appendChild(h2);titleWrap.appendChild(desc);
-  intro.appendChild(titleWrap);
-  views.dashboard.insertBefore(intro,views.dashboard.firstChild);
   const quick=document.createElement('div');
   quick.className='desk-actions-bar';
   [
-    {label:"Manager's Inbox",description:numOffers+' incoming offers · '+numUnread+' unread',screen:'inbox'},
-    {label:'Transfer Centre',description:numSigned+' signed deals · all bids',screen:'transfers'},
-    {label:'Scouting',description:'Discover players and evaluate targets',screen:'scouting'}
+    {label:"Manager's Inbox",description:numUnread+' action(s) · '+numOffers+' bids',screen:'inbox'},
+    {label:'Transfer Centre',description:numSigned+' confirmed deal(s)',screen:'transfers'},
+    ...(!unavailableViews.has('scouting')?[{label:'Scouting',description:'Search players',screen:'scouting'}]:[])
   ].forEach(function(entry){
     const b=document.createElement('button');
     b.type='button';b.className='desk-action-tile';
@@ -841,7 +1069,7 @@ DASHBOARD_JS = r"""
     const small=document.createElement('small');small.textContent=entry.description;
     b.appendChild(strong);b.appendChild(small);quick.appendChild(b);
   });
-  intro.insertAdjacentElement('afterend',quick);
+  views.dashboard.querySelector('.desk-page-heading')?.insertAdjacentElement('afterend',quick);
   if(state==='closed'){
     const next=document.createElement('div');
     next.className='card desk-post-window-next';
@@ -852,7 +1080,7 @@ DASHBOARD_JS = r"""
     continueLink.dataset.deskTab='season-setup';
     continueLink.textContent='Continue to season setup →';
     next.append(explanation,continueLink);
-    quick.insertAdjacentElement('beforebegin',next);
+    quick.insertAdjacentElement('afterend',next);
   }
 
   // Use the authoritative budget breakdown already rendered on the page.
@@ -908,17 +1136,7 @@ DASHBOARD_JS = r"""
     return negative+'£'+(value>=1000000?trimmed(value/1000000)+'m':
       value>=1000?trimmed(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
   }
-  if(!views.inbox.children.length)
-    views.inbox.appendChild(emptyPanel('No inbox activity','Offers will appear once clubs begin approaching your players.'));
-  if(!views.transfers.children.length)
-    views.transfers.appendChild(emptyPanel('No transfers underway','Scouting, shortlisting and recruitment are available from the navigation.'));
-  if(!views.squad.children.length)
-    views.squad.appendChild(emptyPanel('No squad data','Open a career to manage your registered players.'));
-  if(!views['season-setup'].children.length)
-    views['season-setup'].appendChild(emptyPanel('Season setup opens at the deadline',
-      'Complete your transfer window before preparing your PES squads.'));
-  if(!views.scouting.children.length)
-    views.scouting.appendChild(emptyPanel('Scouting is not active on this screen','You can still open saved scouting profiles from your shortlist.'));
+  // Empty states use genuine blank tables and no orphaned explanatory cards.
 
   // Inbox is a compact FM-like message list. Every offer remains a separate
   // message so competing bids are readable and each has its own actions.
@@ -958,11 +1176,13 @@ DASHBOARD_JS = r"""
     const strong=document.createElement('a');
     strong.className='desk-inbox-profile-link';
     strong.href=location.pathname+'/player/'+encodeURIComponent(card.dataset.deskPlayer||'');
-    strong.textContent=card.dataset.deskPlayerName||'Transfer';
+    strong.textContent=card.dataset.mailSubject||
+      card.dataset.deskPlayerName||'Transfer';
     strong.title='Open this player’s scouting profile';
     const meta=document.createElement('span');
     meta.className='desk-inbox-player-meta';
     meta.textContent=[
+      card.dataset.mailSubject?'Player: '+(card.dataset.deskPlayerName||''):'',
       card.dataset.deskPosition||'',
       card.dataset.deskOverall?'OVR '+card.dataset.deskOverall:'',
       card.dataset.deskAge?'Age '+card.dataset.deskAge:''
@@ -970,7 +1190,8 @@ DASHBOARD_JS = r"""
     if(!meta.textContent)meta.hidden=true;
     const small=document.createElement('small');
     small.textContent=cleanInboxClub(card.dataset.deskBuyer||'')+
-      ' · '+(inboxLabels[card.dataset.deskStatus]||'Transfer update');
+      ' · '+(card.dataset.mailStageLabel||
+       inboxLabels[card.dataset.deskStatus]||'Transfer update');
     intro.append(strong,meta,small);heading.appendChild(intro);
     inboxReader.append(heading,selectedInboxDetail);
   }
@@ -993,6 +1214,7 @@ DASHBOARD_JS = r"""
     return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
+    if(card.dataset.deskSide==='mail')return false;
     if(card.dataset.deskSide==='free')
       return card.dataset.deskStatus==='terms_accepted'&&
         card.dataset.deskPlayerChoice==='accepted';
@@ -1008,6 +1230,26 @@ DASHBOARD_JS = r"""
        card.dataset.deskAgent==='terms_accepted'&&
        card.dataset.deskPlayerChoice==='accepted');
   }
+  function offerSubject(card){
+    const name=card.dataset.deskPlayerName||'Player';
+    const side=card.dataset.deskSide;
+    const status=card.dataset.deskStatus||'';
+    if(side==='contract')return ['agreed_future','completed'].includes(status)?
+      'New contract signed: '+name:'Contract request: '+name;
+    if(side==='free')return ['agreed_future','completed'].includes(status)?
+      'Free-agent signing confirmed: '+name:
+      card.dataset.deskPlayerChoice==='accepted'?'Finalise signing: '+name:
+      'Free-agent contract: '+name;
+    if(side==='buy')return ['agreed_future','completed'].includes(status)?
+      'Transfer confirmed: '+name:
+      status==='countered'?'Offer response: '+name:
+      card.dataset.deskPlayerChoice==='accepted'?'Finalise deal: '+name:
+      status==='accepted_pending_contract'?'Contract negotiations: '+name:
+      'Transfer bid: '+name;
+    return ['agreed_future','completed'].includes(status)?
+      'Transfer completed: '+name:status==='proposed'?
+      'Bid received for '+name:'Outgoing transfer: '+name;
+  }
   function refreshInboxItem(card){
     const holder=inboxCardItems.get(card)||card.closest('.desk-inbox-item');
     if(!holder)return;
@@ -1017,9 +1259,9 @@ DASHBOARD_JS = r"""
     holder.dataset.status=status;
     holder.querySelector('.desk-inbox-flag').textContent=required?'!':'';
     holder.querySelector('.desk-inbox-subject').textContent=
-      card.dataset.deskPlayerName||'Player transfer';
+      card.dataset.mailSubject||offerSubject(card);
     holder.querySelector('.desk-inbox-sender').textContent=
-      cleanInboxClub(card.dataset.deskBuyer||'Buying club');
+      cleanInboxClub(card.dataset.mailSender||card.dataset.deskBuyer||'Buying club');
     holder.querySelector('.desk-inbox-fee').textContent=
       card.querySelector('.count')?.textContent.trim()||'—';
     const buyingStages={proposed:'Seller reviewing',countered:'Counteroffer',
@@ -1043,7 +1285,8 @@ DASHBOARD_JS = r"""
       agreed_future:'Renewed',completed:'Renewed',
       declined:'Declined',withdrawn:'Withdrawn',expired:'Expired'};
     holder.querySelector('.desk-inbox-state').textContent=
-      (card.dataset.deskSide==='contract'?renewalStages[status]:
+      (card.dataset.deskSide==='mail'?(card.dataset.mailStageLabel||'Correspondence'):
+       card.dataset.deskSide==='contract'?renewalStages[status]:
        card.dataset.deskSide==='free'?freeStages[status]:
        card.dataset.deskSide==='buy'?buyingStages[status]:saleStages[status])||status;
   }
@@ -1071,16 +1314,82 @@ DASHBOARD_JS = r"""
     item.append(summary,body);
     body.appendChild(card);
     inboxCardItems.set(card,item);
+    inboxGrid.hidden=false;
+    inboxLayout.hidden=false;
     summary.addEventListener('click',function(event){
       event.preventDefault();
       selectInboxCard(card);
     });
     refreshInboxItem(card);
   }
+  // Record-backed letters are separate Inbox messages, not synthetic
+  // client-side "success" states. The 15s heartbeat supplies new commits.
+  window.fc27SyncCorrespondence=function(items){
+    if(!Array.isArray(items))return;
+    const stages=['Bid','Offer response','Contract offer',
+                  'Contract accepted','Finalise deal','Transfer confirmed'];
+    let changed=false;
+    for(const mail of items.slice().reverse()){
+      const id=String(mail.message_id||'');
+      if(!(/^[1-9][0-9]*$/.test(id)||/^(?:fa|action)-[1-9][0-9]*$/.test(id))||
+         inboxGrid.querySelector('[data-message-id="'+id+'"]'))continue;
+      const card=document.createElement('div');
+      card.className='card offer desk-correspondence-email';
+      card.dataset.liveOfferId='mail-'+id;
+      card.dataset.messageId=String(id);
+      card.dataset.deskSide='mail';card.dataset.deskStatus='mail';
+      card.dataset.deskPlayer=String(mail.player_id||'');
+      card.dataset.deskPlayerName=String(mail.player||'Player');
+      card.dataset.deskBuyer=String(mail.sender||'Football operations');
+      card.dataset.mailSender=String(mail.sender||'Football operations');
+      card.dataset.mailSubject=String(mail.subject||'Transfer update');
+      card.dataset.mailStage=String(mail.stage);
+      card.dataset.mailStageLabel=String(mail.stage_label||'Update');
+      const heading=document.createElement('div');heading.className='label';
+      heading.textContent=card.dataset.mailSender+' · '+card.dataset.mailStageLabel;
+      const subject=document.createElement('h3');
+      subject.textContent=card.dataset.mailSubject;
+      const fee=document.createElement('div');fee.className='count';
+      fee.textContent=mail.fee||mail.stage_label||'Update';
+      const body=document.createElement('div');body.className='desk-mail-letter';
+      const p=document.createElement('p');p.textContent=mail.body||'';
+      body.appendChild(p);
+      if(mail.detail){
+        const note=document.createElement('p');
+        note.className='desk-mail-secondary';note.textContent=mail.detail;
+        body.appendChild(note);
+      }
+      const trail=document.createElement('nav');trail.className='desk-mail-stages';
+      trail.setAttribute('aria-label','Transfer progression');
+      stages.forEach((label,index)=>{
+        const step=document.createElement('span');
+        step.textContent=label;
+        if(index===Number(mail.stage))step.className='is-current';
+        trail.appendChild(step);
+      });
+      body.appendChild(trail);
+      const date=document.createElement('p');date.className='desk-mail-footer';
+      date.textContent='Correspondence recorded '+String(mail.created_at||'').slice(0,16).replace('T',' ');
+      body.appendChild(date);
+      const link=document.createElement('a');
+      link.href='#transfers';link.dataset.deskTab='transfers';
+      link.className='desk-inbox-open-negotiation';
+      link.textContent='Open transfer negotiations';
+      body.appendChild(link);
+      card.append(heading,subject,fee,body);
+      inboxGrid.insertBefore(card,inboxColumns.nextSibling);
+      offerCards.unshift(card);makeInboxItem(card);
+      changed=true;
+    }
+    if(changed){
+      if(!selectedInboxCard)selectInboxCard(offerCards[0]);
+      refreshInboxList();
+    }
+  };
   offerCards.forEach(makeInboxItem);
   if(offerCards.length)selectInboxCard(offerCards[0]);
   else inboxReader.innerHTML='<div class="desk-inbox-reader-empty">Select a message to read it here.</div>';
-  if(!offerCards.length)inboxGrid.hidden=true;
+  if(!offerCards.length){inboxGrid.hidden=true;inboxLayout.hidden=true;}
   // Fast client-side inbox filters. Refreshing the market fetches genuine
   // updates from Flask, but switching views and narrowing visible cards
   // never needs a page request.
@@ -1139,9 +1448,12 @@ DASHBOARD_JS = r"""
       if(activeFilter==='action')
         statusMatch=actionRequired(card);
       else if(activeFilter==='talks')
-        statusMatch=(status==='countered'||status==='accepted_pending_contract');
+        statusMatch=(status==='countered'||status==='accepted_pending_contract'||
+          (card.dataset.deskSide==='mail'&&Number(card.dataset.mailStage)>=1&&
+           Number(card.dataset.mailStage)<=4));
       else if(activeFilter==='signed')
-        statusMatch=(status==='agreed_future'||status==='completed');
+        statusMatch=(status==='agreed_future'||status==='completed'||
+          (card.dataset.deskSide==='mail'&&card.dataset.mailStage==='5'));
       else if(activeFilter==='closed')
         statusMatch=(status==='withdrawn'||status==='rejected');
       return matches&&statusMatch;
@@ -3156,7 +3468,7 @@ DASHBOARD_JS = r"""
   // Sidebar, mobile bar, overview buttons and legacy #section links use
   // the same one-page view switcher; no cross-page navigation is required.
   function switchView(name,changeUrl){
-    if(!views[name])name='dashboard';
+    if(!views[name]||unavailableViews.has(name))name='dashboard';
     if(name==='shortlist'&&views.shortlist.dataset.stale==='1'){
       location.hash='#shortlist';
       location.reload();

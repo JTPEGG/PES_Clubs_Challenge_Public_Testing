@@ -1052,15 +1052,18 @@ def actionable_unread_count(conn,*,career_id):
 
 
 def market_messages(conn,*,career_id):
-    rows=conn.execute("""SELECT m.message_id,m.headline,m.detail,m.created_at,
-        m.is_read,m.offer_id,p.full_name AS player_name,
-        b.name AS buyer_name,o.status AS offer_status,o.offered_fee,
-        o.demanded_fee,ia.status AS player_status,
-        ia.decision_reason AS player_reason
+    rows=conn.execute("""SELECT m.message_id,m.message_key,m.headline,
+        m.detail,m.created_at,m.is_read,m.offer_id,
+        p.player_id,p.full_name AS player_name,
+        b.name AS buyer_name,s.name AS seller_name,
+        o.buying_club_id,o.selling_club_id,
+        o.status AS offer_status,o.offered_fee,o.demanded_fee,
+        ia.status AS player_status,ia.decision_reason AS player_reason
         FROM world_career_market_inbox m
         LEFT JOIN world_career_offers o ON o.offer_id=m.offer_id
         LEFT JOIN world_players p ON p.player_id=o.player_id
         LEFT JOIN world_clubs b ON b.club_id=o.buying_club_id
+        LEFT JOIN world_clubs s ON s.club_id=o.selling_club_id
         LEFT JOIN world_career_incoming_approaches ia ON ia.offer_id=o.offer_id
         WHERE m.career_id=? ORDER BY m.message_id DESC LIMIT 70""",
         (career_id,)).fetchall()

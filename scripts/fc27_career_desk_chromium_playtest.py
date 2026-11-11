@@ -291,6 +291,12 @@ def run(world,output):
             check(sancho_inbox.count()==1 and
                   sancho_inbox.get_attribute('data-desk-player-choice')=='accepted',
                   "Player decision was not delivered to the manager Inbox")
+            # Multiple real emails may precede the actionable offer.
+            # Select Sancho's message from the left-hand Inbox list first.
+            if not sancho_inbox.is_visible():
+                item=page.locator('.desk-inbox-item').filter(has=sancho_inbox)
+                check(item.count()==1,"Sancho's decision has no indexed Inbox row")
+                item.locator('summary').click()
             sancho_inbox.locator('button[name="action"][value="confirm"]').click()
             page.wait_for_load_state('domcontentloaded')
             with closing(sqlite3.connect(world)) as db:

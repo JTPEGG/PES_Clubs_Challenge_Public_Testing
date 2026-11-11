@@ -142,7 +142,8 @@ class LiveMarketHttpTests(unittest.TestCase):
         self.assertIn("Start 30-minute transfer window",html)
         self.assertIn("switchView(",html)
         self.assertIn("history.pushState",html)
-        self.assertIn("Your transfer window",html)
+        self.assertIn("data-manager-club=",html)
+        self.assertIn("desk-page-heading",html)
         # A simple GET or tab switch must not start the deadline.
         with self.connect_db() as db:
             self.assertEqual(window_snapshot(db,career_id=CAREER)["state"],
@@ -152,7 +153,7 @@ class LiveMarketHttpTests(unittest.TestCase):
         base=f"/world/play/career/{CAREER}/market"
         before=self.client.get(base,base_url="https://localhost")
         self.assertEqual(before.status_code,200)
-        self.assertIn("Open saved shortlist",before.get_data(as_text=True))
+        self.assertIn('data-desk-table="shortlist"',before.get_data(as_text=True))
         shortlist=self.client.get(base+"/shortlist",base_url="https://localhost")
         self.assertEqual(shortlist.status_code,200)
         self.assertIn("My transfer shortlist",shortlist.get_data(as_text=True))
