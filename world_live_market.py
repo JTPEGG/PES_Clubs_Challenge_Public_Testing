@@ -654,17 +654,27 @@ def _review_due_manager_buying_offers(conn,*,career_id,window_id,now):
                 detail=str(exc)[:240],offer_id=oid,when=now)
             conn.commit()
             continue
-        headline={"accepted_pending_contract":"Selling club accepted your fee",
-            "countered":"Selling club made a counteroffer",
-            "rejected":"Selling club rejected your offer"}.get(status,
-                "Selling club responded")
+        demand_row=conn.execute("""SELECT demanded_fee FROM world_career_offers
+            WHERE career_id=? AND offer_id=?""",(career_id,oid)).fetchone()
+        demand=demand_row[0] if demand_row else None
+        headline=(
+            f"{seller} accept your fee for {player}"
+            if status=="accepted_pending_contract" else
+            f"{seller} want £{demand:,} for {player}"
+            if status=="countered" and demand is not None else
+            f"{seller} declined your offer for {player}"
+            if status=="rejected" else
+            f"{seller} have responded to your bid for {player}"
+        )
         _message(conn,career_id=career_id,window_id=window_id,
             key=f"manager-buy-review:{oid}",
             headline=headline,
-            detail=f"{seller} has evaluated your submitted offer for {player}. "+
-                ("Player and agent negotiations are now required." if
-                 status=="accepted_pending_contract" else
-                 "Review the club response in your Transfer Centre."),
+            detail=(
+                "Personal terms can now be negotiated."
+                if status=="accepted_pending_contract" else
+                f"Open Transfers to respond to {seller}'s £{demand:,} asking price."
+                if status=="countered" and demand is not None else
+                "You can review the outcome in Transfers."),
             offer_id=oid,when=now)
         conn.commit()
         if status=="accepted_pending_contract":
