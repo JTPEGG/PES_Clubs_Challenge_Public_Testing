@@ -988,7 +988,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 {% for attr in scout_attributes %}<option value="{{attr}}" {% if scout_attribute==attr %}selected{% endif %}>{{attr|replace('_',' ')|title}}</option>{% endfor %}</select></label>
 <label>Min attribute<br><input type="number" name="scout_min_attribute" min="1" max="99" value="{{scout_min_attribute}}" style="width:80px"></label>
 <label>Contract<br><select name="scout_contract">
-<option value="">All</option><option value="expiring" {% if scout_contract=='expiring' %}selected{% endif %}>Within 12 months</option>
+<option value="">All</option><option value="expiring" {% if scout_contract=='expiring' %}selected{% endif %}>Expiring in next 12 months</option>
 <option value="known" {% if scout_contract=='known' %}selected{% endif %}>Known game expiry</option>
 <option value="unknown" {% if scout_contract=='unknown' %}selected{% endif %}>Unknown</option>
 </select></label>
@@ -1006,6 +1006,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 <div class="desk-scout-table-tools"><button type="button" data-scout-attributes-toggle aria-expanded="false">Show attributes</button></div>
 <div class="scout-table" data-scout-scroll><table data-scout-results>
 <thead><tr><th>Player</th><th>Club</th><th>Pos</th><th>OVR</th><th>Age</th><th>Height</th><th>Value</th>
+<th title="Transfer-listed players only: actual seller counteroffer when received, otherwise a non-binding game estimate.">Asking price</th>
 <th title="Current game wage, or free-agent reference wage. Not an agreed transfer demand.">Wage / wk</th>
 <th>Contract (game)</th><th>Years left</th><th class="desk-scout-extra">Pace</th><th class="desk-scout-extra">Shoot</th><th class="desk-scout-extra">Pass</th>
 <th class="desk-scout-extra">Dribble</th><th class="desk-scout-extra">Defend</th><th class="desk-scout-extra">Physical</th>
@@ -1016,6 +1017,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 <td><b>{{p.overall}}</b></td><td>{{p.age if p.age is not none else '—'}}</td>
 <td>{{p.height_cm ~ ' cm' if p.height_cm is not none else '—'}}</td>
 <td>{{'—' if p.free_agent else money(p.market_value) if p.market_value is not none else '—'}}</td>
+<td title="{{'Non-binding game estimate, not a selling club quote' if p.asking_estimated else 'Seller counteroffer received' if p.asking_price is not none else 'No asking price: player is not transfer-listed'}}">{{('Est. ' if p.asking_estimated else '') + money(p.asking_price) if p.asking_price is not none else '—'}}</td>
 <td title="{{'Reference game wage, not confirmed agent demand' if p.free_agent else 'Current game wage, not future agent demand'}}">{{('Est. ' if p.free_agent else '') + money(p.current_wage) if p.current_wage is not none else '—'}}</td>
 <td>{{'Unattached' if p.free_agent else p.expires or 'Unknown'}}</td><td>{{p.years_left if p.years_left is not none else '—'}}</td>
 <td class="desk-scout-extra">{{p.pace if p.pace is not none else '—'}}</td>
@@ -3502,6 +3504,11 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 value=("—" if p["free_agent"] else
                        format_market_gbp(p["market_value"])
                        if p["market_value"] is not None else "—"),
+                asking_price=(("Est. " if p["asking_estimated"] else "")+
+                       format_market_gbp(p["asking_price"])
+                       if p["asking_price"] is not None else "—"),
+                asking_estimated=bool(p["asking_estimated"]),
+                listed=bool(p["transfer_listed"]),
                 wage=(("Est. " if p["free_agent"] else "")+
                       format_market_gbp(p["current_wage"])
                       if p["current_wage"] is not None else "—"),
