@@ -657,7 +657,7 @@ def format_market_gbp(value):
     if absolute>=1_000_000:
         return f"{sign}£{absolute/1_000_000:,.2f}m"
     if absolute>=1_000:
-        return f"{sign}£{absolute/1_000:,.0f}k"
+        return f"{sign}£{absolute/1_000:,.2f}".rstrip("0").rstrip(".")+"k"
     return f"{sign}£{absolute:,}"
 
 LIVE_MARKET_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -1318,9 +1318,9 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
    {% elif o.status=='accepted_pending_contract' %}
    <b>Fee accepted.</b> Complete personal terms with the player's agent before you can sign.
    {% elif o.status=='countered' %}
-   <b>Seller counteroffer.</b> Review the revised fee in your transfer negotiations.
+   <b>{{o.seller_name|club_display}} want {{money(o.demanded_fee)}} for {{o.player_name}}.</b> Review or negotiate the fee in Transfers.
    {% elif o.status=='rejected' %}
-   <b>Rejected.</b> The selling club declined your offer.
+   <b>{{o.seller_name|club_display}} declined your offer for {{o.player_name}}.</b>
    {% elif o.status in ('agreed_future','completed') %}
    <b>Confirmed.</b> The player is included in your projected squad.
    {% else %}{{o.status_label}}.{% endif %}
@@ -3141,7 +3141,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 ORDER BY o.offer_id DESC""",
                 (snap["window_id"],career_id,c["manager_club_id"],
                  c["manager_club_id"])).fetchall()
-            buy_labels={"proposed":"Awaiting seller","countered":"Seller counteroffer",
+            buy_labels={"proposed":"Awaiting seller","countered":"Club counteroffer",
                 "rejected":"Seller rejected offer",
                 "accepted_pending_contract":"Player/agent talks",
                 "agreed_future":"Confirmed",
@@ -3169,7 +3169,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 (snap["window_id"],career_id)).fetchall()
             for event_id,name,seller,buyer,fee,when in deal_rows:
                 clean=lambda value:re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",value)
-                world_news.append(dict(event_id=event_id,headline="AI transfer agreed",
+                world_news.append(dict(event_id=event_id,headline="Transfer agreed",
                     player=name,seller=clean(seller),buyer=clean(buyer),
                     fee_display=format_market_gbp(fee),is_world=True,
                     detail=(name+" · "+clean(seller)+" → "+clean(buyer)+
@@ -3653,7 +3653,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                             signing_id=signing))))
             contract_updates=[dict(player_id=r[0],status=r[1],
                 current_wage=r[2],peer_wage=r[3],demand=r[4],
-                player=r[5],position=r[6],overall=r[7],age=age_for(r[8]))
+                player=r[5],position=r[6],overall=r[7],age=age_for(r[8]),
+                signed_wage=r[9],contract_years=r[10])
                 for r in db.execute("""SELECT
                 a.player_id,a.status,a.old_weekly_wage,
                 a.peer_weekly_wage,a.demand_weekly_wage,p.full_name,
@@ -3661,7 +3662,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 (SELECT x.overall FROM world_dataset_ratings x
                  JOIN world_career_saves cc ON cc.career_id=a.career_id
                  WHERE x.dataset_id=cc.dataset_id AND x.player_id=a.player_id
-                 LIMIT 1),p.birth_date
+                 LIMIT 1),p.birth_date,a.offered_weekly_wage,
+                 a.contract_years
                 FROM world_career_contract_renewals a
                 JOIN world_players p ON p.player_id=a.player_id
                 WHERE a.career_id=? AND a.window_id=?
@@ -3681,7 +3683,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
             import re
             def clean_club(v):
                 return re.sub(r"\s*\[WH27:[^\]]+\]\s*$","",v)
-            world_updates=[dict(event_id=eid,headline="AI transfer agreed",
+            world_updates=[dict(event_id=eid,headline="Transfer agreed",
                 player=name,seller=clean_club(seller),buyer=clean_club(buyer),
                 fee=format_market_gbp(fee),
                 detail=(name+" · "+clean_club(seller)+" → "+clean_club(buyer)+

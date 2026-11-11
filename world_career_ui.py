@@ -506,6 +506,94 @@ body.desk-contract-open{overflow:hidden}
  .desk-player-report .card{padding:12px}.desk-player-report form{align-items:stretch}
  .desk-player-report label,.desk-player-report form input[type=number]{width:100%;max-width:100%}}
 
+/* Contract negotiations are a native Career Desk view, not a separate modal. */
+body.desk-contract-open{overflow:auto}
+.desk-contract-layer{display:block;position:static;inset:auto;z-index:auto;min-height:0;width:100%}
+.desk-contract-scrim{display:none}
+.desk-contract-panel{width:100%;max-width:980px;height:auto;min-height:380px;
+ background:var(--desk-panel);border:1px solid var(--desk-stroke);
+ border-radius:12px;box-shadow:none;overflow:hidden}
+.desk-contract-body{overflow:visible;padding:18px 22px 28px}
+.desk-contract-notice{position:fixed;z-index:125;bottom:22px;right:22px;max-width:440px;
+ padding:12px 16px;border-radius:9px;border:1px solid #519d9b;
+ background:#153b3c;color:#e9fff7;box-shadow:0 12px 30px #02061080;font-size:13px}
+.desk-contract-notice[data-error="1"]{border-color:#ba6464;background:#522e39}
+
+/* Freeze-pane Scouting: keep budgets and filters visible while results scroll. */
+@media(min-width:761px) and (min-height:620px){
+ .desk-view[data-view="scouting"]{height:calc(100dvh - 102px);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+ .desk-view[data-view="scouting"]>h2{flex:none;margin-top:0}
+ .desk-view[data-view="scouting"]>.desk-scout-finance{flex:none}
+ .desk-view[data-view="scouting"] .card:has(>form.scout-filters){display:flex;flex-direction:column;
+  flex:1;min-height:0;overflow:visible;padding-bottom:4px}
+ .desk-view[data-view="scouting"] .scout-filters,
+ .desk-view[data-view="scouting"] .desk-scout-table-tools{flex:none}
+ .desk-view[data-view="scouting"] .scout-table[data-scout-scroll]{flex:1;min-height:0;
+  max-height:none;overflow:auto}
+ .desk-view[data-view="scouting"] .scout-table[data-scout-scroll] thead th{position:sticky;top:0;z-index:5}
+ .desk-view[data-view="scouting"] [data-scout-progress]{flex:none;min-height:34px}
+}
+.desk-view[data-view="scouting"] .scout-filters{position:relative}
+.desk-scout-position-trigger{min-height:37px;border:1px solid #4b728b;border-radius:6px;
+ background:#10293b;color:#f5fbff;padding:7px 12px;white-space:nowrap;font-size:12px}
+.desk-view[data-view="scouting"] .desk-position-chooser{position:absolute;z-index:70;
+ top:75px;left:13px;width:min(620px,calc(100% - 26px));max-height:50dvh;overflow-y:auto;
+ box-shadow:0 18px 40px #020711c4}
+
+/* Graphite, white and gold from the new PES Challenge manager desk. */
+:root{
+ --desk-bg:#0e1015;--desk-panel:#1b1e25;--desk-panel2:#252a33;
+ --desk-stroke:#353941;--desk-accent:#e3bd49;--desk-green:#e3bd49;
+ --desk-faint:#b1b5bc
+}
+body.desk-ui{background:var(--desk-bg);color:#f6f6f7}
+.desk-topbar{background:#171a20;border-bottom-color:#363941;box-shadow:0 5px 18px #00000045}
+.desk-sidebar{background:#16191f;border-right-color:#363941}
+.desk-brand small,.desk-nav-label,.desk-section-kicker{color:#b0b4bc}
+.desk-logo{background:linear-gradient(140deg,#f4d76a,#b68b2a);color:#141518}
+.desk-tab{color:#c4c8cf}
+.desk-tab:hover{background:#2a2c34}
+.desk-tab[aria-current="page"]{background:#383326;color:#fff2be;border-color:#5c4b27;
+ box-shadow:inset 3px 0 var(--desk-accent)}
+.desk-view .card{background:var(--desk-panel);border-color:var(--desk-stroke)}
+.desk-view .offer{background:#20242b}
+.desk-view .offer:focus-within{background:#2a2b2c;border-color:var(--desk-accent)}
+.desk-view .scout-table th{background:#2b2e34}
+.desk-view .scout-table,.desk-view .scout-filters,
+.desk-scout-searchbar,.desk-scout-dialog,.desk-position-chooser{background:#1c2027!important;
+ border-color:#45474e!important}
+.desk-scout-finance span,.desk-view .pill,.desk-money-control{background:#292b31;border-color:#4a4c53}
+.desk-view .scout-table tbody tr:hover{background:#2c2e36}
+.desk-view .scout-table a,.desk-view .muted a{color:#f1d072}
+.desk-view .desk-scout-searchbar select,.desk-view .desk-scout-searchbar input,
+.desk-money-control select,.desk-position-grid label{background:#25282e!important;
+ color:#f7f7f7!important;border-color:#53555e!important}
+.desk-scout-quick-check,.desk-position-grid label{background:#25282e!important;border-color:#454951!important}
+.desk-scout-quick-check input,.desk-position-grid input{accent-color:#efc94c}
+.desk-position-grid label:has(input:checked){background:#4c4228!important;border-color:#efd56c!important}
+.desk-scout-add,.desk-counter-stepper button,.desk-money-step{background:#6d5929!important;
+ border-color:#af903d!important;color:#fff}
+.desk-contract-panel{background:#202329;border-color:#474850}
+.desk-contract-header{background:#282a30;border-color:#494b50}
+.desk-contract-body .card,.desk-contract-body .metric{background:#2a2e35;border-color:#474c53}
+.desk-contract-body button{background:#6c592f;border-color:#bb9a48}
+.desk-live-status,.desk-view .count,.desk-counter-preview,.desk-news-fee{color:#f0cc67}
+.desk-live-status:before{background:#efd067;box-shadow:0 0 0 4px #efd06720}
+.desk-news-card,.desk-offer-briefing,.desk-offer-briefing-metrics>div{background:#23262d!important;border-color:#40444b!important}
+.desk-news-icon{background:#33302a;border-color:#655735}
+.desk-news-route .desk-news-arrow{color:#e9c458}
+.desk-money-control{display:inline-flex;gap:5px;align-items:center;border:1px solid #4c4f58;
+ border-radius:7px;padding:4px;min-height:38px;max-width:100%;vertical-align:middle}
+.desk-money-control .desk-money-step{font-weight:800;min-width:27px;min-height:27px;
+ border-radius:5px;padding:2px 7px}
+.desk-money-preview{min-width:66px;font-weight:750;font-variant-numeric:tabular-nums;
+ text-align:center;font-size:13px;color:#fff3cb}
+.desk-money-increment{font-size:11px!important;min-width:60px;min-height:27px!important;
+ padding:2px 6px!important;border-radius:5px!important}
+.desk-money-native{position:absolute!important;width:1px!important;height:1px!important;
+ border:0!important;opacity:0!important;padding:0!important;pointer-events:none!important}
+@media(max-width:760px){.desk-money-control{flex-wrap:wrap}.desk-money-increment{max-width:76px}}
+
 """
 
 DASHBOARD_JS = r"""
@@ -514,11 +602,11 @@ DASHBOARD_JS = r"""
   const source=document.getElementById('desk-screen-source');
   const host=document.getElementById('desk-view-host');
   if(!source||!host||source.dataset.initialized==='1')return;
-  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup','player'];
+  const names=['dashboard','inbox','transfers','squad','scouting','shortlist','finances','news','season-setup','player','contract'];
   const titles={
     dashboard:'Manager overview',inbox:"Manager's Inbox",transfers:'Transfer Centre',
     squad:'Squad planner',scouting:'Scouting',shortlist:'My shortlist',finances:'Club finances',
-    news:'Market news','season-setup':'Season setup',player:'Player profile'
+    news:'Market news','season-setup':'Season setup',player:'Player profile',contract:'Contract negotiations'
   };
   const views={};
   names.forEach(function(name){
@@ -534,17 +622,17 @@ DASHBOARD_JS = r"""
   // Keep the manager's navigation visible during contract talks. Fetch only
   // the existing source-backed contract form; no full dashboard navigation
   // or duplicate transfer-authorisation endpoint is introduced.
-  const contractLayer=document.createElement('div');
-  contractLayer.className='desk-contract-layer';contractLayer.hidden=true;
+  const contractLayer=views.contract;
+  contractLayer.className='desk-view desk-contract-layer';contractLayer.hidden=true;
   contractLayer.innerHTML='<div class="desk-contract-scrim" data-contract-close></div>'+
     '<aside class="desk-contract-panel" role="dialog" aria-modal="true" aria-label="Contract negotiations">'+
     '<div class="desk-contract-header"><div><strong>Contract negotiations</strong>'+
     '<small>Career Desk · 30-minute window remains open</small></div>'+
     '<button class="desk-contract-close" type="button" data-contract-close aria-label="Close negotiations">×</button></div>'+
     '<div class="desk-contract-body" data-contract-body></div></aside>';
-  document.body.appendChild(contractLayer);
   const contractBody=contractLayer.querySelector('[data-contract-body]');
   let contractRequest=null,contractUrlOpen=null,contractFocus=null;
+  let contractReturnView='inbox';
   function validContractUrl(href){
     const url=new URL(href,location.href);
     if(url.origin!==location.origin||
@@ -558,7 +646,22 @@ DASHBOARD_JS = r"""
     contractLayer.hidden=true;
     document.body.classList.remove('desk-contract-open');
     contractUrlOpen=null;
+    switchView(contractReturnView,true);
     if(contractFocus?.isConnected)contractFocus.focus();
+  }
+  function contractNotice(message,isError=false){
+    let toast=document.getElementById('desk-contract-notice');
+    if(!toast){
+      toast=document.createElement('div');
+      toast.id='desk-contract-notice';
+      toast.className='desk-contract-notice';
+      toast.setAttribute('role','status');
+      document.body.appendChild(toast);
+    }
+    toast.textContent=message;
+    toast.dataset.error=isError?'1':'0';
+    clearTimeout(contractNotice.dismiss);
+    contractNotice.dismiss=setTimeout(()=>toast.remove(),7500);
   }
   async function loadContractDrawer(url){
     contractRequest?.abort();
@@ -595,10 +698,10 @@ DASHBOARD_JS = r"""
     const url=validContractUrl(link.href);
     if(!url)return;
     event.preventDefault();
+    contractReturnView=names.find(name=>name!=='contract'&&!views[name].hidden)||'inbox';
     contractFocus=link;
     contractUrlOpen=url;
-    contractLayer.hidden=false;
-    document.body.classList.add('desk-contract-open');
+    switchView('contract',true);
     contractLayer.querySelector('.desk-contract-close').focus();
     loadContractDrawer(url);
   },true);
@@ -621,12 +724,11 @@ DASHBOARD_JS = r"""
     if(form.dataset.saving==='1')return;
     const data=new FormData(form);
     data.set('action',pressed.value);
-    const buttons=Array.from(form.querySelectorAll('button'));
-    const feedback=document.createElement('p');
-    feedback.className='desk-contract-feedback';feedback.setAttribute('role','status');
-    feedback.textContent='Sending your decision to the player’s agent…';
-    form.appendChild(feedback);
-    form.dataset.saving='1';buttons.forEach(b=>b.disabled=true);
+    // The server remains authoritative. Close only an open contract view;
+    // a quick Reject renewal inside Inbox must NOT navigate back to Squad.
+    form.dataset.saving='1';
+    if(!contractLayer.hidden&&contractLayer.contains(form))closeContractDrawer();
+    contractNotice('Decision submitted. You can continue using your Inbox.');
     try{
       const response=await fetch(url.pathname,{
         method:'POST',credentials:'same-origin',body:data,
@@ -634,24 +736,14 @@ DASHBOARD_JS = r"""
       const result=await response.json().catch(()=>null);
       if(!response.ok||!result?.ok)
         throw new Error(result?.error||'Contract decision was not saved');
-      feedback.textContent=result.message||'Contract decision saved.';
-      if(['agreed_future','completed','declined','withdrawn'].includes(result.status)){
-        closeContractDrawer();
-        // The Inbox now contains the actual signed/rejected decision, sourced
-        // from the committed server transaction rather than a fake toast.
-        location.hash='#inbox';
-        location.reload();
-      }else if(!contractLayer.hidden&&contractUrlOpen){
-        await loadContractDrawer(contractUrlOpen);
-      }else{
-        location.hash='#inbox';location.reload();
-      }
+      contractNotice(result.message||'Contract decision saved.');
+      // Ask the existing heartbeat to reconcile the real saved Inbox state,
+      // without discarding the user's current tab, search or scroll position.
+      window.fc27PollMarket?.();
     }catch(error){
-      feedback.textContent=String(error.message||error);
-      feedback.dataset.error='1';
+      contractNotice(String(error.message||error),true);
     }finally{
       form.dataset.saving='0';
-      buttons.forEach(button=>{if(button.isConnected)button.disabled=false;});
     }
   },true);
 
@@ -812,8 +904,9 @@ DASHBOARD_JS = r"""
   function gbp(value){
     const negative=value<0?'-':'';
     value=Math.abs(value);
-    return negative+'£'+(value>=1000000?(value/1000000).toFixed(2)+'m':
-      value>=1000?Math.round(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
+    const trimmed=v=>String(Number(v.toFixed(2)));
+    return negative+'£'+(value>=1000000?trimmed(value/1000000)+'m':
+      value>=1000?trimmed(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
   }
   if(!views.inbox.children.length)
     views.inbox.appendChild(emptyPanel('No inbox activity','Offers will appear once clubs begin approaching your players.'));
@@ -956,36 +1049,8 @@ DASHBOARD_JS = r"""
   }
 
   function enhanceCounter(card){
-    if(!card)return;
-    card.querySelectorAll('input[name="counter_fee"]').forEach(input=>{
-      if(input.dataset.stepper==='1')return;
-      input.dataset.stepper='1';
-      const original=Number(input.min)||0;
-      const step=original>=10000000?250000:original>=1000000?50000:
-        original>=200000?10000:original>=20000?2500:500;
-      const wrapper=document.createElement('span');
-      wrapper.className='desk-counter-stepper';
-      input.before(wrapper);wrapper.appendChild(input);
-      const preview=document.createElement('strong');
-      preview.className='desk-counter-preview';
-      function repaint(){preview.textContent=gbp(Number(input.value)||0);}
-      function adjust(delta){
-        const low=Number(input.min)||0,high=Number(input.max)||1000000000;
-        const next=Math.max(low,Math.min(high,(Number(input.value)||low)+delta));
-        input.value=String(next);repaint();
-      }
-      const minus=document.createElement('button');
-      minus.type='button';minus.textContent='−';minus.title='Reduce counter by '+gbp(step);
-      minus.setAttribute('aria-label','Reduce counteroffer by '+gbp(step));
-      minus.addEventListener('click',()=>adjust(-step));
-      const plus=document.createElement('button');
-      plus.type='button';plus.textContent='+';plus.title='Increase counter by '+gbp(step);
-      plus.setAttribute('aria-label','Increase counteroffer by '+gbp(step));
-      plus.addEventListener('click',()=>adjust(step));
-      wrapper.append(minus,plus,preview);
-      input.addEventListener('input',repaint);
-      repaint();
-    });
+    // All money controls use the same compact £ amount and step selector.
+    enhanceMoneyInputs(card);
   }
 
   function makeInboxItem(card){
@@ -1264,10 +1329,12 @@ DASHBOARD_JS = r"""
 
     const quick=document.createElement('div');
     quick.className='desk-scout-quick';
-    for(const name of ['scout_max_value','scout_max_wage','scout_interest']){
+    for(const name of ['scout_max_value','scout_max_wage','scout_interest',
+                        'scout_listed','scout_free_only']){
       const setting=available.find(entry=>entry.name===name);
       if(!setting)continue;
-      setting.field.classList.add(name==='scout_interest'?
+      setting.field.classList.add(
+        ['scout_interest','scout_listed','scout_free_only'].includes(name)?
         'desk-scout-quick-check':'desk-scout-quick-number');
       if(name==='scout_max_value'){
         setting.field.firstChild.textContent='Max market value (£)';
@@ -1294,21 +1361,29 @@ DASHBOARD_JS = r"""
       compactForm.requestSubmit();
     });
     quick.appendChild(showTeam);
+    const expiring=document.createElement('label');
+    expiring.className='desk-scout-quick-check';
+    const expiringBox=document.createElement('input');
+    expiringBox.type='checkbox';
+    const contractField=available.find(entry=>entry.name==='scout_contract');
+    expiringBox.checked=contractField?.input.value==='expiring';
+    const expiringLabel=document.createElement('span');
+    expiringLabel.textContent='Contract expiring';
+    expiring.append(expiringBox,expiringLabel);
+    expiringBox.addEventListener('change',()=>{
+      if(contractField)contractField.input.value=expiringBox.checked?'expiring':'';
+      compactForm.requestSubmit();
+    });
+    quick.appendChild(expiring);
     quick.appendChild(resetButton);
     searchBar.appendChild(quick);
 
     const oldPosition=available.find(entry=>entry.name==='scout_position');
     if(oldPosition){
-      // Keep a quick broad-position selector on the main scouting toolbar.
-      // Detailed multi-position checkboxes remain inside Add condition.
-      oldPosition.field.classList.add('desk-scout-main-position');
-      searchBar.insertBefore(oldPosition.field,openButton);
+      // The broad four-option selector is superseded by the exact
+      // position pop-out; keep the field hidden for compatible form posts.
+      oldPosition.field.hidden=true;
       available.splice(available.indexOf(oldPosition),1);
-      oldPosition.input.addEventListener('change',()=>{
-        const detailed=compactForm.querySelector('[data-scout-positions]');
-        if(detailed)detailed.value='';
-        compactForm.requestSubmit();
-      });
     }
     const positions=[
       ['GK','Goalkeeper'],['CB','Centre-back'],['LB','Left-back'],
@@ -1327,6 +1402,14 @@ DASHBOARD_JS = r"""
     const positionsGrid=document.createElement('div');
     positionsGrid.className='desk-position-grid';
     const selectedCodes=new Set((positionsInput?.value||'').split(',').filter(Boolean));
+    if(!selectedCodes.size&&oldPosition?.input.value){
+      const groups={GK:['GK'],DEF:['CB','LB','RB','LWB','RWB'],
+        MID:['DMF','CMF','AMF','LMF','RMF'],
+        FWD:['LWF','RWF','SS','CF']};
+      (groups[oldPosition.input.value]||[]).forEach(code=>selectedCodes.add(code));
+      if(positionsInput)positionsInput.value=[...selectedCodes].join(',');
+    }
+    if(oldPosition)oldPosition.input.value='';
     const boxes=[];
     positions.forEach(([code,name])=>{
       const label=document.createElement('label');
@@ -1345,7 +1428,31 @@ DASHBOARD_JS = r"""
         renderChips();compactForm.requestSubmit();
       });
     });
-    positionsPanel.append(positionsTitle,positionsGrid);grid.prepend(positionsPanel);
+    positionsPanel.append(positionsTitle,positionsGrid);
+    positionsPanel.hidden=true;
+    compactForm.appendChild(positionsPanel);
+    const positionButton=document.createElement('button');
+    positionButton.type='button';
+    positionButton.className='desk-scout-position-trigger';
+    function positionCaption(){
+      const n=boxes.filter(box=>box.checked).length;
+      positionButton.textContent=n?'Positions · '+n+' selected':'All positions';
+      positionButton.setAttribute('aria-expanded',String(!positionsPanel.hidden));
+    }
+    positionCaption();
+    searchBar.insertBefore(positionButton,openButton);
+    positionButton.addEventListener('click',()=>{
+      positionsPanel.hidden=!positionsPanel.hidden;
+      positionCaption();
+    });
+    document.addEventListener('click',event=>{
+      if(!positionsPanel.contains(event.target)&&
+         event.target!==positionButton){
+        positionsPanel.hidden=true;
+        positionCaption();
+      }
+    });
+    positionsGrid.addEventListener('change',positionCaption);
     if(positionsInput)available.push({input:positionsInput,
       field:positionsPanel,name:'scout_positions'});
 
@@ -1405,7 +1512,8 @@ DASHBOARD_JS = r"""
     function renderChips(){
       chips.replaceChildren();
       for(const {input,name} of available){
-        if(['scout_max_value','scout_max_wage','scout_interest'].includes(name))continue;
+        if(['scout_max_value','scout_max_wage','scout_interest',
+            'scout_listed','scout_free_only','scout_contract'].includes(name))continue;
         if(!hasCondition(input))continue;
         const chip=document.createElement('span');chip.className='desk-scout-chip';
         const label=document.createElement('span');
@@ -1423,7 +1531,11 @@ DASHBOARD_JS = r"""
       openButton.textContent='+ Add condition'+(chips.children.length?
         ' ('+chips.children.length+')':'');
     }
-    compactForm.addEventListener('change',renderChips);
+    compactForm.addEventListener('change',event=>{
+      if(event.target===contractField?.input)
+        expiringBox.checked=contractField.input.value==='expiring';
+      renderChips();
+    });
     compactForm.addEventListener('input',renderChips);
     resetButton.addEventListener('click',()=>{
       available.forEach(({input})=>{
@@ -1431,7 +1543,9 @@ DASHBOARD_JS = r"""
       });
       boxes.forEach(b=>b.checked=false);
       showTeamCheckbox.checked=true;
+      expiringBox.checked=false;
       if(hideOwn)hideOwn.value='0';
+      positionCaption();
       compactForm.requestSubmit();renderChips();
     });
     const explanation=views.scouting.querySelector('.desk-scout-finance + p.muted');
@@ -1552,6 +1666,7 @@ DASHBOARD_JS = r"""
       limitControl.addEventListener('click',function(){
         valueControl.value=String(Math.max(0,Math.floor(
           Number(document.body.dataset.feeRemaining)||0)));
+        valueControl.dispatchEvent(new Event('input',{bubbles:true}));
         scoutForm.requestSubmit();
       });
     }
@@ -1584,7 +1699,8 @@ DASHBOARD_JS = r"""
       },{rootMargin:'500px'});
       observer.observe(scoutProgress);
     }else{
-      window.addEventListener('scroll',function(){
+      (views.scouting.querySelector('[data-scout-scroll]')||window)
+        .addEventListener('scroll',function(){
         const box=scoutProgress.getBoundingClientRect();
         if(!views.scouting.hidden&&box.top<window.innerHeight+500)
           loadScout(false);
@@ -1648,8 +1764,10 @@ DASHBOARD_JS = r"""
       el=>Number(el.dataset.liveOfferId)));
   const pound=n=>{
     n=Number(n)||0;const abs=Math.abs(n);
-    return (n<0?'-':'')+'£'+(abs>=1e6?(abs/1e6).toFixed(2)+'m':
-      abs>=1e3?Math.round(abs/1e3)+'k':Math.round(abs).toLocaleString('en-GB'));
+    const trimmed=v=>String(Number(v.toFixed(2)));
+    return (n<0?'-':'')+'£'+(abs>=1e6?trimmed(abs/1e6)+'m':
+      abs>=1e3?trimmed(abs/1e3)+'k':
+      Math.round(abs).toLocaleString('en-GB'));
   };
   function updateSaleBudgetUI(result){
     if(result.available_transfer_budget===undefined)return;
@@ -1682,6 +1800,83 @@ DASHBOARD_JS = r"""
       pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
       pound(result.sale_board_withheld||0)+' retained by the board.';
   }
+  // Compact money values are display-only. Original integer GBP inputs
+  // remain in the form so all existing server validation and CSRF work.
+  // Buttons and increment chooser replace error-prone manual £ entries.
+  function enhanceMoneyInputs(root){
+    if(!(root instanceof Element||root instanceof Document))return;
+    const fields=root.querySelectorAll('input[type="number"][name]');
+    fields.forEach(input=>{
+      if(input.dataset.moneyStepper==='1'||input.dataset.stepper==='1')return;
+      if(!/^(offered_fee|negotiated_fee|counter_fee|weekly_wage|wage_weekly|current_wage_weekly|scout_max_value|scout_max_wage|investment_pool)$/.test(input.name))return;
+      // The old dedicated counter stepper is also replaced by this compact
+      // component when not already initialised.
+      input.dataset.moneyStepper='1';
+      const wage=/wage/.test(input.name);
+      const initial=Number(input.value)||0;
+      const suggested=wage?(initial>=50000?1000:500):
+        initial>=10000000?250000:initial>=1000000?50000:initial>=200000?10000:5000;
+      const steps=wage?[250,500,1000,2500,5000,10000,25000]:
+        [1000,5000,10000,25000,50000,100000,250000,500000,1000000];
+      const control=document.createElement('span');
+      control.className='desk-money-control';
+      const less=document.createElement('button');
+      less.type='button';less.className='desk-money-step';less.textContent='−';
+      const preview=document.createElement('output');
+      preview.className='desk-money-preview';preview.setAttribute('aria-live','off');
+      const more=document.createElement('button');
+      more.type='button';more.className='desk-money-step';more.textContent='+';
+      const increment=document.createElement('select');
+      increment.className='desk-money-increment';
+      increment.setAttribute('aria-label','Change amount in increments of');
+      for(const value of steps){
+        const option=document.createElement('option');
+        option.value=String(value);option.textContent=pound(value);
+        increment.appendChild(option);
+      }
+      increment.value=String(suggested);
+      if(!increment.value)increment.value=String(steps[0]);
+      function repaint(){
+        preview.textContent=input.value===''?'Any amount':pound(Number(input.value));
+        const title=input.value===''?'No amount selected':pound(Number(input.value));
+        preview.title=title;
+      }
+      function move(direction){
+        const step=Number(increment.value);
+        const low=input.min===''?-Infinity:Number(input.min);
+        const high=input.max===''?Infinity:Number(input.max);
+        const base=input.value===''?Math.max(0,Number.isFinite(low)?low:0):Number(input.value);
+        const revised=Math.max(low,Math.min(high,Math.round(base+direction*step)));
+        if(!Number.isFinite(revised))return;
+        input.value=String(revised);
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        repaint();
+      }
+      less.addEventListener('click',()=>move(-1));
+      more.addEventListener('click',()=>move(1));
+      increment.addEventListener('change',event=>event.stopPropagation());
+      less.setAttribute('aria-label','Decrease '+input.name.replaceAll('_',' ')+' amount');
+      more.setAttribute('aria-label','Increase '+input.name.replaceAll('_',' ')+' amount');
+      input.step='1';input.readOnly=true;
+      input.classList.add('desk-money-native');
+      input.before(control);
+      control.append(less,preview,more,increment,input);
+      input.addEventListener('input',repaint);
+      repaint();
+    });
+  }
+  const moneyObserver=new MutationObserver(entries=>{
+    for(const entry of entries){
+      for(const node of entry.addedNodes){
+        if(node.nodeType!==1)continue;
+        if(node.matches?.('input[type="number"][name]')||
+            node.querySelector?.('input[type="number"][name]'))
+          enhanceMoneyInputs(node.parentElement||node);
+      }
+    }
+  });
+  moneyObserver.observe(host,{subtree:true,childList:true});
+  enhanceMoneyInputs(host);
   window.fc27UpdateBudget=updateSaleBudgetUI;
   const labels={
     proposed:'New offer',countered:'Awaiting buyer',
@@ -2097,7 +2292,10 @@ DASHBOARD_JS = r"""
         'Contract signed':'Contract renewal · Player representative';
       card.querySelector('.count').textContent=pound(item.demand)+'/wk requested';
       card.querySelector('.desk-offer-briefing-note').textContent=signed?
-        'Signed contract confirmed. New terms become effective at the transfer deadline.':
+        'New contract signed: '+item.player+' has agreed a '+
+        String(item.contract_years||'new')+'-year renewal on '+
+        pound(item.signed_wage||item.demand)+'/week. The new contract takes '+
+        'effect at the transfer deadline.':
         'Current '+pound(item.current_wage)+'/week · comparable game wage '+
         pound(item.peer_wage||0)+'/week. Agent status: '+
         String(item.status).replaceAll('_',' ')+'.';
@@ -2277,7 +2475,7 @@ DASHBOARD_JS = r"""
         o.status==='rejected'?'Seller rejected your fee. You can make an improved bid.':
         o.status==='accepted_pending_contract'?'Seller accepted your fee. Negotiate the player contract in Transfers.':
         o.status==='agreed_future'||o.status==='completed'?'Transfer confirmed and reflected in the projected squad.':
-        o.status==='proposed'?'The selling club is reviewing your bid.':'Transfer talks are closed.';
+        o.status==='proposed'?o.seller+' are reviewing your bid for '+o.player+'.':'Transfer talks are closed.';
       card.querySelectorAll(':scope > .actions,:scope > .desk-inbox-open-negotiation').forEach(x=>x.remove());
       if(o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'&&
          o.player_choice==='accepted'){

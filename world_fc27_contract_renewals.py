@@ -256,6 +256,8 @@ def renewal_action(conn,*,career_id,player_id,action,weekly_wage=None,
     status=renewal_info(conn,career_id=career_id,player_id=player_id)
     if status and status["status"] in ("agreed_future","completed","expired"):
         raise ValueError("This renewal has already been finalised or expired")
+    if status and status["status"]=="declined" and action=="offer":
+        raise ValueError("Contract talks have ended for this window")
     if action not in ("offer","confirm","decline","withdraw"):
         raise ValueError("Unsupported contract decision")
     if action=="offer":
@@ -286,10 +288,23 @@ def renewal_action(conn,*,career_id,player_id,action,weekly_wage=None,
             # Manager's submitted offer IS the authorisation. Once the agent
             # agrees, the new contract is binding without a second click.
             outcome="agreed_future" if weekly_wage>=acceptable else "countered"
-            if weekly_wage<demand*.65 and status and status["rounds"]>=2:
+            previous_offer=(status["offered_weekly_wage"] if status else None)
+            no_progress=(previous_offer is not None and
+                         weekly_wage<=previous_offer)
+            rounds=(status["rounds"] if status else 0)
+            # A real counter should change, but agents also have limits:
+            # repeated unchanged bids and the sixth unsuccessful round
+            # conclude talks rather than generating endless £12k demands.
+            if outcome=="countered" and (
+                (no_progress and rounds>=2) or rounds>=5 or
+                (weekly_wage<demand*.65 and rounds>=2)):
                 outcome="declined"
-            new_demand=demand if outcome=="agreed_future" else int(
-                round(max(weekly_wage+500,demand*(.992 if contract_years>=3 else 1.0))/500)*500)
+            concession=(.019 + min(rounds,3)*.006 +
+                        (.012 if contract_years>=3 else 0))
+            new_demand=(demand if outcome!="countered" else int(
+                round(max(weekly_wage+250,demand*(1-concession))/250)*250))
+            if outcome=="countered" and new_demand>=demand:
+                new_demand=max(weekly_wage+250,demand-250)
             if outcome=="agreed_future":
                 wage=wage_budget_breakdown(conn,career_id,target["club"])
                 increment=max(0,weekly_wage-(status["old_weekly_wage"] if status else target["wage"]))
