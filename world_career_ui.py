@@ -925,6 +925,78 @@ body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:focus-vi
 body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:focus-visible{
  outline:2px solid #d0ad3a;outline-offset:2px}
 
+/* Layout correction — viewport-anchored sidebar as in Anderlecht.
+   Restore the dark, neutral workspace canvas used before the latest
+   pale grey background pass. Existing white content cards remain intact. */
+body.desk-ui{
+  --desk-workspace-bg:#0e1015;
+  background:var(--desk-workspace-bg)!important;
+}
+body.desk-ui .desk-shell{
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  padding:0!important;
+  grid-template-columns:230px minmax(0,1fr);
+  background:var(--desk-workspace-bg)!important;
+}
+body.desk-ui .desk-workspace{
+  background:var(--desk-workspace-bg)!important;
+  min-width:0;
+  width:100%;
+  margin:0!important;
+}
+body.desk-ui .desk-view[data-view="scouting"]{
+  background:transparent!important;
+}
+body.desk-ui .desk-page-heading{
+  border-bottom-color:#353a3b;
+}
+body.desk-ui .desk-page-title h1{
+  color:#f6f7f5!important;
+}
+body.desk-ui .desk-page-title small{
+  color:#a8ada8!important;
+}
+body.desk-ui .desk-view>h1,
+body.desk-ui .desk-view>h2,
+body.desk-ui .desk-view>h3{
+  color:#f4f5f2!important;
+}
+body.desk-ui .desk-workspace>.desk-view{
+  color:#e7ece6;
+}
+body.desk-ui .desk-sidebar{
+  margin-left:0!important;
+  left:0;
+}
+@media(min-width:651px){
+  body.desk-ui .desk-sidebar{
+    position:sticky;
+    top:68px;
+    align-self:start;
+    height:calc(100dvh - 68px);
+    overflow-y:auto;
+    scrollbar-width:thin;
+  }
+}
+@media (min-width:651px) and (max-width:940px){
+  body.desk-ui .desk-shell{
+    grid-template-columns:70px minmax(0,1fr);
+  }
+}
+@media(max-width:650px){
+  body.desk-ui .desk-shell{
+    display:block;
+  }
+  body.desk-ui .desk-sidebar{
+    display:none;
+  }
+  body.desk-ui .desk-workspace{
+    width:100%;
+  }
+}
+
 """
 
 DASHBOARD_JS = r"""
