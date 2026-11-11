@@ -770,13 +770,7 @@ small{color:#b4cadb}form.inline{display:inline-flex}
  · <a href="#season-setup" data-desk-tab="season-setup">Proceed to season setup</a>.
  Only signed deals have registered in this career ledger.</div>
  {% endif %}
- {% if purchases|selectattr('status','equalto','rejected')|list|length %}
- <div class="desk-global-message alert" role="alert">
- <strong>Transfer bid rejected.</strong>
- One or more selling clubs have declined your offers.
- <a href="#inbox" data-desk-tab="inbox">Review rejected bids in the Inbox</a>.
- </div>
- {% endif %}
+
  <div id="desk-view-host"></div>
  <div id="desk-screen-source">
 {% if not spectator %}
@@ -899,13 +893,8 @@ small{color:#b4cadb}form.inline{display:inline-flex}
 {% endif %}
 <h2 id="overview-anchor" hidden>Overview</h2>
 {% if snap.state=='not_started' %}
-<div class="card"><h2>Your 30-minute transfer window is ready</h2>
-<p><a href="/world/play/career/{{career_id}}/market/shortlist">Open saved shortlist</a> — scouting targets can be reviewed before starting the clock.</p>
-<p>As soon as the manager starts, the 30-minute real-world clock runs continuously.
-AI clubs will assess squad needs automatically and eligible offers will arrive in the inbox.
-Your completed transfers register together at the deadline; unfinished negotiations expire.</p>
-<p><b>Important:</b> the clock cannot be paused or restarted if you close your browser.
-No mid-season transfers. This does not edit the Xbox PES game file.</p>
+<div class="card desk-start-card"><h2>Summer transfer window</h2>
+<p>30 minutes to complete your business. Confirmed transfers register at the deadline; the clock cannot be paused.</p>
 {% if not spectator %}
 <form method="post" action="/world/play/career/{{career_id}}/market/start">
 <input type="hidden" name="csrf" value="{{csrf}}">
@@ -1453,8 +1442,7 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
   {% endif %}
 </div>
 {% endfor %}</div>
-{% else %}<div class="card" id="desk-inbox-no-offers"><p>No offers have arrived yet. The world is evaluating its squads;
-a quiet market is possible. No transfers will be invented to fill the inbox.</p></div>{% endif %}
+{% else %}{% endif %}
 {% if snap.state=='closed' %}
 <h2 id="window-summary">Final transfer window report</h2>
 <div class="card desk-post-window-next">
@@ -1712,6 +1700,8 @@ Rejected and expired offers are not transfers.</p>
          if(typeof window.fc27SyncContractRequests==='function')
            window.fc27SyncContractRequests(state.contract_updates,
              {{career_id|tojson}},state.csrf);
+         if(typeof window.fc27SyncCorrespondence==='function')
+           window.fc27SyncCorrespondence(state.mail_updates);
          if(typeof window.fc27UpdateBudget==='function')
            window.fc27UpdateBudget(state);
          const marketFeed=document.querySelector('#desk-view-news .feed');
