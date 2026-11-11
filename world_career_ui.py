@@ -2120,6 +2120,9 @@ DASHBOARD_JS = r"""
     let searchTimer;
     scoutForm.querySelectorAll('input[type=text],input:not([type]),input[type=number]')
       .forEach(function(input){
+        // The enhanced currency fields have their own debounced/exact
+        // handler and must not issue a duplicate search 550ms later.
+        if(['scout_max_value','scout_max_wage'].includes(input.name))return;
         input.addEventListener('input',function(){
           clearTimeout(searchTimer);
           searchTimer=setTimeout(function(){
@@ -2327,6 +2330,7 @@ DASHBOARD_JS = r"""
     });
     let timer;
     manual.addEventListener('input',()=>{
+      clearTimeout(timer);
       const raw=manual.value.trim();
       // Commas, spaces and the £ symbol are purely a display affordance.
       // Reject malformed values instead of submitting a wrong integer.
