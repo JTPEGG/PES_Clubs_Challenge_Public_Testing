@@ -3653,7 +3653,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                             signing_id=signing))))
             contract_updates=[dict(player_id=r[0],status=r[1],
                 current_wage=r[2],peer_wage=r[3],demand=r[4],
-                player=r[5],position=r[6],overall=r[7],age=age_for(r[8]))
+                player=r[5],position=r[6],overall=r[7],age=age_for(r[8]),
+                signed_wage=r[9],contract_years=r[10])
                 for r in db.execute("""SELECT
                 a.player_id,a.status,a.old_weekly_wage,
                 a.peer_weekly_wage,a.demand_weekly_wage,p.full_name,
@@ -3661,7 +3662,8 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 (SELECT x.overall FROM world_dataset_ratings x
                  JOIN world_career_saves cc ON cc.career_id=a.career_id
                  WHERE x.dataset_id=cc.dataset_id AND x.player_id=a.player_id
-                 LIMIT 1),p.birth_date
+                 LIMIT 1),p.birth_date,a.offered_weekly_wage,
+                 a.contract_years
                 FROM world_career_contract_renewals a
                 JOIN world_players p ON p.player_id=a.player_id
                 WHERE a.career_id=? AND a.window_id=?
