@@ -1048,36 +1048,8 @@ DASHBOARD_JS = r"""
   }
 
   function enhanceCounter(card){
-    if(!card)return;
-    card.querySelectorAll('input[name="counter_fee"]').forEach(input=>{
-      if(input.dataset.stepper==='1')return;
-      input.dataset.stepper='1';
-      const original=Number(input.min)||0;
-      const step=original>=10000000?250000:original>=1000000?50000:
-        original>=200000?10000:original>=20000?2500:500;
-      const wrapper=document.createElement('span');
-      wrapper.className='desk-counter-stepper';
-      input.before(wrapper);wrapper.appendChild(input);
-      const preview=document.createElement('strong');
-      preview.className='desk-counter-preview';
-      function repaint(){preview.textContent=gbp(Number(input.value)||0);}
-      function adjust(delta){
-        const low=Number(input.min)||0,high=Number(input.max)||1000000000;
-        const next=Math.max(low,Math.min(high,(Number(input.value)||low)+delta));
-        input.value=String(next);repaint();
-      }
-      const minus=document.createElement('button');
-      minus.type='button';minus.textContent='−';minus.title='Reduce counter by '+gbp(step);
-      minus.setAttribute('aria-label','Reduce counteroffer by '+gbp(step));
-      minus.addEventListener('click',()=>adjust(-step));
-      const plus=document.createElement('button');
-      plus.type='button';plus.textContent='+';plus.title='Increase counter by '+gbp(step);
-      plus.setAttribute('aria-label','Increase counteroffer by '+gbp(step));
-      plus.addEventListener('click',()=>adjust(step));
-      wrapper.append(minus,plus,preview);
-      input.addEventListener('input',repaint);
-      repaint();
-    });
+    // All money controls use the same compact £ amount and step selector.
+    enhanceMoneyInputs(card);
   }
 
   function makeInboxItem(card){
@@ -2497,7 +2469,7 @@ DASHBOARD_JS = r"""
         o.status==='rejected'?'Seller rejected your fee. You can make an improved bid.':
         o.status==='accepted_pending_contract'?'Seller accepted your fee. Negotiate the player contract in Transfers.':
         o.status==='agreed_future'||o.status==='completed'?'Transfer confirmed and reflected in the projected squad.':
-        o.status==='proposed'?'The selling club is reviewing your bid.':'Transfer talks are closed.';
+        o.status==='proposed'?o.seller+' are reviewing your bid for '+o.player+'.':'Transfer talks are closed.';
       card.querySelectorAll(':scope > .actions,:scope > .desk-inbox-open-negotiation').forEach(x=>x.remove());
       if(o.status==='accepted_pending_contract'&&newAgent==='terms_accepted'&&
          o.player_choice==='accepted'){
