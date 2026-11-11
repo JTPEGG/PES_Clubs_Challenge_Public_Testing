@@ -519,6 +519,27 @@ body.desk-contract-open{overflow:auto}
  background:#153b3c;color:#e9fff7;box-shadow:0 12px 30px #02061080;font-size:13px}
 .desk-contract-notice[data-error="1"]{border-color:#ba6464;background:#522e39}
 
+/* Freeze-pane Scouting: keep budgets and filters visible while results scroll. */
+@media(min-width:761px) and (min-height:620px){
+ .desk-view[data-view="scouting"]{height:calc(100dvh - 102px);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+ .desk-view[data-view="scouting"]>h2{flex:none;margin-top:0}
+ .desk-view[data-view="scouting"]>.desk-scout-finance{flex:none}
+ .desk-view[data-view="scouting"] .card:has(>form.scout-filters){display:flex;flex-direction:column;
+  flex:1;min-height:0;overflow:hidden;padding-bottom:4px}
+ .desk-view[data-view="scouting"] .scout-filters,
+ .desk-view[data-view="scouting"] .desk-scout-table-tools{flex:none}
+ .desk-view[data-view="scouting"] .scout-table[data-scout-scroll]{flex:1;min-height:0;
+  max-height:none;overflow:auto}
+ .desk-view[data-view="scouting"] .scout-table[data-scout-scroll] thead th{position:sticky;top:0;z-index:5}
+ .desk-view[data-view="scouting"] [data-scout-progress]{flex:none;min-height:34px}
+}
+.desk-view[data-view="scouting"] .scout-filters{position:relative}
+.desk-scout-position-trigger{min-height:37px;border:1px solid #4b728b;border-radius:6px;
+ background:#10293b;color:#f5fbff;padding:7px 12px;white-space:nowrap;font-size:12px}
+.desk-view[data-view="scouting"] .desk-position-chooser{position:absolute;z-index:70;
+ top:75px;left:13px;width:min(620px,calc(100% - 26px));max-height:50dvh;overflow-y:auto;
+ box-shadow:0 18px 40px #020711c4}
+
 """
 
 DASHBOARD_JS = r"""
@@ -571,7 +592,7 @@ DASHBOARD_JS = r"""
     contractLayer.hidden=true;
     document.body.classList.remove('desk-contract-open');
     contractUrlOpen=null;
-    switchView(contractReturnView,false);
+    switchView(contractReturnView,true);
     if(contractFocus?.isConnected)contractFocus.focus();
   }
   function contractNotice(message,isError=false){
@@ -1281,10 +1302,12 @@ DASHBOARD_JS = r"""
 
     const quick=document.createElement('div');
     quick.className='desk-scout-quick';
-    for(const name of ['scout_max_value','scout_max_wage','scout_interest']){
+    for(const name of ['scout_max_value','scout_max_wage','scout_interest',
+                        'scout_listed','scout_free_only']){
       const setting=available.find(entry=>entry.name===name);
       if(!setting)continue;
-      setting.field.classList.add(name==='scout_interest'?
+      setting.field.classList.add(
+        ['scout_interest','scout_listed','scout_free_only'].includes(name)?
         'desk-scout-quick-check':'desk-scout-quick-number');
       if(name==='scout_max_value'){
         setting.field.firstChild.textContent='Max market value (£)';
@@ -1311,21 +1334,29 @@ DASHBOARD_JS = r"""
       compactForm.requestSubmit();
     });
     quick.appendChild(showTeam);
+    const expiring=document.createElement('label');
+    expiring.className='desk-scout-quick-check';
+    const expiringBox=document.createElement('input');
+    expiringBox.type='checkbox';
+    const contractField=available.find(entry=>entry.name==='scout_contract');
+    expiringBox.checked=contractField?.input.value==='expiring';
+    const expiringLabel=document.createElement('span');
+    expiringLabel.textContent='Contract expiring';
+    expiring.append(expiringBox,expiringLabel);
+    expiringBox.addEventListener('change',()=>{
+      if(contractField)contractField.input.value=expiringBox.checked?'expiring':'';
+      compactForm.requestSubmit();
+    });
+    quick.appendChild(expiring);
     quick.appendChild(resetButton);
     searchBar.appendChild(quick);
 
     const oldPosition=available.find(entry=>entry.name==='scout_position');
     if(oldPosition){
-      // Keep a quick broad-position selector on the main scouting toolbar.
-      // Detailed multi-position checkboxes remain inside Add condition.
-      oldPosition.field.classList.add('desk-scout-main-position');
-      searchBar.insertBefore(oldPosition.field,openButton);
+      // The broad four-option selector is superseded by the exact
+      // position pop-out; keep the field hidden for compatible form posts.
+      oldPosition.field.hidden=true;
       available.splice(available.indexOf(oldPosition),1);
-      oldPosition.input.addEventListener('change',()=>{
-        const detailed=compactForm.querySelector('[data-scout-positions]');
-        if(detailed)detailed.value='';
-        compactForm.requestSubmit();
-      });
     }
     const positions=[
       ['GK','Goalkeeper'],['CB','Centre-back'],['LB','Left-back'],
@@ -1344,6 +1375,14 @@ DASHBOARD_JS = r"""
     const positionsGrid=document.createElement('div');
     positionsGrid.className='desk-position-grid';
     const selectedCodes=new Set((positionsInput?.value||'').split(',').filter(Boolean));
+    if(!selectedCodes.size&&oldPosition?.input.value){
+      const groups={GK:['GK'],DEF:['CB','LB','RB','LWB','RWB'],
+        MID:['DMF','CMF','AMF','LMF','RMF'],
+        FWD:['LWF','RWF','SS','CF']};
+      (groups[oldPosition.input.value]||[]).forEach(code=>selectedCodes.add(code));
+      if(positionsInput)positionsInput.value=[...selectedCodes].join(',');
+    }
+    if(oldPosition)oldPosition.input.value='';
     const boxes=[];
     positions.forEach(([code,name])=>{
       const label=document.createElement('label');
@@ -1362,7 +1401,31 @@ DASHBOARD_JS = r"""
         renderChips();compactForm.requestSubmit();
       });
     });
-    positionsPanel.append(positionsTitle,positionsGrid);grid.prepend(positionsPanel);
+    positionsPanel.append(positionsTitle,positionsGrid);
+    positionsPanel.hidden=true;
+    compactForm.appendChild(positionsPanel);
+    const positionButton=document.createElement('button');
+    positionButton.type='button';
+    positionButton.className='desk-scout-position-trigger';
+    function positionCaption(){
+      const n=boxes.filter(box=>box.checked).length;
+      positionButton.textContent=n?'Positions · '+n+' selected':'All positions';
+      positionButton.setAttribute('aria-expanded',String(!positionsPanel.hidden));
+    }
+    positionCaption();
+    searchBar.insertBefore(positionButton,openButton);
+    positionButton.addEventListener('click',()=>{
+      positionsPanel.hidden=!positionsPanel.hidden;
+      positionCaption();
+    });
+    document.addEventListener('click',event=>{
+      if(!positionsPanel.contains(event.target)&&
+         event.target!==positionButton){
+        positionsPanel.hidden=true;
+        positionCaption();
+      }
+    });
+    positionsGrid.addEventListener('change',positionCaption);
     if(positionsInput)available.push({input:positionsInput,
       field:positionsPanel,name:'scout_positions'});
 
@@ -1422,7 +1485,8 @@ DASHBOARD_JS = r"""
     function renderChips(){
       chips.replaceChildren();
       for(const {input,name} of available){
-        if(['scout_max_value','scout_max_wage','scout_interest'].includes(name))continue;
+        if(['scout_max_value','scout_max_wage','scout_interest',
+            'scout_listed','scout_free_only','scout_contract'].includes(name))continue;
         if(!hasCondition(input))continue;
         const chip=document.createElement('span');chip.className='desk-scout-chip';
         const label=document.createElement('span');
@@ -1440,7 +1504,11 @@ DASHBOARD_JS = r"""
       openButton.textContent='+ Add condition'+(chips.children.length?
         ' ('+chips.children.length+')':'');
     }
-    compactForm.addEventListener('change',renderChips);
+    compactForm.addEventListener('change',event=>{
+      if(event.target===contractField?.input)
+        expiringBox.checked=contractField.input.value==='expiring';
+      renderChips();
+    });
     compactForm.addEventListener('input',renderChips);
     resetButton.addEventListener('click',()=>{
       available.forEach(({input})=>{
@@ -1448,7 +1516,9 @@ DASHBOARD_JS = r"""
       });
       boxes.forEach(b=>b.checked=false);
       showTeamCheckbox.checked=true;
+      expiringBox.checked=false;
       if(hideOwn)hideOwn.value='0';
+      positionCaption();
       compactForm.requestSubmit();renderChips();
     });
     const explanation=views.scouting.querySelector('.desk-scout-finance + p.muted');
@@ -1601,7 +1671,8 @@ DASHBOARD_JS = r"""
       },{rootMargin:'500px'});
       observer.observe(scoutProgress);
     }else{
-      window.addEventListener('scroll',function(){
+      (views.scouting.querySelector('[data-scout-scroll]')||window)
+        .addEventListener('scroll',function(){
         const box=scoutProgress.getBoundingClientRect();
         if(!views.scouting.hidden&&box.top<window.innerHeight+500)
           loadScout(false);
