@@ -810,6 +810,121 @@ body.desk-ui .desk-setup-step button:hover{background:#fff8d8!important}
  .desk-mail-stages{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 
+/* Scouting usability V2: light Anderlecht workspace and clean currency inputs. */
+body.desk-ui{background:#f4f5f3!important}
+body.desk-ui .desk-shell{background:#f4f5f3!important}
+body.desk-ui .desk-workspace{background:#f4f5f3!important;min-height:calc(100vh - 66px)}
+body.desk-ui .desk-view[data-view="scouting"]{background:transparent}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar{
+ background:#ffffff!important;border:1px solid #e4e9e0!important;
+ box-shadow:0 4px 22px rgba(20,36,20,.035);border-radius:12px}
+body.desk-ui .desk-view[data-view="scouting"] .scout-filters{
+ background:transparent!important}
+body.desk-ui .desk-scout-searchbar>label,
+body.desk-ui .desk-scout-quick>label{color:#4d5b4d!important}
+body.desk-ui .desk-scout-quick{border-top:1px solid #e9ede7!important;
+ gap:10px;padding-top:15px;align-items:center}
+body.desk-ui .desk-scout-quick>label.desk-scout-quick-number{
+ flex:1 1 260px!important;min-width:235px;max-width:330px}
+body.desk-ui .desk-scout-money{display:flex;flex-direction:column;gap:6px;
+ min-width:0;width:100%;border:1px solid #e0e7db;border-radius:10px;
+ background:#fafbf8;padding:7px}
+body.desk-ui .desk-scout-money-entry{display:flex;align-items:center;gap:3px;
+ min-height:38px;background:#fff;border:1px solid #dce4d9;border-radius:7px;
+ padding:3px;min-width:0}
+body.desk-ui .desk-scout-money-pound{color:#587058;font-size:13px;font-weight:850}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual{
+ flex:1 1 85px;width:70px;min-width:55px;border:0!important;
+ box-shadow:none!important;outline:0!important;background:transparent!important;
+ padding:3px 2px!important;text-align:center;color:#233323!important;
+ font-variant-numeric:tabular-nums;font-size:14px!important;font-weight:800}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual:focus{
+ outline:2px solid #e4bc3e!important;outline-offset:2px!important;
+ background:#fffef6!important;border-radius:4px}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual[aria-invalid="true"]{
+ background:#fff0f0!important;outline:2px solid #ce7373!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step{
+ flex:0 0 32px;display:grid;place-items:center;min-width:32px!important;
+ min-height:32px!important;border-radius:6px!important;padding:0!important;
+ border:1px solid #e1e7df!important;background:#f2f5f0!important;
+ color:#354833!important;box-shadow:none!important;font-size:18px!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step:hover{
+ background:#fff1ba!important;border-color:#e1c656!important}
+body.desk-ui .desk-view .desk-scout-money select.desk-scout-money-preset{
+ appearance:none;-webkit-appearance:none;
+ width:100%;height:33px;min-height:33px!important;background-color:#fff!important;
+ color:#4f5e4c!important;border:1px solid #dce4d9!important;
+ border-radius:6px!important;font-size:11px!important;font-weight:700!important;
+ padding:5px 27px 5px 10px!important;
+ background-image:linear-gradient(45deg,transparent 50%,#687d68 50%),
+ linear-gradient(135deg,#687d68 50%,transparent 50%)!important;
+ background-position:calc(100% - 16px) 13px,calc(100% - 11px) 13px!important;
+ background-size:5px 5px!important;background-repeat:no-repeat!important}
+body.desk-ui .desk-scout-money-hint{
+ font-size:10px;color:#8b9789;line-height:1.35;
+ padding:0 1px;white-space:normal}
+body.desk-ui .desk-scout-searchbar select:not(.desk-scout-money-preset){
+ background:#fff!important;color:#263526!important;
+ border:1px solid #dce4d9!important;border-radius:7px!important;
+ padding-right:30px!important}
+body.desk-ui .desk-scout-quick-check{
+ border:1px solid #e2e7e0!important;background:#f8faf6!important;
+ color:#354434!important;border-radius:8px;padding:9px 11px;
+ min-height:38px}
+body.desk-ui .desk-scout-quick-check:has(input:checked){
+ background:#fff8de!important;border-color:#e6d495!important}
+body.desk-ui .desk-scout-quick-check input{accent-color:#b89520}
+body.desk-ui .desk-scout-add{
+ background:#ffd230!important;color:#2d2c1d!important;
+ border:1px solid #e7c64b!important}
+body.desk-ui .desk-scout-add:hover{background:#ffe177!important}
+body.desk-ui .desk-scout-clear{
+ background:#fff!important;color:#53604d!important;
+ border:1px solid #dbe2d8!important}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results]:not(.desk-show-attributes){
+ table-layout:auto!important;min-width:1150px!important;width:100%!important}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th{
+ width:auto!important;min-width:48px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td:first-child,
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td:nth-child(2){
+ max-width:none!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:first-child{
+ min-width:162px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(2){
+ min-width:130px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(7),
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] th:nth-child(8){
+ min-width:102px}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-estimate{
+ color:#75631c;font-weight:740}
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-actual{
+ color:#2e6d49;font-weight:850}
+body.desk-ui .desk-view[data-view="scouting"] .scout-table{
+ background:#fff!important;box-shadow:0 3px 16px #182b1908;
+ overflow-x:auto!important}
+@media(max-width:780px){
+ body.desk-ui .desk-scout-quick>label.desk-scout-quick-number{
+ flex:1 1 100%!important;max-width:none}
+ body.desk-ui .desk-workspace{padding:18px 14px 50px}
+}
+
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:not([multiple]),
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:not([multiple]):not(.desk-scout-money-preset){
+ appearance:none;-webkit-appearance:none;
+ background-color:#fff!important;color:#263626!important;
+ border:1px solid #dbe3d9!important;border-radius:7px!important;
+ background-image:linear-gradient(45deg,transparent 50%,#768573 50%),
+ linear-gradient(135deg,#768573 50%,transparent 50%)!important;
+ background-position:calc(100% - 17px) center,calc(100% - 12px) center!important;
+ background-size:5px 5px!important;background-repeat:no-repeat!important;
+ padding-right:29px!important;box-shadow:none!important}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select option,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select option{
+ background:#fff;color:#273527}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:focus-visible,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:focus-visible{
+ outline:2px solid #d0ad3a;outline-offset:2px}
+
 """
 
 DASHBOARD_JS = r"""
@@ -1680,7 +1795,8 @@ DASHBOARD_JS = r"""
     const contractField=available.find(entry=>entry.name==='scout_contract');
     expiringBox.checked=contractField?.input.value==='expiring';
     const expiringLabel=document.createElement('span');
-    expiringLabel.textContent='Contract expiring';
+    expiringLabel.textContent='Expires within 12 months';
+    expiring.title='Known contract dates after the career start and within the following 12 months';
     expiring.append(expiringBox,expiringLabel);
     expiringBox.addEventListener('change',()=>{
       if(contractField)contractField.input.value=expiringBox.checked?'expiring':'';
@@ -1852,6 +1968,8 @@ DASHBOARD_JS = r"""
     resetButton.addEventListener('click',()=>{
       available.forEach(({input})=>{
         if(input.type==='checkbox')input.checked=false;else input.value='';
+        if(['scout_max_value','scout_max_wage'].includes(input.name))
+          input.dispatchEvent(new Event('input',{bubbles:true}));
       });
       boxes.forEach(b=>b.checked=false);
       showTeamCheckbox.checked=true;
@@ -1904,16 +2022,23 @@ DASHBOARD_JS = r"""
         if(player.shortlisted)first.appendChild(document.createTextNode(' ★'));
         row.appendChild(first);
         const fields=[player.club,player.position,player.overall,player.age,
-          player.value,player.wage,player.contract,player.years_left,player.pace,
-          player.shooting,player.passing,player.dribbling,
-          player.defending,player.physicality];
+          player.height,player.value,player.asking_price,player.wage,
+          player.contract,player.years_left,player.pace,player.shooting,
+          player.passing,player.dribbling,player.defending,player.physicality];
         if(scoutForm.elements.scout_attribute.value)
           fields.push(player.detail_attribute);
         fields.forEach(function(value,index){
           const cell=document.createElement('td');
           cell.textContent=display(value);
-          if(index>=8&&index<=13)cell.className='desk-scout-extra';
-          if(index===5)cell.title=player.club==='Free agent'?
+          if(index>=10&&index<=15)cell.className='desk-scout-extra';
+          if(index===6 && player.asking_price!=='—'){
+            cell.className=player.asking_estimated?
+              'desk-asking-estimate':'desk-asking-actual';
+            cell.title=player.asking_estimated?
+              'Non-binding game-model asking estimate, not a seller quote':
+              'Actual asking price in the selling club’s counteroffer';
+          }
+          if(index===7)cell.title=player.club==='Free agent'?
             'Reference game wage, not confirmed agent demand':
             'Current game wage, not future agent demand';
           row.appendChild(cell);
@@ -1928,6 +2053,8 @@ DASHBOARD_JS = r"""
         if(active)active.abort();
         active=null;
         page=0;shown=0;hasMore=true;
+        tableBody.replaceChildren();
+        counter.textContent='Updating scouting results…';
         status.textContent='Applying filters…';
         const search=new URLSearchParams(new FormData(scoutForm));
         history.replaceState(null,'',window.location.pathname+'?'+
@@ -1993,6 +2120,9 @@ DASHBOARD_JS = r"""
     let searchTimer;
     scoutForm.querySelectorAll('input[type=text],input:not([type]),input[type=number]')
       .forEach(function(input){
+        // The enhanced currency fields have their own debounced/exact
+        // handler and must not issue a duplicate search 550ms later.
+        if(['scout_max_value','scout_max_wage'].includes(input.name))return;
         input.addEventListener('input',function(){
           clearTimeout(searchTimer);
           searchTimer=setTimeout(function(){
@@ -2112,6 +2242,126 @@ DASHBOARD_JS = r"""
       pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
       pound(result.sale_board_withheld||0)+' retained by the board.';
   }
+  // Scouting gets a legible amount field with optional exact entry, preset
+  // starting points and automatic step sizes. The canonical GBP integer is
+  // still the original named form field, never a formatted £ string.
+  function enhanceScoutMoney(input){
+    input.dataset.moneyStepper='1';
+    const wage=input.name==='scout_max_wage';
+    const initial=input.value;
+    const options=wage?
+      [2500,5000,10000,15000,20000,30000,50000,75000,100000,150000,250000]:
+      [100000,250000,500000,1000000,2000000,5000000,10000000,
+       20000000,50000000,100000000];
+    const control=document.createElement('div');
+    control.className='desk-scout-money';
+    const row=document.createElement('div');
+    row.className='desk-scout-money-entry';
+    const less=document.createElement('button');
+    less.type='button';less.className='desk-scout-money-step';
+    less.textContent='−';less.setAttribute('aria-label','Reduce '+input.name);
+    less.title='Smart decrease';
+    const prefix=document.createElement('span');prefix.className='desk-scout-money-pound';
+    prefix.textContent='£';
+    const manual=document.createElement('input');
+    manual.type='text';manual.inputMode='numeric';
+    manual.className='desk-scout-money-manual';manual.autocomplete='off';
+    manual.setAttribute('aria-label',(wage?'Maximum weekly wage':'Maximum market value')+' in pounds');
+    manual.placeholder='Any amount';
+    const more=document.createElement('button');
+    more.type='button';more.className='desk-scout-money-step';
+    more.textContent='+';more.setAttribute('aria-label','Increase '+input.name);
+    more.title='Smart increase';
+    const preset=document.createElement('select');
+    preset.className='desk-scout-money-preset';
+    preset.setAttribute('aria-label','Choose a '+(wage?'weekly wage':'market value')+' starting amount');
+    const none=document.createElement('option');none.value='';none.textContent='No limit';
+    preset.appendChild(none);
+    for(const amount of options){
+      const option=document.createElement('option');
+      option.value=String(amount);option.textContent=wage?
+        '£'+(amount/1000).toLocaleString('en-GB')+'k':
+        amount>=1000000?'£'+(amount/1000000).toLocaleString('en-GB')+'m':
+        '£'+(amount/1000).toLocaleString('en-GB')+'k';
+      preset.appendChild(option);
+    }
+    const custom=document.createElement('option');
+    custom.value='custom';custom.textContent='Custom amount';
+    preset.appendChild(custom);
+    const hint=document.createElement('small');
+    hint.className='desk-scout-money-hint';
+    hint.textContent='Type an exact amount or use the smart + / −';
+    const format=value=>value===''?'':Number(value).toLocaleString('en-GB');
+    function display(){
+      manual.value=format(input.value);
+      preset.value=(input.value===''||options.includes(Number(input.value)))?
+        String(input.value):'custom';
+      if(!preset.value && input.value!=='')preset.value='custom';
+    }
+    function setValue(value,notify){
+      input.value=value===''?'':String(Math.max(0,Math.min(1000000000,Math.floor(Number(value)||0))));
+      manual.removeAttribute('aria-invalid');
+      display();
+      if(notify){
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        input.form?.requestSubmit();
+      }
+    }
+    function smartStep(amount){
+      if(wage)return amount<10000?500:amount<50000?2500:
+        amount<100000?5000:10000;
+      return amount<500000?50000:amount<2000000?100000:
+        amount<10000000?500000:amount<50000000?2000000:5000000;
+    }
+    function move(direction){
+      const current=input.value===''?0:Number(input.value);
+      const step=smartStep(current);
+      const next=direction>0?
+        Math.floor(current/step)*step+step:
+        Math.max(0,Math.ceil(current/step)*step-step);
+      setValue(next,true);
+    }
+    less.addEventListener('click',()=>move(-1));
+    more.addEventListener('click',()=>move(1));
+    preset.addEventListener('change',event=>{
+      event.stopPropagation();
+      if(preset.value==='custom'){manual.focus();manual.select();return;}
+      setValue(preset.value,true);
+    });
+    let timer;
+    manual.addEventListener('input',()=>{
+      clearTimeout(timer);
+      const raw=manual.value.trim();
+      // Commas, spaces and the £ symbol are purely a display affordance.
+      // Reject malformed values instead of submitting a wrong integer.
+      const valid=/^£?\s*[0-9][0-9,\s]*$/.test(raw);
+      if(raw!==''&&!valid){
+        manual.setAttribute('aria-invalid','true');
+        return;
+      }
+      manual.removeAttribute('aria-invalid');
+      const stripped=raw.replace(/[^0-9]/g,'');
+      input.value=stripped===''?'':String(Math.min(1000000000,Number(stripped)));
+      preset.value=input.value!==''&&options.includes(Number(input.value))?
+        input.value:input.value===''?'':'custom';
+      clearTimeout(timer);
+      timer=setTimeout(()=>input.form?.requestSubmit(),500);
+    });
+    manual.addEventListener('blur',()=>{
+      if(manual.getAttribute('aria-invalid')==='true')return;
+      clearTimeout(timer);
+      display();
+      input.form?.requestSubmit();
+    });
+    input.type='hidden'; // FormData still sends the original plain GBP integer.
+    input.before(control);
+    control.append(row,preset,hint);
+    row.append(less,prefix,manual,more);
+    control.appendChild(input);
+    input.addEventListener('input',display); // supports reset and Use budget.
+    input.value=initial;
+    display();
+  }
   // Compact money values are display-only. Original integer GBP inputs
   // remain in the form so all existing server validation and CSRF work.
   // Buttons and increment chooser replace error-prone manual £ entries.
@@ -2121,6 +2371,9 @@ DASHBOARD_JS = r"""
     fields.forEach(input=>{
       if(input.dataset.moneyStepper==='1'||input.dataset.stepper==='1')return;
       if(!/^(offered_fee|negotiated_fee|counter_fee|weekly_wage|wage_weekly|current_wage_weekly|scout_max_value|scout_max_wage|investment_pool)$/.test(input.name))return;
+      if(input.name==='scout_max_value'||input.name==='scout_max_wage'){
+        enhanceScoutMoney(input);return;
+      }
       // The old dedicated counter stepper is also replaced by this compact
       // component when not already initialised.
       input.dataset.moneyStepper='1';

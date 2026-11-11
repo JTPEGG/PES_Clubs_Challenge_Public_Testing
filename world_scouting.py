@@ -392,17 +392,36 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
 
     out=[]
     anchor=date.fromisoformat(asof)
-    # Source-club AI listings are career-relative estimates based on
-    # the same role, contract and financial profile used by the seller AI.
-    # Manager decisions override these estimates.
-    from world_fc27_transfer_list import modelled_ai_listed_ids
+    # Exactly one calendar year from the career's source game date; the
+    # real-world browser date must not alter a saved pre-season career.
+    try:
+        expiry_cutoff=anchor.replace(year=anchor.year+1)
+    except ValueError:  # 29 February in a leap-year career
+        expiry_cutoff=anchor.replace(year=anchor.year+1,day=28)
+    # Generate consistent game-model listing flags for the entire scout
+    # list, not only when the "transfer-listed" checkbox is active. The new
+    # estimated asking-price column must agree with that same checkbox.
+    # Explicit manager changes continue to override AI predictions.
+    from world_fc27_transfer_list import (modelled_ai_listed_ids,
+        estimated_listed_asking_price)
     modelled_listings=(modelled_ai_listed_ids(conn,career_id=career_id,
         dataset=dataset,manager=manager,rows=rows,asof=asof)
-        if listed_only and dataset=="fc27-warehouse-659-mens-2026-27"
-        else set())
+        if dataset=="fc27-warehouse-659-mens-2026-27" else set())
     manager_listings=dict(conn.execute("""SELECT player_id,transfer_listed
         FROM world_career_player_circumstances WHERE career_id=?""",
-        (career_id,)).fetchall()) if listed_only else {}
+        (career_id,)).fetchall()) if (listed_only or
+            dataset=="fc27-warehouse-659-mens-2026-27") else {}
+    # A genuine seller counteroffer overrides any simulated asking price.
+    # Restrict to the human buyer and pending counteroffers; old/historical
+    # quotes must not look like the seller's current demand.
+    actual_asking={}
+    if dataset=="fc27-warehouse-659-mens-2026-27":
+        for pid,amount in conn.execute("""SELECT player_id,demanded_fee
+            FROM world_career_offers
+            WHERE career_id=? AND buying_club_id=?
+              AND status='countered' AND demanded_fee>0
+            ORDER BY offer_id DESC""",(career_id,manager)).fetchall():
+            actual_asking.setdefault(pid,int(amount))
     for r in rows:
         d=dict(r)
         d["free_agent"]=(d["club_id"] is None)
@@ -411,12 +430,11 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
         if squad_only and d["club_id"]!=manager:continue
         if exclude_manager_players and d["club_id"]==manager:continue
         if selected_positions and positional_code(d["primary_position"]) not in selected_positions:continue
-        if listed_only:
-            if d["free_agent"]:continue
-            if (d["player_id"] in manager_listings and
-                not bool(manager_listings[d["player_id"]])):continue
-            if (d["player_id"] not in modelled_listings and
-                not bool(manager_listings.get(d["player_id"],False))):continue
+        d["transfer_listed"]=(not d["free_agent"] and
+            (bool(manager_listings[d["player_id"]])
+             if d["player_id"] in manager_listings
+             else d["player_id"] in modelled_listings))
+        if listed_only and not d["transfer_listed"]:continue
         d["shortlisted"]=d["player_id"] in saved_ids
         if shortlist_only and not d["shortlisted"]:continue
         if position and position_family(d["primary_position"])!=position:
@@ -441,11 +459,14 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
             expiry=date.fromisoformat(d["expires"]) if d["expires"] else None
         except ValueError:
             pass
-        remaining=max(0,(expiry-anchor).days) if expiry else None
-        d["years_left"]=round(remaining/365.25,1) if remaining is not None else None
+        remaining=(expiry-anchor).days if expiry else None
+        d["years_left"]=(round(max(0,remaining)/365.25,1)
+                         if remaining is not None and remaining>=0 else None)
         if contract=="known" and not expiry:continue
         if contract=="unknown" and expiry:continue
-        if contract=="expiring" and (remaining is None or remaining>365):continue
+        # Expired contracts must NOT masquerade as zero months remaining.
+        if contract=="expiring" and not (
+            expiry is not None and anchor<expiry<=expiry_cutoff):continue
         if category and min_category is not None and (
             d[category] is None or d[category]<min_category):continue
         if attribute and min_attribute is not None and (
@@ -558,6 +579,18 @@ def scouting_search(conn, *, career_id, query="", position="", min_overall=None,
                     if baseline is not None else None)
             else:
                 d["market_value"]=_player_reference(conn,dataset,d["player_id"])[0]
+    # Compute asking estimates for the visible page only, never 17,593
+    # hypothetical valuations. No offer, budget or transfer is changed.
+    for d in page:
+        d["asking_price"]=None
+        d["asking_estimated"]=False
+        if not d["transfer_listed"]:continue
+        if d["player_id"] in actual_asking and not d["owned"]:
+            d["asking_price"]=actual_asking[d["player_id"]]
+        else:
+            d["asking_price"]=estimated_listed_asking_price(
+                d["market_value"],d["years_left"])
+            d["asking_estimated"]=d["asking_price"] is not None
     return (page,total) if with_total else page
 
 

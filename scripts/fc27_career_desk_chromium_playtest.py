@@ -522,7 +522,7 @@ def run(world,output):
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").count()>=80,
                   "FC27 scouting did not render its first 80 players")
             scout_row=page.locator("#desk-view-scouting [data-scout-results] tbody tr").first
-            wage=scout_row.locator("td").nth(7).inner_text()
+            wage=scout_row.locator("td").nth(8).inner_text()
             check(wage.startswith("£") and wage!="—",
                   "Game source weekly wage must appear immediately after transfer value")
             extra_header=page.locator("#desk-view-scouting th.desk-scout-extra").first
@@ -531,17 +531,22 @@ def run(world,output):
             page.locator("[data-scout-attributes-toggle]").click()
             check(extra_header.is_visible(),
                   "Show attributes must reveal the optional scouting columns")
-            first_pace=scout_row.locator("td").nth(10).inner_text()
+            first_pace=scout_row.locator("td").nth(11).inner_text()
             check(first_pace.isdigit(),"FC27 six-category scouting source data is missing")
             page.locator("[data-scout-attributes-toggle]").click()
             check(not extra_header.is_visible(),
                   "Hide attributes must restore compact scouting view")
             attrs=page.locator('select[name="scout_attribute"] option').count()
             check(attrs==30,f"FC27 individual source attribute choices missing: {attrs}")
-            check(page.locator('input[name="scout_max_value"]').is_visible(),
-                  "Quick market value filter missing")
-            check(page.locator('input[name="scout_max_wage"]').is_visible(),
-                  "Quick weekly wage estimate filter missing")
+            check(page.locator('input[name="scout_max_value"]').count()==1 and
+                  page.locator('input[name="scout_max_value"]').get_attribute('type')=='hidden',
+                  "Canonical value filter must stay available for server FormData")
+            check(page.locator('input[name="scout_max_wage"]').count()==1 and
+                  page.locator('input[name="scout_max_wage"]').get_attribute('type')=='hidden',
+                  "Canonical wage filter must stay available for server FormData")
+            check(page.locator('.desk-scout-money-manual').count()==2 and
+                  page.locator('.desk-scout-money-preset').count()==2,
+                  "Visible exact-entry and preset currency controls missing")
             check(page.locator('input[name="scout_interest"]').is_visible(),
                   "Quick interested-player toggle missing")
             check(page.locator('.desk-scout-quick input[type="checkbox"]').count()>=2,
@@ -567,6 +572,21 @@ def run(world,output):
                   "Automatic infinite scrolling did not load subsequent players")
             check(page.locator("#desk-view-scouting .scout-table table tbody tr").first.inner_text()==first,
                   "Infinite scrolling replaced the first page instead of appending")
+            preset=page.locator('.desk-scout-money-preset').first
+            preset.select_option('2000000')
+            check(page.locator('input[name="scout_max_value"]').input_value()=='2000000' and
+                  page.locator('.desk-scout-money-manual').first.input_value()=='2,000,000',
+                  "Preset must update the plain GBP value and readable formatted amount")
+            page.locator('.desk-scout-money-entry button').nth(1).click()
+            check(page.locator('input[name="scout_max_value"]').input_value()=='2500000',
+                  "Transfer value smart + must step £2m to £2.5m")
+            amount=page.locator('.desk-scout-money-manual').first
+            amount.fill('1,250,000')
+            check(page.locator('input[name="scout_max_value"]').input_value()=='1250000',
+                  "Comma-formatted manual amount must round-trip to exact GBP")
+            amount.fill('')
+            amount.blur()
+
             # A warmed filter must return promptly even while autonomous
             # FC27 market jobs run in the background. This measures the
             # actual live browser -> authenticated Flask JSON response.
@@ -604,6 +624,55 @@ def run(world,output):
                   f"Cached FC27 interest filter took {interest_seconds:.2f}s")
             found.append(f"Prewarmed would-consider-a-move response {interest_seconds:.2f}s")
             page.locator('input[name="scout_interest"]').uncheck()
+            # The saved game date, not the browser clock, defines "within
+            # 12 months". Verify the genuine AJAX contract filter and dates.
+            expiring=page.locator('.desk-scout-quick-check').filter(
+                has_text='Expires within 12 months').locator('input[type="checkbox"]')
+            with page.expect_response(
+                lambda response:'/market/scout-feed?' in response.url
+                    and 'scout_contract=expiring' in response.url
+                    and response.status==200,
+                timeout=15000) as expiry_request:
+                expiring.check()
+            expiry_payload=expiry_request.value.json()
+            with closing(sqlite3.connect(world)) as db:
+                start_date=db.execute('SELECT pes_lock_date FROM world_career_saves WHERE career_id=?',
+                    (CAREER,)).fetchone()[0]
+            start=datetime.fromisoformat(start_date).date()
+            cutoff=start.replace(year=start.year+1)
+            check(expiry_payload['total']<17804,
+                'Expiring checkbox must actually narrow the all-player population')
+            for player in expiry_payload['players']:
+                date_string=player['contract']
+                try: due=datetime.fromisoformat(date_string).date()
+                except (TypeError,ValueError):
+                    raise AssertionError('Expiring search included a player with no known date')
+                check(start<due<=cutoff,
+                    'Expiring search included an already expired or >12-month contract')
+            with page.expect_response(
+                lambda response:'/market/scout-feed?' in response.url
+                    and 'scout_contract=expiring' not in response.url
+                    and response.status==200,
+                timeout=15000):
+                expiring.uncheck()
+            # Transfer-listed players expose either an actual seller quote
+            # or a clearly labelled, non-binding estimated asking price.
+            # Transfer-listed is a quick-bar checkbox, so do not open the
+            # conditions modal over it (the modal intentionally blocks
+            # interaction with the rest of the page).
+            with page.expect_response(
+                lambda response:'/market/scout-feed?' in response.url
+                    and 'scout_listed=1' in response.url
+                    and response.status==200,
+                timeout=15000) as listed_request:
+                page.locator('input[name="scout_listed"]').check()
+            listed_payload=listed_request.value.json()
+            check(listed_payload['total']>0,'Source world should have listed players')
+            check(all(p['listed'] and p['asking_price']!='—'
+                      for p in listed_payload['players']),
+                  'Transfer-listed rows must show a real seller quote or estimated asking price')
+            page.locator('input[name="scout_listed"]').uncheck()
+            found.append('12-month contract expiry, transfer-listed asking prices and smart currency controls validated')
             page.locator('.desk-sidebar [data-desk-tab="transfers"]').click()
             check(page.locator('#desk-view-transfers .desk-table-filter-row').count()==0,
                   "Transfer Centre should not have column search boxes")
