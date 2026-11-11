@@ -789,6 +789,34 @@ DASHBOARD_JS = r"""
   source.dataset.initialized='1';
   source.hidden=true;
 
+  // Only show accessible views. A newly created career has no live Scouting
+  // before the window starts; an orphaned explanatory panel is not a feature.
+  const unavailableViews=new Set();
+  if(!views.scouting.querySelector('form.scout-filters')){
+    unavailableViews.add('scouting');
+    document.querySelectorAll('[data-desk-tab="scouting"]').forEach(x=>x.hidden=true);
+  }
+
+  // Same crest and compact header on every actual manager workspace page.
+  const crest=document.querySelector('.desk-brand .desk-club-crest');
+  const managerClub=document.body.dataset.managerClub||'Club';
+  names.forEach(name=>{
+    if(unavailableViews.has(name)||name==='contract'||name==='player')return;
+    const head=document.createElement('div');
+    head.className='desk-page-heading';
+    const emblem=document.createElement('span');
+    emblem.className='desk-page-crest';
+    if(crest)emblem.append(...Array.from(crest.childNodes).map(node=>node.cloneNode(true)));
+    const label=document.createElement('div');
+    label.className='desk-page-title';
+    const h=document.createElement('h1');h.textContent=titles[name];
+    const sub=document.createElement('small');sub.textContent=managerClub;
+    label.append(h,sub);head.append(emblem,label);
+    views[name].prepend(head);
+    // Retain the hidden ID anchors used by the transfer desk navigation.
+    views[name].querySelectorAll(':scope > h2').forEach(h2=>h2.classList.add('desk-original-heading'));
+  });
+
   // The complete shortlist section is routed to its own tab above.
   // Never leave an orphan explanatory panel in Scouting.
   const noticeText='Your shortlist is saved to this career and remains available after the window closes.';
@@ -811,28 +839,12 @@ DASHBOARD_JS = r"""
   const numSaved=Number(document.body.dataset.saved||0);
   const state=document.body.dataset.windowState||'not_started';
 
-  // Provide a concise, actionable overview with the original financial
-  // cards immediately underneath. The figures remain sourced from the server.
-  const intro=document.createElement('div');
-  intro.className='desk-view-header';
-  const titleWrap=document.createElement('div');
-  const h2=document.createElement('h2');
-  h2.textContent='Your transfer window';
-  const desc=document.createElement('p');
-  desc.className='muted';
-  desc.textContent=state==='open'?
-    'Keep on top of offers, negotiations and recruitment before the deadline.':
-    state==='closed'?'The window is closed. Review results and registrations.':
-    'Review your squad and saved targets before starting the clock.';
-  titleWrap.appendChild(h2);titleWrap.appendChild(desc);
-  intro.appendChild(titleWrap);
-  views.dashboard.insertBefore(intro,views.dashboard.firstChild);
   const quick=document.createElement('div');
   quick.className='desk-actions-bar';
   [
-    {label:"Manager's Inbox",description:numOffers+' incoming offers · '+numUnread+' unread',screen:'inbox'},
-    {label:'Transfer Centre',description:numSigned+' signed deals · all bids',screen:'transfers'},
-    {label:'Scouting',description:'Discover players and evaluate targets',screen:'scouting'}
+    {label:"Manager's Inbox",description:numUnread+' action(s) · '+numOffers+' bids',screen:'inbox'},
+    {label:'Transfer Centre',description:numSigned+' confirmed deal(s)',screen:'transfers'},
+    ...(!unavailableViews.has('scouting')?[{label:'Scouting',description:'Search players',screen:'scouting'}]:[])
   ].forEach(function(entry){
     const b=document.createElement('button');
     b.type='button';b.className='desk-action-tile';
@@ -841,7 +853,7 @@ DASHBOARD_JS = r"""
     const small=document.createElement('small');small.textContent=entry.description;
     b.appendChild(strong);b.appendChild(small);quick.appendChild(b);
   });
-  intro.insertAdjacentElement('afterend',quick);
+  views.dashboard.querySelector('.desk-page-heading')?.insertAdjacentElement('afterend',quick);
   if(state==='closed'){
     const next=document.createElement('div');
     next.className='card desk-post-window-next';
@@ -852,7 +864,7 @@ DASHBOARD_JS = r"""
     continueLink.dataset.deskTab='season-setup';
     continueLink.textContent='Continue to season setup →';
     next.append(explanation,continueLink);
-    quick.insertAdjacentElement('beforebegin',next);
+    quick.insertAdjacentElement('afterend',next);
   }
 
   // Use the authoritative budget breakdown already rendered on the page.
@@ -908,17 +920,7 @@ DASHBOARD_JS = r"""
     return negative+'£'+(value>=1000000?trimmed(value/1000000)+'m':
       value>=1000?trimmed(value/1000)+'k':Math.round(value).toLocaleString('en-GB'));
   }
-  if(!views.inbox.children.length)
-    views.inbox.appendChild(emptyPanel('No inbox activity','Offers will appear once clubs begin approaching your players.'));
-  if(!views.transfers.children.length)
-    views.transfers.appendChild(emptyPanel('No transfers underway','Scouting, shortlisting and recruitment are available from the navigation.'));
-  if(!views.squad.children.length)
-    views.squad.appendChild(emptyPanel('No squad data','Open a career to manage your registered players.'));
-  if(!views['season-setup'].children.length)
-    views['season-setup'].appendChild(emptyPanel('Season setup opens at the deadline',
-      'Complete your transfer window before preparing your PES squads.'));
-  if(!views.scouting.children.length)
-    views.scouting.appendChild(emptyPanel('Scouting is not active on this screen','You can still open saved scouting profiles from your shortlist.'));
+  // Empty states use genuine blank tables and no orphaned explanatory cards.
 
   // Inbox is a compact FM-like message list. Every offer remains a separate
   // message so competing bids are readable and each has its own actions.
@@ -958,11 +960,13 @@ DASHBOARD_JS = r"""
     const strong=document.createElement('a');
     strong.className='desk-inbox-profile-link';
     strong.href=location.pathname+'/player/'+encodeURIComponent(card.dataset.deskPlayer||'');
-    strong.textContent=card.dataset.deskPlayerName||'Transfer';
+    strong.textContent=card.dataset.mailSubject||
+      card.dataset.deskPlayerName||'Transfer';
     strong.title='Open this player’s scouting profile';
     const meta=document.createElement('span');
     meta.className='desk-inbox-player-meta';
     meta.textContent=[
+      card.dataset.mailSubject?'Player: '+(card.dataset.deskPlayerName||''):'',
       card.dataset.deskPosition||'',
       card.dataset.deskOverall?'OVR '+card.dataset.deskOverall:'',
       card.dataset.deskAge?'Age '+card.dataset.deskAge:''
@@ -970,7 +974,8 @@ DASHBOARD_JS = r"""
     if(!meta.textContent)meta.hidden=true;
     const small=document.createElement('small');
     small.textContent=cleanInboxClub(card.dataset.deskBuyer||'')+
-      ' · '+(inboxLabels[card.dataset.deskStatus]||'Transfer update');
+      ' · '+(card.dataset.mailStageLabel||
+       inboxLabels[card.dataset.deskStatus]||'Transfer update');
     intro.append(strong,meta,small);heading.appendChild(intro);
     inboxReader.append(heading,selectedInboxDetail);
   }
@@ -993,6 +998,7 @@ DASHBOARD_JS = r"""
     return String(value||'').replace(/\s*\[WH27:[^\]]+\]\s*$/i,'').trim();
   }
   function actionRequired(card){
+    if(card.dataset.deskSide==='mail')return false;
     if(card.dataset.deskSide==='free')
       return card.dataset.deskStatus==='terms_accepted'&&
         card.dataset.deskPlayerChoice==='accepted';
@@ -1008,6 +1014,26 @@ DASHBOARD_JS = r"""
        card.dataset.deskAgent==='terms_accepted'&&
        card.dataset.deskPlayerChoice==='accepted');
   }
+  function offerSubject(card){
+    const name=card.dataset.deskPlayerName||'Player';
+    const side=card.dataset.deskSide;
+    const status=card.dataset.deskStatus||'';
+    if(side==='contract')return ['agreed_future','completed'].includes(status)?
+      'New contract signed: '+name:'Contract request: '+name;
+    if(side==='free')return ['agreed_future','completed'].includes(status)?
+      'Free-agent signing confirmed: '+name:
+      card.dataset.deskPlayerChoice==='accepted'?'Finalise signing: '+name:
+      'Free-agent contract: '+name;
+    if(side==='buy')return ['agreed_future','completed'].includes(status)?
+      'Transfer confirmed: '+name:
+      status==='countered'?'Offer response: '+name:
+      card.dataset.deskPlayerChoice==='accepted'?'Finalise deal: '+name:
+      status==='accepted_pending_contract'?'Contract negotiations: '+name:
+      'Transfer bid: '+name;
+    return ['agreed_future','completed'].includes(status)?
+      'Transfer completed: '+name:status==='proposed'?
+      'Bid received for '+name:'Outgoing transfer: '+name;
+  }
   function refreshInboxItem(card){
     const holder=inboxCardItems.get(card)||card.closest('.desk-inbox-item');
     if(!holder)return;
@@ -1017,9 +1043,9 @@ DASHBOARD_JS = r"""
     holder.dataset.status=status;
     holder.querySelector('.desk-inbox-flag').textContent=required?'!':'';
     holder.querySelector('.desk-inbox-subject').textContent=
-      card.dataset.deskPlayerName||'Player transfer';
+      card.dataset.mailSubject||offerSubject(card);
     holder.querySelector('.desk-inbox-sender').textContent=
-      cleanInboxClub(card.dataset.deskBuyer||'Buying club');
+      cleanInboxClub(card.dataset.mailSender||card.dataset.deskBuyer||'Buying club');
     holder.querySelector('.desk-inbox-fee').textContent=
       card.querySelector('.count')?.textContent.trim()||'—';
     const buyingStages={proposed:'Seller reviewing',countered:'Counteroffer',
@@ -1043,7 +1069,8 @@ DASHBOARD_JS = r"""
       agreed_future:'Renewed',completed:'Renewed',
       declined:'Declined',withdrawn:'Withdrawn',expired:'Expired'};
     holder.querySelector('.desk-inbox-state').textContent=
-      (card.dataset.deskSide==='contract'?renewalStages[status]:
+      (card.dataset.deskSide==='mail'?(card.dataset.mailStageLabel||'Correspondence'):
+       card.dataset.deskSide==='contract'?renewalStages[status]:
        card.dataset.deskSide==='free'?freeStages[status]:
        card.dataset.deskSide==='buy'?buyingStages[status]:saleStages[status])||status;
   }
@@ -1071,6 +1098,8 @@ DASHBOARD_JS = r"""
     item.append(summary,body);
     body.appendChild(card);
     inboxCardItems.set(card,item);
+    inboxGrid.hidden=false;
+    inboxLayout.hidden=false;
     summary.addEventListener('click',function(event){
       event.preventDefault();
       selectInboxCard(card);
@@ -1080,7 +1109,7 @@ DASHBOARD_JS = r"""
   offerCards.forEach(makeInboxItem);
   if(offerCards.length)selectInboxCard(offerCards[0]);
   else inboxReader.innerHTML='<div class="desk-inbox-reader-empty">Select a message to read it here.</div>';
-  if(!offerCards.length)inboxGrid.hidden=true;
+  if(!offerCards.length){inboxGrid.hidden=true;inboxLayout.hidden=true;}
   // Fast client-side inbox filters. Refreshing the market fetches genuine
   // updates from Flask, but switching views and narrowing visible cards
   // never needs a page request.
@@ -1139,9 +1168,12 @@ DASHBOARD_JS = r"""
       if(activeFilter==='action')
         statusMatch=actionRequired(card);
       else if(activeFilter==='talks')
-        statusMatch=(status==='countered'||status==='accepted_pending_contract');
+        statusMatch=(status==='countered'||status==='accepted_pending_contract'||
+          (card.dataset.deskSide==='mail'&&Number(card.dataset.mailStage)>=1&&
+           Number(card.dataset.mailStage)<=4));
       else if(activeFilter==='signed')
-        statusMatch=(status==='agreed_future'||status==='completed');
+        statusMatch=(status==='agreed_future'||status==='completed'||
+          (card.dataset.deskSide==='mail'&&card.dataset.mailStage==='5'));
       else if(activeFilter==='closed')
         statusMatch=(status==='withdrawn'||status==='rejected');
       return matches&&statusMatch;
@@ -3156,7 +3188,7 @@ DASHBOARD_JS = r"""
   // Sidebar, mobile bar, overview buttons and legacy #section links use
   // the same one-page view switcher; no cross-page navigation is required.
   function switchView(name,changeUrl){
-    if(!views[name])name='dashboard';
+    if(!views[name]||unavailableViews.has(name))name='dashboard';
     if(name==='shortlist'&&views.shortlist.dataset.stale==='1'){
       location.hash='#shortlist';
       location.reload();
