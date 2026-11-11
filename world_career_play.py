@@ -58,6 +58,8 @@ from world_live_market import (
     spectator_token,manager_respond,market_messages,mark_market_read,
     actionable_unread_count,
 )
+from world_career_branding import club_brand
+from world_career_correspondence import correspondence
 from world_scouting import scouting_search,scouting_attributes,CATEGORIES,SORT_COLUMNS,set_shortlisted,player_profile,recruitment_recommendations
 from world_live_buying import (
     submit_buy_offer,act_on_buy_offer,manager_targets,
@@ -701,11 +703,14 @@ small{color:#b4cadb}form.inline{display:inline-flex}
  data-last-message-id="{{messages[0].message_id if messages else 0}}"
  data-signed="{{signed}}" data-saved="{{shortlist|length}}"
  data-fee-remaining="{{funds}}" data-fee-total="{{budget_total}}"
- data-wage-remaining="{{wage_headroom}}" data-wage-total="{{wage_total}}">
+ data-wage-remaining="{{wage_headroom}}" data-wage-total="{{wage_total}}"
+ data-manager-club="{{brand.name}}" style="--club-kit:{{brand.primary}};--club-kit-trim:{{brand.trim}};--club-kit-text:{{brand.text}}">
 <header class="desk-topbar">
  <a href="/world/play" class="desk-brand">
-  <span class="desk-logo" aria-hidden="true">PES</span>
-  <span><strong>Clubs Challenge</strong><small>Career transfer centre · Development</small></span>
+  <span class="desk-club-crest" aria-hidden="true">
+  {% if brand.logo %}<img src="{{brand.logo}}" alt="" width="46" height="46" onerror="this.hidden=true;this.nextElementSibling.hidden=false"><span hidden class="desk-crest-fallback">{{brand.initials}}</span>{% else %}<span class="desk-crest-fallback">{{brand.initials}}</span>{% endif %}
+  </span>
+  <span><strong>{{brand.name}}</strong><small>Career Desk · Transfer window</small></span>
  </a>
  <div class="desk-header-right">
   <span class="desk-header-tag"><strong>{{manager_name|club_display}}</strong> · Summer window</span>
@@ -908,19 +913,15 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <button>Start 30-minute transfer window</button></form>
 {% endif %}</div>
 {% if not spectator %}
-<div class="card" data-desk-prestart-shortlist>
- <h2>Saved transfer shortlist</h2>
- {% if shortlist %}
- <div class="scout-table"><table data-desk-table="scouting"><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>OVR</th><th>Indicative value</th></tr></thead><tbody>
+<div class="card desk-shortlist-card" data-desk-prestart-shortlist>
+ <div class="scout-table"><table data-desk-table="shortlist"><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th><th>Wage / week</th><th>Contract expires</th></tr></thead><tbody>
  {% for p in shortlist %}
  <tr><td><a href="/world/play/career/{{career_id}}/market/player/{{p.player_id}}">{{p.full_name}}</a></td>
  <td>{{p.club_name|club_display}}</td><td>{{p.primary_position or '—'}}</td><td>{{p.overall}}</td>
- <td>{{money(p.market_value) if p.market_value is not none else '—'}}</td></tr>
+ <td>{{money(p.market_value) if p.market_value is not none else '—'}}</td>
+ <td>{{money(p.current_wage) if p.current_wage is not none else '—'}}</td>
+ <td>{{p.expires or '—'}}</td></tr>
  {% endfor %}</tbody></table></div>
- {% else %}
- <p class="muted">No players saved yet. Your career shortlist is ready to use once you start scouting.</p>
- {% endif %}
- <p><a href="/world/play/career/{{career_id}}/market/shortlist">Open full shortlist</a></p>
 </div>
 {% endif %}
 {% else %}
@@ -953,7 +954,7 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 {% if not spectator %}
 <h2 id="recruitment">My transfer shortlist</h2>
 <div class="card">
-<p class="muted">Your saved targets are available throughout the window. Browse players in Scouting and save them from their profile.</p>
+
 {% if shortlist %}
 <div class="scout-table"><table><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th><th>Wage / week</th><th>Contract expires</th></tr></thead>
 <tbody>{% for p in shortlist %}
@@ -963,7 +964,9 @@ No mid-season transfers. This does not edit the Xbox PES game file.</p>
 <td>{{money(p.current_wage) if p.current_wage is not none else '—'}}</td>
 <td>{{p.expires if p.expires else ('Unattached' if p.free_agent else '—')}}</td></tr>
 {% endfor %}</tbody></table></div>
-{% else %}<p class="muted">No shortlisted players yet.</p>{% endif %}
+{% else %}
+<div class="scout-table"><table data-desk-table="shortlist"><thead><tr><th>Player</th><th>Club</th><th>Position</th><th>Overall</th><th>Value</th><th>Wage / week</th><th>Contract expires</th></tr></thead><tbody></tbody></table></div>
+{% endif %}
 </div>
 <h2 id="scouting">Scouting &amp; squad values</h2>
 <div class="desk-scout-finance" role="group" aria-label="Available scouting budgets">
@@ -1200,8 +1203,31 @@ max="1000000" step="1" value="{{o.agent_demand}}" required></label>
 <input type="hidden" name="csrf" value="{{csrf}}">
 <button>Mark as read</button>
 </form>{% endif %}
-{% if offers or purchases or free_signings or renewal_requests %}
-<div class="grid">{% for o in offers %}
+{% if offers or purchases or free_signings or renewal_requests or letters %}
+<div class="grid">
+{% for mail in letters %}
+<div class="card offer desk-correspondence-email"
+ data-live-offer-id="mail-{{mail.message_id}}" data-message-id="{{mail.message_id}}"
+ data-desk-side="mail" data-desk-player="{{mail.player_id}}"
+ data-desk-player-name="{{mail.player}}" data-desk-buyer="{{mail.sender}}"
+ data-desk-status="mail" data-mail-stage="{{mail.stage}}"
+ data-mail-subject="{{mail.subject}}" data-mail-sender="{{mail.sender}}"
+ data-mail-date="{{mail.created_at}}">
+ <div class="label">{{mail.sender}} · {{mail.stage_label}}</div>
+ <h3>{{mail.subject}}</h3>
+ <div class="count">{{mail.fee or mail.stage_label}}</div>
+ <div class="desk-mail-letter"><p>{{mail.body}}</p>
+ {% if mail.detail %}<p class="desk-mail-secondary">{{mail.detail}}</p>{% endif %}
+ <nav class="desk-mail-stages" aria-label="Transfer progression">
+ {% for label in ['Bid','Offer response','Contract offer','Contract accepted','Finalise deal','Transfer confirmed'] %}
+ <span class="{{'is-current' if loop.index0==mail.stage else ''}}">{{label}}</span>
+ {% endfor %}</nav>
+ <p class="desk-mail-footer">Correspondence recorded {{mail.created_at[:16]|replace('T',' ')}}</p>
+ <a class="desk-inbox-open-negotiation" href="#transfers" data-desk-tab="transfers">Open transfer negotiations</a>
+ </div>
+</div>
+{% endfor %}
+{% for o in offers %}
 <div class="card offer" data-live-offer-id="{{o.offer_id}}" data-desk-player="{{o.player_id}}" data-desk-player-name="{{o.player_name}}"
  data-desk-status="{{o.status}}" data-desk-agent="{{o.player_status or ''}}"
  data-desk-player-choice="{{o.player_choice or ''}}"
@@ -3150,6 +3176,7 @@ def create_play_blueprint(db_path, on_career_commit=None):
                 for r in outgoing]
             signed=sum(o["status"] in ("agreed_future","completed") for o in offers+purchases)
             messages=market_messages(db,career_id=career_id)
+            letters=correspondence(messages,c["manager_club_id"])
             # General market news must not light up the manager's Inbox.
             unread=actionable_unread_count(db,career_id=career_id)
 
@@ -3258,7 +3285,8 @@ def create_play_blueprint(db_path, on_career_commit=None):
             spectator=spectator,snap=snap,offers=offers,
             purchases=purchases,renewal_requests=renewal_requests,targets=targets,player_search=player_search,
             buy_request_key="manager-buy-v1-"+secrets.token_urlsafe(14),
-            messages=messages,news_feed=news_feed,unread=unread,signed=signed,
+            messages=messages,letters=letters,brand=club_brand(c["name"]),
+            news_feed=news_feed,unread=unread,signed=signed,
             player_age=age_at_lock,
             scout_results=scout_results,scout_attributes=scout_attributes,
             scout_page=scout_page,scout_pages=scout_pages,
@@ -3710,6 +3738,7 @@ th{background:#1d3044}div.scroll{overflow-x:auto}
                 free_agent_updates=free_updates,
                 contract_updates=contract_updates,csrf=csrf_value(),
                 world_updates=world_updates,
+                mail_updates=correspondence(market_messages(db,career_id=career_id),manager_id),
                 messages=msg[0],remaining_seconds=snap["remaining_seconds"])
         response=jsonify(payload)
         response.headers["Cache-Control"]="private, no-store"
