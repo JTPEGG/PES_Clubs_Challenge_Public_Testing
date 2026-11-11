@@ -29,6 +29,17 @@ def run():
     assert "£3.85m" in letters[0]["body"]
     assert all(x["stage"]!=5 for x in letters)
     assert correspondence(messages,99)==[]
+    decision=dict(messages[0],message_id=9,
+        message_key="player-review-outcome:purchase:2",
+        headline="Player accepts your contract",
+        offer_status="accepted_pending_contract",
+        created_at="2026-11-11T15:02:00+00:00")
+    after_decision=correspondence(messages+[decision],1)
+    assert any(x["stage"]==4 and x["subject"]=="Finalise deal: Player A"
+               for x in after_decision)
+    assert not any(x["stage"]==5 for x in after_decision)
+    decision["offer_status"]="agreed_future"
+    assert not any(x["stage"]==4 for x in correspondence(messages+[decision],1))
 
     db=sqlite3.connect(":memory:")
     db.executescript("""
