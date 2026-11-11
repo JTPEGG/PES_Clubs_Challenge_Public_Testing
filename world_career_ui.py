@@ -724,10 +724,10 @@ DASHBOARD_JS = r"""
     if(form.dataset.saving==='1')return;
     const data=new FormData(form);
     data.set('action',pressed.value);
-    // The server remains authoritative, but does not lock the reader or
-    // steal the entire screen while processing the decision.
+    // The server remains authoritative. Close only an open contract view;
+    // a quick Reject renewal inside Inbox must NOT navigate back to Squad.
     form.dataset.saving='1';
-    closeContractDrawer();
+    if(!contractLayer.hidden&&contractLayer.contains(form))closeContractDrawer();
     contractNotice('Decision submitted. You can continue using your Inbox.');
     try{
       const response=await fetch(url.pathname,{
@@ -1665,6 +1665,7 @@ DASHBOARD_JS = r"""
       limitControl.addEventListener('click',function(){
         valueControl.value=String(Math.max(0,Math.floor(
           Number(document.body.dataset.feeRemaining)||0)));
+        valueControl.dispatchEvent(new Event('input',{bubbles:true}));
         scoutForm.requestSubmit();
       });
     }
@@ -1762,8 +1763,9 @@ DASHBOARD_JS = r"""
       el=>Number(el.dataset.liveOfferId)));
   const pound=n=>{
     n=Number(n)||0;const abs=Math.abs(n);
-    return (n<0?'-':'')+'£'+(abs>=1e6?(abs/1e6).toFixed(2)+'m':
-      abs>=1e3?(abs<1e5&&abs%1000?(abs/1000).toFixed(1):Math.round(abs/1000))+'k':
+    const trimmed=v=>v.toFixed(2).replace(/\\.?0+$/,'');
+    return (n<0?'-':'')+'£'+(abs>=1e6?trimmed(abs/1e6)+'m':
+      abs>=1e3?trimmed(abs/1e3)+'k':
       Math.round(abs).toLocaleString('en-GB'));
   };
   function updateSaleBudgetUI(result){
