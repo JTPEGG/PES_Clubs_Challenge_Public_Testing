@@ -908,6 +908,23 @@ body.desk-ui .desk-view[data-view="scouting"] .scout-table{
  body.desk-ui .desk-workspace{padding:18px 14px 50px}
 }
 
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:not([multiple]),
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:not([multiple]):not(.desk-scout-money-preset){
+ appearance:none;-webkit-appearance:none;
+ background-color:#fff!important;color:#263626!important;
+ border:1px solid #dbe3d9!important;border-radius:7px!important;
+ background-image:linear-gradient(45deg,transparent 50%,#768573 50%),
+ linear-gradient(135deg,#768573 50%,transparent 50%)!important;
+ background-position:calc(100% - 17px) center,calc(100% - 12px) center!important;
+ background-size:5px 5px!important;background-repeat:no-repeat!important;
+ padding-right:29px!important;box-shadow:none!important}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select option,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select option{
+ background:#fff;color:#273527}
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:focus-visible,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:focus-visible{
+ outline:2px solid #d0ad3a;outline-offset:2px}
+
 """
 
 DASHBOARD_JS = r"""
@@ -2036,6 +2053,8 @@ DASHBOARD_JS = r"""
         if(active)active.abort();
         active=null;
         page=0;shown=0;hasMore=true;
+        tableBody.replaceChildren();
+        counter.textContent='Updating scouting results…';
         status.textContent='Applying filters…';
         const search=new URLSearchParams(new FormData(scoutForm));
         history.replaceState(null,'',window.location.pathname+'?'+
