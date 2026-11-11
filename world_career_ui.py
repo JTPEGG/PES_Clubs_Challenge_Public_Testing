@@ -1680,7 +1680,8 @@ DASHBOARD_JS = r"""
     const contractField=available.find(entry=>entry.name==='scout_contract');
     expiringBox.checked=contractField?.input.value==='expiring';
     const expiringLabel=document.createElement('span');
-    expiringLabel.textContent='Contract expiring';
+    expiringLabel.textContent='Expires within 12 months';
+    expiring.title='Known contract dates after the career start and within the following 12 months';
     expiring.append(expiringBox,expiringLabel);
     expiringBox.addEventListener('change',()=>{
       if(contractField)contractField.input.value=expiringBox.checked?'expiring':'';
@@ -1852,6 +1853,8 @@ DASHBOARD_JS = r"""
     resetButton.addEventListener('click',()=>{
       available.forEach(({input})=>{
         if(input.type==='checkbox')input.checked=false;else input.value='';
+        if(['scout_max_value','scout_max_wage'].includes(input.name))
+          input.dispatchEvent(new Event('input',{bubbles:true}));
       });
       boxes.forEach(b=>b.checked=false);
       showTeamCheckbox.checked=true;
@@ -1904,16 +1907,23 @@ DASHBOARD_JS = r"""
         if(player.shortlisted)first.appendChild(document.createTextNode(' ★'));
         row.appendChild(first);
         const fields=[player.club,player.position,player.overall,player.age,
-          player.value,player.wage,player.contract,player.years_left,player.pace,
-          player.shooting,player.passing,player.dribbling,
-          player.defending,player.physicality];
+          player.height,player.value,player.asking_price,player.wage,
+          player.contract,player.years_left,player.pace,player.shooting,
+          player.passing,player.dribbling,player.defending,player.physicality];
         if(scoutForm.elements.scout_attribute.value)
           fields.push(player.detail_attribute);
         fields.forEach(function(value,index){
           const cell=document.createElement('td');
           cell.textContent=display(value);
-          if(index>=8&&index<=13)cell.className='desk-scout-extra';
-          if(index===5)cell.title=player.club==='Free agent'?
+          if(index>=10&&index<=15)cell.className='desk-scout-extra';
+          if(index===6 && player.asking_price!=='—'){
+            cell.className=player.asking_estimated?
+              'desk-asking-estimate':'desk-asking-actual';
+            cell.title=player.asking_estimated?
+              'Non-binding game-model asking estimate, not a seller quote':
+              'Actual asking price in the selling club’s counteroffer';
+          }
+          if(index===7)cell.title=player.club==='Free agent'?
             'Reference game wage, not confirmed agent demand':
             'Current game wage, not future agent demand';
           row.appendChild(cell);
@@ -2112,6 +2122,125 @@ DASHBOARD_JS = r"""
       pound(result.sale_budget_allocated||0)+' made available for new transfers; '+
       pound(result.sale_board_withheld||0)+' retained by the board.';
   }
+  // Scouting gets a legible amount field with optional exact entry, preset
+  // starting points and automatic step sizes. The canonical GBP integer is
+  // still the original named form field, never a formatted £ string.
+  function enhanceScoutMoney(input){
+    input.dataset.moneyStepper='1';
+    const wage=input.name==='scout_max_wage';
+    const initial=input.value;
+    const options=wage?
+      [2500,5000,10000,15000,20000,30000,50000,75000,100000,150000,250000]:
+      [100000,250000,500000,1000000,2000000,5000000,10000000,
+       20000000,50000000,100000000];
+    const control=document.createElement('div');
+    control.className='desk-scout-money';
+    const row=document.createElement('div');
+    row.className='desk-scout-money-entry';
+    const less=document.createElement('button');
+    less.type='button';less.className='desk-scout-money-step';
+    less.textContent='−';less.setAttribute('aria-label','Reduce '+input.name);
+    less.title='Smart decrease';
+    const prefix=document.createElement('span');prefix.className='desk-scout-money-pound';
+    prefix.textContent='£';
+    const manual=document.createElement('input');
+    manual.type='text';manual.inputMode='numeric';
+    manual.className='desk-scout-money-manual';manual.autocomplete='off';
+    manual.setAttribute('aria-label',(wage?'Maximum weekly wage':'Maximum market value')+' in pounds');
+    manual.placeholder='Any amount';
+    const more=document.createElement('button');
+    more.type='button';more.className='desk-scout-money-step';
+    more.textContent='+';more.setAttribute('aria-label','Increase '+input.name);
+    more.title='Smart increase';
+    const preset=document.createElement('select');
+    preset.className='desk-scout-money-preset';
+    preset.setAttribute('aria-label','Choose a '+(wage?'weekly wage':'market value')+' starting amount');
+    const none=document.createElement('option');none.value='';none.textContent='No limit';
+    preset.appendChild(none);
+    for(const amount of options){
+      const option=document.createElement('option');
+      option.value=String(amount);option.textContent=wage?
+        '£'+(amount/1000).toLocaleString('en-GB')+'k':
+        amount>=1000000?'£'+(amount/1000000).toLocaleString('en-GB')+'m':
+        '£'+(amount/1000).toLocaleString('en-GB')+'k';
+      preset.appendChild(option);
+    }
+    const custom=document.createElement('option');
+    custom.value='custom';custom.textContent='Custom amount';
+    preset.appendChild(custom);
+    const hint=document.createElement('small');
+    hint.className='desk-scout-money-hint';
+    hint.textContent='Type an exact amount or use the smart + / −';
+    const format=value=>value===''?'':Number(value).toLocaleString('en-GB');
+    function display(){
+      manual.value=format(input.value);
+      preset.value=(input.value===''||options.includes(Number(input.value)))?
+        String(input.value):'custom';
+      if(!preset.value && input.value!=='')preset.value='custom';
+    }
+    function setValue(value,notify){
+      input.value=value===''?'':String(Math.max(0,Math.min(1000000000,Math.floor(Number(value)||0))));
+      manual.removeAttribute('aria-invalid');
+      display();
+      if(notify){
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        input.form?.requestSubmit();
+      }
+    }
+    function smartStep(amount){
+      if(wage)return amount<10000?500:amount<50000?2500:
+        amount<100000?5000:10000;
+      return amount<500000?50000:amount<2000000?100000:
+        amount<10000000?500000:amount<50000000?2000000:5000000;
+    }
+    function move(direction){
+      const current=input.value===''?0:Number(input.value);
+      const step=smartStep(current);
+      const next=direction>0?
+        Math.floor(current/step)*step+step:
+        Math.max(0,Math.ceil(current/step)*step-step);
+      setValue(next,true);
+    }
+    less.addEventListener('click',()=>move(-1));
+    more.addEventListener('click',()=>move(1));
+    preset.addEventListener('change',event=>{
+      event.stopPropagation();
+      if(preset.value==='custom'){manual.focus();manual.select();return;}
+      setValue(preset.value,true);
+    });
+    let timer;
+    manual.addEventListener('input',()=>{
+      const raw=manual.value.trim();
+      // Commas, spaces and the £ symbol are purely a display affordance.
+      // Reject malformed values instead of submitting a wrong integer.
+      const valid=/^£?\s*[0-9][0-9,\s]*$/.test(raw);
+      if(raw!==''&&!valid){
+        manual.setAttribute('aria-invalid','true');
+        return;
+      }
+      manual.removeAttribute('aria-invalid');
+      const stripped=raw.replace(/[^0-9]/g,'');
+      input.value=stripped===''?'':String(Math.min(1000000000,Number(stripped)));
+      preset.value=input.value!==''&&options.includes(Number(input.value))?
+        input.value:input.value===''?'':'custom';
+      clearTimeout(timer);
+      timer=setTimeout(()=>input.form?.requestSubmit(),500);
+    });
+    manual.addEventListener('blur',()=>{
+      if(manual.getAttribute('aria-invalid')==='true')return;
+      clearTimeout(timer);
+      display();
+      input.form?.requestSubmit();
+    });
+    input.type='hidden'; // FormData still sends the original plain GBP integer.
+    input.before(control);
+    control.append(row,preset,hint);
+    row.append(less,prefix,manual,more);
+    control.appendChild(input);
+    input.addEventListener('input',display); // supports reset and Use budget.
+    input.value=initial;
+    display();
+  }
   // Compact money values are display-only. Original integer GBP inputs
   // remain in the form so all existing server validation and CSRF work.
   // Buttons and increment chooser replace error-prone manual £ entries.
@@ -2121,6 +2250,9 @@ DASHBOARD_JS = r"""
     fields.forEach(input=>{
       if(input.dataset.moneyStepper==='1'||input.dataset.stepper==='1')return;
       if(!/^(offered_fee|negotiated_fee|counter_fee|weekly_wage|wage_weekly|current_wage_weekly|scout_max_value|scout_max_wage|investment_pool)$/.test(input.name))return;
+      if(input.name==='scout_max_value'||input.name==='scout_max_wage'){
+        enhanceScoutMoney(input);return;
+      }
       // The old dedicated counter stepper is also replaced by this compact
       // component when not already initialised.
       input.dataset.moneyStepper='1';
