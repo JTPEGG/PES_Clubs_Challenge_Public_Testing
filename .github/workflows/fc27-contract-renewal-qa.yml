@@ -5,6 +5,9 @@ on:
   push:
     paths:
       - 'world_fc27_contract_renewals.py'
+      - 'world_fc27_player_review.py'
+      - 'world_fc27_free_agents.py'
+      - 'scripts/fc27_free_agent_realism_qa.py'
       - 'world_fc27_contract_terms.py'
       - 'world_careers.py'
       - 'world_preseason_window.py'
@@ -34,6 +37,8 @@ jobs:
       - name: Compile renewal and transfer engine
         run: |
           python -m py_compile world_fc27_contract_renewals.py world_fc27_contract_terms.py world_player_morale.py world_live_market.py world_careers.py world_career_play.py
+      - name: Verify high-OVR free-agent sporting-choice regression
+        run: python -m scripts.fc27_free_agent_realism_qa
       - name: Build disposable approved FC27 world
         run: |
           mkdir -p qa
