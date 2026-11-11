@@ -841,24 +841,31 @@ def run(world,output):
             drawer=page.locator('.desk-contract-layer')
             check(drawer.is_visible() and
                   page.locator('.desk-sidebar').is_visible() and
-                  page.url==full_desk_url,
-                  "Contract talks navigated away from manager dashboard")
+                  page.url.split('#')[0]==full_desk_url.split('#')[0] and
+                  page.url.endswith('#contract'),
+                  "Contract talks should be an integrated Career Desk view")
             offer_form=drawer.locator(
                 'form[action$="/contract/'+str(renewal_player)+'/decision"]')
             offer_form.wait_for(state="visible",timeout=12000)
             check(offer_form.is_visible(),
                   "In-window contract panel did not load its valid negotiation form")
-            offer_form.locator('input[name="weekly_wage"]').fill(str(renewal_wage))
+            # Money fields are now compact read-only native-number inputs
+            # with displayed £ amounts and selectable +/- increments.
+            amount=offer_form.locator('input[name="weekly_wage"]')
+            check(int(amount.input_value())==renewal_wage and
+                  offer_form.locator('.desk-money-control').is_visible(),
+                  "Contract value and compact amount stepper are incorrect")
             with page.expect_response(
                 lambda response:response.url.endswith(
                     '/contract/'+str(renewal_player)+'/decision') and
                     response.request.method=="POST",timeout=20000) as renewal_response:
                 offer_form.locator('button[value="offer"]').click()
-            # The UI navigates to Inbox immediately on a successful POST,
-            # which may retire the devtools response body before Playwright
-            # can read it. Assert HTTP success plus durable saved state below.
+            # Submission closes only the integrated contract view; the
+            # manager can continue using Squad/Inbox while the request saves.
             check(renewal_response.value.status==200,
                   "Accepted renewal HTTP response failed")
+            page.locator('.desk-sidebar [data-desk-tab="inbox"]').click()
+            page.evaluate("window.fc27PollMarket?.()")
             page.wait_for_function(
                 """(pid)=>location.hash==='#inbox' && Boolean(
                     document.querySelector('#desk-view-inbox .desk-contract-inbox[data-desk-player="'+pid+'"][data-desk-status="agreed_future"]'))""",
@@ -929,7 +936,7 @@ def run(world,output):
                     WHERE career_id=? AND player_id=?""",
                     (CAREER,reject_player)).fetchone()[0]
                 check(rejected=="declined","Quick Inbox rejection was not committed")
-            found.append("Compact notification feed, both scouting budgets, contract drawer, signed renewal Inbox mail and one-click reject")
+            found.append("Compact news, Scouting budgets, integrated contract view, signed Inbox receipt and non-blocking renewal rejection")
 
             # The spectator endpoint is separately accessible without login
             # but is read-only and does not show managerial POST forms.
