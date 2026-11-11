@@ -997,6 +997,272 @@ body.desk-ui .desk-sidebar{
   }
 }
 
+/* Contrast restoration — dark Career Desk cards on dark canvas.
+   Keep the flush-left sidebar and all existing UI behaviour; override the
+   earlier pale Anderlecht card skin that made mixed-theme text unreadable.
+   This block must remain LAST in DASHBOARD_CSS. */
+:root{
+  color-scheme:dark;
+  --desk-bg:#0e1015;
+  --desk-panel:#202630;
+  --desk-panel2:#29323e;
+  --desk-stroke:#3f4c58;
+  --desk-accent:#f0cd60;
+  --desk-ink:#f1f5f7;
+  --desk-faint:#b2bfcb;
+}
+body.desk-ui{color-scheme:dark;color:#f0f4f7!important;background:#0e1015!important}
+body.desk-ui .desk-shell,
+body.desk-ui .desk-workspace{background:#0e1015!important}
+body.desk-ui .desk-topbar{background:#191f27!important;border-bottom:1px solid #36434c!important;
+ box-shadow:0 3px 18px #04060a66!important}
+body.desk-ui .desk-brand,
+body.desk-ui .desk-brand strong,
+body.desk-ui .desk-header-tag strong,
+body.desk-ui .desk-header-clock strong{color:#f1f4f6!important}
+body.desk-ui .desk-brand small,body.desk-ui .desk-header-tag,
+body.desk-ui .desk-header-clock small{color:#b3bdc6!important}
+body.desk-ui .desk-header-clock{border-left-color:#46535c!important}
+body.desk-ui .desk-view{color:#e5ebef!important}
+body.desk-ui .desk-view .card,
+body.desk-ui .desk-view .offer,
+body.desk-ui .desk-setup-card,
+body.desk-ui .desk-start-card,
+body.desk-ui .desk-shortlist-card{
+ background:#202630!important;color:#eef2f6!important;
+ border:1px solid #40505e!important;border-radius:12px;
+ box-shadow:0 5px 24px #03060930!important
+}
+body.desk-ui .desk-view .offer{border-left:3px solid #e8bf55!important}
+body.desk-ui .desk-view .offer:focus-within{background:#263341!important;
+ border-color:#a98741!important}
+body.desk-ui .desk-view .card p,
+body.desk-ui .desk-view .offer p,
+body.desk-ui .desk-view .card li,
+body.desk-ui .desk-view .offer li,
+body.desk-ui .desk-view .card section,
+body.desk-ui .desk-view .offer section{color:#dbe3e9}
+body.desk-ui .desk-view h1,
+body.desk-ui .desk-view h2,
+body.desk-ui .desk-view h3,
+body.desk-ui .desk-view strong,
+body.desk-ui .desk-view .card b,
+body.desk-ui .desk-view .offer b{color:#f5f7f8!important}
+body.desk-ui .desk-view .label,
+body.desk-ui .desk-view .muted,
+body.desk-ui .desk-view .time-note,
+body.desk-ui .desk-view small,
+body.desk-ui .desk-view .card label,
+body.desk-ui .desk-view label{color:#b7c4cd!important}
+body.desk-ui .desk-view .count,
+body.desk-ui .desk-finance-value,
+body.desk-ui .desk-news-fee{color:#f2d277!important}
+body.desk-ui .desk-view a,
+body.desk-ui .desk-news-route a,
+body.desk-ui .desk-inbox-profile-link{color:#f3d57c!important}
+body.desk-ui .desk-view a:hover{text-decoration:underline}
+body.desk-ui .desk-view .pill,
+body.desk-ui .desk-view .badge{
+ background:#303b45!important;color:#e9f0f5!important;
+ border:1px solid #52616b!important
+}
+body.desk-ui .desk-view .scout-table,
+body.desk-ui .desk-shortlist-card .scout-table,
+body.desk-ui .desk-view[data-view="scouting"] .scout-table{
+ background:#222a33!important;border-color:#46535d!important;
+ box-shadow:none!important
+}
+body.desk-ui .desk-view table,
+body.desk-ui .desk-view table tbody,
+body.desk-ui .desk-view table tr,
+body.desk-ui .desk-view .scout-table table{background:#222a33!important;color:#edf1f4!important}
+body.desk-ui .desk-view table th{
+ background:#303d49!important;color:#e5edf1!important;
+ border-bottom:1px solid #53616d!important
+}
+body.desk-ui .desk-view table td{
+ background:transparent!important;color:#ecf1f5!important;
+ border-bottom:1px solid #394653!important
+}
+body.desk-ui .desk-view table tbody tr:hover{background:#33424e!important}
+body.desk-ui .desk-view table tbody tr.owned{background:#33453e!important}
+body.desk-ui .desk-view table tbody tr.owned:hover{background:#3d5147!important}
+body.desk-ui .desk-view .desk-table-sort{color:#dce7ec!important}
+body.desk-ui .desk-view .desk-table-sort::after{color:#f2cf6a!important}
+body.desk-ui .desk-view .desk-asking-estimate,
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-estimate{
+ color:#f3d277!important
+}
+body.desk-ui .desk-view .desk-asking-actual,
+body.desk-ui .desk-view[data-view="scouting"] table[data-scout-results] td.desk-asking-actual{
+ color:#8de2b8!important
+}
+body.desk-ui .desk-view input:not([type="checkbox"]):not([type="radio"]),
+body.desk-ui .desk-view select,
+body.desk-ui .desk-view textarea,
+body.desk-ui .desk-inbox-tools input{
+ background:#303944!important;color:#f1f6f9!important;
+ border:1px solid #51606a!important;
+}
+body.desk-ui .desk-view input::placeholder,
+body.desk-ui .desk-inbox-tools input::placeholder{color:#bac5cc!important}
+body.desk-ui .desk-view select option{background:#2a343f!important;color:#f2f7f9!important}
+body.desk-ui .desk-view .desk-scout-finance span{
+ background:#293440!important;color:#bbcad4!important;
+ border:1px solid #485665!important;box-shadow:none!important
+}
+body.desk-ui .desk-view .desk-scout-finance b{color:#f5f7f8!important}
+body.desk-ui .desk-view .scout-filters,
+body.desk-ui .desk-view .desk-scout-searchbar,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar,
+body.desk-ui .desk-view .desk-scout-dialog,
+body.desk-ui .desk-view .desk-position-chooser{
+ background:#202630!important;color:#e9eef2!important;
+ border-color:#46535e!important;box-shadow:none!important
+}
+body.desk-ui .desk-scout-money{background:#29343f!important;border-color:#485763!important}
+body.desk-ui .desk-scout-money-entry{background:#303c48!important;border-color:#53626d!important}
+body.desk-ui .desk-scout-money-pound{color:#e2edf3!important}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual{
+ color:#f8f9f9!important;background:#303c48!important
+}
+body.desk-ui .desk-view .desk-scout-money input.desk-scout-money-manual:focus{
+ background:#344555!important
+}
+body.desk-ui .desk-view .desk-scout-money select.desk-scout-money-preset,
+body.desk-ui .desk-scout-searchbar input,
+body.desk-ui .desk-scout-searchbar select,
+body.desk-ui .desk-scout-dialog input,
+body.desk-ui .desk-scout-dialog select,
+body.desk-ui .desk-money-control select,
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-dialog select:not([multiple]),
+body.desk-ui .desk-view[data-view="scouting"] .desk-scout-searchbar select:not([multiple]){
+ background-color:#303d49!important;color:#f2f7f9!important;
+ border-color:#53616d!important
+}
+body.desk-ui .desk-scout-money-hint{color:#b9c6ce!important}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step{
+ background:#3a4651!important;color:#f8f5e9!important;border-color:#5b6871!important
+}
+body.desk-ui .desk-view .desk-scout-money button.desk-scout-money-step:hover{
+ background:#5c4b30!important;border-color:#cda950!important
+}
+body.desk-ui .desk-scout-quick{border-top-color:#42515c!important}
+body.desk-ui .desk-scout-searchbar>label,
+body.desk-ui .desk-scout-quick>label{color:#e0e7eb!important}
+body.desk-ui .desk-scout-quick-check,
+body.desk-ui .desk-position-grid label{
+ background:#2b3641!important;color:#e6edf2!important;border-color:#53616d!important
+}
+body.desk-ui .desk-scout-quick-check:has(input:checked),
+body.desk-ui .desk-position-grid label:has(input:checked){
+ background:#493f30!important;color:#fff1c7!important;border-color:#b7984b!important
+}
+body.desk-ui .desk-scout-position-trigger{
+ background:#2d3b47!important;color:#edf4f7!important;border:1px solid #53616d!important
+}
+body.desk-ui .desk-scout-clear{background:#34414d!important;color:#f2f7f9!important;border-color:#576773!important}
+body.desk-ui .desk-scout-chips>*{
+ background:#473f31!important;color:#ffe2a0!important;border-color:#8a784b!important
+}
+body.desk-ui .desk-inbox-split,
+body.desk-ui .desk-inbox-split .desk-inbox-list,
+body.desk-ui .desk-inbox-reader,
+body.desk-ui .desk-inbox-reader .desk-inbox-detail,
+body.desk-ui .desk-inbox-item .desk-inbox-detail{
+ background:#222a33!important;color:#edf3f7!important;border-color:#455360!important
+}
+body.desk-ui .desk-inbox-columns,
+body.desk-ui .desk-inbox-reader-header{
+ background:#2d3945!important;color:#c9d5dd!important;border-color:#495967!important
+}
+body.desk-ui .desk-inbox-item{border-bottom:1px solid #3e4b56!important}
+body.desk-ui .desk-inbox-item>summary{background:#26313b!important;color:#f0f4f7!important}
+body.desk-ui .desk-inbox-item>summary:hover{background:#354454!important}
+body.desk-ui .desk-inbox-item[data-selected="true"]>summary{
+ background:#4c432d!important;box-shadow:inset 3px 0 #e3c35c!important
+}
+body.desk-ui .desk-inbox-item[data-action-needed="true"]>summary{background:#384236!important}
+body.desk-ui .desk-inbox-subject,
+body.desk-ui .desk-inbox-reader-header a,
+body.desk-ui .desk-inbox-reader-header strong{color:#f4f6f7!important}
+body.desk-ui .desk-inbox-sender,
+body.desk-ui .desk-inbox-state,
+body.desk-ui .desk-inbox-reader-header small,
+body.desk-ui .desk-inbox-reader-empty{color:#bbcad4!important}
+body.desk-ui .desk-inbox-fee{color:#f4d57a!important}
+body.desk-ui .desk-offer-briefing,
+body.desk-ui .desk-offer-briefing-metrics>div{
+ background:#2b3742!important;color:#eaf0f4!important;border-color:#52616b!important
+}
+body.desk-ui .desk-offer-briefing-note{color:#cbd6de!important}
+body.desk-ui .desk-contract-panel,
+body.desk-ui .desk-contract-body .card,
+body.desk-ui .desk-contract-body .metric{
+ background:#202b36!important;color:#ecf3f6!important;border-color:#4d5b66!important
+}
+body.desk-ui .desk-contract-header{background:#2c3945!important;border-color:#4e5e69!important}
+body.desk-ui .desk-contract-body .metric strong{color:#f2f6f8!important}
+body.desk-ui .desk-news-card,
+body.desk-ui .desk-news-content,
+body.desk-ui .desk-global-message{
+ background:#202b36!important;color:#ebf0f4!important;border-color:#465562!important;
+ box-shadow:none!important
+}
+body.desk-ui .desk-news-content strong{color:#f5f7f9!important}
+body.desk-ui .desk-news-card p,
+body.desk-ui .desk-news-route{color:#cfdae0!important}
+body.desk-ui .desk-news-fee{color:#f2d070!important}
+body.desk-ui .desk-action-tile{
+ background:#25313b!important;color:#edf2f6!important;
+ border:1px solid #4a5c67!important;box-shadow:0 4px 16px #0002!important
+}
+body.desk-ui .desk-action-tile:hover{background:#34434e!important}
+body.desk-ui .desk-action-tile strong{color:#f6f7f8!important}
+body.desk-ui .desk-action-tile small{color:#c0ccd3!important}
+body.desk-ui .desk-finance-grid .card{background:#222b35!important}
+body.desk-ui .desk-finance-value{color:#f3d277!important}
+body.desk-ui .desk-finance-track{background:#3b4751!important}
+body.desk-ui .desk-tactics-toolbar,
+body.desk-ui .desk-tactics-group,
+body.desk-ui .desk-tactics-player{
+ background:#232f39!important;color:#edf2f6!important;border-color:#495a65!important
+}
+body.desk-ui .desk-tactics-group>header{background:#2e3b47!important;border-color:#53616c!important}
+body.desk-ui .desk-tactics-player[data-selected="true"]{
+ background:#493f30!important;border-color:#bba358!important
+}
+body.desk-ui .desk-tactics-toolbar label,
+body.desk-ui .desk-tactics-group strong{color:#f1f4f6!important}
+body.desk-ui .desk-tactics-pos,
+body.desk-ui .desk-tactics-group header span{color:#d4dfe4!important}
+body.desk-ui .desk-tactics-player .desk-tactics-ovr{color:#f4d27b!important}
+body.desk-ui .desk-money-control{background:#303d47!important;border-color:#52636b!important}
+body.desk-ui .desk-money-preview{color:#f9edc8!important}
+body.desk-ui .desk-mail-letter>p{color:#e6edf1!important}
+body.desk-ui .desk-mail-letter .desk-mail-secondary{
+ background:#2c3b47!important;color:#ccd8df!important;border-left-color:#e2c65f
+}
+body.desk-ui .desk-mail-stages span{
+ background:#2c3740!important;color:#cbd7de!important;border-color:#4c5b64!important
+}
+body.desk-ui .desk-mail-stages span.is-current{
+ background:#514631!important;color:#ffe9af!important;border-color:#bb9d54!important
+}
+body.desk-ui .desk-mail-footer{color:#c1ccd4!important}
+body.desk-ui .desk-setup-step button{
+ background:#303d48!important;color:#f1f4f7!important;border-color:#55636e!important
+}
+body.desk-ui .desk-setup-step button:hover{background:#453d2d!important}
+body.desk-ui .desk-page-heading{border-bottom-color:#3d4750!important}
+body.desk-ui .desk-page-title h1{color:#f3f6f7!important}
+body.desk-ui .desk-page-title small{color:#bac7cf!important}
+body.desk-ui .desk-mobile-tabs{background:#26323c!important;border-bottom-color:#465560!important}
+body.desk-ui .desk-mobile-tabs .desk-tab{color:#e5edf3!important}
+body.desk-ui .desk-mobile-tabs .desk-tab[aria-current="page"]{
+ background:#51452b!important;color:#fff2c8!important;border-color:#a18b4d!important
+}
+
 """
 
 DASHBOARD_JS = r"""
